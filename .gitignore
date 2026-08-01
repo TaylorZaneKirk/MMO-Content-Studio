@@ -1,0 +1,31 @@
+# Godot
+.godot/
+.import/
+export.cfg
+export_presets.cfg
+
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+connection-profiles.json
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
