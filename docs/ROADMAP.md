@@ -2,6 +2,8 @@
 
 ## T0 — Authoring Foundation
 
+**Status:** Source implementation complete; development-machine runtime verification pending.
+
 Deliver the shared architecture required by all later content workspaces.
 
 Scope:

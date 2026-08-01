@@ -1,0 +1,195 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
+
+[sub_resource type="StyleBoxFlat" id="StylePanel"]
+bg_color = Color(0.086, 0.098, 0.122, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.19, 0.22, 0.28, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+content_margin_left = 20.0
+content_margin_top = 18.0
+content_margin_right = 20.0
+content_margin_bottom = 18.0
+
+[node name="Main" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_main")
+
+[node name="AuthoringHostClient" type="Node" parent="."]
+unique_name_in_owner = true
+script = ExtResource("2_client")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = 24.0
+offset_right = -28.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Root" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Header" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+
+[node name="TitleBlock" type="VBoxContainer" parent="Margin/Root/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Title" type="Label" parent="Margin/Root/Header/TitleBlock"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "MMO Content Studio"
+
+[node name="Subtitle" type="Label" parent="Margin/Root/Header/TitleBlock"]
+layout_mode = 2
+modulate = Color(0.7, 0.73, 0.79, 1)
+text = "T0 Authoring Foundation"
+
+[node name="ConnectionBlock" type="VBoxContainer" parent="Margin/Root/Header"]
+layout_mode = 2
+alignment = 2
+
+[node name="ConnectionBadge" type="Label" parent="Margin/Root/Header/ConnectionBlock"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "CONNECTING"
+horizontal_alignment = 2
+
+[node name="ConnectionMessage" type="Label" parent="Margin/Root/Header/ConnectionBlock"]
+unique_name_in_owner = true
+layout_mode = 2
+custom_minimum_size = Vector2(360, 0)
+modulate = Color(0.7, 0.73, 0.79, 1)
+text = "Connecting to the local authoring host…"
+horizontal_alignment = 2
+autowrap_mode = 2
+
+[node name="RetryButton" type="Button" parent="Margin/Root/Header/ConnectionBlock"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Retry connection"
+
+[node name="Body" type="HBoxContainer" parent="Margin/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="SystemPanel" type="PanelContainer" parent="Margin/Root/Body"]
+custom_minimum_size = Vector2(610, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StylePanel")
+
+[node name="Content" type="VBoxContainer" parent="Margin/Root/Body/SystemPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Heading" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Environment health"
+
+[node name="HostLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+layout_mode = 2
+modulate = Color(0.58, 0.63, 0.72, 1)
+text = "Authoring host"
+
+[node name="HostValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Waiting for handshake"
+
+[node name="ApiLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+layout_mode = 2
+modulate = Color(0.58, 0.63, 0.72, 1)
+text = "API contract"
+
+[node name="ApiValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Not connected"
+
+[node name="DatabaseLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+layout_mode = 2
+modulate = Color(0.58, 0.63, 0.72, 1)
+text = "PostgreSQL"
+
+[node name="DatabaseValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Not checked"
+autowrap_mode = 2
+
+[node name="SchemaLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+layout_mode = 2
+modulate = Color(0.58, 0.63, 0.72, 1)
+text = "Schema compatibility"
+
+[node name="SchemaValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Not verified"
+
+[node name="AssetRootsLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+layout_mode = 2
+modulate = Color(0.58, 0.63, 0.72, 1)
+text = "Asset roots"
+
+[node name="AssetRootsList" type="VBoxContainer" parent="Margin/Root/Body/SystemPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Waiting" type="Label" parent="Margin/Root/Body/SystemPanel/Content/AssetRootsList"]
+layout_mode = 2
+text = "Waiting for health response"
+
+[node name="CatalogPanel" type="PanelContainer" parent="Margin/Root/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StylePanel")
+
+[node name="Content" type="VBoxContainer" parent="Margin/Root/Body/CatalogPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Heading" type="Label" parent="Margin/Root/Body/CatalogPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Content catalog"
+
+[node name="Description" type="Label" parent="Margin/Root/Body/CatalogPanel/Content"]
+layout_mode = 2
+modulate = Color(0.7, 0.73, 0.79, 1)
+text = "T0 exposes versioned catalog seams. Item authoring becomes available in T1."
+autowrap_mode = 2
+
+[node name="CatalogList" type="VBoxContainer" parent="Margin/Root/Body/CatalogPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Waiting" type="Label" parent="Margin/Root/Body/CatalogPanel/Content/CatalogList"]
+layout_mode = 2
+text = "Waiting for catalog response"
