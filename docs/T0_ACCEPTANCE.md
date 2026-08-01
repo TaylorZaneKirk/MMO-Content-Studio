@@ -3,7 +3,7 @@
 ## Implemented
 
 - Godot 4 application shell
-- Loopback-only .NET 8 authoring-host project
+- Loopback-only .NET 10 authoring-host project
 - Shared API v1 response and error envelope
 - Version handshake
 - PostgreSQL connection-profile and schema-health reporting
@@ -16,7 +16,7 @@
 
 ## Runtime acceptance procedure
 
-On a development machine with .NET 8 and Godot 4 installed:
+On a development machine with .NET 10 and Godot 4 installed:
 
 1. Copy `host/appsettings.Local.example.json` to
    `host/appsettings.Local.json`.

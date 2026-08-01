@@ -26,6 +26,8 @@ Exit condition:
 
 ## T1 — Basic Items
 
+**Status:** Source implementation complete; development-machine database and Godot verification pending.
+
 Create the first complete vertical slice for non-consumable, non-equippable items.
 
 Capabilities:
@@ -33,8 +35,8 @@ Capabilities:
 - List and search existing items
 - Load one complete item definition
 - Create and edit a basic item
-- Select/import inventory and ground sprites
-- Configure basic inventory and trade behavior
+- Select or import the current shared inventory/ground PNG
+- Preserve the current non-equippable item metadata contract
 - Save as runtime-disabled draft
 - Validate the persisted aggregate
 - Publish or disable the item

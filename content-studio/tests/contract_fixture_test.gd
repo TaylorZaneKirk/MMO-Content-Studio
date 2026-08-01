@@ -4,16 +4,24 @@ const EXPECTED_API_VERSION := "1"
 
 
 func _initialize() -> void:
+	var main_scene := load("res://scenes/Main.tscn") as PackedScene
+	if main_scene == null:
+		push_error("T1 main scene or one of its scripts failed to parse")
+		quit(1)
+		return
+
 	var envelope := {
 		"api_version": "1",
 		"request_id": "fixture",
 		"success": true,
 		"data": {
-			"sections": [
-				{"content_type": "items", "entries": []},
-				{"content_type": "mobs", "entries": []},
-				{"content_type": "npcs", "entries": []},
-			]
+			"target_operation": "save_draft",
+			"valid_for_draft": true,
+			"valid_for_publication": false,
+			"messages": [],
+			"changes": [
+				{"field": "display_name", "before": null, "after": "Iron Ore"},
+			],
 		},
 		"errors": [],
 	}
@@ -23,8 +31,8 @@ func _initialize() -> void:
 		quit(1)
 		return
 
-	if envelope.data.sections.size() != 3:
-		push_error("Expected three T0 catalog sections")
+	if not envelope.data.valid_for_draft or envelope.data.changes.size() != 1:
+		push_error("T1 item-preview fixture mismatch")
 		quit(1)
 		return
 

@@ -14,10 +14,10 @@ corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
-content_margin_left = 20.0
-content_margin_top = 18.0
-content_margin_right = 20.0
-content_margin_bottom = 18.0
+content_margin_left = 16.0
+content_margin_top = 14.0
+content_margin_right = 16.0
+content_margin_bottom = 14.0
 
 [node name="Main" type="Control"]
 layout_mode = 3
@@ -37,16 +37,16 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 28.0
-offset_top = 24.0
-offset_right = -28.0
-offset_bottom = -24.0
+offset_left = 24.0
+offset_top = 20.0
+offset_right = -24.0
+offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Root" type="VBoxContainer" parent="Margin"]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 14
 
 [node name="Header" type="HBoxContainer" parent="Margin/Root"]
 layout_mode = 2
@@ -63,7 +63,7 @@ text = "MMO Content Studio"
 [node name="Subtitle" type="Label" parent="Margin/Root/Header/TitleBlock"]
 layout_mode = 2
 modulate = Color(0.7, 0.73, 0.79, 1)
-text = "T0 Authoring Foundation"
+text = "T1 Basic Item Authoring"
 
 [node name="ConnectionBlock" type="VBoxContainer" parent="Margin/Root/Header"]
 layout_mode = 2
@@ -79,7 +79,7 @@ horizontal_alignment = 2
 [node name="ConnectionMessage" type="Label" parent="Margin/Root/Header/ConnectionBlock"]
 unique_name_in_owner = true
 layout_mode = 2
-custom_minimum_size = Vector2(360, 0)
+custom_minimum_size = Vector2(420, 0)
 modulate = Color(0.7, 0.73, 0.79, 1)
 text = "Connecting to the local authoring host…"
 horizontal_alignment = 2
@@ -91,105 +91,281 @@ visible = false
 layout_mode = 2
 text = "Retry connection"
 
-[node name="Body" type="HBoxContainer" parent="Margin/Root"]
+[node name="Tabs" type="TabContainer" parent="Margin/Root"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 18
 
-[node name="SystemPanel" type="PanelContainer" parent="Margin/Root/Body"]
-custom_minimum_size = Vector2(610, 0)
+[node name="Items" type="HBoxContainer" parent="Margin/Root/Tabs"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="CatalogPanel" type="PanelContainer" parent="Margin/Root/Tabs/Items"]
+custom_minimum_size = Vector2(310, 0)
+layout_mode = 2
+theme_override_styles/panel = SubResource("StylePanel")
+
+[node name="Content" type="VBoxContainer" parent="Margin/Root/Tabs/Items/CatalogPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Heading" type="Label" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Items"
+
+[node name="ItemSearch" type="LineEdit" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+placeholder_text = "Search item ID or name"
+
+[node name="NewItemButton" type="Button" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "+ New Basic Item"
+
+[node name="Scroll" type="ScrollContainer" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ItemList" type="VBoxContainer" parent="Margin/Root/Tabs/Items/CatalogPanel/Content/Scroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 6
+
+[node name="EditorPanel" type="PanelContainer" parent="Margin/Root/Tabs/Items"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StylePanel")
 
-[node name="Content" type="VBoxContainer" parent="Margin/Root/Body/SystemPanel"]
+[node name="EditorScroll" type="ScrollContainer" parent="Margin/Root/Tabs/Items/EditorPanel"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Content" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/separation = 12
 
-[node name="Heading" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="Heading" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Basic Item Definition"
+
+[node name="Form" type="GridContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+layout_mode = 2
+columns = 2
+
+[node name="ItemIdLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+text = "Stable item ID"
+
+[node name="ItemIdEdit" type="LineEdit" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "iron_ore"
+
+[node name="DisplayNameLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+text = "Display name"
+
+[node name="DisplayNameEdit" type="LineEdit" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="IconLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+text = "Inventory / ground icon"
+
+[node name="IconControls" type="HBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="IconOption" type="OptionButton" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form/IconControls"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ImportAssetButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form/IconControls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Import PNG…"
+
+[node name="PublicationLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+text = "Publication state"
+
+[node name="PublicationValue" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "No item selected"
+
+[node name="KindLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+text = "Authoring kind"
+
+[node name="AuthoringKindValue" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Unknown"
+
+[node name="UpdatedLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+layout_mode = 2
+text = "Last updated"
+
+[node name="UpdatedValue" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Unknown"
+
+[node name="PreviewRow" type="HBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="IconPreview" type="TextureRect" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(128, 128)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Operation" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="TargetLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
+layout_mode = 2
+text = "Target operation"
+
+[node name="TargetOperation" type="OptionButton" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="PreviewButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Validate and Preview Changes"
+
+[node name="ApplyButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "Apply Previewed Operation"
+
+[node name="OperationStatus" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
+unique_name_in_owner = true
+layout_mode = 2
+modulate = Color(0.7, 0.73, 0.79, 1)
+text = "Select an item or create a new one."
+autowrap_mode = 2
+
+[node name="ChangesHeading" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Exact logical changes"
+
+[node name="ChangesList" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ValidationHeading" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "Validation"
+
+[node name="ValidationList" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="SystemPanel" type="PanelContainer" parent="Margin/Root/Tabs/Environment"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/panel = SubResource("StylePanel")
+
+[node name="Content" type="VBoxContainer" parent="Margin/Root/Tabs/Environment/SystemPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Heading" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Environment health"
 
-[node name="HostLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="HostLabel" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 layout_mode = 2
-modulate = Color(0.58, 0.63, 0.72, 1)
 text = "Authoring host"
 
-[node name="HostValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="HostValue" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Waiting for handshake"
 
-[node name="ApiLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="ApiLabel" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 layout_mode = 2
-modulate = Color(0.58, 0.63, 0.72, 1)
 text = "API contract"
 
-[node name="ApiValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="ApiValue" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Not connected"
 
-[node name="DatabaseLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="DatabaseLabel" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 layout_mode = 2
-modulate = Color(0.58, 0.63, 0.72, 1)
 text = "PostgreSQL"
 
-[node name="DatabaseValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="DatabaseValue" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Not checked"
 autowrap_mode = 2
 
-[node name="SchemaLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="SchemaLabel" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 layout_mode = 2
-modulate = Color(0.58, 0.63, 0.72, 1)
 text = "Schema compatibility"
 
-[node name="SchemaValue" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="SchemaValue" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Not verified"
 
-[node name="AssetRootsLabel" type="Label" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="AssetRootsLabel" type="Label" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 layout_mode = 2
-modulate = Color(0.58, 0.63, 0.72, 1)
 text = "Asset roots"
 
-[node name="AssetRootsList" type="VBoxContainer" parent="Margin/Root/Body/SystemPanel/Content"]
+[node name="AssetRootsList" type="VBoxContainer" parent="Margin/Root/Tabs/Environment/SystemPanel/Content"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="Waiting" type="Label" parent="Margin/Root/Body/SystemPanel/Content/AssetRootsList"]
-layout_mode = 2
-text = "Waiting for health response"
-
-[node name="CatalogPanel" type="PanelContainer" parent="Margin/Root/Body"]
+[node name="CatalogPanel" type="PanelContainer" parent="Margin/Root/Tabs/Environment"]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_styles/panel = SubResource("StylePanel")
 
-[node name="Content" type="VBoxContainer" parent="Margin/Root/Body/CatalogPanel"]
+[node name="Content" type="VBoxContainer" parent="Margin/Root/Tabs/Environment/CatalogPanel"]
 layout_mode = 2
-theme_override_constants/separation = 12
+theme_override_constants/separation = 10
 
-[node name="Heading" type="Label" parent="Margin/Root/Body/CatalogPanel/Content"]
+[node name="Heading" type="Label" parent="Margin/Root/Tabs/Environment/CatalogPanel/Content"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 text = "Content catalog"
 
-[node name="Description" type="Label" parent="Margin/Root/Body/CatalogPanel/Content"]
-layout_mode = 2
-modulate = Color(0.7, 0.73, 0.79, 1)
-text = "T0 exposes versioned catalog seams. Item authoring becomes available in T1."
-autowrap_mode = 2
-
-[node name="CatalogList" type="VBoxContainer" parent="Margin/Root/Body/CatalogPanel/Content"]
+[node name="CatalogList" type="VBoxContainer" parent="Margin/Root/Tabs/Environment/CatalogPanel/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 10
 
-[node name="Waiting" type="Label" parent="Margin/Root/Body/CatalogPanel/Content/CatalogList"]
-layout_mode = 2
-text = "Waiting for catalog response"
+
+[node name="AssetFileDialog" type="FileDialog" parent="."]
+unique_name_in_owner = true
+title = "Import Item PNG"
+file_mode = 0
+access = 2
+filters = PackedStringArray("*.png ; PNG Images")

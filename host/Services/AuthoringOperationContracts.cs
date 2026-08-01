@@ -25,6 +25,9 @@ public sealed record AuthoringOperationResult<T>(
 
     public static AuthoringOperationResult<T> Failure(params ApiError[] errors) =>
         new(false, default, errors);
+
+    public static AuthoringOperationResult<T> Failure(IEnumerable<ApiError> errors) =>
+        new(false, default, errors.ToArray());
 }
 
 public interface IContentAggregateReader<TResult>

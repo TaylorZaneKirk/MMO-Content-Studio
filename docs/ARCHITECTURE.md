@@ -59,14 +59,15 @@ Deleting a capability from the logical definition removes obsolete dependent rec
 
 The current MMO Project uses `item_definitions.runtime_enabled` as the active item-publication seam.
 
-Content Studio initially exposes friendly states:
+The current boolean persists only two states:
 
-- Draft
-- Valid
-- Published
-- Disabled
+- `Published` maps to `runtime_enabled = true`
+- `Draft` maps to `runtime_enabled = false`
 
-Until the game adopts a richer lifecycle, `Published` maps to `runtime_enabled = true`; all other states remain runtime-disabled.
+The **Disable** operation therefore returns an item to the persisted `Draft`
+state in T1. Validation readiness is calculated rather than stored. A future
+publication-lifecycle migration may distinguish Draft, Ready for Review,
+Disabled, and Deprecated without changing the GUI/host boundary.
 
 ## Process model
 
@@ -77,3 +78,37 @@ Initially, developers may run Godot and the .NET host separately. The intended f
 3. Verify host API version, database schema, and asset roots.
 4. Load the content catalog.
 5. Shut down the child host when the application exits.
+
+
+## T1 basic-item boundary
+
+The first authoring aggregate maps to the MMO Project's current
+`item_definitions` contract:
+
+- stable `item_id`
+- `item_name`
+- canonical `icon_texture_path`
+- `runtime_enabled`
+- `updated_at` optimistic-concurrency token
+
+T1 intentionally refuses to edit definitions carrying equipment metadata. A
+basic-item draft always has `equipment_slot_id = null`, `required_strength = 1`,
+and `runtime_enabled = false`.
+
+The current game schema uses one icon path for both inventory and ground-item
+presentation, so T1 exposes one shared icon. Separate ground art requires a
+future game-schema and runtime change rather than a Content Studio-only field.
+
+PNG import is a host-owned filesystem mutation. Godot chooses a local file, but
+the host validates and copies it into the canonical `game_client_assets/items`
+directory without overwriting a different existing file.
+
+Published definitions cannot be returned to draft/disabled state while live
+character inventory, character equipment, or ground-item rows reference them.
+The host performs a friendly preflight check and the MMO Project database trigger
+remains the final race-safe authority. Existing-item mutations require the
+`updated_at` concurrency token.
+
+Static mob-drop references are not yet database-authored, so T1 surfaces a
+warning rather than pretending to validate them. The MMO server startup
+validator remains authoritative for those references until the T4 mob migration.

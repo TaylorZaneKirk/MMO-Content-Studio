@@ -9,7 +9,33 @@ extends Control
 @onready var schema_value: Label = %SchemaValue
 @onready var asset_roots_list: VBoxContainer = %AssetRootsList
 @onready var catalog_list: VBoxContainer = %CatalogList
+@onready var item_search: LineEdit = %ItemSearch
+@onready var item_list: VBoxContainer = %ItemList
+@onready var new_item_button: Button = %NewItemButton
+@onready var item_id_edit: LineEdit = %ItemIdEdit
+@onready var display_name_edit: LineEdit = %DisplayNameEdit
+@onready var icon_option: OptionButton = %IconOption
+@onready var import_asset_button: Button = %ImportAssetButton
+@onready var asset_file_dialog: FileDialog = %AssetFileDialog
+@onready var icon_preview: TextureRect = %IconPreview
+@onready var publication_value: Label = %PublicationValue
+@onready var authoring_kind_value: Label = %AuthoringKindValue
+@onready var updated_value: Label = %UpdatedValue
+@onready var target_operation: OptionButton = %TargetOperation
+@onready var preview_button: Button = %PreviewButton
+@onready var apply_button: Button = %ApplyButton
+@onready var changes_list: VBoxContainer = %ChangesList
+@onready var validation_list: VBoxContainer = %ValidationList
+@onready var operation_status: Label = %OperationStatus
 @onready var authoring_host_client: AuthoringHostClient = %AuthoringHostClient
+
+var _items: Array = []
+var _asset_entries: Array = []
+var _asset_by_resource_path: Dictionary = {}
+var _current_item: Dictionary = {}
+var _preview_signature := ""
+var _preview_operation := ""
+var _preview_is_applicable := false
 
 
 func _ready() -> void:
@@ -17,9 +43,37 @@ func _ready() -> void:
 	authoring_host_client.handshake_received.connect(_on_handshake_received)
 	authoring_host_client.health_received.connect(_on_health_received)
 	authoring_host_client.catalog_received.connect(_on_catalog_received)
+	authoring_host_client.item_assets_received.connect(_on_item_assets_received)
+	authoring_host_client.item_asset_imported.connect(_on_item_asset_imported)
+	authoring_host_client.items_received.connect(_on_items_received)
+	authoring_host_client.item_received.connect(_on_item_received)
+	authoring_host_client.item_preview_received.connect(_on_item_preview_received)
+	authoring_host_client.item_mutation_completed.connect(_on_item_mutation_completed)
 	authoring_host_client.request_failed.connect(_on_request_failed)
 	retry_button.pressed.connect(authoring_host_client.retry)
+	new_item_button.pressed.connect(_start_new_item)
+	item_search.text_changed.connect(_on_item_search_changed)
+	item_id_edit.text_changed.connect(_on_form_changed)
+	display_name_edit.text_changed.connect(_on_form_changed)
+	icon_option.item_selected.connect(_on_icon_selected)
+	import_asset_button.pressed.connect(_open_asset_import)
+	asset_file_dialog.file_selected.connect(_on_asset_file_selected)
+	target_operation.item_selected.connect(_on_target_operation_changed)
+	preview_button.pressed.connect(_preview_changes)
+	apply_button.pressed.connect(_apply_previewed_operation)
+	_configure_target_operations()
+	_set_form_enabled(false)
 	authoring_host_client.connect_and_load()
+
+
+func _configure_target_operations() -> void:
+	target_operation.clear()
+	target_operation.add_item("Save as Draft")
+	target_operation.set_item_metadata(0, "save_draft")
+	target_operation.add_item("Publish")
+	target_operation.set_item_metadata(1, "publish")
+	target_operation.add_item("Disable")
+	target_operation.set_item_metadata(2, "disable")
 
 
 func _on_connection_state_changed(state: String, message: String) -> void:
@@ -96,8 +150,322 @@ func _on_catalog_received(payload: Dictionary) -> void:
 		catalog_list.add_child(row)
 
 
-func _on_request_failed(_operation: String, _message: String) -> void:
-	pass
+func _on_item_assets_received(payload: Dictionary) -> void:
+	_asset_entries = payload.get("assets", []) as Array
+	_asset_by_resource_path.clear()
+	icon_option.clear()
+	icon_option.add_item("Select an item icon…")
+	icon_option.set_item_metadata(0, "")
+	for asset_variant in _asset_entries:
+		if asset_variant is not Dictionary:
+			continue
+		var asset := asset_variant as Dictionary
+		var resource_path := str(asset.get("resource_path", ""))
+		_asset_by_resource_path[resource_path] = asset
+		icon_option.add_item(str(asset.get("display_name", resource_path)))
+		icon_option.set_item_metadata(icon_option.item_count - 1, resource_path)
+
+
+
+
+func _on_item_asset_imported(payload: Dictionary) -> void:
+	var asset := payload.get("asset", {}) as Dictionary
+	if asset.is_empty():
+		return
+	var resource_path := str(asset.get("resource_path", ""))
+	if not _asset_by_resource_path.has(resource_path):
+		_asset_entries.append(asset)
+		_asset_by_resource_path[resource_path] = asset
+		icon_option.add_item(str(asset.get("display_name", resource_path)))
+		icon_option.set_item_metadata(icon_option.item_count - 1, resource_path)
+	_select_icon_path(resource_path)
+	_update_icon_preview(str(asset.get("file_path", "")))
+	operation_status.text = str(payload.get("message", "Item asset imported."))
+	_clear_preview()
+
+
+func _open_asset_import() -> void:
+	asset_file_dialog.popup_centered_ratio(0.75)
+
+
+func _on_asset_file_selected(path: String) -> void:
+	var suggested_name := path.get_file()
+	authoring_host_client.import_item_asset(path, suggested_name)
+	operation_status.text = "Importing PNG into the canonical item asset directory…"
+
+
+func _on_items_received(payload: Dictionary) -> void:
+	_items = payload.get("items", []) as Array
+	_rebuild_item_list()
+
+
+func _on_item_received(payload: Dictionary) -> void:
+	_current_item = payload
+	item_id_edit.text = str(payload.get("item_id", ""))
+	item_id_edit.editable = false
+	display_name_edit.text = str(payload.get("display_name", ""))
+	_select_icon_path(str(payload.get("icon_texture_path", "")))
+	publication_value.text = str(payload.get("publication_state", "Unknown"))
+	authoring_kind_value.text = str(payload.get("authoring_kind", "Unknown"))
+	updated_value.text = str(payload.get("updated_at_utc", "Unknown"))
+	var editable := bool(payload.get("editable_in_basic_items", false))
+	_set_form_enabled(editable)
+	item_id_edit.editable = false
+	operation_status.text = "Loaded %s." % item_id_edit.text
+	_clear_preview()
+	_update_target_defaults()
+	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
+
+
+func _on_item_preview_received(payload: Dictionary) -> void:
+	var operation := str(payload.get("target_operation", "save_draft"))
+	_preview_signature = _form_signature(operation)
+	_preview_operation = operation
+	var valid_for_draft := bool(payload.get("valid_for_draft", false))
+	var valid_for_publication := bool(payload.get("valid_for_publication", false))
+	_preview_is_applicable = valid_for_publication if operation == "publish" else valid_for_draft
+	if operation == "disable":
+		_preview_is_applicable = valid_for_draft
+	_render_changes(payload.get("changes", []) as Array)
+	_render_validation(payload.get("messages", []) as Array)
+	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
+	apply_button.disabled = not _preview_is_applicable
+	apply_button.text = "Apply: %s" % _operation_display_name(operation)
+	operation_status.text = "Preview ready. Review the exact changes before applying."
+
+
+func _on_item_mutation_completed(payload: Dictionary) -> void:
+	var item := payload.get("item", {}) as Dictionary
+	var operation := str(payload.get("operation", "mutation"))
+	operation_status.text = "%s completed successfully." % _operation_display_name(operation)
+	_current_item = item
+	_on_item_received(item)
+	authoring_host_client.load_items(item_search.text)
+
+
+func _on_request_failed(operation: String, message: String, errors: Array) -> void:
+	operation_status.text = "%s failed: %s" % [operation, message]
+	_render_validation(errors)
+	apply_button.disabled = true
+
+
+func _on_item_search_changed(_value: String) -> void:
+	_rebuild_item_list()
+
+
+func _rebuild_item_list() -> void:
+	_clear_children(item_list)
+	var search := item_search.text.strip_edges().to_lower()
+	for item_variant in _items:
+		if item_variant is not Dictionary:
+			continue
+		var item := item_variant as Dictionary
+		var haystack := "%s %s" % [item.get("item_id", ""), item.get("display_name", "")]
+		if not search.is_empty() and not haystack.to_lower().contains(search):
+			continue
+		var button := Button.new()
+		button.text = "%s\n%s  •  %s" % [
+			str(item.get("display_name", "Unnamed item")),
+			str(item.get("publication_state", "Unknown")),
+			str(item.get("authoring_kind", "Unknown")),
+		]
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.tooltip_text = str(item.get("item_id", ""))
+		button.pressed.connect(_load_item.bind(str(item.get("item_id", ""))))
+		item_list.add_child(button)
+
+
+func _load_item(item_id: String) -> void:
+	if not item_id.is_empty():
+		authoring_host_client.load_item(item_id)
+
+
+func _start_new_item() -> void:
+	_current_item = {}
+	item_id_edit.text = ""
+	item_id_edit.editable = true
+	display_name_edit.text = ""
+	icon_option.select(0)
+	publication_value.text = "Unsaved"
+	authoring_kind_value.text = "Basic"
+	updated_value.text = "Not saved"
+	_set_form_enabled(true)
+	item_id_edit.grab_focus()
+	operation_status.text = "Creating a new basic item."
+	_update_icon_preview("")
+	_clear_preview()
+	_update_target_defaults()
+
+
+func _on_form_changed(_value: String) -> void:
+	_clear_preview()
+
+
+func _on_icon_selected(_index: int) -> void:
+	_clear_preview()
+	var resource_path := _selected_icon_path()
+	var asset := _asset_by_resource_path.get(resource_path, {}) as Dictionary
+	_update_icon_preview(str(asset.get("file_path", "")))
+
+
+func _on_target_operation_changed(_index: int) -> void:
+	_clear_preview()
+
+
+func _preview_changes() -> void:
+	var item_id := item_id_edit.text.strip_edges()
+	if item_id.is_empty():
+		operation_status.text = "Enter a stable item ID before previewing."
+		return
+	var operation := _selected_operation()
+	authoring_host_client.preview_item(item_id, {
+		"display_name": display_name_edit.text,
+		"icon_texture_path": _selected_icon_path(),
+		"expected_updated_at_utc": _current_item.get("updated_at_utc", null),
+		"target_operation": operation,
+	})
+	operation_status.text = "Calculating validation and change summary…"
+
+
+func _apply_previewed_operation() -> void:
+	var operation := _selected_operation()
+	if not _preview_is_applicable or _preview_signature != _form_signature(operation) or _preview_operation != operation:
+		operation_status.text = "The form changed. Preview the operation again before applying it."
+		apply_button.disabled = true
+		return
+	var item_id := item_id_edit.text.strip_edges()
+	var expected := _current_item.get("updated_at_utc", null)
+	match operation:
+		"publish":
+			authoring_host_client.publish_item(item_id, expected)
+		"disable":
+			authoring_host_client.disable_item(item_id, expected)
+		_:
+			authoring_host_client.save_item_draft(item_id, {
+				"display_name": display_name_edit.text,
+				"icon_texture_path": _selected_icon_path(),
+				"expected_updated_at_utc": expected,
+			})
+	apply_button.disabled = true
+	operation_status.text = "Applying transactional authoring operation…"
+
+
+func _update_target_defaults() -> void:
+	var state := str(_current_item.get("publication_state", "Unsaved"))
+	if state == "Draft":
+		target_operation.select(1)
+	elif state == "Published":
+		target_operation.select(2)
+	else:
+		target_operation.select(0)
+
+
+func _selected_operation() -> String:
+	return str(target_operation.get_item_metadata(target_operation.selected))
+
+
+func _selected_icon_path() -> String:
+	if icon_option.selected < 0:
+		return ""
+	return str(icon_option.get_item_metadata(icon_option.selected))
+
+
+func _select_icon_path(resource_path: String) -> void:
+	for index in range(icon_option.item_count):
+		if str(icon_option.get_item_metadata(index)) == resource_path:
+			icon_option.select(index)
+			return
+	icon_option.select(0)
+
+
+func _set_form_enabled(enabled: bool) -> void:
+	display_name_edit.editable = enabled
+	icon_option.disabled = not enabled
+	import_asset_button.disabled = not enabled
+	target_operation.disabled = not enabled
+	preview_button.disabled = not enabled
+	if not enabled:
+		apply_button.disabled = true
+
+
+func _clear_preview() -> void:
+	_preview_signature = ""
+	_preview_operation = ""
+	_preview_is_applicable = false
+	apply_button.disabled = true
+	apply_button.text = "Apply Previewed Operation"
+	_clear_children(changes_list)
+	_clear_children(validation_list)
+
+
+func _form_signature(operation: String) -> String:
+	return JSON.stringify([
+		item_id_edit.text.strip_edges(),
+		display_name_edit.text.strip_edges(),
+		_selected_icon_path(),
+		_current_item.get("updated_at_utc", null),
+		operation,
+	])
+
+
+func _render_changes(changes: Array) -> void:
+	_clear_children(changes_list)
+	if changes.is_empty():
+		_add_wrapped_label(changes_list, "No persisted values would change.")
+		return
+	for change_variant in changes:
+		if change_variant is not Dictionary:
+			continue
+		var change := change_variant as Dictionary
+		_add_wrapped_label(changes_list, "• %s: %s → %s" % [
+			str(change.get("field", "field")),
+			str(change.get("before", "∅")),
+			str(change.get("after", "∅")),
+		])
+
+
+func _render_validation(messages: Array) -> void:
+	_clear_children(validation_list)
+	if messages.is_empty():
+		_add_wrapped_label(validation_list, "No validation messages.")
+		return
+	for message_variant in messages:
+		if message_variant is not Dictionary:
+			continue
+		var message := message_variant as Dictionary
+		_add_wrapped_label(validation_list, "[%s] %s" % [
+			str(message.get("severity", "Info")).to_upper(),
+			str(message.get("message", "Validation message")),
+		])
+
+
+func _update_icon_preview(file_path: String) -> void:
+	icon_preview.texture = null
+	if file_path.is_empty() or not FileAccess.file_exists(file_path):
+		return
+	var image := Image.load_from_file(file_path)
+	if image == null or image.is_empty():
+		return
+	icon_preview.texture = ImageTexture.create_from_image(image)
+
+
+func _add_wrapped_label(container: Node, text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	container.add_child(label)
+
+
+func _operation_display_name(operation: String) -> String:
+	match operation:
+		"save_draft":
+			return "Save Draft"
+		"publish":
+			return "Publish"
+		"disable":
+			return "Disable"
+		_:
+			return operation.capitalize()
 
 
 func _clear_children(container: Node) -> void:

@@ -79,7 +79,21 @@ public sealed class AuthoringHealthService
             var checks = new List<HealthCheck>
             {
                 await CheckTableAsync(connection, "item_definitions", cancellationToken),
-                await CheckColumnAsync(connection, "item_definitions", "runtime_enabled", cancellationToken)
+                await CheckTableAsync(connection, "character_inventory", cancellationToken),
+                await CheckTableAsync(connection, "character_equipment", cancellationToken),
+                await CheckTableAsync(connection, "ground_items", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "item_id", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "item_name", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "icon_texture_path", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "equipment_slot_id", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "runtime_enabled", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "required_strength", cancellationToken),
+                await CheckColumnAsync(connection, "item_definitions", "updated_at", cancellationToken),
+                await CheckTriggerAsync(
+                    connection,
+                    "item_definitions",
+                    "item_definitions_runtime_disable_guard",
+                    cancellationToken)
             };
 
             var status = checks.All(check => check.Status == HealthState.Healthy)
@@ -92,7 +106,7 @@ public sealed class AuthoringHealthService
                 databaseName,
                 status == HealthState.Healthy ? _hostOptions.ExpectedSchemaContract : null,
                 status == HealthState.Healthy
-                    ? "Database connection and required T0 schema checks passed."
+                    ? "Database connection and required T1 basic-item schema checks passed."
                     : "Database connected, but one or more required schema checks failed.",
                 checks);
         }
@@ -156,6 +170,38 @@ public sealed class AuthoringHealthService
         return exists
             ? new HealthCheck($"column:{tableName}.{columnName}", HealthState.Healthy, $"Required column '{tableName}.{columnName}' exists.")
             : new HealthCheck($"column:{tableName}.{columnName}", HealthState.Unhealthy, $"Required column '{tableName}.{columnName}' is missing.");
+    }
+
+    private static async Task<HealthCheck> CheckTriggerAsync(
+        NpgsqlConnection connection,
+        string tableName,
+        string triggerName,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select exists (
+                select 1
+                from information_schema.triggers
+                where event_object_schema = 'public'
+                  and event_object_table = @table_name
+                  and trigger_name = @trigger_name
+            );
+            """;
+
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("table_name", tableName);
+        command.Parameters.AddWithValue("trigger_name", triggerName);
+        var exists = (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
+
+        return exists
+            ? new HealthCheck(
+                $"trigger:{triggerName}",
+                HealthState.Healthy,
+                $"Required trigger '{triggerName}' exists on '{tableName}'.")
+            : new HealthCheck(
+                $"trigger:{triggerName}",
+                HealthState.Unhealthy,
+                $"Required trigger '{triggerName}' is missing from '{tableName}'.");
     }
 
     private IReadOnlyList<AssetRootHealth> CheckAssetRoots()
