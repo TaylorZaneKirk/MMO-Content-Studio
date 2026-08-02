@@ -60,17 +60,21 @@ weapon profiles are rejected until the runtime supports them.
 T3B uses existing runtime tables for base items, equipment slots, requirements,
 modifiers, `item_combat_profiles`, and `item_combat_bonuses`.
 
-The only new schema artifact in this slice is
-`integrations/mmo-project/prototype/sql/018_item_tool_capabilities.sql` for
-handoff, mirrored into the local MMO Project runtime path as
-`prototype/sql/018_item_tool_capabilities.sql`. It creates
-`item_tool_capabilities` and guards rows so they can only attach to `right_hand`
-or `left_hand` equipment.
+The new schema handoff artifact is
+`integrations/mmo-project/prototype/sql/018_item_tool_capabilities.sql`. It must
+be reviewed and applied to the MMO Project repository before development-machine
+runtime verification. The migration creates `item_tool_capabilities`, prevents
+capabilities from attaching to non-hand items, and prevents an item from moving
+out of `right_hand` or `left_hand` while capability rows remain. Structural
+migrations do not seed item-specific content.
 
 ## Verification
 
 - Source contracts cover routes, aggregate contracts, validation, transaction
-  shape, migration scope, and the absence of Godot SQL.
-- Compiled host tests cover deterministic tool capability normalization,
-  duplicate detection, derived classification labels, active runtime weapon slot
-  rules, and the registry values exposed by options.
+  shape, migration scope, bidirectional slot integrity, the absence of
+  item-specific migration seeds, and the absence of Godot SQL.
+- Compiled host tests cover deterministic capability normalization, canonical
+  duplicate detection, derived classification labels, active runtime weapon-slot
+  rules, registry values, normalization edge cases, and classification behavior.
+- Full database transaction, optimistic-concurrency, and HTTP integration
+  verification still requires the configured development PostgreSQL database.
