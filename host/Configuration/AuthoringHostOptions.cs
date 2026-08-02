@@ -6,7 +6,7 @@ public sealed class AuthoringHostOptions
 
     public string ServiceName { get; init; } = "MMO Content Authoring Host";
     public string ListenUrl { get; init; } = "http://127.0.0.1:5187";
-    public string ExpectedSchemaContract { get; init; } = "prototype-item-authoring-v1";
+    public string ExpectedSchemaContract { get; init; } = "prototype-consumable-authoring-v1";
 }
 
 public sealed class ConnectionProfilesOptions

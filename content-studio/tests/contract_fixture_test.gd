@@ -6,7 +6,7 @@ const EXPECTED_API_VERSION := "1"
 func _initialize() -> void:
 	var main_scene := load("res://scenes/Main.tscn") as PackedScene
 	if main_scene == null:
-		push_error("T1 main scene or one of its scripts failed to parse")
+		push_error("T2 main scene or one of its scripts failed to parse")
 		quit(1)
 		return
 
@@ -17,10 +17,10 @@ func _initialize() -> void:
 		"data": {
 			"target_operation": "save_draft",
 			"valid_for_draft": true,
-			"valid_for_publication": false,
+			"valid_for_publication": true,
 			"messages": [],
 			"changes": [
-				{"field": "display_name", "before": null, "after": "Iron Ore"},
+				{"field": "effect", "before": null, "after": "restore_resource:health:3-5"},
 			],
 		},
 		"errors": [],
@@ -32,7 +32,7 @@ func _initialize() -> void:
 		return
 
 	if not envelope.data.valid_for_draft or envelope.data.changes.size() != 1:
-		push_error("T1 item-preview fixture mismatch")
+		push_error("T2 consumable-preview fixture mismatch")
 		quit(1)
 		return
 

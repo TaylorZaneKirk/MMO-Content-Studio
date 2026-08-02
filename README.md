@@ -24,22 +24,24 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T1 basic-item authoring implemented
+## Current state: T2 consumable authoring implemented
 
 The repository now contains:
 
 - a Godot 4 desktop Content Studio shell
 - a loopback-only .NET 10 authoring host
 - environment, schema, and asset-root health checks
-- searchable item catalog and complete item loading
+- searchable Basic Items and Consumables workspaces
 - canonical item-PNG selection and import
+- declarative consumable profiles, ordered requirements, and ordered effects
+- portions/empty-container transformations through result items
 - exact validation and logical-change previews
 - transactional draft creation and editing
 - strict publication and disable operations
-- optimistic concurrency and reload-after-commit verification
+- optimistic aggregate concurrency and reload-after-commit verification
 - source and optional runtime contract tests
 
-T0 and T1 still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
+T0 through T2 still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
 ## Repository layout
 
@@ -52,6 +54,7 @@ checks/           reserved for CI definitions
 scripts/          reserved for packaging/orchestration scripts
 tests/            cross-process contract tests
 tools/            local run and test commands
+integrations/     MMO Project migrations and integration handoff artifacts
 docs/             architecture, API, roadmap, and acceptance documents
 ```
 
@@ -98,7 +101,7 @@ The default API address is `http://127.0.0.1:5187`.
 
 1. **T0 — Authoring foundation** — implemented; runtime verification pending
 2. **T1 — Basic items** — implemented; runtime verification pending
-3. **T2 — Consumable items**
+3. **T2 — Consumable items** — implemented; migration/runtime verification pending
 4. **T3A — Wearable equipment**
 5. **T3B — Weapons and tools**
 6. **T4 — Mobs**
@@ -106,10 +109,9 @@ The default API address is `http://127.0.0.1:5187`.
 8. **Dialogue workspace**
 9. **Quest Studio evaluation**
 
-The first content vertical slice creates, edits, validates, disables, and
-publishes a basic non-consumable, non-equippable item through the GUI, including
-shared inventory/ground-icon selection and transactional PostgreSQL
-synchronization.
+The current vertical slices author both ordinary items and declarative
+consumables. Consumables synchronize the base item, profile, requirements, and
+effects in one transaction without contributor-authored SQL.
 
 ## Documentation
 
@@ -117,4 +119,6 @@ synchronization.
 - [`docs/API_V1.md`](docs/API_V1.md)
 - [`docs/T0_ACCEPTANCE.md`](docs/T0_ACCEPTANCE.md)
 - [`docs/T1_ACCEPTANCE.md`](docs/T1_ACCEPTANCE.md)
+- [`docs/T2_ACCEPTANCE.md`](docs/T2_ACCEPTANCE.md)
+- [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)

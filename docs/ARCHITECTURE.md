@@ -112,3 +112,40 @@ remains the final race-safe authority. Existing-item mutations require the
 Static mob-drop references are not yet database-authored, so T1 surfaces a
 warning rather than pretending to validate them. The MMO server startup
 validator remains authoritative for those references until the T4 mob migration.
+
+## T2 consumable aggregate
+
+T2 expands one authored item into a four-part aggregate:
+
+```text
+item_definitions
+  └─ item_consumable_profiles
+       ├─ item_consumable_requirements (ordered)
+       └─ item_consumable_effects (ordered)
+```
+
+The host owns complete replacement semantics for both child collections. A save
+locks the base item, validates the full logical definition, upserts the base and
+profile, deletes/reinserts ordered children, reloads the aggregate, and verifies
+semantic equality before reporting success.
+
+The first declarative vocabulary is deliberately narrow:
+
+- `skill_minimum` requirement
+- `restore_resource` effect with an inclusive minimum/maximum range
+- health, concentration, and Special resources
+- eat, drink, and use actions
+
+This is a registry-shaped boundary, not a scripting language. Contributors
+cannot store C#, GDScript, SQL, or arbitrary expressions in effect rows. New
+behavior requires a reviewed runtime handler and a corresponding schema/contract
+extension.
+
+`result_item_id` supports portions and container transformations without adding
+per-instance state. True charges remain deferred until inventory instances can
+store authoritative metadata beyond `item_id` and `stack_count`.
+
+T2 includes a migration artifact and an idempotent translation of the current hard-coded food dictionary into equivalent inclusive restore ranges, but intentionally does not mutate the separate
+MMO Project repository. Applying the migration enables authoring; the game
+server still requires an explicit consumer that executes the declarative profile
+through its authoritative inventory/runtime-state mutation boundary.

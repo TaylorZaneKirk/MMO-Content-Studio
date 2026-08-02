@@ -4,52 +4,42 @@
 
 **Status:** Source implementation complete; development-machine runtime verification pending.
 
-Deliver the shared architecture required by all later content workspaces.
-
-Scope:
-
-- Godot application shell
-- .NET authoring-host skeleton
-- Versioned local API contract
-- Connection profile configuration
-- Database and schema health checks
-- Shared result/error envelope
-- Transaction boundary conventions
-- Validation severity model
-- Catalog and aggregate-loading seams
-- Asset-root configuration
-- Automated startup and contract tests
-
-Exit condition:
-
-> Godot can connect to the local host, display database/schema health, and retrieve a versioned empty content catalog through tested contracts.
+Godot shell, loopback .NET host, versioned API, environment health, shared
+envelopes, catalog seams, asset roots, and contract tests.
 
 ## T1 — Basic Items
 
-**Status:** Source implementation complete; development-machine database and Godot verification pending.
+**Status:** Source implementation complete; development-machine runtime verification pending.
 
-Create the first complete vertical slice for non-consumable, non-equippable items.
-
-Capabilities:
-
-- List and search existing items
-- Load one complete item definition
-- Create and edit a basic item
-- Select or import the current shared inventory/ground PNG
-- Preserve the current non-equippable item metadata contract
-- Save as runtime-disabled draft
-- Validate the persisted aggregate
-- Publish or disable the item
-- Show the exact logical change summary before commit
-- Reload and verify after commit
-
-Exit condition:
-
-> A maintainer can add a valid basic item to the development game without writing SQL or manually coordinating related persistence records.
+Search, load, create, edit, validate, preview, draft, publish, disable, import
+item PNGs, enforce concurrency, and reload/verify base item definitions.
 
 ## T2 — Consumable Items
 
-Add declarative consumable profiles, requirements, resource effects, messages, charges/portions, and presentation references.
+**Status:** Source implementation complete; database migration and development-machine runtime verification pending.
+
+Capabilities:
+
+- Search all item definitions and identify Basic, Consumable, and Equipment kinds
+- Convert an eligible basic item into a consumable aggregate
+- Author `eat`, `drink`, or `use` actions
+- Configure consumed stack quantity and optional result-item transformation
+- Configure combat availability, cooldown, messages, animation, and sound references
+- Author ordered `skill_minimum` requirements
+- Author ordered `restore_resource` effects with inclusive minimum/maximum ranges for health, concentration, and Special
+- Preview exact base/profile/requirement/effect replacements
+- Save, publish, and disable transactionally with aggregate concurrency
+- Preserve live-reference publication guards
+- Explicitly defer per-instance charge counters and arbitrary executable effects
+
+Exit condition:
+
+> A maintainer can create or modify a declarative consumable without manual
+> content SQL, and the complete persisted aggregate survives reload and strict
+> publication validation.
+
+A separate MMO server integration remains required to execute the authored
+profiles at runtime.
 
 ## T3A — Wearable Equipment
 

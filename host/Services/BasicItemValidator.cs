@@ -45,14 +45,20 @@ public sealed partial class BasicItemValidator
         }
 
         if (existing is not null
-            && (existing.EquipmentSlotId is not null || existing.RequiredStrength != 1))
+            && (existing.EquipmentSlotId is not null
+                || existing.RequiredStrength != 1
+                || existing.HasConsumableProfile))
         {
             messages.Add(new ApiError(
                 "wrong_authoring_workspace",
-                "This item has equipment metadata and cannot be changed by Basic Items.",
+                existing.HasConsumableProfile
+                    ? "This item has a consumable profile and cannot be changed by Basic Items."
+                    : "This item has equipment metadata and cannot be changed by Basic Items.",
                 ValidationSeverity.Error,
                 "item_id",
-                "Open it in the Equipment workspace after T3 is implemented."));
+                existing.HasConsumableProfile
+                    ? "Open it in the Consumables workspace."
+                    : "Open it in the Equipment workspace after T3 is implemented."));
         }
 
         var asset = _assetService.Resolve(iconTexturePath.Trim());

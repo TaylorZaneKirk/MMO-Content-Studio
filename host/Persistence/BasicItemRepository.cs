@@ -25,7 +25,11 @@ public sealed class BasicItemRepository
                 equipment_slot_id,
                 runtime_enabled,
                 required_strength,
-                updated_at
+                updated_at,
+                exists (
+                    select 1 from item_consumable_profiles cp
+                    where cp.item_id = item_definitions.item_id
+                ) as has_consumable_profile
             from item_definitions
             where @search is null
                or item_id ilike '%' || @search || '%'
@@ -67,6 +71,26 @@ public sealed class BasicItemRepository
                 select 1 from character_equipment where item_id = @item_id
                 union all
                 select 1 from ground_items where item_id = @item_id
+            );
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("item_id", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
+    }
+
+    public async Task<bool> HasPublishedConsumableResultReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            select exists (
+                select 1
+                from item_consumable_profiles profile
+                join item_definitions source_item on source_item.item_id = profile.item_id
+                where profile.result_item_id = @item_id
+                  and source_item.runtime_enabled = true
             );
             """;
 
@@ -196,7 +220,11 @@ public sealed class BasicItemRepository
                 equipment_slot_id,
                 runtime_enabled,
                 required_strength,
-                updated_at
+                updated_at,
+                exists (
+                    select 1 from item_consumable_profiles cp
+                    where cp.item_id = item_definitions.item_id
+                ) as has_consumable_profile
             from item_definitions
             where item_id = @item_id
             """ + (forUpdate ? " for update;" : ";");
@@ -217,6 +245,7 @@ public sealed class BasicItemRepository
             reader.IsDBNull(equipmentOrdinal) ? null : reader.GetString(equipmentOrdinal),
             reader.GetBoolean(reader.GetOrdinal("runtime_enabled")),
             reader.GetInt32(reader.GetOrdinal("required_strength")),
+            reader.GetBoolean(reader.GetOrdinal("has_consumable_profile")),
             new DateTimeOffset(
                 DateTime.SpecifyKind(
                     reader.GetFieldValue<DateTime>(reader.GetOrdinal("updated_at")),
@@ -226,11 +255,14 @@ public sealed class BasicItemRepository
     private static void EnsureBasicEditable(BasicItemRecord? existing)
     {
         if (existing is not null
-            && (existing.EquipmentSlotId is not null || existing.RequiredStrength != 1))
+            && (existing.EquipmentSlotId is not null
+                || existing.RequiredStrength != 1
+                || existing.HasConsumableProfile))
         {
+            var workspace = existing.HasConsumableProfile ? "Consumables" : "the future Equipment workspace";
             throw new BasicItemKindConflictException(
                 existing.ItemId,
-                "Items with equipment metadata must be edited in the future Equipment workspace.");
+                $"This item must be edited in {workspace}.");
         }
     }
 
@@ -258,6 +290,7 @@ public sealed record BasicItemRecord(
     string? EquipmentSlotId,
     bool RuntimeEnabled,
     int RequiredStrength,
+    bool HasConsumableProfile,
     DateTimeOffset UpdatedAtUtc);
 
 public sealed class BasicItemNotFoundException : Exception

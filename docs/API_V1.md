@@ -36,12 +36,12 @@ content operation is attempted.
 
 ### `GET /api/v1/system/health`
 
-Reports the active database profile, PostgreSQL connectivity, the T1
-`item_definitions` schema contract, and configured asset-root status.
+Reports the active database profile, PostgreSQL connectivity, the T2 item and
+consumable schema contract, and configured asset-root status.
 
 ### `GET /api/v1/catalog`
 
-Returns the top-level content catalog. The Items section is implemented in T1;
+Returns the top-level content catalog. Items and Consumables are implemented;
 Mobs and NPCs remain planned workspaces.
 
 ## Item asset routes
@@ -136,3 +136,108 @@ generates one when absent. The value is returned in the response envelope.
 
 Breaking request or response changes require a new API route prefix. Additive
 fields may be introduced within v1 when existing clients can safely ignore them.
+
+## Consumable routes
+
+T2 requires the integration migration at
+`integrations/mmo-project/prototype/sql/017_item_consumable_profiles.sql`.
+
+### `GET /api/v1/consumables/options`
+
+Returns the exact declarative values supported by this host version:
+
+- use actions: `eat`, `drink`, `use`
+- requirement type: `skill_minimum`
+- effect type: `restore_resource`
+- resource targets: `health`, `concentration`, `special`
+- current skills loaded from `skill_definitions`
+
+The response explicitly reports that true per-instance charges are unsupported
+by the current inventory schema.
+
+### `GET /api/v1/consumables?search=potion`
+
+Lists all item definitions so an eligible Basic item can be converted. Each row
+reports whether a consumable profile exists and whether the Consumables
+workspace may edit it. Equipment definitions remain visible but read-only.
+
+### `GET /api/v1/consumables/{itemId}`
+
+Loads one aggregate containing:
+
+- base item definition and publication state
+- consumable profile
+- ordered requirements
+- ordered effects
+- aggregate concurrency timestamp
+- local icon preview path
+
+An eligible Basic item with no profile loads with safe form defaults and can be
+converted by saving a consumable draft.
+
+### `POST /api/v1/consumables/{itemId}/preview`
+
+Validates and previews `save_draft`, `publish`, or `disable`. The request contains
+the complete intended definition:
+
+```json
+{
+  "display_name": "Minor health potion",
+  "icon_texture_path": "res://assets/items/minor_health_potion.png",
+  "use_action": "drink",
+  "consume_quantity": 1,
+  "result_item_id": "empty_vial",
+  "success_message": "You drink the potion.",
+  "usable_in_combat": true,
+  "cooldown_ms": 1200,
+  "use_animation_id": "drink_potion",
+  "use_sound_resource_path": "res://assets/audio/items/drink_potion.ogg",
+  "requirements": [
+    {
+      "requirement_index": 0,
+      "requirement_type": "skill_minimum",
+      "target_id": "vitality",
+      "minimum_value": 5
+    }
+  ],
+  "effects": [
+    {
+      "effect_index": 0,
+      "effect_type": "restore_resource",
+      "target_id": "health",
+      "minimum_amount": 8,
+      "maximum_amount": 10
+    }
+  ],
+  "expected_updated_at_utc": null,
+  "target_operation": "save_draft"
+}
+```
+
+The host normalizes child indexes from list order and never accepts arbitrary
+code or expressions.
+
+### `PUT /api/v1/consumables/{itemId}/draft`
+
+Synchronizes `item_definitions`, `item_consumable_profiles`, requirements, and
+effects in one transaction. Requirements and effects are replacement sets:
+removing a row from the logical definition deletes the obsolete persisted row.
+Saving always produces a runtime-disabled draft.
+
+### `POST /api/v1/consumables/{itemId}/publish`
+
+Requires a canonical icon, at least one valid effect, known requirement skills,
+and a published result item when one is configured. It then sets the base item
+`runtime_enabled = true`.
+
+### `POST /api/v1/consumables/{itemId}/disable`
+
+Returns the base item to Draft while preserving its consumable profile. Existing
+MMO database guards continue to reject disabling an item referenced by live
+gameplay state.
+
+## Runtime-consumption boundary
+
+These routes author and validate persistence. They do not imply that the current
+MMO server executes the new tables. The server-side item-use resolver must be
+integrated separately before authored profiles affect gameplay.

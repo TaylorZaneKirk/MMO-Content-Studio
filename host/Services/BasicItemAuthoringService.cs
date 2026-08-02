@@ -111,10 +111,16 @@ public sealed class BasicItemAuthoringService
             var messages = validation.Messages.ToList();
             var operationWouldDisable = existing?.RuntimeEnabled == true
                 && (targetOperation is "save_draft" or "disable");
-            if (operationWouldDisable
-                && await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+            if (operationWouldDisable)
             {
-                messages.Add(LiveReferenceError(itemId));
+                if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+                {
+                    messages.Add(LiveReferenceError(itemId));
+                }
+                if (await _repository.HasPublishedConsumableResultReferencesAsync(itemId, cancellationToken))
+                {
+                    messages.Add(PublishedConsumableReferenceError(itemId));
+                }
             }
             if (hasUnsavedChanges)
             {
@@ -164,10 +170,16 @@ public sealed class BasicItemAuthoringService
             {
                 return AuthoringOperationResult<BasicItemMutationResponse>.Failure(validation.Messages);
             }
-            if (existing?.RuntimeEnabled == true
-                && await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+            if (existing?.RuntimeEnabled == true)
             {
-                return AuthoringOperationResult<BasicItemMutationResponse>.Failure(LiveReferenceError(itemId));
+                if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+                {
+                    return AuthoringOperationResult<BasicItemMutationResponse>.Failure(LiveReferenceError(itemId));
+                }
+                if (await _repository.HasPublishedConsumableResultReferencesAsync(itemId, cancellationToken))
+                {
+                    return AuthoringOperationResult<BasicItemMutationResponse>.Failure(PublishedConsumableReferenceError(itemId));
+                }
             }
 
             var saved = await _repository.SaveDraftAsync(
@@ -185,6 +197,10 @@ public sealed class BasicItemAuthoringService
 
             return AuthoringOperationResult<BasicItemMutationResponse>.Success(
                 new BasicItemMutationResponse("save_draft", ToDefinition(verified), validation.Messages));
+        }
+        catch (PostgresException exception) when (IsPublishedConsumableReferenceGuard(exception))
+        {
+            return AuthoringOperationResult<BasicItemMutationResponse>.Failure(PublishedConsumableReferenceError(itemId));
         }
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
@@ -248,11 +264,16 @@ public sealed class BasicItemAuthoringService
                 return AuthoringOperationResult<BasicItemMutationResponse>.Failure(validation.Messages);
             }
 
-            if (!published
-                && existing.RuntimeEnabled
-                && await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+            if (!published && existing.RuntimeEnabled)
             {
-                return AuthoringOperationResult<BasicItemMutationResponse>.Failure(LiveReferenceError(itemId));
+                if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+                {
+                    return AuthoringOperationResult<BasicItemMutationResponse>.Failure(LiveReferenceError(itemId));
+                }
+                if (await _repository.HasPublishedConsumableResultReferencesAsync(itemId, cancellationToken))
+                {
+                    return AuthoringOperationResult<BasicItemMutationResponse>.Failure(PublishedConsumableReferenceError(itemId));
+                }
             }
 
             var saved = await _repository.SetPublicationAsync(
@@ -271,6 +292,10 @@ public sealed class BasicItemAuthoringService
                     published ? "publish" : "disable",
                     ToDefinition(verified),
                     validation.Messages));
+        }
+        catch (PostgresException exception) when (IsPublishedConsumableReferenceGuard(exception))
+        {
+            return AuthoringOperationResult<BasicItemMutationResponse>.Failure(PublishedConsumableReferenceError(itemId));
         }
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
@@ -298,7 +323,7 @@ public sealed class BasicItemAuthoringService
             record.DisplayName,
             record.IconTexturePath,
             record.RuntimeEnabled ? "Published" : "Draft",
-            IsBasicRecord(record) ? "Basic" : "Equipment",
+            BasicAuthoringKind(record),
             IsBasicRecord(record),
             record.UpdatedAtUtc,
             asset.FilePath);
@@ -310,7 +335,7 @@ public sealed class BasicItemAuthoringService
             record.DisplayName,
             record.IconTexturePath,
             record.RuntimeEnabled ? "Published" : "Draft",
-            IsBasicRecord(record) ? "Basic" : "Equipment",
+            BasicAuthoringKind(record),
             record.UpdatedAtUtc);
 
     private static IReadOnlyList<BasicItemChange> CalculateChanges(
@@ -370,13 +395,33 @@ public sealed class BasicItemAuthoringService
             "publication_state",
             "Remove all live references in the development database before disabling or editing the published definition.");
 
+    private static ApiError PublishedConsumableReferenceError(string itemId) =>
+        new(
+            "item_has_published_consumable_references",
+            $"Item '{itemId}' cannot be disabled because a published consumable produces it as a result item.",
+            ValidationSeverity.Error,
+            "publication_state",
+            "Disable or update every published consumable that references this result item first.");
+
+    private static bool IsPublishedConsumableReferenceGuard(PostgresException exception) =>
+        exception.MessageText.Contains(
+            "published consumable references it",
+            StringComparison.OrdinalIgnoreCase);
+
     private static bool IsLiveReferenceGuard(PostgresException exception) =>
         exception.MessageText.Contains(
             "Cannot disable runtime item",
             StringComparison.OrdinalIgnoreCase);
 
     private static bool IsBasicRecord(BasicItemRecord record) =>
-        record.EquipmentSlotId is null && record.RequiredStrength == 1;
+        record.EquipmentSlotId is null
+        && record.RequiredStrength == 1
+        && !record.HasConsumableProfile;
+
+    private static string BasicAuthoringKind(BasicItemRecord record) =>
+        record.HasConsumableProfile
+            ? "Consumable"
+            : IsBasicRecord(record) ? "Basic" : "Equipment";
 
     private static string? NormalizePreviewOperation(string operation) =>
         operation.Trim().ToLowerInvariant() switch

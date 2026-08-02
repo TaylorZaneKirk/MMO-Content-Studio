@@ -93,11 +93,14 @@ class T0RuntimeContractTests(unittest.TestCase):
         self.assertEqual(envelope["data"]["database"]["status"], "Unconfigured")
         self.assertIn(envelope["data"]["overall_status"], ("Degraded", "Unhealthy"))
 
-    def test_catalog_is_versioned_and_empty(self) -> None:
+    def test_catalog_is_versioned_and_exposes_workspaces(self) -> None:
         envelope = self._get("/catalog")
         self.assertTrue(envelope["success"])
         sections = envelope["data"]["sections"]
-        self.assertEqual([section["content_type"] for section in sections], ["items", "mobs", "npcs"])
+        self.assertEqual(
+            [section["content_type"] for section in sections],
+            ["items", "consumables", "mobs", "npcs"],
+        )
         self.assertTrue(all(section["entries"] == [] for section in sections))
 
 

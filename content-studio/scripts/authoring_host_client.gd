@@ -11,6 +11,11 @@ signal items_received(payload: Dictionary)
 signal item_received(payload: Dictionary)
 signal item_preview_received(payload: Dictionary)
 signal item_mutation_completed(payload: Dictionary)
+signal consumable_options_received(payload: Dictionary)
+signal consumables_received(payload: Dictionary)
+signal consumable_received(payload: Dictionary)
+signal consumable_preview_received(payload: Dictionary)
+signal consumable_mutation_completed(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const API_VERSION := "1"
@@ -30,6 +35,13 @@ enum RequestKind {
 	ITEM_SAVE_DRAFT,
 	ITEM_PUBLISH,
 	ITEM_DISABLE,
+	CONSUMABLE_OPTIONS,
+	CONSUMABLES,
+	CONSUMABLE,
+	CONSUMABLE_PREVIEW,
+	CONSUMABLE_SAVE_DRAFT,
+	CONSUMABLE_PUBLISH,
+	CONSUMABLE_DISABLE,
 }
 
 @export var base_url := DEFAULT_BASE_URL
@@ -112,6 +124,55 @@ func disable_item(item_id: String, expected_updated_at_utc: Variant) -> void:
 	_request(
 		RequestKind.ITEM_DISABLE,
 		"/api/v1/items/%s/disable" % item_id.uri_encode(),
+		HTTPClient.METHOD_POST,
+		{"expected_updated_at_utc": expected_updated_at_utc}
+	)
+
+
+
+
+func load_consumables(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(RequestKind.CONSUMABLES, "/api/v1/consumables%s" % suffix)
+
+
+func load_consumable(item_id: String) -> void:
+	_request(RequestKind.CONSUMABLE, "/api/v1/consumables/%s" % item_id.uri_encode())
+
+
+func preview_consumable(item_id: String, payload: Dictionary) -> void:
+	_request(
+		RequestKind.CONSUMABLE_PREVIEW,
+		"/api/v1/consumables/%s/preview" % item_id.uri_encode(),
+		HTTPClient.METHOD_POST,
+		payload
+	)
+
+
+func save_consumable_draft(item_id: String, payload: Dictionary) -> void:
+	_request(
+		RequestKind.CONSUMABLE_SAVE_DRAFT,
+		"/api/v1/consumables/%s/draft" % item_id.uri_encode(),
+		HTTPClient.METHOD_PUT,
+		payload
+	)
+
+
+func publish_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
+	_request(
+		RequestKind.CONSUMABLE_PUBLISH,
+		"/api/v1/consumables/%s/publish" % item_id.uri_encode(),
+		HTTPClient.METHOD_POST,
+		{"expected_updated_at_utc": expected_updated_at_utc}
+	)
+
+
+func disable_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
+	_request(
+		RequestKind.CONSUMABLE_DISABLE,
+		"/api/v1/consumables/%s/disable" % item_id.uri_encode(),
 		HTTPClient.METHOD_POST,
 		{"expected_updated_at_utc": expected_updated_at_utc}
 	)
@@ -213,6 +274,12 @@ func _match_success(kind: int, data: Dictionary) -> void:
 			item_asset_imported.emit(data)
 		RequestKind.ITEMS:
 			items_received.emit(data)
+			_request(RequestKind.CONSUMABLE_OPTIONS, "/api/v1/consumables/options")
+		RequestKind.CONSUMABLE_OPTIONS:
+			consumable_options_received.emit(data)
+			_request(RequestKind.CONSUMABLES, "/api/v1/consumables")
+		RequestKind.CONSUMABLES:
+			consumables_received.emit(data)
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
 		RequestKind.ITEM:
 			item_received.emit(data)
@@ -220,6 +287,12 @@ func _match_success(kind: int, data: Dictionary) -> void:
 			item_preview_received.emit(data)
 		RequestKind.ITEM_SAVE_DRAFT, RequestKind.ITEM_PUBLISH, RequestKind.ITEM_DISABLE:
 			item_mutation_completed.emit(data)
+		RequestKind.CONSUMABLE:
+			consumable_received.emit(data)
+		RequestKind.CONSUMABLE_PREVIEW:
+			consumable_preview_received.emit(data)
+		RequestKind.CONSUMABLE_SAVE_DRAFT, RequestKind.CONSUMABLE_PUBLISH, RequestKind.CONSUMABLE_DISABLE:
+			consumable_mutation_completed.emit(data)
 		_:
 			_fail_kind(kind, "Unexpected request completion.", [])
 
@@ -232,7 +305,7 @@ func _fail_current(message: String, errors: Array) -> void:
 
 func _fail_kind(kind: int, message: String, errors: Array) -> void:
 	var operation := _kind_name(kind)
-	if kind in [RequestKind.HANDSHAKE, RequestKind.HEALTH, RequestKind.CATALOG, RequestKind.ITEM_ASSETS, RequestKind.ITEMS]:
+	if kind in [RequestKind.HANDSHAKE, RequestKind.HEALTH, RequestKind.CATALOG, RequestKind.ITEM_ASSETS, RequestKind.ITEMS, RequestKind.CONSUMABLE_OPTIONS, RequestKind.CONSUMABLES]:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
 
@@ -261,6 +334,20 @@ func _kind_name(kind: int) -> String:
 			return "item_publish"
 		RequestKind.ITEM_DISABLE:
 			return "item_disable"
+		RequestKind.CONSUMABLE_OPTIONS:
+			return "consumable_options"
+		RequestKind.CONSUMABLES:
+			return "consumables"
+		RequestKind.CONSUMABLE:
+			return "consumable"
+		RequestKind.CONSUMABLE_PREVIEW:
+			return "consumable_preview"
+		RequestKind.CONSUMABLE_SAVE_DRAFT:
+			return "consumable_save_draft"
+		RequestKind.CONSUMABLE_PUBLISH:
+			return "consumable_publish"
+		RequestKind.CONSUMABLE_DISABLE:
+			return "consumable_disable"
 		_:
 			return "request"
 

@@ -82,6 +82,10 @@ public sealed class AuthoringHealthService
                 await CheckTableAsync(connection, "character_inventory", cancellationToken),
                 await CheckTableAsync(connection, "character_equipment", cancellationToken),
                 await CheckTableAsync(connection, "ground_items", cancellationToken),
+                await CheckTableAsync(connection, "skill_definitions", cancellationToken),
+                await CheckTableAsync(connection, "item_consumable_profiles", cancellationToken),
+                await CheckTableAsync(connection, "item_consumable_requirements", cancellationToken),
+                await CheckTableAsync(connection, "item_consumable_effects", cancellationToken),
                 await CheckColumnAsync(connection, "item_definitions", "item_id", cancellationToken),
                 await CheckColumnAsync(connection, "item_definitions", "item_name", cancellationToken),
                 await CheckColumnAsync(connection, "item_definitions", "icon_texture_path", cancellationToken),
@@ -89,10 +93,52 @@ public sealed class AuthoringHealthService
                 await CheckColumnAsync(connection, "item_definitions", "runtime_enabled", cancellationToken),
                 await CheckColumnAsync(connection, "item_definitions", "required_strength", cancellationToken),
                 await CheckColumnAsync(connection, "item_definitions", "updated_at", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "use_action", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "consume_quantity", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "result_item_id", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "success_message", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "usable_in_combat", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "cooldown_ms", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "use_animation_id", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "use_sound_resource_path", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_profiles", "updated_at", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_requirements", "requirement_index", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_requirements", "requirement_type", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_requirements", "target_id", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_requirements", "minimum_value", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_effects", "effect_index", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_effects", "effect_type", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_effects", "target_id", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_effects", "minimum_amount", cancellationToken),
+                await CheckColumnAsync(connection, "item_consumable_effects", "maximum_amount", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_profiles_use_action_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_profiles_consume_quantity_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_profiles_cooldown_ms_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_profiles_result_not_self_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_requirements_identity_key", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_requirements_index_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_requirements_type_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_requirements_skill_id_fkey", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_requirements_minimum_value_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_effects_identity_key", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_effects_index_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_effects_type_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_effects_resource_check", cancellationToken),
+                await CheckConstraintAsync(connection, "item_consumable_effects_amount_range_check", cancellationToken),
                 await CheckTriggerAsync(
                     connection,
                     "item_definitions",
                     "item_definitions_runtime_disable_guard",
+                    cancellationToken),
+                await CheckTriggerAsync(
+                    connection,
+                    "item_definitions",
+                    "item_definitions_consumable_result_publication_guard",
+                    cancellationToken),
+                await CheckTriggerAsync(
+                    connection,
+                    "item_consumable_profiles",
+                    "item_consumable_profiles_result_publication_guard",
                     cancellationToken)
             };
 
@@ -106,8 +152,8 @@ public sealed class AuthoringHealthService
                 databaseName,
                 status == HealthState.Healthy ? _hostOptions.ExpectedSchemaContract : null,
                 status == HealthState.Healthy
-                    ? "Database connection and required T1 basic-item schema checks passed."
-                    : "Database connected, but one or more required schema checks failed.",
+                    ? "Database connection and required T2 item/consumable schema checks passed."
+                    : "Database connected, but one or more required schema checks failed. Apply the T2 integration migration if consumable tables are missing.",
                 checks);
         }
         catch (Exception exception) when (exception is NpgsqlException or TimeoutException or InvalidOperationException)
@@ -170,6 +216,35 @@ public sealed class AuthoringHealthService
         return exists
             ? new HealthCheck($"column:{tableName}.{columnName}", HealthState.Healthy, $"Required column '{tableName}.{columnName}' exists.")
             : new HealthCheck($"column:{tableName}.{columnName}", HealthState.Unhealthy, $"Required column '{tableName}.{columnName}' is missing.");
+    }
+
+    private static async Task<HealthCheck> CheckConstraintAsync(
+        NpgsqlConnection connection,
+        string constraintName,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select exists (
+                select 1
+                from information_schema.table_constraints
+                where constraint_schema = 'public'
+                  and constraint_name = @constraint_name
+            );
+            """;
+
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("constraint_name", constraintName);
+        var exists = (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
+
+        return exists
+            ? new HealthCheck(
+                $"constraint:{constraintName}",
+                HealthState.Healthy,
+                $"Required constraint '{constraintName}' exists.")
+            : new HealthCheck(
+                $"constraint:{constraintName}",
+                HealthState.Unhealthy,
+                $"Required constraint '{constraintName}' is missing.");
     }
 
     private static async Task<HealthCheck> CheckTriggerAsync(

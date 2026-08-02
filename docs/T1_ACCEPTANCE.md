@@ -39,4 +39,4 @@ T1 is the first database-backed content-authoring vertical slice.
 
 The MMO Project currently stores the same `icon_texture_path` for inventory and ground-item rendering. T1 therefore exposes one **Inventory / ground icon** field. Separate ground presentation becomes a schema and runtime change when the game requires it.
 
-The current schema also does not carry declarative consumable metadata. Non-equippable definitions are editable in this initial workspace; T2 will introduce explicit consumable profiles and refine content-kind classification.
+T2 now introduces explicit consumable profiles and refines content-kind classification. Once the T2 migration is applied, Basic Items marks profile-backed definitions as Consumable and routes them to the Consumables workspace.

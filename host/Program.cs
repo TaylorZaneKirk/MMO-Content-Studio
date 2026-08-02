@@ -36,6 +36,9 @@ builder.Services.AddSingleton<ItemAssetAuthoringService>();
 builder.Services.AddSingleton<BasicItemRepository>();
 builder.Services.AddSingleton<BasicItemValidator>();
 builder.Services.AddSingleton<BasicItemAuthoringService>();
+builder.Services.AddSingleton<ConsumableItemRepository>();
+builder.Services.AddSingleton<ConsumableItemValidator>();
+builder.Services.AddSingleton<ConsumableItemAuthoringService>();
 builder.Services.AddSingleton<ContentCatalogService>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -56,7 +59,7 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/system/handshake", (
     IOptions<AuthoringHostOptions> options) =>
 {
     var requestId = RequestIdProvider.Resolve(context);
-    var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.2.0";
+    var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.0";
     var response = new HandshakeResponse(
         options.Value.ServiceName,
         version,
@@ -175,6 +178,83 @@ app.MapPost($"{AuthoringApi.RoutePrefix}/items/{{itemId}}/disable", async (
         await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
 });
 
+app.MapGet($"{AuthoringApi.RoutePrefix}/consumables/options", async (
+    HttpContext context,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.LoadOptionsAsync(cancellationToken));
+});
+
+app.MapGet($"{AuthoringApi.RoutePrefix}/consumables", async (
+    HttpContext context,
+    string? search,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.ListAsync(search, cancellationToken));
+});
+
+app.MapGet($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}", async (
+    HttpContext context,
+    string itemId,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.LoadAsync(itemId, cancellationToken));
+});
+
+app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/preview", async (
+    HttpContext context,
+    string itemId,
+    ConsumablePreviewRequest request,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.PreviewAsync(itemId, request, cancellationToken));
+});
+
+app.MapPut($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/draft", async (
+    HttpContext context,
+    string itemId,
+    SaveConsumableDraftRequest request,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.SaveDraftAsync(itemId, request, cancellationToken));
+});
+
+app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/publish", async (
+    HttpContext context,
+    string itemId,
+    PublicationMutationRequest request,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(
+        requestId,
+        await service.PublishAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
+});
+
+app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/disable", async (
+    HttpContext context,
+    string itemId,
+    PublicationMutationRequest request,
+    ConsumableItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(
+        requestId,
+        await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
+});
+
 app.MapFallback((HttpContext context) =>
 {
     var requestId = RequestIdProvider.Resolve(context);
@@ -204,7 +284,9 @@ static IResult ToHttpResult<T>(string requestId, AuthoringOperationResult<T> res
 
     if (codes.Contains("item_version_conflict")
         || codes.Contains("wrong_authoring_workspace")
-        || codes.Contains("item_has_live_references"))
+        || codes.Contains("item_has_live_references")
+        || codes.Contains("item_has_published_consumable_references")
+        || codes.Contains("consumable_profile_missing"))
     {
         return Results.Conflict(envelope);
     }
