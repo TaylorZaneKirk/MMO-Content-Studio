@@ -1,17 +1,17 @@
-name: Apply repaired T3B payload
+name: Recover T3B implementation
 on:
   pull_request:
     branches: [main]
 permissions:
   contents: write
 jobs:
-  apply:
-    if: github.actor != 'github-actions[bot]'
+  recover:
+    if: github.actor != 'github-actions[bot]' && github.head_ref == 'repair-t3b-main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: t3b-weapons-tools
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
       - name: Repair, reconstruct, and verify payload
         shell: bash
@@ -100,12 +100,22 @@ jobs:
           rm -rf .t3b-bootstrap .github/workflows/apply-t3b.yml .github/workflows/apply-t3b-repair.yml
       - name: Validate source contracts
         run: python3 -m unittest discover -s tests/contract -p 'test_*.py' -v
-      - name: Commit exact implementation
+      - name: Verify repair scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f host/Services/HandItemAuthoringService.cs
+          test -f content-studio/scripts/hand_item_editor.gd
+          test -f integrations/mmo-project/prototype/sql/018_item_hand_and_tool_profiles.sql
+          test ! -e .t3b-bootstrap
+          test ! -e .github/workflows/apply-t3b.yml
+          test ! -e .github/workflows/apply-t3b-repair.yml
+      - name: Commit recovered implementation
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "feat: implement T3B weapons and tools authoring"
-          git push origin HEAD:t3b-weapons-tools
+          git commit -m "fix: recover T3B implementation"
+          git push origin HEAD:${{ github.head_ref }}
