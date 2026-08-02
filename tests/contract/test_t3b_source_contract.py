@@ -146,7 +146,7 @@ class T3BSourceContractTests(unittest.TestCase):
             ):
                 self.assertIn(token, migration)
             self.assertNotIn("inventory_17_mining_hammer", migration)
-            self.assertNotIn("INSERT INTO item_tool_capabilities", migration.upper())
+            self.assertNotIn("INSERT INTO ITEM_TOOL_CAPABILITIES", migration.upper())
             for forbidden in ("durability", "ammo", "charges", "item_instance"):
                 self.assertNotIn(forbidden, migration.lower())
 
