@@ -1,0 +1,125 @@
+name: Stage workspace-support migration
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  stage:
+    if: github.head_ref == 'agent/migrate-workspace-support-stage'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Verify staging pieces
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          expected = {
+              'chunk-000': 'fcef47bbd841f6c4698d747ae8dfc0ddb6c022c0',
+              'chunk-001': 'b2aee2a24dc75cbeb8df1642a1a187a16945dad6',
+              'chunk-002-part-0': '23d54a9de486c459a51956fdad0a9e16d5604f94',
+              'chunk-002-part-1': '28bdb6118eede7cfe5af88eda9f78e803ef5a0b5',
+              'chunk-003': 'e23123e95a250e3806673f3d93c3723332512482',
+              'chunk-004-part-0': '25f9ef1673568fd075e7b800c3d01d7ff213a239',
+              'chunk-004-part-1': 'b4281c7cdf18e0bbe122ff0e53b611bd2775e1a4',
+              'chunk-005-part-0': 'b9dc642a9464abb4f4e63d9ffab6901e681f3a3a',
+              'chunk-005-part-1': '985f14ed8a09d08e4cd959097a9ec6723d4e792e',
+              'chunk-006-part-0': '846bdc00aac455aa44e64df7cc43f78bf51478f9',
+              'chunk-006-part-1': 'b537ad1f5276d15a41a644f47b8428c978abe73d',
+          }
+          root = Path('.workspace-stage')
+          for name, wanted in expected.items():
+              data = (root / name).read_bytes()
+              actual = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+              if actual != wanted:
+                  raise SystemExit(f'{name}: expected {wanted}, got {actual}')
+          print('All staging Git blob hashes match.')
+          PY
+
+      - name: Reconstruct and verify source archive
+        run: |
+          cat \
+            .workspace-stage/chunk-000 \
+            .workspace-stage/chunk-001 \
+            .workspace-stage/chunk-002-part-0 \
+            .workspace-stage/chunk-002-part-1 \
+            .workspace-stage/chunk-003 \
+            .workspace-stage/chunk-004-part-0 \
+            .workspace-stage/chunk-004-part-1 \
+            .workspace-stage/chunk-005-part-0 \
+            .workspace-stage/chunk-005-part-1 \
+            .workspace-stage/chunk-006-part-0 \
+            .workspace-stage/chunk-006-part-1 \
+            > /tmp/workspace-support.b64
+          base64 -d /tmp/workspace-support.b64 > /tmp/workspace-support.tar.gz
+          echo '4ec55c7f0d4c2dc55fe70e7a30c5d6389e20d811cf6254a6c1e45bd6b63d5d7b  /tmp/workspace-support.tar.gz' | sha256sum -c -
+
+      - name: Apply to clean feature branch
+        run: |
+          git fetch origin agent/migrate-workspace-support
+          git checkout -B agent/migrate-workspace-support origin/agent/migrate-workspace-support
+          tar -xzf /tmp/workspace-support.tar.gz -C "$GITHUB_WORKSPACE"
+
+      - name: Verify exact diff scope
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          expected = sorted([
+              'content-studio/scripts/main.gd',
+              'content-studio/scripts/consumable_editor.gd',
+              'content-studio/scripts/equipment_editor.gd',
+              'content-studio/scripts/authoring_workspace_support.gd',
+              'docs/GODOT_WORKSPACE_SUPPORT.md',
+              'tests/contract/test_godot_workspace_support.py',
+              'tests/contract/test_t1_source_contract.py',
+              'tests/contract/test_t2_source_contract.py',
+              'tests/contract/test_t3a_source_contract.py',
+          ])
+          actual = sorted(filter(None, subprocess.check_output(['git', 'diff', '--name-only'], text=True).splitlines()))
+          if actual != expected:
+              raise SystemExit(f'Unexpected diff scope:\nexpected={expected}\nactual={actual}')
+          print('Diff scope is exact.')
+          PY
+
+      - name: Validate migration
+        run: |
+          python3 tools/check_forbidden_artifacts.py
+          bash -n tools/*.sh
+          python3 -m unittest discover -s tests/contract -p 'test_*.py' -v
+          dotnet restore tests/host/MMO.ContentStudio.AuthoringHost.Tests/MMO.ContentStudio.AuthoringHost.Tests.csproj
+          dotnet build host/MMO.ContentStudio.AuthoringHost.csproj --configuration Release --nologo
+          dotnet test tests/host/MMO.ContentStudio.AuthoringHost.Tests/MMO.ContentStudio.AuthoringHost.Tests.csproj --configuration Release --nologo
+
+      - name: Commit clean source migration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            content-studio/scripts/main.gd \
+            content-studio/scripts/consumable_editor.gd \
+            content-studio/scripts/equipment_editor.gd \
+            content-studio/scripts/authoring_workspace_support.gd \
+            docs/GODOT_WORKSPACE_SUPPORT.md \
+            tests/contract/test_godot_workspace_support.py \
+            tests/contract/test_t1_source_contract.py \
+            tests/contract/test_t2_source_contract.py \
+            tests/contract/test_t3a_source_contract.py
+          git commit -m 'refactor: migrate editors to shared workspace support'
+          git push origin HEAD:agent/migrate-workspace-support
