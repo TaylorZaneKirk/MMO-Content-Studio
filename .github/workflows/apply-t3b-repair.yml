@@ -13,86 +13,55 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
-      - name: Repair, reconstruct, and verify payload
+      - name: Restore immutable payload blobs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          cat .t3b-bootstrap/fix00-* > .t3b-bootstrap/chunk-00
           python3 - <<'PY'
           from pathlib import Path
+          import base64
           import hashlib
+          import json
+          import os
+          import urllib.request
 
-          root = Path('.t3b-bootstrap')
-          prefix = (root / 'fix01-00').read_text()
-          remote = (root / 'chunk-01').read_text()
-          value = prefix + remote[len(prefix):]
-          target = 'ebc9df2994601c79e780fab4f18039d9070207bd'
-          alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
-
-          def blob_sha(text: str) -> str:
-              data = text.encode('ascii')
-              return hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
-
-          def accept(candidate: str) -> bool:
-              if blob_sha(candidate) != target:
-                  return False
-              (root / 'chunk-01').write_text(candidate)
-              return True
-
-          if not accept(value):
-              found = False
-              invalid_positions = [i for i, char in enumerate(value) if char not in alphabet]
-              for position in invalid_positions:
-                  for replacement in alphabet:
-                      if accept(value[:position] + replacement + value[position + 1:]):
-                          found = True
-                          break
-                  if found:
-                      break
-
-              if not found:
-                  for position in range(len(value)):
-                      if accept(value[:position] + value[position + 1:]):
-                          found = True
-                          break
-
-              if not found:
-                  for position in range(len(value) + 1):
-                      for inserted in alphabet:
-                          if accept(value[:position] + inserted + value[position:]):
-                              found = True
-                              break
-                      if found:
-                          break
-
-              if not found:
-                  for position, original in enumerate(value):
-                      for replacement in alphabet:
-                          if replacement == original:
-                              continue
-                          if accept(value[:position] + replacement + value[position + 1:]):
-                              found = True
-                              break
-                      if found:
-                          break
-
-              if not found:
-                  raise SystemExit(
-                      f'Unable to repair chunk-01 from a single-character edit; length={len(value)} sha={blob_sha(value)}'
-                  )
-          PY
-          python3 - <<'PY'
-          from pathlib import Path
-          import hashlib
-          for name, expected in {
+          expected = {
               'chunk-00': '30064ae41f9d38e3f4b569a1b2aef318cf20e203',
               'chunk-01': 'ebc9df2994601c79e780fab4f18039d9070207bd',
-          }.items():
-              data = (Path('.t3b-bootstrap') / name).read_bytes()
+              'chunk-02': 'd5e094b31a7583b30a9aa19325a455aed92524ba',
+              'chunk-03': '14533cb4eb28b46bcc86380e3acab01c5af18dce',
+              'chunk-04': 'eb56af92c6ba036a2a197ab3382b4105187b1ad2',
+              'chunk-05': 'ad7cc86afacf0e5a647ed0a7049ab6482ea7e913',
+              'chunk-06': 'b81d22b09c782bebcb956d11062b886a90bebb2b',
+          }
+          root = Path('.t3b-bootstrap')
+          root.mkdir(exist_ok=True)
+          repository = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GITHUB_TOKEN']
+
+          for name, sha in expected.items():
+              request = urllib.request.Request(
+                  f'https://api.github.com/repos/{repository}/git/blobs/{sha}',
+                  headers={
+                      'Authorization': f'Bearer {token}',
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28',
+                  },
+              )
+              with urllib.request.urlopen(request) as response:
+                  payload = json.load(response)
+              data = base64.b64decode(payload['content'])
               actual = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
-              if actual != expected:
-                  raise SystemExit(f'{name} Git blob mismatch: {actual}')
+              if actual != sha:
+                  raise SystemExit(f'{name} Git blob mismatch: expected {sha}, got {actual}')
+              (root / name).write_bytes(data)
           PY
+      - name: Reconstruct and verify archive
+        shell: bash
+        run: |
+          set -euo pipefail
           cat .t3b-bootstrap/chunk-0[0-6] > /tmp/t3b.b64
           base64 -d /tmp/t3b.b64 > /tmp/t3b.tar.gz
           echo "5cf4c8a68033ae6fa2ea6d72639a6b4bde1345ed1c9920b14c8b06399d50a68d  /tmp/t3b.tar.gz" | sha256sum -c -
