@@ -1,0 +1,58 @@
+name: Content Studio CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: content-studio-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-and-host:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Reject transport artifacts
+        run: python3 tools/check_forbidden_artifacts.py
+
+      - name: Run source contracts
+        run: python3 -m unittest discover -s tests/contract -p 'test_*.py' -v
+
+      - name: Restore host
+        run: dotnet restore host/MMO.ContentStudio.AuthoringHost.csproj
+
+      - name: Build host
+        run: dotnet build host/MMO.ContentStudio.AuthoringHost.csproj --no-restore --configuration Release --nologo
+
+      - name: Validate static project files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import xml.etree.ElementTree as ET
+
+          root = Path('.')
+          for path in root.rglob('*.json'):
+              if any(part in {'bin', 'obj', '.godot'} for part in path.parts):
+                  continue
+              json.loads(path.read_text(encoding='utf-8'))
+          for path in root.rglob('*.csproj'):
+              ET.parse(path)
+          print('Static JSON/XML validation passed.')
+          PY
