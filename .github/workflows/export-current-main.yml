@@ -1,0 +1,29 @@
+name: Export current main
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.head_ref == 'agent/export-current-main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Remove export-only files
+        run: |
+          rm -rf .git
+          rm -f .github/workflows/export-current-main.yml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: current-main-workspace
+          path: .
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
