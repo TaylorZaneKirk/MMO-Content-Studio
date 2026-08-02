@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name EquipmentEditor
 
+const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
+
 const PAPER_DOLL_LAYER_ORDER := ["cape", "right_hand", "legs", "boots", "body", "left_hand", "gloves", "head"]
 const PAPER_DOLL_VISIBLE_SLOTS := ["head", "cape", "body", "legs", "boots", "gloves"]
 const DEFAULT_VISUAL_KEYS := {"head": "head1", "body": "defbod", "legs": "defbod"}
@@ -17,9 +19,7 @@ var _asset_by_path: Dictionary = {}
 var _options: Dictionary = {}
 var _current_item: Dictionary = {}
 var _bonus_controls: Dictionary = {}
-var _preview_signature := ""
-var _preview_operation := ""
-var _preview_applicable := false
+var _workspace_support: AuthoringWorkspaceSupport
 var _reload_item_id := ""
 var _game_client_assets_root := ""
 var _visual_file_cache: Dictionary = {}
@@ -59,6 +59,7 @@ var _preview_frame: SpinBox
 
 
 func _ready() -> void:
+	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new() as AuthoringWorkspaceSupport
 	_client = %AuthoringHostClient
 	_build_ui()
 	_connect_client()
@@ -434,14 +435,17 @@ func _on_equipment_item_received(payload: Dictionary) -> void:
 
 
 func _on_preview_received(payload: Dictionary) -> void:
-	_preview_operation = str(payload.get("target_operation", ""))
-	_preview_signature = _signature(_preview_operation)
-	var valid := bool(payload.get("valid_for_publication", false)) if _preview_operation == "publish" else bool(payload.get("valid_for_draft", false))
-	_preview_applicable = valid
-	_apply_button.disabled = not valid
-	_apply_button.text = "Apply %s" % _operation_name(_preview_operation)
-	_render_changes(payload.get("changes", []) as Array)
-	_render_validation(payload.get("messages", []) as Array)
+	var operation := str(payload.get("target_operation", ""))
+	var valid := bool(payload.get("valid_for_publication", false)) if operation == "publish" else bool(payload.get("valid_for_draft", false))
+	_workspace_support.accept_preview(
+		operation,
+		_signature(operation),
+		valid,
+		_apply_button,
+		"Apply %s" % _workspace_support.operation_name(operation)
+	)
+	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
+	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
 	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
 	_status.text = "Preview ready." if valid else "Preview contains blocking validation errors."
 
@@ -450,7 +454,7 @@ func _on_mutation_completed(payload: Dictionary) -> void:
 	var item := payload.get("item", {}) as Dictionary
 	_reload_item_id = str(item.get("item_id", _item_id.text))
 	_clear_preview()
-	_status.text = "%s completed. Reloading item…" % _operation_name(str(payload.get("operation", "operation")))
+	_status.text = "%s completed. Reloading item…" % _workspace_support.operation_name(str(payload.get("operation", "operation")))
 	_client.load_equipment()
 
 
@@ -458,7 +462,7 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if not operation.begins_with("equipment") and operation != "item_asset_import":
 		return
 	_status.text = "%s failed: %s" % [operation, message]
-	_render_validation(errors)
+	_workspace_support.render_validation(_validation, errors)
 	_apply_button.disabled = true
 
 
@@ -616,7 +620,7 @@ func _preview() -> void:
 
 func _apply() -> void:
 	var operation := _selected_metadata(_operation)
-	if not _preview_applicable or _preview_signature != _signature(operation) or _preview_operation != operation:
+	if not _workspace_support.can_apply(operation, _signature(operation)):
 		_status.text = "The form changed. Preview the operation again before applying it."
 		_apply_button.disabled = true
 		return
@@ -938,39 +942,12 @@ func _paper_doll_z_index(slot_name: String, direction: String) -> int:
 
 
 func _clear_preview() -> void:
-	_preview_signature = ""
-	_preview_operation = ""
-	_preview_applicable = false
-	_apply_button.disabled = true
-	_apply_button.text = "Apply Previewed Operation"
-	_clear_rows(_changes)
-	_clear_rows(_validation)
+	_workspace_support.clear_preview(_apply_button, _changes, _validation)
 
 
 func _signature(operation: String) -> String:
 	return JSON.stringify([_item_id.text, _payload(), operation])
 
-
-func _render_changes(values: Array) -> void:
-	_clear_rows(_changes)
-	if values.is_empty():
-		_add_wrapped(_changes, "No persisted values would change.")
-		return
-	for variant in values:
-		if variant is Dictionary:
-			var change := variant as Dictionary
-			_add_wrapped(_changes, "• %s: %s → %s" % [str(change.get("field", "field")), str(change.get("before", "∅")), str(change.get("after", "∅"))])
-
-
-func _render_validation(values: Array) -> void:
-	_clear_rows(_validation)
-	if values.is_empty():
-		_add_wrapped(_validation, "No validation messages.")
-		return
-	for variant in values:
-		if variant is Dictionary:
-			var message := variant as Dictionary
-			_add_wrapped(_validation, "[%s] %s" % [str(message.get("severity", "Info")).to_upper(), str(message.get("message", "Validation message"))])
 
 
 func _fill_option(control: OptionButton, values: Array) -> void:
@@ -1016,20 +993,3 @@ func _clear_rows(container: Node) -> void:
 		child.queue_free()
 
 
-func _add_wrapped(container: Node, value: String) -> void:
-	var label := Label.new()
-	label.text = value
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	container.add_child(label)
-
-
-func _operation_name(operation: String) -> String:
-	match operation:
-		"save_draft":
-			return "Save Draft"
-		"publish":
-			return "Publish"
-		"disable":
-			return "Disable"
-		_:
-			return operation.capitalize()

@@ -124,9 +124,9 @@ class T2SourceContractTests(unittest.TestCase):
 
     def test_godot_consumable_editor_uses_preview_before_apply(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "consumable_editor.gd").read_text()
-        self.assertIn("_preview_signature", editor)
+        self.assertIn("_workspace_support.can_apply", editor)
+        self.assertIn("_workspace_support.accept_preview", editor)
         self.assertIn("Preview the operation again", editor)
-        self.assertIn("Apply Previewed Operation", editor)
         self.assertIn("_collect_requirements", editor)
         self.assertIn("_collect_effects", editor)
 

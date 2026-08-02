@@ -59,9 +59,9 @@ class T1SourceContractTests(unittest.TestCase):
 
     def test_godot_requires_preview_before_apply(self) -> None:
         main = (ROOT / "content-studio" / "scripts" / "main.gd").read_text()
-        self.assertIn("_preview_signature", main)
+        self.assertIn("_workspace_support.can_apply", main)
+        self.assertIn("_workspace_support.accept_preview", main)
         self.assertIn("Preview the operation again", main)
-        self.assertIn("Apply Previewed Operation", main)
 
     def test_godot_has_no_database_driver_or_sql(self) -> None:
         godot_sources = "\n".join(

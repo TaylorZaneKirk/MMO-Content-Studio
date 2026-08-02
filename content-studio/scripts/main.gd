@@ -1,5 +1,7 @@
 extends Control
 
+const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
+
 @onready var connection_badge: Label = %ConnectionBadge
 @onready var connection_message: Label = %ConnectionMessage
 @onready var retry_button: Button = %RetryButton
@@ -33,12 +35,11 @@ var _items: Array = []
 var _asset_entries: Array = []
 var _asset_by_resource_path: Dictionary = {}
 var _current_item: Dictionary = {}
-var _preview_signature := ""
-var _preview_operation := ""
-var _preview_is_applicable := false
+var _workspace_support: AuthoringWorkspaceSupport
 
 
 func _ready() -> void:
+	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new() as AuthoringWorkspaceSupport
 	authoring_host_client.connection_state_changed.connect(_on_connection_state_changed)
 	authoring_host_client.handshake_received.connect(_on_handshake_received)
 	authoring_host_client.health_received.connect(_on_health_received)
@@ -219,25 +220,28 @@ func _on_item_received(payload: Dictionary) -> void:
 
 func _on_item_preview_received(payload: Dictionary) -> void:
 	var operation := str(payload.get("target_operation", "save_draft"))
-	_preview_signature = _form_signature(operation)
-	_preview_operation = operation
 	var valid_for_draft := bool(payload.get("valid_for_draft", false))
 	var valid_for_publication := bool(payload.get("valid_for_publication", false))
-	_preview_is_applicable = valid_for_publication if operation == "publish" else valid_for_draft
+	var applicable := valid_for_publication if operation == "publish" else valid_for_draft
 	if operation == "disable":
-		_preview_is_applicable = valid_for_draft
-	_render_changes(payload.get("changes", []) as Array)
-	_render_validation(payload.get("messages", []) as Array)
+		applicable = valid_for_draft
+	_workspace_support.accept_preview(
+		operation,
+		_form_signature(operation),
+		applicable,
+		apply_button,
+		"Apply: %s" % _workspace_support.operation_name(operation)
+	)
+	_workspace_support.render_changes(changes_list, payload.get("changes", []) as Array)
+	_workspace_support.render_validation(validation_list, payload.get("messages", []) as Array)
 	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
-	apply_button.disabled = not _preview_is_applicable
-	apply_button.text = "Apply: %s" % _operation_display_name(operation)
 	operation_status.text = "Preview ready. Review the exact changes before applying."
 
 
 func _on_item_mutation_completed(payload: Dictionary) -> void:
 	var item := payload.get("item", {}) as Dictionary
 	var operation := str(payload.get("operation", "mutation"))
-	operation_status.text = "%s completed successfully." % _operation_display_name(operation)
+	operation_status.text = "%s completed successfully." % _workspace_support.operation_name(operation)
 	_current_item = item
 	_on_item_received(item)
 	authoring_host_client.load_items(item_search.text)
@@ -245,7 +249,7 @@ func _on_item_mutation_completed(payload: Dictionary) -> void:
 
 func _on_request_failed(operation: String, message: String, errors: Array) -> void:
 	operation_status.text = "%s failed: %s" % [operation, message]
-	_render_validation(errors)
+	_workspace_support.render_validation(validation_list, errors)
 	apply_button.disabled = true
 
 
@@ -329,7 +333,7 @@ func _preview_changes() -> void:
 
 func _apply_previewed_operation() -> void:
 	var operation := _selected_operation()
-	if not _preview_is_applicable or _preview_signature != _form_signature(operation) or _preview_operation != operation:
+	if not _workspace_support.can_apply(operation, _form_signature(operation)):
 		operation_status.text = "The form changed. Preview the operation again before applying it."
 		apply_button.disabled = true
 		return
@@ -389,13 +393,7 @@ func _set_form_enabled(enabled: bool) -> void:
 
 
 func _clear_preview() -> void:
-	_preview_signature = ""
-	_preview_operation = ""
-	_preview_is_applicable = false
-	apply_button.disabled = true
-	apply_button.text = "Apply Previewed Operation"
-	_clear_children(changes_list)
-	_clear_children(validation_list)
+	_workspace_support.clear_preview(apply_button, changes_list, validation_list)
 
 
 func _form_signature(operation: String) -> String:
@@ -408,36 +406,6 @@ func _form_signature(operation: String) -> String:
 	])
 
 
-func _render_changes(changes: Array) -> void:
-	_clear_children(changes_list)
-	if changes.is_empty():
-		_add_wrapped_label(changes_list, "No persisted values would change.")
-		return
-	for change_variant in changes:
-		if change_variant is not Dictionary:
-			continue
-		var change := change_variant as Dictionary
-		_add_wrapped_label(changes_list, "• %s: %s → %s" % [
-			str(change.get("field", "field")),
-			str(change.get("before", "∅")),
-			str(change.get("after", "∅")),
-		])
-
-
-func _render_validation(messages: Array) -> void:
-	_clear_children(validation_list)
-	if messages.is_empty():
-		_add_wrapped_label(validation_list, "No validation messages.")
-		return
-	for message_variant in messages:
-		if message_variant is not Dictionary:
-			continue
-		var message := message_variant as Dictionary
-		_add_wrapped_label(validation_list, "[%s] %s" % [
-			str(message.get("severity", "Info")).to_upper(),
-			str(message.get("message", "Validation message")),
-		])
-
 
 func _update_icon_preview(file_path: String) -> void:
 	icon_preview.texture = null
@@ -448,24 +416,6 @@ func _update_icon_preview(file_path: String) -> void:
 		return
 	icon_preview.texture = ImageTexture.create_from_image(image)
 
-
-func _add_wrapped_label(container: Node, text: String) -> void:
-	var label := Label.new()
-	label.text = text
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	container.add_child(label)
-
-
-func _operation_display_name(operation: String) -> String:
-	match operation:
-		"save_draft":
-			return "Save Draft"
-		"publish":
-			return "Publish"
-		"disable":
-			return "Disable"
-		_:
-			return operation.capitalize()
 
 
 func _clear_children(container: Node) -> void:
