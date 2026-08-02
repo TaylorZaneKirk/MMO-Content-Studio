@@ -1,12 +1,31 @@
 extends SceneTree
 
 const EXPECTED_API_VERSION := "1"
+const AuthoringWorkspaceSupport = preload("res://scripts/authoring_workspace_support.gd")
 
 
 func _initialize() -> void:
 	var main_scene := load("res://scenes/Main.tscn") as PackedScene
 	if main_scene == null:
 		push_error("T3A main scene or one of its scripts failed to parse")
+		quit(1)
+		return
+
+	var workspace_support := AuthoringWorkspaceSupport.new()
+	var apply_button := Button.new()
+	workspace_support.accept_preview(
+		"save_draft",
+		"fixture-signature",
+		true,
+		apply_button,
+		"Apply: Save Draft"
+	)
+	if not workspace_support.can_apply("save_draft", "fixture-signature"):
+		push_error("Shared workspace preview gate fixture mismatch")
+		quit(1)
+		return
+	if workspace_support.operation_name("save_draft") != "Save Draft":
+		push_error("Shared workspace operation-name fixture mismatch")
 		quit(1)
 		return
 
