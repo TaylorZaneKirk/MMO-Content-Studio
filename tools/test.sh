@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+python3 "${ROOT}/tools/check_forbidden_artifacts.py"
+
 python3 -m unittest discover -s "${ROOT}/tests/contract" -p 'test_*.py' -v
 
 if command -v dotnet >/dev/null 2>&1; then
