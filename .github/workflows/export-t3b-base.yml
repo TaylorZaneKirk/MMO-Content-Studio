@@ -1,0 +1,23 @@
+name: Export T3B base
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    if: github.head_ref == 'agent/export-t3b-base'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package source
+        run: |
+          tar --exclude=.git --exclude='./.github/workflows/export-t3b-base.yml' -czf /tmp/mcs-t3b-base.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcs-t3b-base
+          path: /tmp/mcs-t3b-base.tar.gz
+          retention-days: 1
