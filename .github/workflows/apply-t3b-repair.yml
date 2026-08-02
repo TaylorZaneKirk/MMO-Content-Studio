@@ -13,78 +13,28 @@ jobs:
         with:
           ref: ${{ github.head_ref }}
           fetch-depth: 0
-      - name: Restore immutable payload blobs
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      - name: Locate historical T3B trees
         shell: bash
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          import base64
-          import hashlib
-          import json
-          import os
-          import urllib.request
-
-          expected = {
-              'chunk-00': '30064ae41f9d38e3f4b569a1b2aef318cf20e203',
-              'chunk-01': 'ebc9df2994601c79e780fab4f18039d9070207bd',
-              'chunk-02': 'd5e094b31a7583b30a9aa19325a455aed92524ba',
-              'chunk-03': '14533cb4eb28b46bcc86380e3acab01c5af18dce',
-              'chunk-04': 'eb56af92c6ba036a2a197ab3382b4105187b1ad2',
-              'chunk-05': 'ad7cc86afacf0e5a647ed0a7049ab6482ea7e913',
-              'chunk-06': 'b81d22b09c782bebcb956d11062b886a90bebb2b',
-          }
-          root = Path('.t3b-bootstrap')
-          root.mkdir(exist_ok=True)
-          repository = os.environ['GITHUB_REPOSITORY']
-          token = os.environ['GITHUB_TOKEN']
-
-          for name, sha in expected.items():
-              request = urllib.request.Request(
-                  f'https://api.github.com/repos/{repository}/git/blobs/{sha}',
-                  headers={
-                      'Authorization': f'Bearer {token}',
-                      'Accept': 'application/vnd.github+json',
-                      'X-GitHub-Api-Version': '2022-11-28',
-                  },
-              )
-              with urllib.request.urlopen(request) as response:
-                  payload = json.load(response)
-              data = base64.b64decode(payload['content'])
-              actual = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
-              if actual != sha:
-                  raise SystemExit(f'{name} Git blob mismatch: expected {sha}, got {actual}')
-              (root / name).write_bytes(data)
-          PY
-      - name: Reconstruct and verify archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat .t3b-bootstrap/chunk-0[0-6] > /tmp/t3b.b64
-          base64 -d /tmp/t3b.b64 > /tmp/t3b.tar.gz
-          echo "5cf4c8a68033ae6fa2ea6d72639a6b4bde1345ed1c9920b14c8b06399d50a68d  /tmp/t3b.tar.gz" | sha256sum -c -
-          tar -xzf /tmp/t3b.tar.gz -C "$GITHUB_WORKSPACE"
-          rm -rf .t3b-bootstrap .github/workflows/apply-t3b.yml .github/workflows/apply-t3b-repair.yml
-      - name: Validate source contracts
-        run: python3 -m unittest discover -s tests/contract -p 'test_*.py' -v
-      - name: Verify repair scope
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f host/Services/HandItemAuthoringService.cs
-          test -f content-studio/scripts/hand_item_editor.gd
-          test -f integrations/mmo-project/prototype/sql/018_item_hand_and_tool_profiles.sql
-          test ! -e .t3b-bootstrap
-          test ! -e .github/workflows/apply-t3b.yml
-          test ! -e .github/workflows/apply-t3b-repair.yml
-      - name: Commit recovered implementation
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "fix: recover T3B implementation"
-          git push origin HEAD:${{ github.head_ref }}
+          git fetch --all --prune
+          echo "Recent graph:"
+          git log --all --oneline --decorate --graph -40
+          echo "Commits containing T3B host service:"
+          found=0
+          while read -r commit; do
+            if git cat-file -e "${commit}:host/Services/HandItemAuthoringService.cs" 2>/dev/null; then
+              echo "FOUND ${commit} $(git log -1 --format=%s "${commit}")"
+              found=1
+            fi
+          done < <(git rev-list --all)
+          echo "Commits containing T3B Godot editor:"
+          while read -r commit; do
+            if git cat-file -e "${commit}:content-studio/scripts/hand_item_editor.gd" 2>/dev/null; then
+              echo "FOUND_EDITOR ${commit} $(git log -1 --format=%s "${commit}")"
+            fi
+          done < <(git rev-list --all)
+          if [[ "${found}" -eq 0 ]]; then
+            echo "NO_T3B_TREE_FOUND"
+          fi
+          exit 1
