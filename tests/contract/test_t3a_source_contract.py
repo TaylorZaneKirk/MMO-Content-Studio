@@ -175,9 +175,15 @@ class T3ASourceContractTests(unittest.TestCase):
         self.assertIn("prototype-equipment-authoring-v1", options)
 
     def test_catalog_and_scene_expose_equipment_workspace(self) -> None:
-        catalog = (ROOT / "host" / "Services" / "ContentCatalogService.cs").read_text()
+        catalog = (
+            ROOT
+            / "host"
+            / "Features"
+            / "Equipment"
+            / "EquipmentCatalogSectionProvider.cs"
+        ).read_text()
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
-        self.assertIn('new ContentCatalogSection("equipment"', catalog)
+        self.assertIn('ContentType => "equipment"', catalog)
         self.assertIn("item.Equippable", catalog)
         self.assertIn('path="res://scripts/equipment_editor.gd"', scene)
         self.assertIn('[node name="Equipment" type="HBoxContainer"', scene)

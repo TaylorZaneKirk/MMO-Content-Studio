@@ -1,67 +1,39 @@
 using MMO.ContentStudio.AuthoringHost.Contracts;
+using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
 
-public sealed class ContentCatalogService
+public sealed class ContentCatalogService(
+    IEnumerable<IAuthoringCatalogSectionProvider> providers)
 {
-    private readonly BasicItemAuthoringService _basicItems;
-    private readonly ConsumableItemAuthoringService _consumables;
-    private readonly EquipmentItemAuthoringService _equipment;
+    private readonly IReadOnlyList<IAuthoringCatalogSectionProvider> _providers =
+        providers
+            .OrderBy(provider => provider.SortOrder)
+            .ThenBy(provider => provider.ContentType, StringComparer.Ordinal)
+            .ToArray();
 
-    public ContentCatalogService(
-        BasicItemAuthoringService basicItems,
-        ConsumableItemAuthoringService consumables,
-        EquipmentItemAuthoringService equipment)
+    public async Task<ContentCatalogResponse> LoadAsync(
+        CancellationToken cancellationToken = default)
     {
-        _basicItems = basicItems;
-        _consumables = consumables;
-        _equipment = equipment;
+        EnsureUniqueContentTypes();
+        var sections = new List<ContentCatalogSection>(_providers.Count);
+        foreach (var provider in _providers)
+        {
+            sections.Add(await provider.LoadAsync(cancellationToken));
+        }
+
+        return new ContentCatalogResponse(DateTimeOffset.UtcNow, sections);
     }
 
-    public async Task<ContentCatalogResponse> LoadAsync(CancellationToken cancellationToken = default)
+    private void EnsureUniqueContentTypes()
     {
-        var itemResult = await _basicItems.ListAsync(null, cancellationToken);
-        IReadOnlyList<ContentCatalogEntry> itemEntries =
-            itemResult.Succeeded && itemResult.Value is not null
-                ? itemResult.Value.Items.Select(item => new ContentCatalogEntry(
-                    item.ItemId,
-                    item.DisplayName,
-                    item.PublicationState)).ToArray()
-                : [];
-
-        var consumableResult = await _consumables.ListAsync(null, cancellationToken);
-        IReadOnlyList<ContentCatalogEntry> consumableEntries =
-            consumableResult.Succeeded && consumableResult.Value is not null
-                ? consumableResult.Value.Items
-                    .Where(item => item.HasConsumableProfile)
-                    .Select(item => new ContentCatalogEntry(
-                        item.ItemId,
-                        item.DisplayName,
-                        item.PublicationState))
-                    .ToArray()
-                : [];
-
-
-        var equipmentResult = await _equipment.ListAsync(null, cancellationToken);
-        IReadOnlyList<ContentCatalogEntry> equipmentEntries =
-            equipmentResult.Succeeded && equipmentResult.Value is not null
-                ? equipmentResult.Value.Items
-                    .Where(item => item.Equippable)
-                    .Select(item => new ContentCatalogEntry(
-                        item.ItemId,
-                        item.DisplayName,
-                        item.PublicationState))
-                    .ToArray()
-                : [];
-
-        return new ContentCatalogResponse(
-            DateTimeOffset.UtcNow,
-            [
-                new ContentCatalogSection("items", "Items", true, itemEntries),
-                new ContentCatalogSection("consumables", "Consumables", true, consumableEntries),
-                new ContentCatalogSection("equipment", "Equipment", true, equipmentEntries),
-                new ContentCatalogSection("mobs", "Mobs", false, []),
-                new ContentCatalogSection("npcs", "NPCs", false, [])
-            ]);
+        var duplicate = _providers
+            .GroupBy(provider => provider.ContentType, StringComparer.Ordinal)
+            .FirstOrDefault(group => group.Count() > 1);
+        if (duplicate is not null)
+        {
+            throw new InvalidOperationException(
+                $"Multiple authoring catalog providers registered for '{duplicate.Key}'.");
+        }
     }
 }
