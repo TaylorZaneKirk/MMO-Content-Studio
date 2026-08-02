@@ -1,4 +1,5 @@
 using MMO.ContentStudio.AuthoringHost.Contracts;
+using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Health;
 using MMO.ContentStudio.AuthoringHost.Http;
 using MMO.ContentStudio.AuthoringHost.Persistence;
@@ -14,6 +15,7 @@ public static class EquipmentAuthoringFeature
         services.AddSingleton<EquipmentItemValidator>();
         services.AddSingleton<EquipmentItemAuthoringService>();
         services.AddSingleton<IAuthoringSchemaRequirementProvider, EquipmentSchemaRequirements>();
+        services.AddSingleton<IAuthoringCatalogSectionProvider, EquipmentCatalogSectionProvider>();
         return services;
     }
 
