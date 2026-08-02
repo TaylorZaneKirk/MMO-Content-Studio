@@ -1,4 +1,5 @@
 using MMO.ContentStudio.AuthoringHost.Contracts;
+using MMO.ContentStudio.AuthoringHost.Health;
 using MMO.ContentStudio.AuthoringHost.Http;
 using MMO.ContentStudio.AuthoringHost.Persistence;
 using MMO.ContentStudio.AuthoringHost.Services;
@@ -12,6 +13,7 @@ public static class ConsumableAuthoringFeature
         services.AddSingleton<ConsumableItemRepository>();
         services.AddSingleton<ConsumableItemValidator>();
         services.AddSingleton<ConsumableItemAuthoringService>();
+        services.AddSingleton<IAuthoringSchemaRequirementProvider, ConsumableSchemaRequirements>();
         return services;
     }
 
