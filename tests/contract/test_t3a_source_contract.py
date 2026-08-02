@@ -119,6 +119,12 @@ class T3ASourceContractTests(unittest.TestCase):
         self.assertIn('path_join("actors").path_join("player")', editor)
         self.assertIn("DEFAULT_VISUAL_KEYS", editor)
         self.assertIn("_visual_frame_fallbacks", editor)
+        self.assertIn("PAPER_DOLL_STAGE_PADDING := 8.0", editor)
+        self.assertIn("PAPER_DOLL_ANCHOR_OFFSET := Vector2(-7, -7)", editor)
+        self.assertIn("_paper_doll_source_bounds", editor)
+        self.assertIn("_paper_doll_preview_scale", editor)
+        self.assertIn("_place_paper_doll_layer", editor)
+        self.assertNotIn("image.get_used_rect().size == Vector2i.ZERO", editor)
         self.assertIn("bonuses_variant is Dictionary", editor)
 
     def test_godot_client_supports_equipment_mutations(self) -> None:
