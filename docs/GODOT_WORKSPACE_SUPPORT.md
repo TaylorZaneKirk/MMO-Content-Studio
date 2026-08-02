@@ -1,7 +1,7 @@
 # Godot Authoring Workspace Support
 
-`AuthoringWorkspaceSupport` centralizes the UI behavior shared by every current
-content workspace:
+`AuthoringWorkspaceSupport` defines the reusable UI behavior that every content
+workspace needs:
 
 - preview signature, operation, and applicability state
 - invalidation when a form changes
@@ -11,10 +11,8 @@ content workspace:
 - validation-message rendering
 - publication-operation display names
 
-Items, Consumables, and Equipment keep ownership of their forms, payloads,
-preview requests, mutations, status wording, and visual previews. They delegate
-only the lifecycle and feedback behavior that must remain consistent across all
-workspaces.
+The support object is intentionally UI-only. It does not own HTTP requests,
+feature payloads, mutation routing, database access, or visual-preview logic.
 
 A future workspace should create one support instance and call:
 
@@ -23,6 +21,16 @@ A future workspace should create one support instance and call:
 3. `can_apply` immediately before sending a mutation.
 4. `render_changes` and `render_validation` for host feedback.
 
-This preserves the existing safety invariant: a mutation can only be submitted
-when the latest valid preview matches both the selected operation and the exact
+This preserves the safety invariant that a mutation can only be submitted when
+the latest valid preview matches both the selected operation and the exact
 current form signature.
+
+## Adoption sequence
+
+This PR adds the reusable foundation without changing the existing editors.
+Items, Consumables, and Equipment will migrate to it after PR #6's Godot HTTP
+transport passes its development-machine smoke test. Keeping those changes
+separate avoids stacking two unverified runtime refactors in the same UI path.
+
+The next new workspace may use this support object immediately, even before the
+existing editor migration is complete.
