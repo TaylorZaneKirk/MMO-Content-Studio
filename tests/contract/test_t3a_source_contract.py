@@ -12,23 +12,33 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class T3ASourceContractTests(unittest.TestCase):
     def test_t3a_read_and_mutation_routes_exist(self) -> None:
-        program = (ROOT / "host" / "Program.cs").read_text()
+        feature = (
+            ROOT
+            / "host"
+            / "Features"
+            / "Equipment"
+            / "EquipmentAuthoringFeature.cs"
+        ).read_text()
+        self.assertIn(
+            'MapGroup($"{AuthoringApi.RoutePrefix}/equipment")',
+            feature,
+        )
         for route in (
-            "/equipment/options",
-            "/equipment",
-            "/equipment/{{itemId}}",
-            "/equipment/{{itemId}}/preview",
-            "/equipment/{{itemId}}/draft",
-            "/equipment/{{itemId}}/publish",
-            "/equipment/{{itemId}}/disable",
+            'MapGet("/options"',
+            'MapGet(string.Empty',
+            'MapGet("/{itemId}"',
+            'MapPost("/{itemId}/preview"',
+            'MapPut("/{itemId}/draft"',
+            'MapPost("/{itemId}/publish"',
+            'MapPost("/{itemId}/disable"',
         ):
-            self.assertIn(route, program)
+            self.assertIn(route, feature)
         for service in (
             "EquipmentItemRepository",
             "EquipmentItemValidator",
             "EquipmentItemAuthoringService",
         ):
-            self.assertIn(f"AddSingleton<{service}>()", program)
+            self.assertIn(f"AddSingleton<{service}>()", feature)
 
     def test_contract_makes_equipability_explicit(self) -> None:
         contracts = (ROOT / "host" / "Contracts" / "EquipmentContracts.cs").read_text()

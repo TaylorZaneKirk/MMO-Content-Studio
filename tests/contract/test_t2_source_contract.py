@@ -12,16 +12,26 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class T2SourceContractTests(unittest.TestCase):
     def test_t2_routes_exist(self) -> None:
-        program = (ROOT / "host" / "Program.cs").read_text()
+        feature = (
+            ROOT
+            / "host"
+            / "Features"
+            / "Consumables"
+            / "ConsumableAuthoringFeature.cs"
+        ).read_text()
+        self.assertIn(
+            'MapGroup($"{AuthoringApi.RoutePrefix}/consumables")',
+            feature,
+        )
         for route in (
-            "/consumables/options",
-            "/consumables/{{itemId}}",
-            "/consumables/{{itemId}}/preview",
-            "/consumables/{{itemId}}/draft",
-            "/consumables/{{itemId}}/publish",
-            "/consumables/{{itemId}}/disable",
+            'MapGet("/options"',
+            'MapGet("/{itemId}"',
+            'MapPost("/{itemId}/preview"',
+            'MapPut("/{itemId}/draft"',
+            'MapPost("/{itemId}/publish"',
+            'MapPost("/{itemId}/disable"',
         ):
-            self.assertIn(route, program)
+            self.assertIn(route, feature)
 
     def test_consumable_schema_is_declarative_and_ordered(self) -> None:
         migration = (
@@ -74,8 +84,6 @@ class T2SourceContractTests(unittest.TestCase):
             self.assertIn(code, validator)
         self.assertIn("ValidForPublication", validator)
 
-
-
     def test_current_food_behavior_is_seeded_without_overwrite(self) -> None:
         migration = (
             ROOT
@@ -122,7 +130,6 @@ class T2SourceContractTests(unittest.TestCase):
         self.assertIn("_collect_requirements", editor)
         self.assertIn("_collect_effects", editor)
 
-
     def test_godot_consumable_functions_are_not_duplicated(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "consumable_editor.gd").read_text()
         function_names = [
@@ -149,7 +156,6 @@ class T2SourceContractTests(unittest.TestCase):
             self.assertIn(table, health)
         settings = (ROOT / "host" / "appsettings.json").read_text()
         self.assertIn("prototype-equipment-authoring-v1", settings)
-
 
     def test_published_result_items_are_database_guarded(self) -> None:
         migration = (

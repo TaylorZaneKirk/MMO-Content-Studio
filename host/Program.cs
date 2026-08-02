@@ -3,7 +3,8 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
-using MMO.ContentStudio.AuthoringHost.Persistence;
+using MMO.ContentStudio.AuthoringHost.Features;
+using MMO.ContentStudio.AuthoringHost.Http;
 using MMO.ContentStudio.AuthoringHost.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -31,18 +32,8 @@ builder.Services.Configure<AssetRootsOptions>(
 
 builder.Services.AddSingleton<AuthoringDatabaseConnectionFactory>();
 builder.Services.AddSingleton<AuthoringHealthService>();
-builder.Services.AddSingleton<ItemAssetService>();
-builder.Services.AddSingleton<ItemAssetAuthoringService>();
-builder.Services.AddSingleton<BasicItemRepository>();
-builder.Services.AddSingleton<BasicItemValidator>();
-builder.Services.AddSingleton<BasicItemAuthoringService>();
-builder.Services.AddSingleton<ConsumableItemRepository>();
-builder.Services.AddSingleton<ConsumableItemValidator>();
-builder.Services.AddSingleton<ConsumableItemAuthoringService>();
-builder.Services.AddSingleton<EquipmentItemRepository>();
-builder.Services.AddSingleton<EquipmentItemValidator>();
-builder.Services.AddSingleton<EquipmentItemAuthoringService>();
 builder.Services.AddSingleton<ContentCatalogService>();
+builder.Services.AddAuthoringFeatures();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
@@ -61,7 +52,6 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/system/handshake", (
     HttpContext context,
     IOptions<AuthoringHostOptions> options) =>
 {
-    var requestId = RequestIdProvider.Resolve(context);
     var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.0";
     var response = new HandshakeResponse(
         options.Value.ServiceName,
@@ -70,7 +60,7 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/system/handshake", (
         AuthoringApi.SupportedVersions,
         DateTimeOffset.UtcNow);
 
-    return Results.Ok(ApiEnvelope<HandshakeResponse>.Ok(requestId, response));
+    return AuthoringHttpResults.Ok(context, response);
 });
 
 app.MapGet($"{AuthoringApi.RoutePrefix}/system/health", async (
@@ -78,9 +68,8 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/system/health", async (
     AuthoringHealthService healthService,
     CancellationToken cancellationToken) =>
 {
-    var requestId = RequestIdProvider.Resolve(context);
     var response = await healthService.CheckAsync(cancellationToken);
-    return Results.Ok(ApiEnvelope<AuthoringHealthResponse>.Ok(requestId, response));
+    return AuthoringHttpResults.Ok(context, response);
 });
 
 app.MapGet($"{AuthoringApi.RoutePrefix}/catalog", async (
@@ -88,249 +77,11 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/catalog", async (
     ContentCatalogService catalogService,
     CancellationToken cancellationToken) =>
 {
-    var requestId = RequestIdProvider.Resolve(context);
     var response = await catalogService.LoadAsync(cancellationToken);
-    return Results.Ok(ApiEnvelope<ContentCatalogResponse>.Ok(requestId, response));
+    return AuthoringHttpResults.Ok(context, response);
 });
 
-app.MapGet($"{AuthoringApi.RoutePrefix}/assets/items", (
-    HttpContext context,
-    ItemAssetService assetService) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return Results.Ok(ApiEnvelope<ItemAssetCatalogResponse>.Ok(
-        requestId,
-        assetService.LoadCatalog()));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/assets/items/import", async (
-    HttpContext context,
-    ImportItemAssetRequest request,
-    ItemAssetAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.ImportAsync(request, cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/items", async (
-    HttpContext context,
-    string? search,
-    BasicItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.ListAsync(search, cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/items/{{itemId}}", async (
-    HttpContext context,
-    string itemId,
-    BasicItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.LoadAsync(itemId, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/items/{{itemId}}/preview", async (
-    HttpContext context,
-    string itemId,
-    BasicItemPreviewRequest request,
-    BasicItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.PreviewAsync(itemId, request, cancellationToken));
-});
-
-app.MapPut($"{AuthoringApi.RoutePrefix}/items/{{itemId}}/draft", async (
-    HttpContext context,
-    string itemId,
-    SaveBasicItemDraftRequest request,
-    BasicItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.SaveDraftAsync(itemId, request, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/items/{{itemId}}/publish", async (
-    HttpContext context,
-    string itemId,
-    PublicationMutationRequest request,
-    BasicItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(
-        requestId,
-        await service.PublishAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/items/{{itemId}}/disable", async (
-    HttpContext context,
-    string itemId,
-    PublicationMutationRequest request,
-    BasicItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(
-        requestId,
-        await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/consumables/options", async (
-    HttpContext context,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.LoadOptionsAsync(cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/consumables", async (
-    HttpContext context,
-    string? search,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.ListAsync(search, cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}", async (
-    HttpContext context,
-    string itemId,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.LoadAsync(itemId, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/preview", async (
-    HttpContext context,
-    string itemId,
-    ConsumablePreviewRequest request,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.PreviewAsync(itemId, request, cancellationToken));
-});
-
-app.MapPut($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/draft", async (
-    HttpContext context,
-    string itemId,
-    SaveConsumableDraftRequest request,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.SaveDraftAsync(itemId, request, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/publish", async (
-    HttpContext context,
-    string itemId,
-    PublicationMutationRequest request,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(
-        requestId,
-        await service.PublishAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/disable", async (
-    HttpContext context,
-    string itemId,
-    PublicationMutationRequest request,
-    ConsumableItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(
-        requestId,
-        await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
-});
-
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/equipment/options", async (
-    HttpContext context,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.LoadOptionsAsync(cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/equipment", async (
-    HttpContext context,
-    string? search,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.ListAsync(search, cancellationToken));
-});
-
-app.MapGet($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}", async (
-    HttpContext context,
-    string itemId,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.LoadAsync(itemId, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/preview", async (
-    HttpContext context,
-    string itemId,
-    EquipmentPreviewRequest request,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.PreviewAsync(itemId, request, cancellationToken));
-});
-
-app.MapPut($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/draft", async (
-    HttpContext context,
-    string itemId,
-    SaveEquipmentDraftRequest request,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.SaveDraftAsync(itemId, request, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/publish", async (
-    HttpContext context,
-    string itemId,
-    PublicationMutationRequest request,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.PublishAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
-});
-
-app.MapPost($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/disable", async (
-    HttpContext context,
-    string itemId,
-    PublicationMutationRequest request,
-    EquipmentItemAuthoringService service,
-    CancellationToken cancellationToken) =>
-{
-    var requestId = RequestIdProvider.Resolve(context);
-    return ToHttpResult(requestId, await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
-});
+app.MapAuthoringFeatures();
 
 app.MapFallback((HttpContext context) =>
 {
@@ -344,38 +95,3 @@ app.MapFallback((HttpContext context) =>
 });
 
 app.Run();
-
-static IResult ToHttpResult<T>(string requestId, AuthoringOperationResult<T> result)
-{
-    if (result.Succeeded && result.Value is not null)
-    {
-        return Results.Ok(ApiEnvelope<T>.Ok(requestId, result.Value));
-    }
-
-    var envelope = ApiEnvelope<T>.Failure(requestId, result.Errors.ToArray());
-    var codes = result.Errors.Select(error => error.Code).ToHashSet(StringComparer.Ordinal);
-    if (codes.Contains("item_not_found"))
-    {
-        return Results.NotFound(envelope);
-    }
-
-    if (codes.Contains("item_version_conflict")
-        || codes.Contains("wrong_authoring_workspace")
-        || codes.Contains("item_has_live_references")
-        || codes.Contains("item_has_published_consumable_references")
-        || codes.Contains("consumable_profile_missing")
-        || codes.Contains("weapon_or_tool_requires_t3b"))
-    {
-        return Results.Conflict(envelope);
-    }
-
-    if (codes.Contains("database_unavailable"))
-    {
-        return Results.Json(envelope, statusCode: StatusCodes.Status503ServiceUnavailable);
-    }
-
-    return Results.BadRequest(envelope);
-}
-
-public sealed record PublicationMutationRequest(
-    [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc);
