@@ -6,6 +6,9 @@ const PAPER_DOLL_VISIBLE_SLOTS := ["head", "cape", "body", "legs", "boots", "glo
 const DEFAULT_VISUAL_KEYS := {"head": "head1", "body": "defbod", "legs": "defbod"}
 const DEFAULT_PREVIEW_DIRECTION := "N"
 const DEFAULT_PREVIEW_FRAME := 3
+const PAPER_DOLL_STAGE_SIZE := Vector2(180, 180)
+const PAPER_DOLL_STAGE_PADDING := 8.0
+const PAPER_DOLL_ANCHOR_OFFSET := Vector2(-7, -7)
 
 var _client: AuthoringHostClient
 var _items: Array = []
@@ -168,16 +171,16 @@ func _build_ui() -> void:
 	doll_style.set_border_width_all(1)
 	doll_style.set_corner_radius_all(6)
 	doll_panel.add_theme_stylebox_override("panel", doll_style)
-	doll_panel.custom_minimum_size = Vector2(180, 180)
+	doll_panel.custom_minimum_size = PAPER_DOLL_STAGE_SIZE
 	doll_row.add_child(doll_panel)
 	_paper_doll_stage = Control.new()
-	_paper_doll_stage.custom_minimum_size = Vector2(180, 180)
+	_paper_doll_stage.clip_contents = true
+	_paper_doll_stage.custom_minimum_size = PAPER_DOLL_STAGE_SIZE
 	doll_panel.add_child(_paper_doll_stage)
 	for slot_name in PAPER_DOLL_LAYER_ORDER:
 		var layer := TextureRect.new()
-		layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		layer.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		layer.stretch_mode = TextureRect.STRETCH_SCALE
 		layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_paper_doll_stage.add_child(layer)
 		_paper_doll_layers[slot_name] = layer
@@ -753,6 +756,8 @@ func _update_paper_doll_preview() -> void:
 		var layer := _paper_doll_layers[slot_name] as TextureRect
 		layer.texture = null
 		layer.visible = false
+		layer.position = Vector2.ZERO
+		layer.size = Vector2.ZERO
 
 	if _game_client_assets_root.is_empty() or not DirAccess.dir_exists_absolute(_game_client_assets_root):
 		_paper_doll_status.text = "The configured game_client_assets directory is unavailable."
@@ -769,6 +774,7 @@ func _update_paper_doll_preview() -> void:
 		keys[selected_slot] = selected_key
 
 	var loaded_selected := selected_slot.is_empty() or selected_slot == "ring"
+	var loaded_layers := []
 	for slot_name in PAPER_DOLL_LAYER_ORDER:
 		var asset_key := str(keys.get(slot_name, ""))
 		if asset_key.is_empty():
@@ -777,11 +783,24 @@ func _update_paper_doll_preview() -> void:
 		if texture == null:
 			continue
 		var layer := _paper_doll_layers[slot_name] as TextureRect
-		layer.texture = texture
-		layer.visible = true
-		layer.z_index = _paper_doll_z_index(slot_name, direction)
+		loaded_layers.append({"slot_name": slot_name, "texture": texture, "layer": layer})
 		if slot_name == selected_slot:
 			loaded_selected = true
+
+	if not loaded_layers.is_empty():
+		var source_bounds := _paper_doll_source_bounds(loaded_layers)
+		var preview_scale := _paper_doll_preview_scale(source_bounds.size)
+		for layer_entry_variant: Variant in loaded_layers:
+			var layer_entry: Dictionary = layer_entry_variant
+			var slot_name := str(layer_entry.get("slot_name", ""))
+			var texture := layer_entry.get("texture") as Texture2D
+			var layer := layer_entry.get("layer") as TextureRect
+			if texture == null or layer == null:
+				continue
+			layer.texture = texture
+			layer.visible = true
+			layer.z_index = _paper_doll_z_index(slot_name, direction)
+			_place_paper_doll_layer(layer, texture, slot_name, source_bounds, preview_scale)
 
 	if not _equippable.button_pressed:
 		_paper_doll_status.text = "Not equippable: showing the default player layers only."
@@ -801,12 +820,52 @@ func _load_visual_texture(slot_name: String, asset_key: String, frame: int, dire
 		if _visual_texture_cache.has(file_path):
 			return _visual_texture_cache[file_path] as Texture2D
 		var image := Image.load_from_file(file_path)
-		if image == null or image.is_empty() or image.get_used_rect().size == Vector2i.ZERO:
+		if image == null or image.is_empty():
 			continue
 		var texture := ImageTexture.create_from_image(image)
 		_visual_texture_cache[file_path] = texture
 		return texture
 	return null
+
+
+func _paper_doll_source_bounds(loaded_layers: Array) -> Rect2:
+	var has_bounds := false
+	var source_bounds := Rect2(PAPER_DOLL_ANCHOR_OFFSET, Vector2.ZERO)
+	for layer_entry_variant: Variant in loaded_layers:
+		var layer_entry: Dictionary = layer_entry_variant
+		var texture := layer_entry.get("texture") as Texture2D
+		if texture == null:
+			continue
+		var slot_name := str(layer_entry.get("slot_name", ""))
+		var layer_rect := Rect2(PAPER_DOLL_ANCHOR_OFFSET + _paper_doll_layer_offset(slot_name), texture.get_size())
+		if not has_bounds:
+			source_bounds = layer_rect
+			has_bounds = true
+		else:
+			source_bounds = source_bounds.merge(layer_rect)
+	return source_bounds
+
+
+func _paper_doll_preview_scale(source_size: Vector2) -> float:
+	if source_size.x <= 0.0 or source_size.y <= 0.0:
+		return 1.0
+	var available_size := PAPER_DOLL_STAGE_SIZE - (Vector2.ONE * PAPER_DOLL_STAGE_PADDING * 2.0)
+	return minf(available_size.x / source_size.x, available_size.y / source_size.y)
+
+
+func _place_paper_doll_layer(layer: TextureRect, texture: Texture2D, slot_name: String, source_bounds: Rect2, preview_scale: float) -> void:
+	var display_size := texture.get_size() * preview_scale
+	var group_size := source_bounds.size * preview_scale
+	var group_origin := (PAPER_DOLL_STAGE_SIZE - group_size) * 0.5
+	var source_position := PAPER_DOLL_ANCHOR_OFFSET + _paper_doll_layer_offset(slot_name)
+	layer.size = display_size
+	layer.position = group_origin + ((source_position - source_bounds.position) * preview_scale)
+
+
+func _paper_doll_layer_offset(slot_name: String) -> Vector2:
+	if slot_name == "right_hand":
+		return Vector2.ZERO
+	return Vector2.ZERO
 
 
 func _find_visual_file(slot_name: String, asset_key: String, frame: int, direction: String) -> String:

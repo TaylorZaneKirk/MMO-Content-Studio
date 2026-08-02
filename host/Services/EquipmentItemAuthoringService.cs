@@ -466,8 +466,8 @@ public sealed class EquipmentItemAuthoringService
         if (!equippable)
         {
             return new NormalizedEquipmentDraft(
-                displayName.Trim(),
-                iconTexturePath.Trim(),
+                (displayName ?? string.Empty).Trim(),
+                (iconTexturePath ?? string.Empty).Trim(),
                 false,
                 null,
                 1,
@@ -477,17 +477,17 @@ public sealed class EquipmentItemAuthoringService
         }
 
         return new NormalizedEquipmentDraft(
-            displayName.Trim(),
-            iconTexturePath.Trim(),
+            (displayName ?? string.Empty).Trim(),
+            (iconTexturePath ?? string.Empty).Trim(),
             true,
             NormalizeOptional(equipmentSlotId),
             requiredStrength,
             (requirements ?? [])
-                .Select(value => new EquipmentSkillRequirementDraft(value.SkillId.Trim(), value.RequiredValue))
+                .Select(value => new EquipmentSkillRequirementDraft((value.SkillId ?? string.Empty).Trim(), value.RequiredValue))
                 .OrderBy(value => value.SkillId, StringComparer.Ordinal)
                 .ToArray(),
             (modifiers ?? [])
-                .Select(value => new EquipmentSkillModifierDraft(value.SkillId.Trim(), value.ModifierValue))
+                .Select(value => new EquipmentSkillModifierDraft((value.SkillId ?? string.Empty).Trim(), value.ModifierValue))
                 .OrderBy(value => value.SkillId, StringComparer.Ordinal)
                 .ToArray(),
             bonuses ?? EquipmentCombatBonusDefinition.Zero);
