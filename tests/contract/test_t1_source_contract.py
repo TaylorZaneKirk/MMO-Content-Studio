@@ -12,17 +12,20 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class T1SourceContractTests(unittest.TestCase):
     def test_t1_item_routes_exist(self) -> None:
-        program = (ROOT / "host" / "Program.cs").read_text()
+        feature = (
+            ROOT / "host" / "Features" / "Items" / "ItemAuthoringFeature.cs"
+        ).read_text()
         for route in (
-            "/assets/items",
-            "/assets/items/import",
-            "/items/{{itemId}}",
-            "/items/{{itemId}}/preview",
-            "/items/{{itemId}}/draft",
-            "/items/{{itemId}}/publish",
-            "/items/{{itemId}}/disable",
+            'MapGet("/assets/items"',
+            'MapPost("/assets/items/import"',
+            'MapGroup("/items")',
+            'MapGet("/{itemId}"',
+            'MapPost("/{itemId}/preview"',
+            'MapPut("/{itemId}/draft"',
+            'MapPost("/{itemId}/publish"',
+            'MapPost("/{itemId}/disable"',
         ):
-            self.assertIn(route, program)
+            self.assertIn(route, feature)
 
     def test_basic_item_writes_are_transactional_and_reload_verified(self) -> None:
         repository = (ROOT / "host" / "Persistence" / "BasicItemRepository.cs").read_text()
@@ -68,7 +71,6 @@ class T1SourceContractTests(unittest.TestCase):
         self.assertNotIn("npgsql", godot_sources)
         self.assertNotIn("insert into", godot_sources)
         self.assertNotIn("update item_definitions", godot_sources)
-
 
     def test_asset_import_is_guarded_and_non_overwriting(self) -> None:
         service = (ROOT / "host" / "Services" / "ItemAssetAuthoringService.cs").read_text()
