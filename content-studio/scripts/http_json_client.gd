@@ -1,0 +1,136 @@
+extends Node
+class_name AuthoringHttpTransport
+
+signal request_succeeded(operation: String, payload: Dictionary)
+signal request_failed(operation: String, message: String, errors: Array)
+
+const API_VERSION := "1"
+const DEFAULT_BASE_URL := "http://127.0.0.1:5187"
+const REQUEST_TIMEOUT_SECONDS := 8.0
+
+@export var base_url := DEFAULT_BASE_URL
+
+var _http_request: HTTPRequest
+var _operation := ""
+
+
+func _ready() -> void:
+	_http_request = HTTPRequest.new()
+	_http_request.timeout = REQUEST_TIMEOUT_SECONDS
+	_http_request.request_completed.connect(_on_request_completed)
+	add_child(_http_request)
+
+
+func is_busy() -> bool:
+	return not _operation.is_empty()
+
+
+func reset() -> void:
+	_operation = ""
+
+
+func request(
+	operation: String,
+	path: String,
+	method: int = HTTPClient.METHOD_GET,
+	payload: Dictionary = {}
+) -> void:
+	if is_busy():
+		request_failed.emit(operation, "Another host request is still in progress.", [])
+		return
+
+	_operation = operation
+	var headers := PackedStringArray([
+		"Accept: application/json",
+		"Content-Type: application/json",
+		"X-Content-Studio-Api-Version: %s" % API_VERSION,
+		"X-Request-Id: godot-%s" % str(Time.get_ticks_msec()),
+	])
+	var body := "" if method == HTTPClient.METHOD_GET else JSON.stringify(payload)
+	var error := _http_request.request(
+		base_url.trim_suffix("/") + path,
+		headers,
+		method,
+		body
+	)
+	if error != OK:
+		_fail_current("Unable to start request. Godot error code: %s" % error, [])
+
+
+func _on_request_completed(
+	result: int,
+	response_code: int,
+	_headers: PackedStringArray,
+	body: PackedByteArray
+) -> void:
+	var completed_operation := _operation
+	_operation = ""
+
+	if result != HTTPRequest.RESULT_SUCCESS:
+		request_failed.emit(
+			completed_operation,
+			"The authoring host could not be reached (result %s)." % result,
+			[]
+		)
+		return
+
+	var decoded: Variant = JSON.parse_string(body.get_string_from_utf8())
+	if typeof(decoded) != TYPE_DICTIONARY:
+		request_failed.emit(
+			completed_operation,
+			"The authoring host returned invalid JSON.",
+			[]
+		)
+		return
+
+	var envelope := decoded as Dictionary
+	var errors := envelope.get("errors", []) as Array
+	if response_code < 200 or response_code >= 300:
+		request_failed.emit(
+			completed_operation,
+			_extract_error_message(errors, response_code),
+			errors
+		)
+		return
+
+	if not envelope.get("success", false):
+		request_failed.emit(
+			completed_operation,
+			_extract_error_message(errors, response_code),
+			errors
+		)
+		return
+
+	if str(envelope.get("api_version", "")) != API_VERSION:
+		request_failed.emit(
+			completed_operation,
+			"API version mismatch. Studio expects %s but host returned %s." % [
+				API_VERSION,
+				str(envelope.get("api_version", "missing")),
+			],
+			[]
+		)
+		return
+
+	var data: Variant = envelope.get("data", {})
+	if typeof(data) != TYPE_DICTIONARY:
+		request_failed.emit(
+			completed_operation,
+			"The authoring host response did not include an object payload.",
+			[]
+		)
+		return
+
+	request_succeeded.emit(completed_operation, data as Dictionary)
+
+
+func _fail_current(message: String, errors: Array) -> void:
+	var failed_operation := _operation
+	_operation = ""
+	request_failed.emit(failed_operation, message, errors)
+
+
+func _extract_error_message(errors: Array, response_code: int) -> String:
+	if not errors.is_empty() and errors[0] is Dictionary:
+		return str(errors[0].get("message", "Host request failed."))
+	return "Host request failed with HTTP %s." % response_code

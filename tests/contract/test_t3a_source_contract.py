@@ -146,8 +146,8 @@ class T3ASourceContractTests(unittest.TestCase):
             "save_equipment_draft",
             "publish_equipment",
             "disable_equipment",
-            "RequestKind.EQUIPMENT_PREVIEW",
-            "RequestKind.EQUIPMENT_SAVE_DRAFT",
+            "OP_EQUIPMENT_PREVIEW",
+            "OP_EQUIPMENT_SAVE_DRAFT",
         ):
             self.assertIn(token, client)
 

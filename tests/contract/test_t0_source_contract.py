@@ -21,11 +21,11 @@ class T0SourceContractTests(unittest.TestCase):
 
     def test_host_and_godot_share_api_version(self) -> None:
         host_contract = (ROOT / "host" / "Contracts" / "ApiContracts.cs").read_text()
-        godot_client = (
-            ROOT / "content-studio" / "scripts" / "authoring_host_client.gd"
+        godot_transport = (
+            ROOT / "content-studio" / "scripts" / "http_json_client.gd"
         ).read_text()
         self.assertIn('CurrentVersion = "1"', host_contract)
-        self.assertIn('API_VERSION := "1"', godot_client)
+        self.assertIn('API_VERSION := "1"', godot_transport)
 
     def test_t0_routes_exist(self) -> None:
         program = (ROOT / "host" / "Program.cs").read_text()
