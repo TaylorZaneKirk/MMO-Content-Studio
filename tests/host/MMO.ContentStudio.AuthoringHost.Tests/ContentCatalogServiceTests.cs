@@ -1,6 +1,7 @@
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Services;
+using Xunit;
 
 namespace MMO.ContentStudio.AuthoringHost.Tests;
 
