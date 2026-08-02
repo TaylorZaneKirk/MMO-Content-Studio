@@ -45,3 +45,29 @@ transactionally, which is the intended correction path for historical
 name-derived slot assignments such as Chunk of Iron being mapped to a hand slot.
 The MMO database's runtime-publication and live-reference triggers remain the
 final authority during that operation.
+
+## T3B weapon/tool foundation integration
+
+T3B reuses the existing MMO Project equipment and combat tables for base item
+metadata, slots, requirements, modifiers, `item_combat_profiles`, and
+`item_combat_bonuses`.
+
+`prototype/sql/018_item_tool_capabilities.sql` adds the only new table required
+by this foundation slice. This integration artifact is mirrored into the local
+MMO Project runtime checkout for development verification:
+
+- `item_tool_capabilities`
+- one row per item/capability ID
+- deterministic `capability_order`
+- optional declarative animation/effect resource IDs
+- a hand-slot guard requiring the owning item to be `right_hand` or `left_hand`
+
+Tool capabilities are declarative metadata. The migration does not introduce
+durability, ammo, charges, item-instance state, or executable behavior. A later
+runtime gathering/tool-use slice must decide how to consume these rows
+server-authoritatively.
+
+The Content Studio host intentionally publishes only runtime-supported weapon
+profiles today: active weapons are `right_hand`, attack family is `melee`,
+styles are `thrust`, `slash`, or `crush`, range is logical tiles, and timing is
+stored as `attack_speed_units`.

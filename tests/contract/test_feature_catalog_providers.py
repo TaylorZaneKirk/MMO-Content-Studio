@@ -40,6 +40,12 @@ class FeatureCatalogProviderTests(unittest.TestCase):
                 "EquipmentItemAuthoringService",
                 "item.Equippable",
             ),
+            "HandEquipment": (
+                "HandEquipmentCatalogSectionProvider.cs",
+                "hand_equipment",
+                "HandEquipmentAuthoringService",
+                "EquipmentItemRepository.IsHandSlot",
+            ),
         }
         for feature, (file_name, *tokens) in expectations.items():
             source = (FEATURES / feature / file_name).read_text()
@@ -51,6 +57,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
             ("Items", "ItemAuthoringFeature.cs", "ItemCatalogSectionProvider"),
             ("Consumables", "ConsumableAuthoringFeature.cs", "ConsumableCatalogSectionProvider"),
             ("Equipment", "EquipmentAuthoringFeature.cs", "EquipmentCatalogSectionProvider"),
+            ("HandEquipment", "HandEquipmentAuthoringFeature.cs", "HandEquipmentCatalogSectionProvider"),
         )
         for feature, file_name, provider in expectations:
             source = (FEATURES / feature / file_name).read_text()
@@ -70,6 +77,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
             "BasicItemAuthoringService",
             "ConsumableItemAuthoringService",
             "EquipmentItemAuthoringService",
+            "HandEquipmentAuthoringService",
             "item.HasConsumableProfile",
             "item.Equippable",
         ):

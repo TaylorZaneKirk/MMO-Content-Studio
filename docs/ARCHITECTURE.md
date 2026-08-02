@@ -49,6 +49,7 @@ An operation may synchronize multiple tables, including:
 - Equipment metadata
 - Combat profiles
 - Combat bonuses
+- Tool capabilities
 - Skill modifiers
 - Asset references
 - Publication state
@@ -188,3 +189,37 @@ the selected wearable in four directions and four frames. It mirrors the current
 north-frame fallback, legacy filename normalization, and layer z-order rules.
 Explicit directional asset overrides require a later schema and runtime
 integration rather than being invented solely in Content Studio.
+
+## T3B hand-equipment aggregate
+
+T3B keeps weapons and tools inside the equipment domain:
+
+```text
+item_definitions
+  ├─ equipment_slot_id / required_strength
+  ├─ item_skill_requirements
+  ├─ item_skill_modifiers
+  ├─ item_combat_profiles (optional weapon_profile)
+  ├─ item_combat_bonuses
+  └─ item_tool_capabilities (ordered declarative tool capabilities)
+```
+
+`right_hand` and `left_hand` are the only hand slot identifiers. The current
+game server resolves active weapon combat profiles from `right_hand`, so
+publication validation follows that runtime fact: published `right_hand` items
+must have a valid `weapon_profile`, and `left_hand` weapon profiles are blocked
+until the runtime supports them.
+
+Weapon profile data remains narrow and declarative. Range is stored in logical
+tiles, attack speed is stored as `attack_speed_units`, and combat bonuses stay
+in `item_combat_bonuses` rather than being duplicated in the profile.
+
+Tool behavior is also declarative. `item_tool_capabilities` stores ordered
+capability identifiers such as `mining`; it does not store durability, ammo,
+charges, arbitrary scripts, or item-instance state.
+
+T3B API mutations require a matching `preview_signature` in addition to the
+aggregate `updated_at` concurrency token. The host locks the base item row,
+replaces child collections, clears stale hand specialization rows when
+equipability or slot changes, reloads inside the transaction, commits, and then
+reloads again to verify the persisted aggregate.

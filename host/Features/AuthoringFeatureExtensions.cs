@@ -1,6 +1,7 @@
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Features.Consumables;
 using MMO.ContentStudio.AuthoringHost.Features.Equipment;
+using MMO.ContentStudio.AuthoringHost.Features.HandEquipment;
 using MMO.ContentStudio.AuthoringHost.Features.Items;
 
 namespace MMO.ContentStudio.AuthoringHost.Features;
@@ -12,6 +13,7 @@ public static class AuthoringFeatureExtensions
         services.AddItemAuthoring();
         services.AddConsumableAuthoring();
         services.AddEquipmentAuthoring();
+        services.AddHandEquipmentAuthoring();
         services.AddSingleton<IAuthoringCatalogSectionProvider>(
             new PlannedCatalogSectionProvider("mobs", "Mobs", 400));
         services.AddSingleton<IAuthoringCatalogSectionProvider>(
@@ -25,6 +27,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapItemAuthoring();
         endpoints.MapConsumableAuthoring();
         endpoints.MapEquipmentAuthoring();
+        endpoints.MapHandEquipmentAuthoring();
         return endpoints;
     }
 }

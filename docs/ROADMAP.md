@@ -66,7 +66,27 @@ Exit condition:
 
 ## T3B — Weapons and Tools
 
-Add explicit combat profiles, attack family/style, range, attack speed, weapon animation references, and tool capability metadata.
+**Status:** Backend/domain/API foundation complete; full Godot editor and development-machine runtime verification pending.
+
+Capabilities:
+
+- Search hand-equipment candidates and derive `Weapon`, `Tool`, and `Weapon + Tool` classification labels without adding a new top-level item kind
+- Load the complete base/equipment/specialization aggregate
+- Author `right_hand` and `left_hand` equipment while preserving wearable declassification paths
+- Author optional `weapon_profile` rows using runtime-supported melee family/style, logical tile range, and `attack_speed_units`
+- Preserve combat-bonus ownership in `item_combat_bonuses`
+- Author zero or more ordered declarative `tool_capabilities`
+- Require preview signatures before save, publish, or disable apply calls
+- Replace child collections transactionally and clear stale hand specialization rows when equipability or slot changes
+- Reject publication states that the current runtime cannot load, including left-hand weapon profiles and right-hand items without a weapon profile
+- Defer durability, ammo, charges, item instance state, two-handed rules, and the full Godot weapon/tool editor
+
+Exit condition:
+
+> A maintainer can use the host API to safely author the hand-equipment domain
+> aggregate and tool-capability persistence without manually editing linked SQL
+> tables, while runtime-unsupported combat/tool semantics remain blocked from
+> publication.
 
 ## T4 — Mobs
 

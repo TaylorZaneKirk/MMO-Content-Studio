@@ -41,7 +41,7 @@ equipment schema contract, and configured asset-root status.
 
 ### `GET /api/v1/catalog`
 
-Returns the top-level content catalog. Items, Consumables, and Equipment are implemented; Mobs and NPCs remain planned workspaces.
+Returns the top-level content catalog. Items, Consumables, Equipment, and Weapons and Tools are implemented; Mobs and NPCs remain planned workspaces.
 
 ## Item asset routes
 
@@ -125,6 +125,102 @@ Publish and disable requests include:
 
 This optimistic-concurrency token is required for mutations of existing items
 and prevents stale authoring sessions from silently overwriting newer changes.
+
+## Hand-equipment routes
+
+T3B Phase 1 adds backend/API support for weapons and tools through equipment
+aggregates. It does not add the full Godot weapon/tool editor.
+
+### `GET /api/v1/hand-equipment/options`
+
+Returns supported hand slots, wearable slots for declassification, skills,
+combat bonus fields, attack families/styles, tool capability IDs, and weapon
+animation refs.
+
+Current runtime-supported weapon publication values are:
+
+- hand slots: `right_hand`, `left_hand`
+- active weapon slot: `right_hand`
+- attack family: `melee`
+- attack styles: `thrust`, `slash`, `crush`
+- attack speed storage: `attack_speed_units` where one unit is 600 milliseconds
+- range storage: logical tiles
+
+### `GET /api/v1/hand-equipment?search=hammer`
+
+Lists hand-equipment candidates with derived classification labels such as
+`Weapon`, `Tool`, and `Weapon + Tool`. These are feature-owned derived labels;
+they do not create a new top-level item kind.
+
+### `GET /api/v1/hand-equipment/{itemId}`
+
+Loads one aggregate containing:
+
+- base item definition and publication state
+- equipability, `equipment_slot_id`, and required Strength
+- skill requirements and skill modifiers
+- optional `weapon_profile`
+- `combat_bonuses`
+- ordered `tool_capabilities`
+- aggregate `updated_at_utc` concurrency token
+
+### `POST /api/v1/hand-equipment/{itemId}/preview`
+
+Validates `save_draft`, `publish`, or `disable` and returns logical changes plus
+a `preview_signature`.
+
+```json
+{
+  "display_name": "Mining Hammer",
+  "icon_texture_path": "res://assets/items/Inventory_17_Mining Hammer.png",
+  "equippable": true,
+  "equipment_slot_id": "right_hand",
+  "required_strength": 1,
+  "requirements": [
+    { "skill_id": "mining", "required_value": 1 }
+  ],
+  "skill_modifiers": [
+    { "skill_id": "mining", "modifier_value": 1 }
+  ],
+  "weapon_profile": null,
+  "combat_bonuses": null,
+  "tool_capabilities": [
+    {
+      "capability_id": "mining",
+      "power_tier": 1,
+      "action_animation_id": null,
+      "effect_resource_id": null
+    }
+  ],
+  "expected_updated_at_utc": "2026-08-02T12:00:00Z",
+  "target_operation": "save_draft"
+}
+```
+
+### `PUT /api/v1/hand-equipment/{itemId}/draft`
+
+Applies the same logical draft that was previewed. The request includes
+`preview_signature` and `expected_updated_at_utc`; a stale or mismatched preview
+is rejected.
+
+### `POST /api/v1/hand-equipment/{itemId}/publish`
+
+Publishes the saved aggregate after strict validation. The current runtime
+requires published `right_hand` items to have a valid `weapon_profile`; `left_hand`
+weapon profiles are rejected until the runtime resolves them.
+
+```json
+{
+  "expected_updated_at_utc": "2026-08-02T12:00:00Z",
+  "preview_signature": "hex-sha256-preview-signature"
+}
+```
+
+### `POST /api/v1/hand-equipment/{itemId}/disable`
+
+Disables the saved aggregate after preview/signature and live-reference checks.
+Saving or disabling a published item returns it to draft state and remains
+blocked while live inventory, equipment, or ground-item state references it.
 
 ## Request correlation
 
