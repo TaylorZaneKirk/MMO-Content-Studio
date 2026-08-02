@@ -77,66 +77,30 @@ public sealed class EquipmentItemRepository
     {
         const string sql = """
             select
-                item_definitions.item_id,
-                item_definitions.item_name,
-                item_definitions.icon_texture_path,
-                item_definitions.equipment_slot_id,
-                equipment_slot_definitions.display_name as equipment_slot_display_name,
-                item_definitions.runtime_enabled,
-                item_definitions.required_strength,
-                item_definitions.updated_at,
-                exists (
-                    select 1 from item_consumable_profiles cp
-                    where cp.item_id = item_definitions.item_id
-                ) as has_consumable_profile,
-                exists (
-                    select 1 from item_combat_profiles profile
-                    where profile.item_id = item_definitions.item_id
-                ) as has_combat_profile,
-                exists (
-                    select 1 from item_combat_bonuses bonuses
-                    where bonuses.item_id = item_definitions.item_id
-                ) as has_combat_bonuses,
-                exists (
-                    select 1 from item_skill_requirements requirements
-                    where requirements.item_id = item_definitions.item_id
-                ) as has_skill_requirements,
-                exists (
-                    select 1 from item_skill_modifiers modifiers
-                    where modifiers.item_id = item_definitions.item_id
-                ) as has_skill_modifiers
-            from item_definitions
-            left join equipment_slot_definitions
-                on equipment_slot_definitions.slot_id = item_definitions.equipment_slot_id
-            where (
-                    item_definitions.equipment_slot_id is not null
-                    or item_definitions.required_strength > 1
-                    or exists (
-                        select 1 from item_combat_profiles profile
-                        where profile.item_id = item_definitions.item_id
-                    )
-                    or exists (
-                        select 1 from item_combat_bonuses bonuses
-                        where bonuses.item_id = item_definitions.item_id
-                    )
-                    or exists (
-                        select 1 from item_skill_requirements requirements
-                        where requirements.item_id = item_definitions.item_id
-                    )
-                    or exists (
-                        select 1 from item_skill_modifiers modifiers
-                        where modifiers.item_id = item_definitions.item_id
-                    )
-                )
-              and (
-                    @search is null
-                    or item_definitions.item_id ilike '%' || @search || '%'
-                    or item_definitions.item_name ilike '%' || @search || '%'
-                    or item_definitions.equipment_slot_id ilike '%' || @search || '%'
-                )
-            order by equipment_slot_definitions.sort_order nulls last,
-                item_definitions.item_name,
-                item_definitions.item_id;
+                i.item_id,
+                i.item_name,
+                i.icon_texture_path,
+                i.equipment_slot_id,
+                slot.display_name as equipment_slot_display_name,
+                i.runtime_enabled,
+                i.required_strength,
+                i.updated_at,
+                exists (select 1 from item_consumable_profiles p where p.item_id = i.item_id) as has_consumable_profile,
+                exists (select 1 from item_combat_profiles p where p.item_id = i.item_id) as has_combat_profile,
+                exists (select 1 from item_combat_bonuses b where b.item_id = i.item_id) as has_combat_bonuses,
+                exists (select 1 from item_skill_requirements r where r.item_id = i.item_id) as has_skill_requirements,
+                exists (select 1 from item_skill_modifiers m where m.item_id = i.item_id) as has_skill_modifiers
+            from item_definitions i
+            left join equipment_slot_definitions slot on slot.slot_id = i.equipment_slot_id
+            where @search is null
+               or i.item_id ilike '%' || @search || '%'
+               or i.item_name ilike '%' || @search || '%'
+               or i.equipment_slot_id ilike '%' || @search || '%'
+            order by
+                case when i.equipment_slot_id is null then 1 else 0 end,
+                slot.sort_order nulls last,
+                i.item_name,
+                i.item_id;
             """;
 
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
@@ -159,23 +123,101 @@ public sealed class EquipmentItemRepository
         CancellationToken cancellationToken = default)
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
-        var record = await LoadBaseAsync(connection, itemId, cancellationToken);
-        if (record is null)
+        return await LoadAggregateAsync(connection, null, itemId, false, cancellationToken);
+    }
+
+    public async Task<EquipmentItemRecord> SaveDraftAsync(
+        string itemId,
+        NormalizedEquipmentDraft draft,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken)
+            ?? throw new EquipmentItemNotFoundException(itemId);
+        EnsureExpectedVersion(existing, expectedUpdatedAtUtc);
+        EnsureNotConsumable(existing);
+
+        if (draft.Equippable && existing.HasCombatProfile)
         {
-            return null;
+            throw new EquipmentKindConflictException(
+                itemId,
+                "Items with combat profiles must be edited in the T3B Weapons and Tools workspace. Turn off Equippable to deliberately remove all equipment and combat metadata.");
         }
 
-        var requirements = await LoadRequirementsAsync(connection, itemId, cancellationToken);
-        var modifiers = await LoadModifiersAsync(connection, itemId, cancellationToken);
-        var combatProfile = await LoadCombatProfileAsync(connection, itemId, cancellationToken);
-        var combatBonuses = await LoadCombatBonusesAsync(connection, itemId, cancellationToken);
-        return record with
+        const string itemSql = """
+            update item_definitions
+            set item_name = @item_name,
+                icon_texture_path = @icon_texture_path,
+                equipment_slot_id = @equipment_slot_id,
+                required_strength = @required_strength,
+                runtime_enabled = false,
+                updated_at = now()
+            where item_id = @item_id;
+            """;
+        await using (var command = new NpgsqlCommand(itemSql, connection, transaction))
         {
-            Requirements = requirements,
-            SkillModifiers = modifiers,
-            CombatProfile = combatProfile,
-            CombatBonuses = combatBonuses
-        };
+            command.Parameters.AddWithValue("item_id", itemId);
+            command.Parameters.AddWithValue("item_name", draft.DisplayName);
+            command.Parameters.AddWithValue("icon_texture_path", draft.IconTexturePath);
+            command.Parameters.Add("equipment_slot_id", NpgsqlDbType.Text).Value =
+                (object?)draft.EquipmentSlotId ?? DBNull.Value;
+            command.Parameters.AddWithValue("required_strength", draft.RequiredStrength);
+            var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+            if (affected != 1)
+            {
+                throw new InvalidOperationException($"Expected to update one item '{itemId}', but updated {affected} rows.");
+            }
+        }
+
+        if (draft.Equippable)
+        {
+            await ReplaceRequirementsAsync(connection, transaction, itemId, draft.Requirements, cancellationToken);
+            await ReplaceModifiersAsync(connection, transaction, itemId, draft.SkillModifiers, cancellationToken);
+            await ReplaceCombatBonusesAsync(connection, transaction, itemId, draft.CombatBonuses, cancellationToken);
+        }
+        else
+        {
+            await DeleteEquipmentMetadataAsync(connection, transaction, itemId, cancellationToken);
+        }
+
+        var saved = await LoadAggregateAsync(connection, transaction, itemId, false, cancellationToken)
+            ?? throw new InvalidOperationException("Saved equipment item could not be reloaded inside its transaction.");
+        await transaction.CommitAsync(cancellationToken);
+        return saved;
+    }
+
+    public async Task<EquipmentItemRecord> SetPublicationAsync(
+        string itemId,
+        bool runtimeEnabled,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken)
+            ?? throw new EquipmentItemNotFoundException(itemId);
+        EnsureExpectedVersion(existing, expectedUpdatedAtUtc);
+        EnsureNotConsumable(existing);
+        if (existing.RuntimeEnabled != runtimeEnabled)
+        {
+            const string sql = """
+                update item_definitions
+                set runtime_enabled = @runtime_enabled,
+                    updated_at = now()
+                where item_id = @item_id;
+                """;
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("runtime_enabled", runtimeEnabled);
+            command.Parameters.AddWithValue("item_id", itemId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var saved = await LoadAggregateAsync(connection, transaction, itemId, false, cancellationToken)
+            ?? throw new InvalidOperationException("Equipment publication change could not be reloaded inside its transaction.");
+        await transaction.CommitAsync(cancellationToken);
+        return saved;
     }
 
     public static bool IsWearableSlot(string? slotId) =>
@@ -184,48 +226,63 @@ public sealed class EquipmentItemRepository
     public static bool IsHandSlot(string? slotId) =>
         slotId is "left_hand" or "right_hand";
 
-    private static async Task<EquipmentItemRecord?> LoadBaseAsync(
+    public static bool HasEquipmentMetadata(EquipmentItemRecord record) =>
+        record.EquipmentSlotId is not null
+        || record.RequiredStrength != 1
+        || record.HasCombatProfile
+        || record.HasCombatBonuses
+        || record.HasSkillRequirements
+        || record.HasSkillModifiers;
+
+    private static async Task<EquipmentItemRecord?> LoadAggregateAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         string itemId,
+        bool forUpdate,
         CancellationToken cancellationToken)
     {
-        const string sql = """
-            select
-                item_definitions.item_id,
-                item_definitions.item_name,
-                item_definitions.icon_texture_path,
-                item_definitions.equipment_slot_id,
-                equipment_slot_definitions.display_name as equipment_slot_display_name,
-                item_definitions.runtime_enabled,
-                item_definitions.required_strength,
-                item_definitions.updated_at,
-                exists (
-                    select 1 from item_consumable_profiles cp
-                    where cp.item_id = item_definitions.item_id
-                ) as has_consumable_profile,
-                exists (
-                    select 1 from item_combat_profiles profile
-                    where profile.item_id = item_definitions.item_id
-                ) as has_combat_profile,
-                exists (
-                    select 1 from item_combat_bonuses bonuses
-                    where bonuses.item_id = item_definitions.item_id
-                ) as has_combat_bonuses,
-                exists (
-                    select 1 from item_skill_requirements requirements
-                    where requirements.item_id = item_definitions.item_id
-                ) as has_skill_requirements,
-                exists (
-                    select 1 from item_skill_modifiers modifiers
-                    where modifiers.item_id = item_definitions.item_id
-                ) as has_skill_modifiers
-            from item_definitions
-            left join equipment_slot_definitions
-                on equipment_slot_definitions.slot_id = item_definitions.equipment_slot_id
-            where item_definitions.item_id = @item_id;
-            """;
+        var baseRecord = await LoadBaseAsync(connection, transaction, itemId, forUpdate, cancellationToken);
+        if (baseRecord is null)
+        {
+            return null;
+        }
 
-        await using var command = new NpgsqlCommand(sql, connection);
+        return baseRecord with
+        {
+            Requirements = await LoadRequirementsAsync(connection, transaction, itemId, cancellationToken),
+            SkillModifiers = await LoadModifiersAsync(connection, transaction, itemId, cancellationToken),
+            CombatProfile = await LoadCombatProfileAsync(connection, transaction, itemId, cancellationToken),
+            CombatBonuses = await LoadCombatBonusesAsync(connection, transaction, itemId, cancellationToken)
+        };
+    }
+
+    private static async Task<EquipmentItemRecord?> LoadBaseAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        bool forUpdate,
+        CancellationToken cancellationToken)
+    {
+        var sql = """
+            select
+                i.item_id,
+                i.item_name,
+                i.icon_texture_path,
+                i.equipment_slot_id,
+                slot.display_name as equipment_slot_display_name,
+                i.runtime_enabled,
+                i.required_strength,
+                i.updated_at,
+                exists (select 1 from item_consumable_profiles p where p.item_id = i.item_id) as has_consumable_profile,
+                exists (select 1 from item_combat_profiles p where p.item_id = i.item_id) as has_combat_profile,
+                exists (select 1 from item_combat_bonuses b where b.item_id = i.item_id) as has_combat_bonuses,
+                exists (select 1 from item_skill_requirements r where r.item_id = i.item_id) as has_skill_requirements,
+                exists (select 1 from item_skill_modifiers m where m.item_id = i.item_id) as has_skill_modifiers
+            from item_definitions i
+            left join equipment_slot_definitions slot on slot.slot_id = i.equipment_slot_id
+            where i.item_id = @item_id
+            """ + (forUpdate ? " for update of i;" : ";");
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
@@ -235,22 +292,18 @@ public sealed class EquipmentItemRepository
 
     private static async Task<IReadOnlyList<EquipmentSkillRequirementDefinition>> LoadRequirementsAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         string itemId,
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select
-                item_skill_requirements.skill_id,
-                skill_definitions.display_name,
-                item_skill_requirements.required_value
-            from item_skill_requirements
-            join skill_definitions
-                on skill_definitions.skill_id = item_skill_requirements.skill_id
-            where item_skill_requirements.item_id = @item_id
-            order by skill_definitions.sort_order, skill_definitions.display_name, item_skill_requirements.skill_id;
+            select r.skill_id, s.display_name, r.required_value
+            from item_skill_requirements r
+            join skill_definitions s on s.skill_id = r.skill_id
+            where r.item_id = @item_id
+            order by s.sort_order, s.display_name, r.skill_id;
             """;
-
-        await using var command = new NpgsqlCommand(sql, connection);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var records = new List<EquipmentSkillRequirementDefinition>();
@@ -267,22 +320,18 @@ public sealed class EquipmentItemRepository
 
     private static async Task<IReadOnlyList<EquipmentSkillModifierDefinition>> LoadModifiersAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         string itemId,
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select
-                item_skill_modifiers.skill_id,
-                skill_definitions.display_name,
-                item_skill_modifiers.modifier_value
-            from item_skill_modifiers
-            join skill_definitions
-                on skill_definitions.skill_id = item_skill_modifiers.skill_id
-            where item_skill_modifiers.item_id = @item_id
-            order by skill_definitions.sort_order, skill_definitions.display_name, item_skill_modifiers.skill_id;
+            select m.skill_id, s.display_name, m.modifier_value
+            from item_skill_modifiers m
+            join skill_definitions s on s.skill_id = m.skill_id
+            where m.item_id = @item_id
+            order by s.sort_order, s.display_name, m.skill_id;
             """;
-
-        await using var command = new NpgsqlCommand(sql, connection);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var records = new List<EquipmentSkillModifierDefinition>();
@@ -299,22 +348,17 @@ public sealed class EquipmentItemRepository
 
     private static async Task<EquipmentCombatProfileDefinition?> LoadCombatProfileAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         string itemId,
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select
-                profile_id,
-                attack_type,
-                accuracy_style,
-                minimum_range_tiles,
-                maximum_range_tiles,
-                attack_speed_units
+            select profile_id, attack_type, accuracy_style,
+                minimum_range_tiles, maximum_range_tiles, attack_speed_units
             from item_combat_profiles
             where item_id = @item_id;
             """;
-
-        await using var command = new NpgsqlCommand(sql, connection);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken))
@@ -334,29 +378,18 @@ public sealed class EquipmentItemRepository
 
     private static async Task<EquipmentCombatBonusDefinition?> LoadCombatBonusesAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
         string itemId,
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select
-                attack_thrust,
-                attack_slash,
-                attack_crush,
-                attack_ranged,
-                attack_magic,
-                strength_melee,
-                strength_ranged,
-                strength_magic,
-                defence_thrust,
-                defence_slash,
-                defence_crush,
-                defence_ranged,
-                defence_magic
+            select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
+                strength_melee, strength_ranged, strength_magic,
+                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic
             from item_combat_bonuses
             where item_id = @item_id;
             """;
-
-        await using var command = new NpgsqlCommand(sql, connection);
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
@@ -375,6 +408,136 @@ public sealed class EquipmentItemRepository
                 reader.GetInt32(reader.GetOrdinal("defence_ranged")),
                 reader.GetInt32(reader.GetOrdinal("defence_magic")))
             : null;
+    }
+
+    private static async Task ReplaceRequirementsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        IReadOnlyList<EquipmentSkillRequirementDraft> requirements,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteDeleteAsync(connection, transaction, "item_skill_requirements", itemId, cancellationToken);
+        const string sql = """
+            insert into item_skill_requirements (item_id, skill_id, required_value)
+            values (@item_id, @skill_id, @required_value);
+            """;
+        foreach (var requirement in requirements)
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("item_id", itemId);
+            command.Parameters.AddWithValue("skill_id", requirement.SkillId);
+            command.Parameters.AddWithValue("required_value", requirement.RequiredValue);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    private static async Task ReplaceModifiersAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        IReadOnlyList<EquipmentSkillModifierDraft> modifiers,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
+        const string sql = """
+            insert into item_skill_modifiers (item_id, skill_id, modifier_value)
+            values (@item_id, @skill_id, @modifier_value);
+            """;
+        foreach (var modifier in modifiers)
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("item_id", itemId);
+            command.Parameters.AddWithValue("skill_id", modifier.SkillId);
+            command.Parameters.AddWithValue("modifier_value", modifier.ModifierValue);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    private static async Task ReplaceCombatBonusesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        EquipmentCombatBonusDefinition bonuses,
+        CancellationToken cancellationToken)
+    {
+        if (bonuses.IsZero)
+        {
+            await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
+            return;
+        }
+
+        const string sql = """
+            insert into item_combat_bonuses (
+                item_id,
+                attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
+                strength_melee, strength_ranged, strength_magic,
+                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
+                updated_at
+            ) values (
+                @item_id,
+                @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
+                @strength_melee, @strength_ranged, @strength_magic,
+                @defence_thrust, @defence_slash, @defence_crush, @defence_ranged, @defence_magic,
+                now()
+            )
+            on conflict (item_id) do update set
+                attack_thrust = excluded.attack_thrust,
+                attack_slash = excluded.attack_slash,
+                attack_crush = excluded.attack_crush,
+                attack_ranged = excluded.attack_ranged,
+                attack_magic = excluded.attack_magic,
+                strength_melee = excluded.strength_melee,
+                strength_ranged = excluded.strength_ranged,
+                strength_magic = excluded.strength_magic,
+                defence_thrust = excluded.defence_thrust,
+                defence_slash = excluded.defence_slash,
+                defence_crush = excluded.defence_crush,
+                defence_ranged = excluded.defence_ranged,
+                defence_magic = excluded.defence_magic,
+                updated_at = now();
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        command.Parameters.AddWithValue("attack_thrust", bonuses.AttackThrust);
+        command.Parameters.AddWithValue("attack_slash", bonuses.AttackSlash);
+        command.Parameters.AddWithValue("attack_crush", bonuses.AttackCrush);
+        command.Parameters.AddWithValue("attack_ranged", bonuses.AttackRanged);
+        command.Parameters.AddWithValue("attack_magic", bonuses.AttackMagic);
+        command.Parameters.AddWithValue("strength_melee", bonuses.StrengthMelee);
+        command.Parameters.AddWithValue("strength_ranged", bonuses.StrengthRanged);
+        command.Parameters.AddWithValue("strength_magic", bonuses.StrengthMagic);
+        command.Parameters.AddWithValue("defence_thrust", bonuses.DefenceThrust);
+        command.Parameters.AddWithValue("defence_slash", bonuses.DefenceSlash);
+        command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);
+        command.Parameters.AddWithValue("defence_ranged", bonuses.DefenceRanged);
+        command.Parameters.AddWithValue("defence_magic", bonuses.DefenceMagic);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task DeleteEquipmentMetadataAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteDeleteAsync(connection, transaction, "item_skill_requirements", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
+    }
+
+    private static async Task ExecuteDeleteAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string table,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        var sql = $"delete from {table} where item_id = @item_id;";
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static EquipmentItemRecord ReadRecord(
@@ -403,20 +566,36 @@ public sealed class EquipmentItemRepository
             modifiers,
             combatProfile,
             combatBonuses,
-            new DateTimeOffset(
-                DateTime.SpecifyKind(
-                    reader.GetFieldValue<DateTime>(reader.GetOrdinal("updated_at")),
-                    DateTimeKind.Utc)));
+            ReadUtc(reader, "updated_at"));
+    }
+
+    private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
+        new(DateTime.SpecifyKind(reader.GetFieldValue<DateTime>(reader.GetOrdinal(column)), DateTimeKind.Utc));
+
+    private static void EnsureNotConsumable(EquipmentItemRecord existing)
+    {
+        if (existing.HasConsumableProfile)
+        {
+            throw new EquipmentKindConflictException(
+                existing.ItemId,
+                "Consumable items must be edited in the Consumables workspace.");
+        }
+    }
+
+    private static void EnsureExpectedVersion(
+        EquipmentItemRecord existing,
+        DateTimeOffset? expectedUpdatedAtUtc)
+    {
+        if (expectedUpdatedAtUtc is null
+            || existing.UpdatedAtUtc.ToUniversalTime() != expectedUpdatedAtUtc.Value.ToUniversalTime())
+        {
+            throw new EquipmentConcurrencyException(existing.ItemId, existing.UpdatedAtUtc);
+        }
     }
 }
 
-public sealed record EquipmentSlotRecord(
-    string SlotId,
-    string DisplayName);
-
-public sealed record EquipmentSkillRecord(
-    string SkillId,
-    string DisplayName);
+public sealed record EquipmentSlotRecord(string SlotId, string DisplayName);
+public sealed record EquipmentSkillRecord(string SkillId, string DisplayName);
 
 public sealed record EquipmentItemRecord(
     string ItemId,
@@ -436,3 +615,25 @@ public sealed record EquipmentItemRecord(
     EquipmentCombatProfileDefinition? CombatProfile,
     EquipmentCombatBonusDefinition? CombatBonuses,
     DateTimeOffset UpdatedAtUtc);
+
+public sealed class EquipmentItemNotFoundException : Exception
+{
+    public EquipmentItemNotFoundException(string itemId) : base($"Item '{itemId}' does not exist.") { }
+}
+
+public sealed class EquipmentKindConflictException : Exception
+{
+    public EquipmentKindConflictException(string itemId, string message)
+        : base($"Item '{itemId}' cannot be edited here. {message}") { }
+}
+
+public sealed class EquipmentConcurrencyException : Exception
+{
+    public EquipmentConcurrencyException(string itemId, DateTimeOffset currentUpdatedAtUtc)
+        : base($"Item '{itemId}' changed after it was loaded. Reload it before saving.")
+    {
+        CurrentUpdatedAtUtc = currentUpdatedAtUtc;
+    }
+
+    public DateTimeOffset CurrentUpdatedAtUtc { get; }
+}

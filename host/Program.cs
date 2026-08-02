@@ -40,6 +40,7 @@ builder.Services.AddSingleton<ConsumableItemRepository>();
 builder.Services.AddSingleton<ConsumableItemValidator>();
 builder.Services.AddSingleton<ConsumableItemAuthoringService>();
 builder.Services.AddSingleton<EquipmentItemRepository>();
+builder.Services.AddSingleton<EquipmentItemValidator>();
 builder.Services.AddSingleton<EquipmentItemAuthoringService>();
 builder.Services.AddSingleton<ContentCatalogService>();
 builder.Services.ConfigureHttpJsonOptions(options =>
@@ -257,6 +258,7 @@ app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/disable", async 
         await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
 });
 
+
 app.MapGet($"{AuthoringApi.RoutePrefix}/equipment/options", async (
     HttpContext context,
     EquipmentItemAuthoringService service,
@@ -284,6 +286,50 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}", async (
 {
     var requestId = RequestIdProvider.Resolve(context);
     return ToHttpResult(requestId, await service.LoadAsync(itemId, cancellationToken));
+});
+
+app.MapPost($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/preview", async (
+    HttpContext context,
+    string itemId,
+    EquipmentPreviewRequest request,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.PreviewAsync(itemId, request, cancellationToken));
+});
+
+app.MapPut($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/draft", async (
+    HttpContext context,
+    string itemId,
+    SaveEquipmentDraftRequest request,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.SaveDraftAsync(itemId, request, cancellationToken));
+});
+
+app.MapPost($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/publish", async (
+    HttpContext context,
+    string itemId,
+    PublicationMutationRequest request,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.PublishAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
+});
+
+app.MapPost($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}/disable", async (
+    HttpContext context,
+    string itemId,
+    PublicationMutationRequest request,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
 });
 
 app.MapFallback((HttpContext context) =>
@@ -317,7 +363,8 @@ static IResult ToHttpResult<T>(string requestId, AuthoringOperationResult<T> res
         || codes.Contains("wrong_authoring_workspace")
         || codes.Contains("item_has_live_references")
         || codes.Contains("item_has_published_consumable_references")
-        || codes.Contains("consumable_profile_missing"))
+        || codes.Contains("consumable_profile_missing")
+        || codes.Contains("weapon_or_tool_requires_t3b"))
     {
         return Results.Conflict(envelope);
     }

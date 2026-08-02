@@ -41,11 +41,12 @@ public sealed class ContentCatalogService
                     .ToArray()
                 : [];
 
+
         var equipmentResult = await _equipment.ListAsync(null, cancellationToken);
         IReadOnlyList<ContentCatalogEntry> equipmentEntries =
             equipmentResult.Succeeded && equipmentResult.Value is not null
                 ? equipmentResult.Value.Items
-                    .Where(item => item.EditableInEquipment)
+                    .Where(item => item.Equippable)
                     .Select(item => new ContentCatalogEntry(
                         item.ItemId,
                         item.DisplayName,

@@ -24,27 +24,27 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T3A equipment read seam implemented
+## Current state: T3A wearable-equipment authoring implemented
 
 The repository now contains:
 
 - a Godot 4 desktop Content Studio shell
 - a loopback-only .NET 10 authoring host
 - environment, schema, and asset-root health checks
-- searchable Basic Items and Consumables workspaces
+- searchable Basic Items, Consumables, and Equipment workspaces
 - canonical item-PNG selection and import
 - declarative consumable profiles, ordered requirements, and ordered effects
+- editable wearable slots, requirements, skill modifiers, and combat bonuses
+- a directional paper-doll preview that follows the game client's current asset-key, frame-fallback, and layer-order rules
+- an explicit Equippable / Not equippable control that removes stale equipment metadata atomically
 - portions/empty-container transformations through result items
 - exact validation and logical-change previews
 - transactional draft creation and editing
 - strict publication and disable operations
 - optimistic aggregate concurrency and reload-after-commit verification
-- read-only wearable equipment options, catalog, and aggregate loading
 - source and optional runtime contract tests
 
-T0 through the first T3A read slice still require runtime verification on a
-machine with .NET 10, Godot 4, the MMO Project development database, and the
-game asset directory available.
+T0 through T3A still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
 ## Repository layout
 
@@ -105,19 +105,14 @@ The default API address is `http://127.0.0.1:5187`.
 1. **T0 — Authoring foundation** — implemented; runtime verification pending
 2. **T1 — Basic items** — implemented; runtime verification pending
 3. **T2 — Consumable items** — implemented; migration/runtime verification pending
-4. **T3A — Wearable equipment** — read-only seam implemented; mutations pending
+4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools**
 6. **T4 — Mobs**
 7. **T5 — Minimal NPC authoring**
 8. **Dialogue workspace**
 9. **Quest Studio evaluation**
 
-The current vertical slices author both ordinary items and declarative
-consumables. Consumables synchronize the base item, profile, requirements, and
-effects in one transaction without contributor-authored SQL.
-
-The first T3A slice reads existing wearable equipment aggregates from the game
-schema. It does not yet write equipment metadata.
+The current vertical slices author ordinary items, declarative consumables, and wearable equipment. Equipment synchronizes the base item, slot, requirements, modifiers, and combat bonuses in one transaction. Turning **Equippable** off deliberately clears every dependent equipment and combat row, which provides a safe correction path for legacy misclassifications such as Chunk of Iron.
 
 ## Documentation
 

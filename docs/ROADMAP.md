@@ -43,16 +43,26 @@ profiles at runtime.
 
 ## T3A — Wearable Equipment
 
-**Status:** Read-only source implementation complete; mutation workflow and development-machine runtime verification pending.
+**Status:** Source implementation complete; development-machine runtime verification pending.
 
-Add equipment slots, requirements, paper-doll assets, skill modifiers, combat bonuses, and directional previews.
+Capabilities:
 
-The first T3A slice exposes equipment options, searchable equipment-shaped item
-definitions, and one complete read aggregate across item definitions, slots,
-skill requirements, skill modifiers, combat profiles, and combat bonuses.
-Hand-held weapons and tools remain visible but deferred to T3B. T3A does not
-yet add save, preview, publish, disable, or persisted visual-asset override
-routes.
+- Search every item definition so Basic items can be promoted into wearable equipment
+- Explicitly author **Equippable** or **Not equippable** rather than relying on legacy name-derived metadata
+- Configure wearable slots, required Strength, additional skill requirements, skill modifiers, and combat bonuses
+- Preview the selected wearable on default player layers in N/S/E/W directions and frames 1-4 using the configured game-client assets
+- Preview exact aggregate replacements before applying them
+- Save, publish, and disable transactionally with optimistic concurrency and reload verification
+- Atomically remove slot, requirements, modifiers, combat profile, and combat bonuses when equipability is removed
+- Correct legacy misclassifications such as Chunk of Iron without hand-written SQL
+- Keep left-hand/right-hand weapon and tool editing deferred to T3B while still permitting intentional declassification
+- Continue deriving player-layer visual keys from display name and slot until the runtime supports explicit visual overrides
+
+Exit condition:
+
+> A maintainer can create or modify wearable equipment—or convert a mistakenly
+> equippable item back into an ordinary item—without manually updating any of
+> the related PostgreSQL tables.
 
 ## T3B — Weapons and Tools
 
