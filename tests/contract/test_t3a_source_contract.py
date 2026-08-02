@@ -102,9 +102,9 @@ class T3ASourceContractTests(unittest.TestCase):
             "save_equipment_draft",
             "publish_equipment",
             "disable_equipment",
-            "_preview_signature",
+            "_workspace_support.can_apply",
+            "_workspace_support.accept_preview",
             "Preview the operation again",
-            "Apply Previewed Operation",
         ):
             self.assertIn(token, editor)
 
