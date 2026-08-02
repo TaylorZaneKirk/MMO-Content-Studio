@@ -31,6 +31,9 @@ jobs:
       - name: Reject transport artifacts
         run: python3 tools/check_forbidden_artifacts.py
 
+      - name: Validate shell scripts
+        run: bash -n tools/*.sh
+
       - name: Run source contracts
         run: python3 -m unittest discover -s tests/contract -p 'test_*.py' -v
 

@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 python3 "${ROOT}/tools/check_forbidden_artifacts.py"
+bash -n "${ROOT}"/tools/*.sh
 python3 - <<'PY' "${ROOT}"
 from pathlib import Path
 import json
