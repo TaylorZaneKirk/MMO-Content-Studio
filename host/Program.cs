@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Features;
+using MMO.ContentStudio.AuthoringHost.Health;
 using MMO.ContentStudio.AuthoringHost.Http;
 using MMO.ContentStudio.AuthoringHost.Services;
 
@@ -31,6 +32,7 @@ builder.Services.Configure<AssetRootsOptions>(
     builder.Configuration.GetSection(AssetRootsOptions.SectionName));
 
 builder.Services.AddSingleton<AuthoringDatabaseConnectionFactory>();
+builder.Services.AddSingleton<SchemaHealthInspector>();
 builder.Services.AddSingleton<AuthoringHealthService>();
 builder.Services.AddSingleton<ContentCatalogService>();
 builder.Services.AddAuthoringFeatures();

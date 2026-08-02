@@ -146,14 +146,20 @@ class T2SourceContractTests(unittest.TestCase):
         self.assertNotIn("update item_", editor)
 
     def test_health_requires_t2_schema(self) -> None:
-        health = (ROOT / "host" / "Services" / "AuthoringHealthService.cs").read_text()
+        schema = (
+            ROOT
+            / "host"
+            / "Features"
+            / "Consumables"
+            / "ConsumableSchemaRequirements.cs"
+        ).read_text()
         for table in (
             "item_consumable_profiles",
             "item_consumable_requirements",
             "item_consumable_effects",
             "skill_definitions",
         ):
-            self.assertIn(table, health)
+            self.assertIn(table, schema)
         settings = (ROOT / "host" / "appsettings.json").read_text()
         self.assertIn("prototype-equipment-authoring-v1", settings)
 
@@ -168,13 +174,19 @@ class T2SourceContractTests(unittest.TestCase):
         ).read_text()
         basic_repository = (ROOT / "host" / "Persistence" / "BasicItemRepository.cs").read_text()
         basic_service = (ROOT / "host" / "Services" / "BasicItemAuthoringService.cs").read_text()
-        health = (ROOT / "host" / "Services" / "AuthoringHealthService.cs").read_text()
+        schema = (
+            ROOT
+            / "host"
+            / "Features"
+            / "Consumables"
+            / "ConsumableSchemaRequirements.cs"
+        ).read_text()
         self.assertIn("item_definitions_consumable_result_publication_guard", migration)
         self.assertIn("item_consumable_profiles_result_publication_guard", migration)
         self.assertIn("HasPublishedConsumableResultReferencesAsync", basic_repository)
         self.assertIn("item_has_published_consumable_references", basic_service)
-        self.assertIn("item_definitions_consumable_result_publication_guard", health)
-        self.assertIn("item_consumable_requirements_skill_id_fkey", health)
+        self.assertIn("item_definitions_consumable_result_publication_guard", schema)
+        self.assertIn("item_consumable_requirements_skill_id_fkey", schema)
 
     def test_publish_revalidates_references_inside_transaction(self) -> None:
         repository = (ROOT / "host" / "Persistence" / "ConsumableItemRepository.cs").read_text()

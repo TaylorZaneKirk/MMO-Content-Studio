@@ -152,7 +152,13 @@ class T3ASourceContractTests(unittest.TestCase):
             self.assertIn(token, client)
 
     def test_health_requires_complete_existing_equipment_schema(self) -> None:
-        health = (ROOT / "host" / "Services" / "AuthoringHealthService.cs").read_text()
+        schema = (
+            ROOT
+            / "host"
+            / "Features"
+            / "Equipment"
+            / "EquipmentSchemaRequirements.cs"
+        ).read_text()
         settings = (ROOT / "host" / "appsettings.json").read_text()
         options = (ROOT / "host" / "Configuration" / "AuthoringHostOptions.cs").read_text()
         for token in (
@@ -164,7 +170,7 @@ class T3ASourceContractTests(unittest.TestCase):
             "item_definitions_equipment_slot_id_fkey",
             "item_combat_profiles_attack_type_accuracy_style_check",
         ):
-            self.assertIn(token, health)
+            self.assertIn(token, schema)
         self.assertIn("prototype-equipment-authoring-v1", settings)
         self.assertIn("prototype-equipment-authoring-v1", options)
 
