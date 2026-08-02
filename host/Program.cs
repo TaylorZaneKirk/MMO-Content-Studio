@@ -39,6 +39,8 @@ builder.Services.AddSingleton<BasicItemAuthoringService>();
 builder.Services.AddSingleton<ConsumableItemRepository>();
 builder.Services.AddSingleton<ConsumableItemValidator>();
 builder.Services.AddSingleton<ConsumableItemAuthoringService>();
+builder.Services.AddSingleton<EquipmentItemRepository>();
+builder.Services.AddSingleton<EquipmentItemAuthoringService>();
 builder.Services.AddSingleton<ContentCatalogService>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -253,6 +255,35 @@ app.MapPost($"{AuthoringApi.RoutePrefix}/consumables/{{itemId}}/disable", async 
     return ToHttpResult(
         requestId,
         await service.DisableAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken));
+});
+
+app.MapGet($"{AuthoringApi.RoutePrefix}/equipment/options", async (
+    HttpContext context,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.LoadOptionsAsync(cancellationToken));
+});
+
+app.MapGet($"{AuthoringApi.RoutePrefix}/equipment", async (
+    HttpContext context,
+    string? search,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.ListAsync(search, cancellationToken));
+});
+
+app.MapGet($"{AuthoringApi.RoutePrefix}/equipment/{{itemId}}", async (
+    HttpContext context,
+    string itemId,
+    EquipmentItemAuthoringService service,
+    CancellationToken cancellationToken) =>
+{
+    var requestId = RequestIdProvider.Resolve(context);
+    return ToHttpResult(requestId, await service.LoadAsync(itemId, cancellationToken));
 });
 
 app.MapFallback((HttpContext context) =>

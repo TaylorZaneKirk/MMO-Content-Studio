@@ -241,3 +241,47 @@ gameplay state.
 These routes author and validate persistence. They do not imply that the current
 MMO server executes the new tables. The server-side item-use resolver must be
 integrated separately before authored profiles affect gameplay.
+
+## Equipment routes
+
+T3A exposes the current MMO Project equipment schema as a read-only wearable
+equipment workspace. It does not yet define save, preview, publish, or disable
+routes.
+
+### `GET /api/v1/equipment/options`
+
+Returns the authoring vocabulary for the first wearable-equipment slice:
+
+- wearable slots: head, cape, body, legs, boots, gloves, and ring
+- deferred hand slots: right hand and left hand
+- skills loaded from `skill_definitions`
+- combat bonus fields from `item_combat_bonuses`
+
+The response explicitly reports that direct visual asset overrides are not
+supported yet. The current game runtime derives player-layer visual keys from
+item name and slot.
+
+### `GET /api/v1/equipment?search=armor`
+
+Lists equipment-shaped item definitions. An item appears here when it has an
+equipment slot, equipment requirements, skill modifiers, combat metadata, or
+combat bonuses. The response marks hand-held weapon/tool definitions as
+`WeaponOrTool` and not editable in T3A.
+
+### `GET /api/v1/equipment/{itemId}`
+
+Loads one equipment read aggregate containing:
+
+- base item definition and publication state
+- equipment slot and required strength
+- ordered skill requirements
+- ordered skill modifiers
+- optional combat profile
+- optional combat bonuses
+- derived player-layer visual asset key
+- aggregate concurrency timestamp
+- local icon preview path
+
+T3A is read-only. The next wearable slice should add preview-before-apply
+validation and transactional save semantics before any mutation route is
+introduced.

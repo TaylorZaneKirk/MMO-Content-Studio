@@ -43,7 +43,16 @@ profiles at runtime.
 
 ## T3A — Wearable Equipment
 
+**Status:** Read-only source implementation complete; mutation workflow and development-machine runtime verification pending.
+
 Add equipment slots, requirements, paper-doll assets, skill modifiers, combat bonuses, and directional previews.
+
+The first T3A slice exposes equipment options, searchable equipment-shaped item
+definitions, and one complete read aggregate across item definitions, slots,
+skill requirements, skill modifiers, combat profiles, and combat bonuses.
+Hand-held weapons and tools remain visible but deferred to T3B. T3A does not
+yet add save, preview, publish, disable, or persisted visual-asset override
+routes.
 
 ## T3B — Weapons and Tools
 

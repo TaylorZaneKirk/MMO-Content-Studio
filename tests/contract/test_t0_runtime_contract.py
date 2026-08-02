@@ -99,7 +99,7 @@ class T0RuntimeContractTests(unittest.TestCase):
         sections = envelope["data"]["sections"]
         self.assertEqual(
             [section["content_type"] for section in sections],
-            ["items", "consumables", "mobs", "npcs"],
+            ["items", "consumables", "equipment", "mobs", "npcs"],
         )
         self.assertTrue(all(section["entries"] == [] for section in sections))
 

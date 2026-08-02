@@ -1,9 +1,10 @@
 ; Engine configuration file.
-; Best edited using the Godot editor.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
 ;
 ; Format:
-;   [section]
-;   param=value
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
 
 config_version=5
 
@@ -11,6 +12,7 @@ config_version=5
 
 config/name="MMO Content Studio"
 run/main_scene="res://scenes/Main.tscn"
+config/features=PackedStringArray("4.7")
 
 [display]
 
@@ -20,11 +22,13 @@ window/size/window_width_override=1280
 window/size/window_height_override=720
 window/stretch/mode="canvas_items"
 
+[dotnet]
+
+project/assembly_name="MMO Content Studio"
+
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/default_filters/use_nearest_mipmap_filter=false
-textures/canvas_textures/default_texture_filter=0
-
 environment/defaults/default_clear_color=Color(0.055, 0.063, 0.078, 1)

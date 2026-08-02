@@ -40,7 +40,7 @@ class T0SourceContractTests(unittest.TestCase):
         catalog_service = (
             ROOT / "host" / "Services" / "ContentCatalogService.cs"
         ).read_text()
-        for content_type in ("items", "mobs", "npcs"):
+        for content_type in ("items", "consumables", "equipment", "mobs", "npcs"):
             self.assertIn(f'"{content_type}"', catalog_service)
 
     def test_godot_main_scene_exists(self) -> None:

@@ -148,7 +148,7 @@ class T2SourceContractTests(unittest.TestCase):
         ):
             self.assertIn(table, health)
         settings = (ROOT / "host" / "appsettings.json").read_text()
-        self.assertIn("prototype-consumable-authoring-v1", settings)
+        self.assertIn("prototype-equipment-authoring-v1", settings)
 
 
     def test_published_result_items_are_database_guarded(self) -> None:

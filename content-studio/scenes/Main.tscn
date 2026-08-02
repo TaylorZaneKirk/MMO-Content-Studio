@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
 [ext_resource type="Script" path="res://scripts/consumable_editor.gd" id="3_consumables"]
+[ext_resource type="Script" path="res://scripts/equipment_editor.gd" id="4_equipment"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -64,7 +65,7 @@ text = "MMO Content Studio"
 [node name="Subtitle" type="Label" parent="Margin/Root/Header/TitleBlock"]
 layout_mode = 2
 modulate = Color(0.7, 0.73, 0.79, 1)
-text = "T2 Consumable Authoring"
+text = "T3A Wearable Equipment"
 
 [node name="ConnectionBlock" type="VBoxContainer" parent="Margin/Root/Header"]
 layout_mode = 2
@@ -285,6 +286,10 @@ layout_mode = 2
 [node name="Consumables" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2
 script = ExtResource("3_consumables")
+
+[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]
+layout_mode = 2
+script = ExtResource("4_equipment")
 
 [node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2

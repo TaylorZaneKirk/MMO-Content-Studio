@@ -590,7 +590,7 @@ func _apply() -> void:
 		_apply_button.disabled = true
 		return
 	var item_id := _item_id.text.strip_edges()
-	var expected := _current_item.get("updated_at_utc", null)
+	var expected: Variant = _current_item.get("updated_at_utc", null)
 	match operation:
 		"publish":
 			_client.publish_consumable(item_id, expected)

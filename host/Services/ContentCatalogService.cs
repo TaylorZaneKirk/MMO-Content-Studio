@@ -6,13 +6,16 @@ public sealed class ContentCatalogService
 {
     private readonly BasicItemAuthoringService _basicItems;
     private readonly ConsumableItemAuthoringService _consumables;
+    private readonly EquipmentItemAuthoringService _equipment;
 
     public ContentCatalogService(
         BasicItemAuthoringService basicItems,
-        ConsumableItemAuthoringService consumables)
+        ConsumableItemAuthoringService consumables,
+        EquipmentItemAuthoringService equipment)
     {
         _basicItems = basicItems;
         _consumables = consumables;
+        _equipment = equipment;
     }
 
     public async Task<ContentCatalogResponse> LoadAsync(CancellationToken cancellationToken = default)
@@ -38,11 +41,24 @@ public sealed class ContentCatalogService
                     .ToArray()
                 : [];
 
+        var equipmentResult = await _equipment.ListAsync(null, cancellationToken);
+        IReadOnlyList<ContentCatalogEntry> equipmentEntries =
+            equipmentResult.Succeeded && equipmentResult.Value is not null
+                ? equipmentResult.Value.Items
+                    .Where(item => item.EditableInEquipment)
+                    .Select(item => new ContentCatalogEntry(
+                        item.ItemId,
+                        item.DisplayName,
+                        item.PublicationState))
+                    .ToArray()
+                : [];
+
         return new ContentCatalogResponse(
             DateTimeOffset.UtcNow,
             [
                 new ContentCatalogSection("items", "Items", true, itemEntries),
                 new ContentCatalogSection("consumables", "Consumables", true, consumableEntries),
+                new ContentCatalogSection("equipment", "Equipment", true, equipmentEntries),
                 new ContentCatalogSection("mobs", "Mobs", false, []),
                 new ContentCatalogSection("npcs", "NPCs", false, [])
             ]);

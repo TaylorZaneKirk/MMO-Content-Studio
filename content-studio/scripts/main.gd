@@ -108,7 +108,7 @@ func _on_health_received(payload: Dictionary) -> void:
 	schema_value.text = str(database.get("schema_contract", "Not verified"))
 
 	_clear_children(asset_roots_list)
-	var asset_roots := payload.get("asset_roots", [])
+	var asset_roots: Variant = payload.get("asset_roots", [])
 	if asset_roots is Array:
 		for asset_root_variant in asset_roots:
 			if asset_root_variant is not Dictionary:
@@ -126,7 +126,7 @@ func _on_health_received(payload: Dictionary) -> void:
 
 func _on_catalog_received(payload: Dictionary) -> void:
 	_clear_children(catalog_list)
-	var sections := payload.get("sections", [])
+	var sections: Variant = payload.get("sections", [])
 	if sections is not Array:
 		return
 
@@ -134,8 +134,8 @@ func _on_catalog_received(payload: Dictionary) -> void:
 		if section_variant is not Dictionary:
 			continue
 		var section := section_variant as Dictionary
-		var entries := section.get("entries", [])
-		var count := entries.size() if entries is Array else 0
+		var entries: Variant = section.get("entries", [])
+		var count: int = entries.size() if entries is Array else 0
 		var row := HBoxContainer.new()
 		var name_label := Label.new()
 		name_label.text = str(section.get("display_name", "Unknown"))
@@ -334,7 +334,7 @@ func _apply_previewed_operation() -> void:
 		apply_button.disabled = true
 		return
 	var item_id := item_id_edit.text.strip_edges()
-	var expected := _current_item.get("updated_at_utc", null)
+	var expected: Variant = _current_item.get("updated_at_utc", null)
 	match operation:
 		"publish":
 			authoring_host_client.publish_item(item_id, expected)

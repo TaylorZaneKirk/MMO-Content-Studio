@@ -149,3 +149,26 @@ T2 includes a migration artifact and an idempotent translation of the current ha
 MMO Project repository. Applying the migration enables authoring; the game
 server still requires an explicit consumer that executes the declarative profile
 through its authoritative inventory/runtime-state mutation boundary.
+
+## T3A equipment read aggregate
+
+The first wearable-equipment slice is intentionally read-only. It exposes the
+current game schema as one aggregate:
+
+```text
+item_definitions
+  ├─ equipment_slot_definitions
+  ├─ item_skill_requirements
+  ├─ item_skill_modifiers
+  ├─ item_combat_profiles
+  └─ item_combat_bonuses
+```
+
+T3A separates wearable slots from hand-held weapon/tool slots. Head, cape, body,
+legs, boots, gloves, and ring definitions are the wearable boundary for this
+workspace. Left-hand and right-hand definitions remain visible for context but
+are deferred to T3B.
+
+The current runtime derives player-layer visual asset keys from item name and
+slot. The Content Studio read model reports that derived key, but T3A does not
+add a persisted paper-doll asset override or any mutation routes yet.

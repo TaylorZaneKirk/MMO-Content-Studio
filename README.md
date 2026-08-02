@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T2 consumable authoring implemented
+## Current state: T3A equipment read seam implemented
 
 The repository now contains:
 
@@ -39,9 +39,12 @@ The repository now contains:
 - transactional draft creation and editing
 - strict publication and disable operations
 - optimistic aggregate concurrency and reload-after-commit verification
+- read-only wearable equipment options, catalog, and aggregate loading
 - source and optional runtime contract tests
 
-T0 through T2 still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
+T0 through the first T3A read slice still require runtime verification on a
+machine with .NET 10, Godot 4, the MMO Project development database, and the
+game asset directory available.
 
 ## Repository layout
 
@@ -102,7 +105,7 @@ The default API address is `http://127.0.0.1:5187`.
 1. **T0 — Authoring foundation** — implemented; runtime verification pending
 2. **T1 — Basic items** — implemented; runtime verification pending
 3. **T2 — Consumable items** — implemented; migration/runtime verification pending
-4. **T3A — Wearable equipment**
+4. **T3A — Wearable equipment** — read-only seam implemented; mutations pending
 5. **T3B — Weapons and tools**
 6. **T4 — Mobs**
 7. **T5 — Minimal NPC authoring**
@@ -113,6 +116,9 @@ The current vertical slices author both ordinary items and declarative
 consumables. Consumables synchronize the base item, profile, requirements, and
 effects in one transaction without contributor-authored SQL.
 
+The first T3A slice reads existing wearable equipment aggregates from the game
+schema. It does not yet write equipment metadata.
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
@@ -120,5 +126,6 @@ effects in one transaction without contributor-authored SQL.
 - [`docs/T0_ACCEPTANCE.md`](docs/T0_ACCEPTANCE.md)
 - [`docs/T1_ACCEPTANCE.md`](docs/T1_ACCEPTANCE.md)
 - [`docs/T2_ACCEPTANCE.md`](docs/T2_ACCEPTANCE.md)
+- [`docs/T3A_ACCEPTANCE.md`](docs/T3A_ACCEPTANCE.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)

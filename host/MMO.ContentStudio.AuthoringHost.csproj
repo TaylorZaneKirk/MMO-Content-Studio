@@ -4,6 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>NU1900</WarningsNotAsErrors>
     <InvariantGlobalization>true</InvariantGlobalization>
     <AssemblyName>MMO.ContentStudio.AuthoringHost</AssemblyName>
     <RootNamespace>MMO.ContentStudio.AuthoringHost</RootNamespace>

@@ -16,6 +16,9 @@ signal consumables_received(payload: Dictionary)
 signal consumable_received(payload: Dictionary)
 signal consumable_preview_received(payload: Dictionary)
 signal consumable_mutation_completed(payload: Dictionary)
+signal equipment_options_received(payload: Dictionary)
+signal equipment_received(payload: Dictionary)
+signal equipment_item_received(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const API_VERSION := "1"
@@ -42,6 +45,9 @@ enum RequestKind {
 	CONSUMABLE_SAVE_DRAFT,
 	CONSUMABLE_PUBLISH,
 	CONSUMABLE_DISABLE,
+	EQUIPMENT_OPTIONS,
+	EQUIPMENT,
+	EQUIPMENT_ITEM,
 }
 
 @export var base_url := DEFAULT_BASE_URL
@@ -178,6 +184,17 @@ func disable_consumable(item_id: String, expected_updated_at_utc: Variant) -> vo
 	)
 
 
+func load_equipment(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(RequestKind.EQUIPMENT, "/api/v1/equipment%s" % suffix)
+
+
+func load_equipment_item(item_id: String) -> void:
+	_request(RequestKind.EQUIPMENT_ITEM, "/api/v1/equipment/%s" % item_id.uri_encode())
+
+
 func _request(
 	kind: int,
 	path: String,
@@ -219,7 +236,7 @@ func _on_request_completed(
 		_fail_kind(completed_kind, "The authoring host could not be reached (result %s)." % result, [])
 		return
 
-	var decoded := JSON.parse_string(body.get_string_from_utf8())
+	var decoded: Variant = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(decoded) != TYPE_DICTIONARY:
 		_fail_kind(completed_kind, "The authoring host returned invalid JSON.", [])
 		return
@@ -245,7 +262,7 @@ func _on_request_completed(
 		)
 		return
 
-	var data := envelope.get("data", {})
+	var data: Variant = envelope.get("data", {})
 	if typeof(data) != TYPE_DICTIONARY:
 		_fail_kind(completed_kind, "The authoring host response did not include an object payload.", [])
 		return
@@ -280,6 +297,12 @@ func _match_success(kind: int, data: Dictionary) -> void:
 			_request(RequestKind.CONSUMABLES, "/api/v1/consumables")
 		RequestKind.CONSUMABLES:
 			consumables_received.emit(data)
+			_request(RequestKind.EQUIPMENT_OPTIONS, "/api/v1/equipment/options")
+		RequestKind.EQUIPMENT_OPTIONS:
+			equipment_options_received.emit(data)
+			_request(RequestKind.EQUIPMENT, "/api/v1/equipment")
+		RequestKind.EQUIPMENT:
+			equipment_received.emit(data)
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
 		RequestKind.ITEM:
 			item_received.emit(data)
@@ -293,6 +316,8 @@ func _match_success(kind: int, data: Dictionary) -> void:
 			consumable_preview_received.emit(data)
 		RequestKind.CONSUMABLE_SAVE_DRAFT, RequestKind.CONSUMABLE_PUBLISH, RequestKind.CONSUMABLE_DISABLE:
 			consumable_mutation_completed.emit(data)
+		RequestKind.EQUIPMENT_ITEM:
+			equipment_item_received.emit(data)
 		_:
 			_fail_kind(kind, "Unexpected request completion.", [])
 
@@ -305,7 +330,7 @@ func _fail_current(message: String, errors: Array) -> void:
 
 func _fail_kind(kind: int, message: String, errors: Array) -> void:
 	var operation := _kind_name(kind)
-	if kind in [RequestKind.HANDSHAKE, RequestKind.HEALTH, RequestKind.CATALOG, RequestKind.ITEM_ASSETS, RequestKind.ITEMS, RequestKind.CONSUMABLE_OPTIONS, RequestKind.CONSUMABLES]:
+	if kind in [RequestKind.HANDSHAKE, RequestKind.HEALTH, RequestKind.CATALOG, RequestKind.ITEM_ASSETS, RequestKind.ITEMS, RequestKind.CONSUMABLE_OPTIONS, RequestKind.CONSUMABLES, RequestKind.EQUIPMENT_OPTIONS, RequestKind.EQUIPMENT]:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
 
@@ -348,6 +373,12 @@ func _kind_name(kind: int) -> String:
 			return "consumable_publish"
 		RequestKind.CONSUMABLE_DISABLE:
 			return "consumable_disable"
+		RequestKind.EQUIPMENT_OPTIONS:
+			return "equipment_options"
+		RequestKind.EQUIPMENT:
+			return "equipment"
+		RequestKind.EQUIPMENT_ITEM:
+			return "equipment_item"
 		_:
 			return "request"
 
