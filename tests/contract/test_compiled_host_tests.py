@@ -34,6 +34,7 @@ class CompiledHostTestContracts(unittest.TestCase):
     def test_catalog_behavior_is_exercised_as_compiled_code(self) -> None:
         source = TESTS.read_text()
         for token in (
+            "using Xunit;",
             "LoadAsyncOrdersProvidersBySortOrderThenContentType",
             "LoadAsyncRejectsDuplicateContentTypes",
             "PlannedProviderReturnsUnimplementedEmptySection",
