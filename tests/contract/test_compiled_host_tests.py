@@ -35,6 +35,7 @@ class CompiledHostTestContracts(unittest.TestCase):
         source = TESTS.read_text()
         for token in (
             "using Xunit;",
+            "TestContext.Current.CancellationToken",
             "LoadAsyncOrdersProvidersBySortOrderThenContentType",
             "LoadAsyncRejectsDuplicateContentTypes",
             "PlannedProviderReturnsUnimplementedEmptySection",
