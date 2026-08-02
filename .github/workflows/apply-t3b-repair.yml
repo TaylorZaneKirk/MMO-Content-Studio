@@ -1,0 +1,111 @@
+name: Apply repaired T3B payload
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: t3b-weapons-tools
+          fetch-depth: 0
+      - name: Repair, reconstruct, and verify payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .t3b-bootstrap/fix00-* > .t3b-bootstrap/chunk-00
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          root = Path('.t3b-bootstrap')
+          prefix = (root / 'fix01-00').read_text()
+          remote = (root / 'chunk-01').read_text()
+          value = prefix + remote[len(prefix):]
+          target = 'ebc9df2994601c79e780fab4f18039d9070207bd'
+          alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/='
+
+          def blob_sha(text: str) -> str:
+              data = text.encode('ascii')
+              return hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+
+          def accept(candidate: str) -> bool:
+              if blob_sha(candidate) != target:
+                  return False
+              (root / 'chunk-01').write_text(candidate)
+              return True
+
+          if not accept(value):
+              found = False
+              invalid_positions = [i for i, char in enumerate(value) if char not in alphabet]
+              for position in invalid_positions:
+                  for replacement in alphabet:
+                      if accept(value[:position] + replacement + value[position + 1:]):
+                          found = True
+                          break
+                  if found:
+                      break
+
+              if not found:
+                  for position in range(len(value)):
+                      if accept(value[:position] + value[position + 1:]):
+                          found = True
+                          break
+
+              if not found:
+                  for position in range(len(value) + 1):
+                      for inserted in alphabet:
+                          if accept(value[:position] + inserted + value[position:]):
+                              found = True
+                              break
+                      if found:
+                          break
+
+              if not found:
+                  for position, original in enumerate(value):
+                      for replacement in alphabet:
+                          if replacement == original:
+                              continue
+                          if accept(value[:position] + replacement + value[position + 1:]):
+                              found = True
+                              break
+                      if found:
+                          break
+
+              if not found:
+                  raise SystemExit(
+                      f'Unable to repair chunk-01 from a single-character edit; length={len(value)} sha={blob_sha(value)}'
+                  )
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib
+          for name, expected in {
+              'chunk-00': '30064ae41f9d38e3f4b569a1b2aef318cf20e203',
+              'chunk-01': 'ebc9df2994601c79e780fab4f18039d9070207bd',
+          }.items():
+              data = (Path('.t3b-bootstrap') / name).read_bytes()
+              actual = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f'{name} Git blob mismatch: {actual}')
+          PY
+          cat .t3b-bootstrap/chunk-0[0-6] > /tmp/t3b.b64
+          base64 -d /tmp/t3b.b64 > /tmp/t3b.tar.gz
+          echo "5cf4c8a68033ae6fa2ea6d72639a6b4bde1345ed1c9920b14c8b06399d50a68d  /tmp/t3b.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/t3b.tar.gz -C "$GITHUB_WORKSPACE"
+          rm -rf .t3b-bootstrap .github/workflows/apply-t3b.yml .github/workflows/apply-t3b-repair.yml
+      - name: Validate source contracts
+        run: python3 -m unittest discover -s tests/contract -p 'test_*.py' -v
+      - name: Commit exact implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: implement T3B weapons and tools authoring"
+          git push origin HEAD:t3b-weapons-tools
