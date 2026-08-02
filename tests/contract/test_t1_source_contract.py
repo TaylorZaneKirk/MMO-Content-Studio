@@ -96,14 +96,16 @@ class T1SourceContractTests(unittest.TestCase):
     def test_disabling_respects_live_gameplay_references(self) -> None:
         repository = (ROOT / "host" / "Persistence" / "BasicItemRepository.cs").read_text()
         service = (ROOT / "host" / "Services" / "BasicItemAuthoringService.cs").read_text()
-        health = (ROOT / "host" / "Services" / "AuthoringHealthService.cs").read_text()
+        schema = (
+            ROOT / "host" / "Features" / "Items" / "ItemSchemaRequirements.cs"
+        ).read_text()
         self.assertIn("HasLiveReferencesAsync", repository)
         for table in ("character_inventory", "character_equipment", "ground_items"):
             self.assertIn(table, repository)
-            self.assertIn(table, health)
+            self.assertIn(table, schema)
         self.assertIn("item_has_live_references", service)
         self.assertIn("IsLiveReferenceGuard", service)
-        self.assertIn("item_definitions_runtime_disable_guard", health)
+        self.assertIn("item_definitions_runtime_disable_guard", schema)
         validator = (ROOT / "host" / "Services" / "BasicItemValidator.cs").read_text()
         self.assertIn("static_content_references_not_checked", validator)
 
