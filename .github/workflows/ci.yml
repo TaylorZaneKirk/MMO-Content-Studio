@@ -37,8 +37,14 @@ jobs:
       - name: Restore host
         run: dotnet restore host/MMO.ContentStudio.AuthoringHost.csproj
 
+      - name: Restore host unit tests
+        run: dotnet restore tests/host/MMO.ContentStudio.AuthoringHost.Tests/MMO.ContentStudio.AuthoringHost.Tests.csproj
+
       - name: Build host
         run: dotnet build host/MMO.ContentStudio.AuthoringHost.csproj --no-restore --configuration Release --nologo
+
+      - name: Run host unit tests
+        run: dotnet test tests/host/MMO.ContentStudio.AuthoringHost.Tests/MMO.ContentStudio.AuthoringHost.Tests.csproj --no-restore --configuration Release --nologo
 
       - name: Validate static project files
         run: |

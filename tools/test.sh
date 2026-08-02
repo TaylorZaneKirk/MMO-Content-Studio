@@ -9,6 +9,7 @@ python3 -m unittest discover -s "${ROOT}/tests/contract" -p 'test_*.py' -v
 
 if command -v dotnet >/dev/null 2>&1; then
   dotnet build "${ROOT}/host/MMO.ContentStudio.AuthoringHost.csproj" --nologo
+  dotnet test "${ROOT}/tests/host/MMO.ContentStudio.AuthoringHost.Tests/MMO.ContentStudio.AuthoringHost.Tests.csproj" --configuration Release --nologo
 else
   echo "[skip] dotnet SDK not installed; host build/runtime test skipped"
 fi
