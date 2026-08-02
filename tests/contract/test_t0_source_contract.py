@@ -37,11 +37,12 @@ class T0SourceContractTests(unittest.TestCase):
             self.assertIn(route, program)
 
     def test_empty_catalog_has_future_workspace_seams(self) -> None:
-        catalog_service = (
-            ROOT / "host" / "Services" / "ContentCatalogService.cs"
-        ).read_text()
+        feature_sources = "\n".join(
+            path.read_text()
+            for path in (ROOT / "host" / "Features").rglob("*.cs")
+        )
         for content_type in ("items", "consumables", "equipment", "mobs", "npcs"):
-            self.assertIn(f'"{content_type}"', catalog_service)
+            self.assertIn(f'"{content_type}"', feature_sources)
 
     def test_godot_main_scene_exists(self) -> None:
         project = (ROOT / "content-studio" / "project.godot").read_text()
