@@ -58,7 +58,7 @@ public sealed partial class BasicItemValidator
                 "item_id",
                 existing.HasConsumableProfile
                     ? "Open it in the Consumables workspace."
-                    : "Open it in the Equipment workspace after T3 is implemented."));
+                    : "Open it in the Equipment workspace."));
         }
 
         var asset = _assetService.Resolve(iconTexturePath.Trim());

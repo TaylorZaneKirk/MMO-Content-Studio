@@ -195,8 +195,8 @@ public sealed class AuthoringHealthService
                 databaseName,
                 status == HealthState.Healthy ? _hostOptions.ExpectedSchemaContract : null,
                 status == HealthState.Healthy
-                    ? "Database connection and required T3A item/equipment/consumable schema checks passed."
-                    : "Database connected, but one or more required schema checks failed. Apply the MMO Project equipment, skill, combat-bonus, and T2 consumable migrations if tables are missing.",
+                    ? "Database connection and required T3A item, consumable, and equipment schema checks passed."
+                    : "Database connected, but one or more required schema checks failed. Apply the MMO Project item, consumable, equipment, skill, and combat metadata migrations.",
                 checks);
         }
         catch (Exception exception) when (exception is NpgsqlException or TimeoutException or InvalidOperationException)

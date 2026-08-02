@@ -31,3 +31,17 @@ be modeled safely with `consume_quantity` plus `result_item_id`.
 Applying this migration enables authoring. The MMO game server still needs a
 separate runtime-consumption integration slice before it will execute these rows
 instead of its current item-use behavior.
+
+## T3A wearable-equipment integration
+
+T3A does not require a new game-schema migration. It authors the existing
+`item_definitions`, `equipment_slot_definitions`, `item_skill_requirements`,
+`item_skill_modifiers`, `item_combat_profiles`, and `item_combat_bonuses`
+contracts already established by the MMO Project.
+
+The Content Studio adds an explicit **Equippable / Not equippable** workflow over
+those tables. Removing equipability clears every dependent equipment/combat row
+transactionally, which is the intended correction path for historical
+name-derived slot assignments such as Chunk of Iron being mapped to a hand slot.
+The MMO database's runtime-publication and live-reference triggers remain the
+final authority during that operation.

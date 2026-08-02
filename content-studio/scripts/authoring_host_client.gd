@@ -19,6 +19,8 @@ signal consumable_mutation_completed(payload: Dictionary)
 signal equipment_options_received(payload: Dictionary)
 signal equipment_received(payload: Dictionary)
 signal equipment_item_received(payload: Dictionary)
+signal equipment_preview_received(payload: Dictionary)
+signal equipment_mutation_completed(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const API_VERSION := "1"
@@ -48,6 +50,10 @@ enum RequestKind {
 	EQUIPMENT_OPTIONS,
 	EQUIPMENT,
 	EQUIPMENT_ITEM,
+	EQUIPMENT_PREVIEW,
+	EQUIPMENT_SAVE_DRAFT,
+	EQUIPMENT_PUBLISH,
+	EQUIPMENT_DISABLE,
 }
 
 @export var base_url := DEFAULT_BASE_URL
@@ -184,6 +190,7 @@ func disable_consumable(item_id: String, expected_updated_at_utc: Variant) -> vo
 	)
 
 
+
 func load_equipment(search: String = "") -> void:
 	var suffix := ""
 	if not search.strip_edges().is_empty():
@@ -193,6 +200,42 @@ func load_equipment(search: String = "") -> void:
 
 func load_equipment_item(item_id: String) -> void:
 	_request(RequestKind.EQUIPMENT_ITEM, "/api/v1/equipment/%s" % item_id.uri_encode())
+
+
+func preview_equipment(item_id: String, payload: Dictionary) -> void:
+	_request(
+		RequestKind.EQUIPMENT_PREVIEW,
+		"/api/v1/equipment/%s/preview" % item_id.uri_encode(),
+		HTTPClient.METHOD_POST,
+		payload
+	)
+
+
+func save_equipment_draft(item_id: String, payload: Dictionary) -> void:
+	_request(
+		RequestKind.EQUIPMENT_SAVE_DRAFT,
+		"/api/v1/equipment/%s/draft" % item_id.uri_encode(),
+		HTTPClient.METHOD_PUT,
+		payload
+	)
+
+
+func publish_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
+	_request(
+		RequestKind.EQUIPMENT_PUBLISH,
+		"/api/v1/equipment/%s/publish" % item_id.uri_encode(),
+		HTTPClient.METHOD_POST,
+		{"expected_updated_at_utc": expected_updated_at_utc}
+	)
+
+
+func disable_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
+	_request(
+		RequestKind.EQUIPMENT_DISABLE,
+		"/api/v1/equipment/%s/disable" % item_id.uri_encode(),
+		HTTPClient.METHOD_POST,
+		{"expected_updated_at_utc": expected_updated_at_utc}
+	)
 
 
 func _request(
@@ -318,6 +361,10 @@ func _match_success(kind: int, data: Dictionary) -> void:
 			consumable_mutation_completed.emit(data)
 		RequestKind.EQUIPMENT_ITEM:
 			equipment_item_received.emit(data)
+		RequestKind.EQUIPMENT_PREVIEW:
+			equipment_preview_received.emit(data)
+		RequestKind.EQUIPMENT_SAVE_DRAFT, RequestKind.EQUIPMENT_PUBLISH, RequestKind.EQUIPMENT_DISABLE:
+			equipment_mutation_completed.emit(data)
 		_:
 			_fail_kind(kind, "Unexpected request completion.", [])
 
@@ -379,6 +426,14 @@ func _kind_name(kind: int) -> String:
 			return "equipment"
 		RequestKind.EQUIPMENT_ITEM:
 			return "equipment_item"
+		RequestKind.EQUIPMENT_PREVIEW:
+			return "equipment_preview"
+		RequestKind.EQUIPMENT_SAVE_DRAFT:
+			return "equipment_save_draft"
+		RequestKind.EQUIPMENT_PUBLISH:
+			return "equipment_publish"
+		RequestKind.EQUIPMENT_DISABLE:
+			return "equipment_disable"
 		_:
 			return "request"
 

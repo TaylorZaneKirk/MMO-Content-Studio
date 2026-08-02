@@ -36,13 +36,12 @@ content operation is attempted.
 
 ### `GET /api/v1/system/health`
 
-Reports the active database profile, PostgreSQL connectivity, the T2 item and
-consumable schema contract, and configured asset-root status.
+Reports the active database profile, PostgreSQL connectivity, the T3A item, consumable, and
+equipment schema contract, and configured asset-root status.
 
 ### `GET /api/v1/catalog`
 
-Returns the top-level content catalog. Items and Consumables are implemented;
-Mobs and NPCs remain planned workspaces.
+Returns the top-level content catalog. Items, Consumables, and Equipment are implemented; Mobs and NPCs remain planned workspaces.
 
 ## Item asset routes
 
@@ -242,46 +241,81 @@ These routes author and validate persistence. They do not imply that the current
 MMO server executes the new tables. The server-side item-use resolver must be
 integrated separately before authored profiles affect gameplay.
 
-## Equipment routes
-
-T3A exposes the current MMO Project equipment schema as a read-only wearable
-equipment workspace. It does not yet define save, preview, publish, or disable
-routes.
+## Wearable-equipment routes
 
 ### `GET /api/v1/equipment/options`
 
-Returns the authoring vocabulary for the first wearable-equipment slice:
+Returns wearable slots, deferred hand slots, skills, combat-bonus fields, and the
+current derived visual-asset model.
 
-- wearable slots: head, cape, body, legs, boots, gloves, and ring
-- deferred hand slots: right hand and left hand
-- skills loaded from `skill_definitions`
-- combat bonus fields from `item_combat_bonuses`
+### `GET /api/v1/equipment?search=iron`
 
-The response explicitly reports that direct visual asset overrides are not
-supported yet. The current game runtime derives player-layer visual keys from
-item name and slot.
-
-### `GET /api/v1/equipment?search=armor`
-
-Lists equipment-shaped item definitions. An item appears here when it has an
-equipment slot, equipment requirements, skill modifiers, combat metadata, or
-combat bonuses. The response marks hand-held weapon/tool definitions as
-`WeaponOrTool` and not editable in T3A.
+Lists all item definitions, not only existing equipment. This lets an ordinary
+Basic item be promoted into wearable equipment and lets legacy misclassified
+items be found and corrected.
 
 ### `GET /api/v1/equipment/{itemId}`
 
-Loads one equipment read aggregate containing:
+Loads the complete current aggregate: base definition, explicit equipability,
+slot, required Strength, skill requirements, skill modifiers, optional combat
+profile, combat bonuses, publication state, concurrency timestamp, and icon
+preview path.
 
-- base item definition and publication state
-- equipment slot and required strength
-- ordered skill requirements
-- ordered skill modifiers
-- optional combat profile
-- optional combat bonuses
-- derived player-layer visual asset key
-- aggregate concurrency timestamp
-- local icon preview path
+### `POST /api/v1/equipment/{itemId}/preview`
 
-T3A is read-only. The next wearable slice should add preview-before-apply
-validation and transactional save semantics before any mutation route is
-introduced.
+Validates `save_draft`, `publish`, or `disable` and returns exact logical changes.
+A wearable draft request has this shape:
+
+```json
+{
+  "display_name": "Iron platebody",
+  "icon_texture_path": "res://assets/items/iron_platebody.png",
+  "equippable": true,
+  "equipment_slot_id": "body",
+  "required_strength": 10,
+  "requirements": [
+    { "skill_id": "defence", "required_value": 8 }
+  ],
+  "skill_modifiers": [],
+  "combat_bonuses": {
+    "attack_thrust": 0,
+    "attack_slash": 0,
+    "attack_crush": 0,
+    "attack_ranged": -1,
+    "attack_magic": 0,
+    "strength_melee": -1,
+    "strength_ranged": 0,
+    "strength_magic": 0,
+    "defence_thrust": 5,
+    "defence_slash": 5,
+    "defence_crush": 5,
+    "defence_ranged": 5,
+    "defence_magic": 0
+  },
+  "expected_updated_at_utc": "2026-08-02T13:00:00Z",
+  "target_operation": "save_draft"
+}
+```
+
+To deliberately make an item ordinary and non-equippable, send
+`"equippable": false`. The host normalizes the slot to null, Strength to 1, and
+all child collections/bonuses to empty before previewing the cleanup.
+
+### `PUT /api/v1/equipment/{itemId}/draft`
+
+Synchronizes the complete wearable aggregate in one transaction and leaves the
+item runtime-disabled. When `equippable` is false, the operation also deletes
+all skill requirements, skill modifiers, combat profile, and combat-bonus rows.
+This is the supported correction path for legacy misclassifications such as
+Chunk of Iron.
+
+### `POST /api/v1/equipment/{itemId}/publish`
+
+Publishes a previously saved valid wearable aggregate. Canonical art and all
+references must validate. Hand-held weapons/tools remain T3B and cannot be
+published from this route.
+
+### `POST /api/v1/equipment/{itemId}/disable`
+
+Returns a wearable definition to Draft while preserving its metadata. The
+runtime live-reference guard remains authoritative.

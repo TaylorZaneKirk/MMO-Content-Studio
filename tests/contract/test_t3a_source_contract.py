@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fast source-level checks for the T3A wearable-equipment read slice."""
+"""Fast source-level checks for completed T3A wearable-equipment authoring."""
 
 from __future__ import annotations
 
@@ -11,132 +11,169 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class T3ASourceContractTests(unittest.TestCase):
-    def test_t3a_routes_exist_without_mutation_routes(self) -> None:
+    def test_t3a_read_and_mutation_routes_exist(self) -> None:
         program = (ROOT / "host" / "Program.cs").read_text()
         for route in (
             "/equipment/options",
             "/equipment",
             "/equipment/{{itemId}}",
-        ):
-            self.assertIn(route, program)
-        for route in (
             "/equipment/{{itemId}}/preview",
             "/equipment/{{itemId}}/draft",
             "/equipment/{{itemId}}/publish",
             "/equipment/{{itemId}}/disable",
         ):
-            self.assertNotIn(route, program)
+            self.assertIn(route, program)
+        for service in (
+            "EquipmentItemRepository",
+            "EquipmentItemValidator",
+            "EquipmentItemAuthoringService",
+        ):
+            self.assertIn(f"AddSingleton<{service}>()", program)
 
-    def test_equipment_contract_reads_full_current_schema(self) -> None:
+    def test_contract_makes_equipability_explicit(self) -> None:
         contracts = (ROOT / "host" / "Contracts" / "EquipmentContracts.cs").read_text()
-        for field in (
-            "equipment_slot_id",
-            "required_strength",
-            "requirements",
-            "skill_modifiers",
-            "combat_profile",
-            "combat_bonuses",
-            "visual_asset_key",
+        for token in (
+            'JsonPropertyName("equippable")',
+            "SaveEquipmentDraftRequest",
+            "EquipmentPreviewRequest",
+            "EquipmentValidationResponse",
+            "EquipmentMutationResponse",
+            'JsonPropertyName("can_remove_equipability")',
+            'JsonPropertyName("combat_bonuses")',
         ):
-            self.assertIn(field, contracts)
-        for bonus in (
-            "attack_thrust",
-            "attack_slash",
-            "attack_crush",
-            "attack_ranged",
-            "attack_magic",
-            "strength_melee",
-            "defence_magic",
-        ):
-            self.assertIn(bonus, contracts)
+            self.assertIn(token, contracts)
 
-    def test_repository_reads_existing_game_tables_without_writes(self) -> None:
+    def test_not_equippable_clears_all_dependent_metadata_transactionally(self) -> None:
         repository = (ROOT / "host" / "Persistence" / "EquipmentItemRepository.cs").read_text()
+        self.assertIn("BeginTransactionAsync", repository)
+        self.assertIn("runtime_enabled = false", repository)
+        self.assertIn("DeleteEquipmentMetadataAsync", repository)
         for table in (
-            "equipment_slot_definitions",
             "item_skill_requirements",
             "item_skill_modifiers",
             "item_combat_profiles",
             "item_combat_bonuses",
         ):
-            self.assertIn(table, repository)
-        self.assertNotIn("insert into", repository.lower())
-        self.assertNotIn("update item_", repository.lower())
-        self.assertNotIn("delete from", repository.lower())
-        self.assertNotIn("BeginTransactionAsync", repository)
+            self.assertIn(f'ExecuteDeleteAsync(connection, transaction, "{table}"', repository)
+        self.assertIn("equipment_slot_id = @equipment_slot_id", repository)
+        self.assertIn("required_strength = @required_strength", repository)
+        self.assertIn("LoadAggregateAsync(connection, transaction", repository)
+        self.assertIn("CommitAsync", repository)
 
-    def test_t3a_defers_hand_slots_to_t3b(self) -> None:
+    def test_validator_explains_legacy_misclassification_cleanup(self) -> None:
+        validator = (ROOT / "host" / "Services" / "EquipmentItemValidator.cs").read_text()
+        self.assertIn("equipment_metadata_will_be_removed", validator)
+        self.assertIn("Chunk of Iron", validator)
+        self.assertIn("non_equippable_metadata_not_empty", validator)
+        self.assertIn("weapon_or_tool_requires_t3b", validator)
+        self.assertIn("Turn off Equippable", validator)
+
+    def test_t3a_keeps_weapon_editing_deferred_but_allows_declassification(self) -> None:
         service = (ROOT / "host" / "Services" / "EquipmentItemAuthoringService.cs").read_text()
         repository = (ROOT / "host" / "Persistence" / "EquipmentItemRepository.cs").read_text()
-        self.assertIn('"left_hand" or "right_hand"', repository)
+        self.assertIn('slotId is "left_hand" or "right_hand"', repository)
+        self.assertIn("CanRemoveEquipability", service)
         self.assertIn("WeaponOrTool", service)
-        self.assertIn("deferredHandSlots", service)
-        self.assertIn("!record.HasCombatProfile", service)
+        self.assertIn("draft.Equippable && existing.HasCombatProfile", repository)
+        self.assertIn("!record.HasConsumableProfile && EquipmentItemRepository.HasEquipmentMetadata(record)", service)
 
-    def test_visual_asset_key_is_derived_not_persisted(self) -> None:
+    def test_preview_before_apply_and_reload_verification_are_required(self) -> None:
         service = (ROOT / "host" / "Services" / "EquipmentItemAuthoringService.cs").read_text()
-        acceptance = (ROOT / "docs" / "T3A_ACCEPTANCE.md").read_text()
-        self.assertIn("DeriveVisualAssetKey", service)
-        self.assertIn("\\u2019", service)
-        self.assertIn("legs", service)
-        self.assertIn("does not store a separate visual asset override", service)
-        self.assertIn("derived metadata", acceptance)
+        editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()
+        for token in (
+            "PreviewAsync",
+            "CalculateChanges",
+            "saved equipment aggregate failed reload-and-verify",
+            "equipment publication change failed reload-and-verify",
+        ):
+            self.assertIn(token.lower(), service.lower())
+        for token in (
+            "preview_equipment",
+            "save_equipment_draft",
+            "publish_equipment",
+            "disable_equipment",
+            "_preview_signature",
+            "Preview the operation again",
+            "Apply Previewed Operation",
+        ):
+            self.assertIn(token, editor)
 
-    def test_health_requires_t3a_schema(self) -> None:
+    def test_godot_editor_exposes_equippable_toggle_and_full_wearable_form(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()
+        for token in (
+            'class_name EquipmentEditor',
+            '"Equippable"',
+            "Item can be equipped",
+            "Wearable slot",
+            "Required strength",
+            "Additional skill requirements",
+            "Skill modifiers while equipped",
+            "Combat bonuses",
+            "Directional paper-doll preview",
+            "_update_paper_doll_preview",
+            "Chunk of Iron",
+        ):
+            self.assertIn(token, editor)
+        self.assertIn('"equippable": _equippable.button_pressed', editor)
+        self.assertIn('"equipment_slot_id": _selected_metadata(_slot) if _equippable.button_pressed else null', editor)
+        self.assertIn('path_join("actors").path_join("player")', editor)
+        self.assertIn("DEFAULT_VISUAL_KEYS", editor)
+        self.assertIn("_visual_frame_fallbacks", editor)
+        self.assertIn("bonuses_variant is Dictionary", editor)
+
+    def test_godot_client_supports_equipment_mutations(self) -> None:
+        client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()
+        for token in (
+            "equipment_preview_received",
+            "equipment_mutation_completed",
+            "preview_equipment",
+            "save_equipment_draft",
+            "publish_equipment",
+            "disable_equipment",
+            "RequestKind.EQUIPMENT_PREVIEW",
+            "RequestKind.EQUIPMENT_SAVE_DRAFT",
+        ):
+            self.assertIn(token, client)
+
+    def test_health_requires_complete_existing_equipment_schema(self) -> None:
         health = (ROOT / "host" / "Services" / "AuthoringHealthService.cs").read_text()
         settings = (ROOT / "host" / "appsettings.json").read_text()
-        for table in (
+        options = (ROOT / "host" / "Configuration" / "AuthoringHostOptions.cs").read_text()
+        for token in (
             "equipment_slot_definitions",
             "item_skill_requirements",
             "item_skill_modifiers",
             "item_combat_profiles",
             "item_combat_bonuses",
+            "item_definitions_equipment_slot_id_fkey",
+            "item_combat_profiles_attack_type_accuracy_style_check",
         ):
-            self.assertIn(table, health)
-        self.assertIn("item_definitions_equipment_slot_id_fkey", health)
-        self.assertIn("item_combat_profiles_attack_type_accuracy_style_check", health)
+            self.assertIn(token, health)
         self.assertIn("prototype-equipment-authoring-v1", settings)
+        self.assertIn("prototype-equipment-authoring-v1", options)
 
-    def test_catalog_exposes_equipment_workspace(self) -> None:
+    def test_catalog_and_scene_expose_equipment_workspace(self) -> None:
         catalog = (ROOT / "host" / "Services" / "ContentCatalogService.cs").read_text()
-        self.assertIn('"equipment"', catalog)
-        self.assertIn("EditableInEquipment", catalog)
-
-    def test_godot_scene_has_equipment_tab(self) -> None:
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
+        self.assertIn('new ContentCatalogSection("equipment"', catalog)
+        self.assertIn("item.Equippable", catalog)
         self.assertIn('path="res://scripts/equipment_editor.gd"', scene)
         self.assertIn('[node name="Equipment" type="HBoxContainer"', scene)
         self.assertIn('text = "T3A Wearable Equipment"', scene)
 
-    def test_godot_client_loads_equipment_after_consumables(self) -> None:
-        client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()
-        for token in (
-            "equipment_options_received",
-            "equipment_received",
-            "equipment_item_received",
-            "/api/v1/equipment/options",
-            "/api/v1/equipment",
-            "load_equipment_item",
-        ):
-            self.assertIn(token, client)
-        self.assertIn("RequestKind.EQUIPMENT_OPTIONS", client)
-
-    def test_godot_equipment_editor_is_read_only(self) -> None:
+    def test_godot_equipment_functions_are_not_duplicated(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()
-        for token in (
-            "Read-only T3A view",
-            "Deferred Hand Slots",
-            "Skill requirements",
-            "Skill modifiers",
-            "Combat profile",
-            "Combat bonuses",
-            "Visible for context",
-        ):
-            self.assertIn(token, editor)
-        self.assertNotIn("preview_equipment", editor)
-        self.assertNotIn("save_equipment", editor)
-        self.assertNotIn("publish_equipment", editor)
-        self.assertNotIn("disable_equipment", editor)
+        function_names = [
+            line.split("func ", 1)[1].split("(", 1)[0]
+            for line in editor.splitlines()
+            if line.startswith("func ")
+        ]
+        self.assertEqual(len(function_names), len(set(function_names)))
+
+    def test_godot_equipment_editor_has_no_sql_or_database_driver(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text().lower()
+        for forbidden in ("npgsql", "insert into", "update item_", "delete from"):
+            self.assertNotIn(forbidden, editor)
 
 
 if __name__ == "__main__":

@@ -150,25 +150,41 @@ MMO Project repository. Applying the migration enables authoring; the game
 server still requires an explicit consumer that executes the declarative profile
 through its authoritative inventory/runtime-state mutation boundary.
 
-## T3A equipment read aggregate
+## T3A wearable-equipment aggregate
 
-The first wearable-equipment slice is intentionally read-only. It exposes the
-current game schema as one aggregate:
+T3A uses the existing MMO Project schema rather than introducing a parallel
+Content Studio-only model:
 
 ```text
 item_definitions
-  ├─ equipment_slot_definitions
+  ├─ equipment_slot_id / required_strength
   ├─ item_skill_requirements
   ├─ item_skill_modifiers
-  ├─ item_combat_profiles
-  └─ item_combat_bonuses
+  ├─ item_combat_bonuses
+  └─ item_combat_profiles (read-only in wearable mode; editable later in T3B)
 ```
 
-T3A separates wearable slots from hand-held weapon/tool slots. Head, cape, body,
-legs, boots, gloves, and ring definitions are the wearable boundary for this
-workspace. Left-hand and right-hand definitions remain visible for context but
-are deferred to T3B.
+Equipability is an explicit authoring decision in the API and GUI. In current
+persistence it is represented by a non-null `equipment_slot_id`; the author does
+not need to know that implementation detail.
 
-The current runtime derives player-layer visual asset keys from item name and
-slot. The Content Studio read model reports that derived key, but T3A does not
-add a persisted paper-doll asset override or any mutation routes yet.
+Turning **Equippable** off is a destructive aggregate synchronization, not a
+visual toggle. The host locks the item row, clears the slot, resets the legacy
+Strength gate, deletes requirements, modifiers, combat profile, and combat
+bonuses, reloads the result inside the transaction, commits, then reloads and
+verifies it again. This prevents stale rows from continuing to make an ordinary
+material behave like equipment.
+
+The cleanup operation intentionally works for hand-held items even though T3A
+cannot edit their weapon/tool fields. This lets maintainers correct legacy
+name-derived assignments such as `Chunk of Iron -> right_hand` without waiting
+for T3B or writing SQL. Re-enabling or modifying a real hand-held weapon/tool
+remains a T3B concern.
+
+Wearable paper-doll asset keys continue to be derived from display name and slot
+because that is the current client runtime contract. The Godot workspace uses
+the configured `game_client_assets` root to preview default player layers plus
+the selected wearable in four directions and four frames. It mirrors the current
+north-frame fallback, legacy filename normalization, and layer z-order rules.
+Explicit directional asset overrides require a later schema and runtime
+integration rather than being invented solely in Content Studio.
