@@ -17,7 +17,7 @@ public sealed class ContentCatalogServiceTests
             new StubProvider("alpha", 100)
         ]);
 
-        var response = await service.LoadAsync();
+        var response = await service.LoadAsync(TestContext.Current.CancellationToken);
 
         string[] expected = ["alpha", "beta", "zeta"];
         Assert.Equal(
@@ -35,7 +35,7 @@ public sealed class ContentCatalogServiceTests
         ]);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.LoadAsync());
+            () => service.LoadAsync(TestContext.Current.CancellationToken));
 
         Assert.Contains("items", exception.Message, StringComparison.Ordinal);
     }
@@ -45,7 +45,7 @@ public sealed class ContentCatalogServiceTests
     {
         var provider = new PlannedCatalogSectionProvider("mobs", "Mobs", 400);
 
-        var section = await provider.LoadAsync(CancellationToken.None);
+        var section = await provider.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("mobs", section.ContentType);
         Assert.Equal("Mobs", section.DisplayName);
