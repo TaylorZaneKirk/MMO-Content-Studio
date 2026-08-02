@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source contracts for shared Godot authoring-workspace behavior."""
+"""Source contracts for the shared Godot authoring-workspace foundation."""
 
 from __future__ import annotations
 
@@ -9,7 +9,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS = ROOT / "content-studio" / "scripts"
-EDITORS = ("main.gd", "consumable_editor.gd", "equipment_editor.gd")
 
 
 class GodotWorkspaceSupportTests(unittest.TestCase):
@@ -31,36 +30,6 @@ class GodotWorkspaceSupportTests(unittest.TestCase):
         ):
             self.assertIn(token, support)
 
-    def test_existing_editors_delegate_shared_behavior(self) -> None:
-        for file_name in EDITORS:
-            editor = (SCRIPTS / file_name).read_text()
-            self.assertIn(
-                'preload("res://scripts/authoring_workspace_support.gd")',
-                editor,
-                file_name,
-            )
-            self.assertIn("AuthoringWorkspaceSupport.new()", editor, file_name)
-            self.assertIn("_workspace_support.clear_preview", editor, file_name)
-            self.assertIn("_workspace_support.accept_preview", editor, file_name)
-            self.assertIn("_workspace_support.can_apply", editor, file_name)
-            self.assertIn("_workspace_support.render_changes", editor, file_name)
-            self.assertIn("_workspace_support.render_validation", editor, file_name)
-
-    def test_editors_do_not_redeclare_shared_preview_state_or_renderers(self) -> None:
-        for file_name in EDITORS:
-            editor = (SCRIPTS / file_name).read_text()
-            for forbidden in (
-                "var _preview_signature",
-                "var _preview_operation",
-                "var _preview_applicable",
-                "var _preview_is_applicable",
-                "func _render_changes",
-                "func _render_validation",
-                "func _operation_name",
-                "func _operation_display_name",
-            ):
-                self.assertNotIn(forbidden, editor, file_name)
-
     def test_preview_gate_requires_operation_signature_and_applicability(self) -> None:
         support = (SCRIPTS / "authoring_workspace_support.gd").read_text()
         for token in (
@@ -70,6 +39,21 @@ class GodotWorkspaceSupportTests(unittest.TestCase):
         ):
             self.assertIn(token, support)
 
+    def test_support_remains_ui_only(self) -> None:
+        support = (SCRIPTS / "authoring_workspace_support.gd").read_text().lower()
+        for forbidden in (
+            "httprequest",
+            "npgsql",
+            "insert into",
+            "update item_",
+            "delete from",
+        ):
+            self.assertNotIn(forbidden, support)
+
+    def test_support_has_a_tracked_godot_uid(self) -> None:
+        uid = (SCRIPTS / "authoring_workspace_support.gd.uid").read_text().strip()
+        self.assertTrue(uid.startswith("uid://"))
+
     def test_support_functions_are_unique(self) -> None:
         support = (SCRIPTS / "authoring_workspace_support.gd").read_text()
         functions = [
@@ -78,6 +62,12 @@ class GodotWorkspaceSupportTests(unittest.TestCase):
             if line.startswith("func ")
         ]
         self.assertEqual(len(functions), len(set(functions)))
+
+    def test_migration_sequence_is_documented(self) -> None:
+        documentation = (ROOT / "docs" / "GODOT_WORKSPACE_SUPPORT.md").read_text()
+        self.assertIn("PR #6", documentation)
+        self.assertIn("existing editors", documentation)
+        self.assertIn("future workspace", documentation)
 
 
 if __name__ == "__main__":
