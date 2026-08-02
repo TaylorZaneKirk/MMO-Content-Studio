@@ -1,7 +1,7 @@
 name: Apply T3B payload
 on:
-  push:
-    branches: [t3b-weapons-tools]
+  pull_request:
+    branches: [main]
 permissions:
   contents: write
 jobs:
@@ -11,6 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: t3b-weapons-tools
           fetch-depth: 0
       - name: Reconstruct and verify payload
         shell: bash
