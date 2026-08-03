@@ -35,11 +35,11 @@ var _items: Array = []
 var _asset_entries: Array = []
 var _asset_by_resource_path: Dictionary = {}
 var _current_item: Dictionary = {}
-var _workspace_support: AuthoringWorkspaceSupport
+var _workspace_support
 
 
 func _ready() -> void:
-	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new() as AuthoringWorkspaceSupport
+	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
 	authoring_host_client.connection_state_changed.connect(_on_connection_state_changed)
 	authoring_host_client.handshake_received.connect(_on_handshake_received)
 	authoring_host_client.health_received.connect(_on_health_received)

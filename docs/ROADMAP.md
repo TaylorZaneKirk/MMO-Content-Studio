@@ -66,27 +66,30 @@ Exit condition:
 
 ## T3B — Weapons and Tools
 
-**Status:** Backend/domain/API foundation complete; full Godot editor and development-machine runtime verification pending.
+**Status:** Backend/domain/API and Godot workspace implementation complete; development-machine runtime verification pending.
 
 Capabilities:
 
 - Search hand-equipment candidates and derive `Weapon`, `Tool`, and `Weapon + Tool` classification labels without adding a new top-level item kind
 - Load the complete base/equipment/specialization aggregate
+- Use a dedicated top-level **Weapons & Tools** workspace rather than folding hand specialization editing into Equipment
 - Author `right_hand` and `left_hand` equipment while preserving wearable declassification paths
 - Author optional `weapon_profile` rows using runtime-supported melee family/style, logical tile range, and `attack_speed_units`
+- Display attack interval timing from `attack_speed_units` without persisting milliseconds
 - Preserve combat-bonus ownership in `item_combat_bonuses`
-- Author zero or more ordered declarative `tool_capabilities`
+- Author and reorder zero or more declarative `tool_capabilities`
 - Require preview signatures before save, publish, or disable apply calls
+- Share paper-doll asset resolution and rendering with T3A Equipment
 - Replace child collections transactionally and clear stale hand specialization rows when equipability or slot changes
 - Reject publication states that the current runtime cannot load, including left-hand weapon profiles and right-hand items without a weapon profile
-- Defer durability, ammo, charges, item instance state, two-handed rules, and the full Godot weapon/tool editor
+- Defer durability, ammo, charges, item instance state, two-handed rules, and MMO Project runtime execution of tool capabilities
 
 Exit condition:
 
-> A maintainer can use the host API to safely author the hand-equipment domain
-> aggregate and tool-capability persistence without manually editing linked SQL
-> tables, while runtime-unsupported combat/tool semantics remain blocked from
-> publication.
+> A maintainer can use the Godot Content Studio to safely author the
+> hand-equipment domain aggregate and tool-capability persistence without
+> manually editing linked SQL tables, while runtime-unsupported combat/tool
+> semantics remain blocked from publication.
 
 ## T4 — Mobs
 

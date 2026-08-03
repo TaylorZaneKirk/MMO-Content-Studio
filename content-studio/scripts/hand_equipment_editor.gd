@@ -1,12 +1,13 @@
 extends HBoxContainer
-class_name EquipmentEditor
+class_name HandEquipmentEditor
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const PAPER_DOLL_PREVIEW_SCRIPT := preload("res://scripts/paper_doll_preview.gd")
 
-const PAPER_DOLL_VISIBLE_SLOTS := ["head", "cape", "body", "legs", "boots", "gloves"]
+const HAND_VISIBLE_SLOTS := ["right_hand", "left_hand"]
 const DEFAULT_PREVIEW_DIRECTION := "N"
 const DEFAULT_PREVIEW_FRAME := 3
+const COMBAT_UNIT_MILLISECONDS := 600
 
 var _client: AuthoringHostClient
 var _items: Array = []
@@ -28,14 +29,26 @@ var _icon: OptionButton
 var _icon_preview: TextureRect
 var _publication: Label
 var _kind: Label
+var _classification: Label
 var _updated: Label
 var _equippable: CheckBox
 var _slot: OptionButton
 var _required_strength: SpinBox
 var _visual_key: Label
+var _visual_model: Label
 var _requirements: VBoxContainer
 var _modifiers: VBoxContainer
 var _bonus_grid: GridContainer
+var _weapon_enabled: CheckBox
+var _weapon_profile_id: LineEdit
+var _weapon_attack_family: OptionButton
+var _weapon_attack_style: OptionButton
+var _weapon_min_range: SpinBox
+var _weapon_max_range: SpinBox
+var _weapon_speed_units: SpinBox
+var _weapon_timing: Label
+var _weapon_note: Label
+var _tool_rows: VBoxContainer
 var _operation: OptionButton
 var _preview_button: Button
 var _apply_button: Button
@@ -46,6 +59,7 @@ var _file_dialog: FileDialog
 var _import_button: Button
 var _add_requirement_button: Button
 var _add_modifier_button: Button
+var _add_tool_button: Button
 var _paper_doll_stage: Control
 var _paper_doll_status: Label
 var _preview_direction: OptionButton
@@ -58,39 +72,38 @@ func _ready() -> void:
 	_client = %AuthoringHostClient
 	_build_ui()
 	_connect_client()
-	_set_form_enabled(false, false)
+	_set_form_enabled(false)
 
 
 func _connect_client() -> void:
 	_client.health_received.connect(_on_health_received)
 	_client.item_assets_received.connect(_on_assets_received)
 	_client.item_asset_imported.connect(_on_asset_imported)
-	_client.equipment_options_received.connect(_on_options_received)
-	_client.equipment_received.connect(_on_equipment_received)
-	_client.equipment_item_received.connect(_on_equipment_item_received)
-	_client.equipment_preview_received.connect(_on_preview_received)
-	_client.equipment_mutation_completed.connect(_on_mutation_completed)
+	_client.hand_equipment_options_received.connect(_on_options_received)
+	_client.hand_equipment_received.connect(_on_hand_equipment_received)
+	_client.hand_equipment_item_received.connect(_on_hand_equipment_item_received)
+	_client.hand_equipment_preview_received.connect(_on_preview_received)
+	_client.hand_equipment_mutation_completed.connect(_on_mutation_completed)
 	_client.request_failed.connect(_on_request_failed)
 
 
 func _build_ui() -> void:
 	add_theme_constant_override("separation", 14)
 	var catalog_panel := _panel()
-	catalog_panel.custom_minimum_size = Vector2(330, 0)
+	catalog_panel.custom_minimum_size = Vector2(350, 0)
 	add_child(catalog_panel)
 	var catalog := VBoxContainer.new()
 	catalog.add_theme_constant_override("separation", 10)
 	catalog_panel.add_child(catalog)
-	catalog.add_child(_heading("Equipment", 20))
-	var help := Label.new()
-	help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help.modulate = Color(0.7, 0.73, 0.79, 1)
-	help.text = "Select any item to make it wearable—or turn Equippable off to clean up legacy misclassifications such as Chunk of Iron."
-	catalog.add_child(help)
+	catalog.add_child(_heading("Weapons & Tools", 20))
 	_search = LineEdit.new()
-	_search.placeholder_text = "Search item ID, name, or slot"
+	_search.placeholder_text = "Search item ID, name, slot, weapon, or tool"
 	_search.text_changed.connect(_rebuild_list.unbind(1))
 	catalog.add_child(_search)
+	var refresh := Button.new()
+	refresh.text = "Refresh"
+	refresh.pressed.connect(_client.load_hand_equipment.bind(""))
+	catalog.add_child(refresh)
 	var catalog_scroll := ScrollContainer.new()
 	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	catalog.add_child(catalog_scroll)
@@ -110,7 +123,7 @@ func _build_ui() -> void:
 	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	editor.add_theme_constant_override("separation", 12)
 	scroll.add_child(editor)
-	editor.add_child(_heading("Wearable Equipment Definition", 20))
+	editor.add_child(_heading("Hand Equipment Definition", 20))
 
 	var grid := GridContainer.new()
 	grid.columns = 2
@@ -127,20 +140,23 @@ func _build_ui() -> void:
 	_icon.item_selected.connect(_on_form_changed.unbind(1))
 	icon_row.add_child(_icon)
 	_import_button = Button.new()
-	_import_button.text = "Import PNG…"
+	_import_button.text = "Import PNG..."
 	_import_button.pressed.connect(_open_import)
 	icon_row.add_child(_import_button)
 	_publication = _add_value_field(grid, "Publication state", "Unknown")
 	_kind = _add_value_field(grid, "Authoring kind", "Unknown")
+	_classification = _add_value_field(grid, "Classification", "Unknown")
 	_updated = _add_value_field(grid, "Last updated", "Unknown")
 	grid.add_child(_field_label("Equippable"))
 	_equippable = CheckBox.new()
 	_equippable.text = "Item can be equipped"
 	_equippable.toggled.connect(_on_equippable_toggled)
 	grid.add_child(_equippable)
-	_slot = _add_option_field(grid, "Wearable slot")
+	_slot = _add_option_field(grid, "Equipment slot")
+	_slot.item_selected.connect(_on_slot_changed.unbind(1))
 	_required_strength = _add_spin_field(grid, "Required strength", 1, 1000000, 1)
 	_visual_key = _add_value_field(grid, "Derived visual key", "None")
+	_visual_model = _add_value_field(grid, "Visual model", "Unknown")
 
 	var preview_row := HBoxContainer.new()
 	preview_row.add_theme_constant_override("separation", 16)
@@ -153,7 +169,7 @@ func _build_ui() -> void:
 	var visual_note := Label.new()
 	visual_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	visual_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	visual_note.text = "Wearable visual keys are currently derived from display name and slot. Weapons and tools remain T3B, but they can be deliberately converted back to non-equippable items here."
+	visual_note.text = "Current runtime active weapons use right_hand. left_hand tool capabilities may be drafted; left_hand weapon publication is blocked by server validation."
 	preview_row.add_child(visual_note)
 
 	editor.add_child(_heading("Directional paper-doll preview", 16))
@@ -236,6 +252,44 @@ func _build_ui() -> void:
 	_bonus_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	editor.add_child(_bonus_grid)
 
+	editor.add_child(_heading("Weapon profile", 16))
+	_weapon_enabled = CheckBox.new()
+	_weapon_enabled.text = "Weapon Profile Enabled"
+	_weapon_enabled.toggled.connect(_on_weapon_enabled_toggled)
+	editor.add_child(_weapon_enabled)
+	var weapon_grid := GridContainer.new()
+	weapon_grid.columns = 2
+	weapon_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	editor.add_child(weapon_grid)
+	_weapon_profile_id = _add_line_field(weapon_grid, "Profile ID", "gold_sword_melee")
+	_weapon_attack_family = _add_option_field(weapon_grid, "Attack family")
+	_weapon_attack_style = _add_option_field(weapon_grid, "Attack style")
+	_weapon_min_range = _add_spin_field(weapon_grid, "Minimum range tiles", 0, 32, 1)
+	_weapon_max_range = _add_spin_field(weapon_grid, "Maximum range tiles", 0, 32, 1)
+	_weapon_speed_units = _add_spin_field(weapon_grid, "Attack speed units", 1, 60, 1)
+	_weapon_timing = _add_value_field(weapon_grid, "Attack interval", "1 units x 600 ms = 600 ms")
+	_weapon_note = Label.new()
+	_weapon_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_weapon_note.modulate = Color(0.7, 0.73, 0.79, 1)
+	editor.add_child(_weapon_note)
+	_weapon_profile_id.text_changed.connect(_on_form_changed.unbind(1))
+	_weapon_min_range.value_changed.connect(_on_form_changed.unbind(1))
+	_weapon_max_range.value_changed.connect(_on_form_changed.unbind(1))
+	_weapon_speed_units.value_changed.connect(_on_weapon_speed_changed.unbind(1))
+
+	var tool_header := HBoxContainer.new()
+	editor.add_child(tool_header)
+	var tool_heading := _heading("Tool capabilities", 16)
+	tool_heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tool_header.add_child(tool_heading)
+	_add_tool_button = Button.new()
+	_add_tool_button.text = "+ Capability"
+	_add_tool_button.pressed.connect(_add_tool_row)
+	tool_header.add_child(_add_tool_button)
+	_tool_rows = VBoxContainer.new()
+	_tool_rows.add_theme_constant_override("separation", 6)
+	editor.add_child(_tool_rows)
+
 	var operation_row := HBoxContainer.new()
 	operation_row.add_theme_constant_override("separation", 8)
 	editor.add_child(operation_row)
@@ -275,6 +329,7 @@ func _build_ui() -> void:
 
 	_display_name.text_changed.connect(_on_form_changed.unbind(1))
 	_required_strength.value_changed.connect(_on_form_changed.unbind(1))
+	_update_weapon_timing()
 
 
 func _panel() -> PanelContainer:
@@ -372,35 +427,42 @@ func _on_asset_imported(payload: Dictionary) -> void:
 	var asset := payload.get("asset", {}) as Dictionary
 	var resource_path := str(asset.get("resource_path", ""))
 	_client.connect_and_load()
-	_status.text = "Imported %s. Reloading catalogs…" % resource_path
+	_status.text = "Imported %s. Reloading catalogs..." % resource_path
 
 
 func _on_options_received(payload: Dictionary) -> void:
 	_options = payload
-	_fill_option(_slot, payload.get("wearable_slots", []) as Array)
+	var slots: Array = []
+	slots.append_array(payload.get("hand_slots", []) as Array)
+	slots.append_array(payload.get("wearable_slots", []) as Array)
+	_fill_option(_slot, slots)
+	_fill_option(_weapon_attack_family, payload.get("attack_families", []) as Array)
+	_fill_option(_weapon_attack_style, payload.get("attack_styles", []) as Array)
 	_rebuild_bonus_grid()
 
 
-func _on_equipment_received(payload: Dictionary) -> void:
+func _on_hand_equipment_received(payload: Dictionary) -> void:
 	_items = payload.get("items", []) as Array
 	_rebuild_list()
 	if not _reload_item_id.is_empty():
 		var item_id := _reload_item_id
 		_reload_item_id = ""
-		_client.load_equipment_item(item_id)
+		_client.load_hand_equipment_item(item_id)
 
 
-func _on_equipment_item_received(payload: Dictionary) -> void:
+func _on_hand_equipment_item_received(payload: Dictionary) -> void:
 	_current_item = payload.duplicate(true)
 	_item_id.text = str(payload.get("item_id", ""))
 	_display_name.text = str(payload.get("display_name", ""))
 	_publication.text = str(payload.get("publication_state", "Unknown"))
 	_kind.text = str(payload.get("authoring_kind", "Unknown"))
+	_classification.text = str(payload.get("classification_label", "Unknown"))
 	_updated.text = str(payload.get("updated_at_utc", "Unknown"))
 	_equippable.button_pressed = bool(payload.get("equippable", false))
 	_select_option(_slot, str(payload.get("equipment_slot_id", "")))
 	_required_strength.value = float(payload.get("required_strength", 1))
 	_visual_key.text = _optional(str(payload.get("visual_asset_key", "")), "None")
+	_visual_model.text = str(payload.get("visual_asset_model", "Current runtime derives visual keys."))
 	_rebuild_icon_options(str(payload.get("icon_texture_path", "")))
 	_clear_rows(_requirements)
 	for variant in payload.get("requirements", []) as Array:
@@ -415,6 +477,11 @@ func _on_equipment_item_received(payload: Dictionary) -> void:
 	if bonuses_variant is Dictionary:
 		bonuses = bonuses_variant
 	_apply_bonus_values(bonuses)
+	_apply_weapon_profile(payload.get("weapon_profile", null))
+	_clear_rows(_tool_rows)
+	for variant in payload.get("tool_capabilities", []) as Array:
+		if variant is Dictionary:
+			_add_tool_row(variant as Dictionary)
 	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
 	_update_paper_doll_preview()
 	_update_operation_default()
@@ -428,7 +495,7 @@ func _on_preview_received(payload: Dictionary) -> void:
 	var valid := bool(payload.get("valid_for_publication", false)) if operation == "publish" else bool(payload.get("valid_for_draft", false))
 	_workspace_support.accept_preview(
 		operation,
-		_signature(operation),
+		str(payload.get("preview_signature", "")),
 		valid,
 		_apply_button,
 		"Apply %s" % _workspace_support.operation_name(operation)
@@ -443,12 +510,12 @@ func _on_mutation_completed(payload: Dictionary) -> void:
 	var item := payload.get("item", {}) as Dictionary
 	_reload_item_id = str(item.get("item_id", _item_id.text))
 	_clear_preview()
-	_status.text = "%s completed. Reloading item…" % _workspace_support.operation_name(str(payload.get("operation", "operation")))
-	_client.load_equipment()
+	_status.text = "%s completed. Reloading item..." % _workspace_support.operation_name(str(payload.get("operation", "operation")))
+	_client.load_hand_equipment()
 
 
 func _on_request_failed(operation: String, message: String, errors: Array) -> void:
-	if not operation.begins_with("equipment") and operation != "item_asset_import":
+	if not operation.begins_with("hand_equipment") and operation != "item_asset_import":
 		return
 	_status.text = "%s failed: %s" % [operation, message]
 	_workspace_support.render_validation(_validation, errors)
@@ -462,19 +529,29 @@ func _rebuild_list() -> void:
 		if variant is not Dictionary:
 			continue
 		var item := variant as Dictionary
-		var haystack := "%s %s %s" % [item.get("item_id", ""), item.get("display_name", ""), item.get("equipment_slot_id", "")]
+		var haystack := "%s %s %s %s" % [
+			item.get("item_id", ""),
+			item.get("display_name", ""),
+			item.get("equipment_slot_id", ""),
+			item.get("classification_label", ""),
+		]
 		if not query.is_empty() and not haystack.to_lower().contains(query):
 			continue
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s\n%s • %s • %s" % [
+		button.text = "%s\n%s | %s | %s | %s%s%s" % [
 			str(item.get("display_name", "Unnamed item")),
 			str(item.get("publication_state", "Unknown")),
-			str(item.get("authoring_kind", "Unknown")),
+			str(item.get("classification_label", item.get("authoring_kind", "Unknown"))),
 			_optional(str(item.get("equipment_slot_id", "")), "not equippable"),
+			str(item.get("item_id", "")),
+			" | weapon" if bool(item.get("has_weapon_profile", false)) else "",
+			" | tool" if bool(item.get("has_tool_capabilities", false)) else "",
 		]
+		if not bool(item.get("editable_in_hand_equipment", false)):
+			button.text += "\nRead-only here: open the owning workspace."
 		button.tooltip_text = str(item.get("item_id", ""))
-		button.pressed.connect(_client.load_equipment_item.bind(str(item.get("item_id", ""))))
+		button.pressed.connect(_client.load_hand_equipment_item.bind(str(item.get("item_id", ""))))
 		_list.add_child(button)
 
 
@@ -530,6 +607,63 @@ func _add_modifier_row(initial: Dictionary = {}) -> void:
 	_clear_preview()
 
 
+func _add_tool_row(initial: Dictionary = {}) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var capability := OptionButton.new()
+	capability.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_option(capability, _options.get("tool_capabilities", []) as Array)
+	_select_option(capability, str(initial.get("capability_id", "")))
+	row.add_child(capability)
+	var power := SpinBox.new()
+	power.min_value = 1
+	power.max_value = 1000
+	power.value = float(initial.get("power_tier", 1))
+	power.custom_minimum_size = Vector2(90, 0)
+	row.add_child(power)
+	var action := LineEdit.new()
+	action.placeholder_text = "action animation ID"
+	action.text = str(initial.get("action_animation_id", ""))
+	action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(action)
+	var effect := LineEdit.new()
+	effect.placeholder_text = "effect resource ID"
+	effect.text = str(initial.get("effect_resource_id", ""))
+	effect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(effect)
+	var up := Button.new()
+	up.text = "Up"
+	up.pressed.connect(_move_tool_row.bind(row, -1))
+	row.add_child(up)
+	var down := Button.new()
+	down.text = "Down"
+	down.pressed.connect(_move_tool_row.bind(row, 1))
+	row.add_child(down)
+	var remove := Button.new()
+	remove.text = "Remove"
+	remove.pressed.connect(_remove_row.bind(row))
+	row.add_child(remove)
+	row.set_meta("capability", capability)
+	row.set_meta("power", power)
+	row.set_meta("action", action)
+	row.set_meta("effect", effect)
+	capability.item_selected.connect(_on_form_changed.unbind(1))
+	power.value_changed.connect(_on_form_changed.unbind(1))
+	action.text_changed.connect(_on_form_changed.unbind(1))
+	effect.text_changed.connect(_on_form_changed.unbind(1))
+	_tool_rows.add_child(row)
+	_clear_preview()
+
+
+func _move_tool_row(row: Control, delta: int) -> void:
+	var index := row.get_index()
+	var target := clampi(index + delta, 0, _tool_rows.get_child_count() - 1)
+	if target == index:
+		return
+	_tool_rows.move_child(row, target)
+	_clear_preview()
+
+
 func _remove_row(row: Control) -> void:
 	var parent := row.get_parent()
 	if parent != null:
@@ -560,6 +694,19 @@ func _apply_bonus_values(values: Dictionary) -> void:
 		(_bonus_controls[id] as SpinBox).value = float(values.get(id, 0))
 
 
+func _apply_weapon_profile(profile_variant: Variant) -> void:
+	var has_profile := profile_variant is Dictionary
+	_weapon_enabled.button_pressed = has_profile
+	var profile := profile_variant as Dictionary if has_profile else {}
+	_weapon_profile_id.text = str(profile.get("profile_id", ""))
+	_select_option(_weapon_attack_family, str(profile.get("attack_type", "melee")))
+	_select_option(_weapon_attack_style, str(profile.get("accuracy_style", "slash")))
+	_weapon_min_range.value = float(profile.get("minimum_range_tiles", 1))
+	_weapon_max_range.value = float(profile.get("maximum_range_tiles", 1))
+	_weapon_speed_units.value = float(profile.get("attack_speed_units", 4))
+	_update_weapon_timing()
+
+
 func _collect_requirements() -> Array:
 	var values: Array = []
 	for row in _requirements.get_children():
@@ -583,16 +730,47 @@ func _collect_bonuses() -> Dictionary:
 	return values
 
 
+func _collect_tool_capabilities() -> Array:
+	var values: Array = []
+	for row in _tool_rows.get_children():
+		if row.has_meta("capability"):
+			values.append({
+				"capability_id": _selected_metadata(row.get_meta("capability") as OptionButton),
+				"power_tier": int((row.get_meta("power") as SpinBox).value),
+				"action_animation_id": _optional_payload((row.get_meta("action") as LineEdit).text),
+				"effect_resource_id": _optional_payload((row.get_meta("effect") as LineEdit).text),
+			})
+	return values
+
+
+func _weapon_profile_payload() -> Variant:
+	if not _weapon_enabled.button_pressed or not _is_hand_slot(_selected_metadata(_slot)):
+		return null
+	return {
+		"profile_id": _weapon_profile_id.text.strip_edges(),
+		"attack_type": _selected_metadata(_weapon_attack_family),
+		"accuracy_style": _selected_metadata(_weapon_attack_style),
+		"minimum_range_tiles": int(_weapon_min_range.value),
+		"maximum_range_tiles": int(_weapon_max_range.value),
+		"attack_speed_units": int(_weapon_speed_units.value),
+	}
+
+
 func _payload() -> Dictionary:
+	var equippable := _equippable.button_pressed
+	var slot_id := _selected_metadata(_slot) if equippable else ""
+	var hand_slot := _is_hand_slot(slot_id)
 	return {
 		"display_name": _display_name.text,
 		"icon_texture_path": _selected_metadata(_icon),
-		"equippable": _equippable.button_pressed,
-		"equipment_slot_id": _selected_metadata(_slot) if _equippable.button_pressed else null,
-		"required_strength": int(_required_strength.value) if _equippable.button_pressed else 1,
-		"requirements": _collect_requirements() if _equippable.button_pressed else [],
-		"skill_modifiers": _collect_modifiers() if _equippable.button_pressed else [],
-		"combat_bonuses": _collect_bonuses() if _equippable.button_pressed else _zero_bonuses(),
+		"equippable": equippable,
+		"equipment_slot_id": slot_id if equippable else null,
+		"required_strength": int(_required_strength.value) if equippable else 1,
+		"requirements": _collect_requirements() if equippable else [],
+		"skill_modifiers": _collect_modifiers() if equippable else [],
+		"weapon_profile": _weapon_profile_payload() if equippable and hand_slot else null,
+		"combat_bonuses": _collect_bonuses() if equippable else _zero_bonuses(),
+		"tool_capabilities": _collect_tool_capabilities() if equippable and hand_slot else [],
 		"expected_updated_at_utc": _current_item.get("updated_at_utc", null),
 	}
 
@@ -603,26 +781,29 @@ func _preview() -> void:
 		return
 	var payload := _payload()
 	payload["target_operation"] = _selected_metadata(_operation)
-	_client.preview_equipment(_item_id.text, payload)
-	_status.text = "Calculating validation and exact database changes…"
+	_client.preview_hand_equipment(_item_id.text, payload)
+	_status.text = "Calculating validation and exact database changes..."
 
 
 func _apply() -> void:
 	var operation := _selected_metadata(_operation)
-	if not _workspace_support.can_apply(operation, _signature(operation)):
+	var preview_signature: String = _workspace_support.preview_signature
+	if not _workspace_support.can_apply(operation, preview_signature):
 		_status.text = "The form changed. Preview the operation again before applying it."
 		_apply_button.disabled = true
 		return
 	var expected: Variant = _current_item.get("updated_at_utc", null)
 	match operation:
 		"publish":
-			_client.publish_equipment(_item_id.text, expected)
+			_client.publish_hand_equipment(_item_id.text, expected, preview_signature)
 		"disable":
-			_client.disable_equipment(_item_id.text, expected)
+			_client.disable_hand_equipment(_item_id.text, expected, preview_signature)
 		_:
-			_client.save_equipment_draft(_item_id.text, _payload())
+			var payload := _payload()
+			payload["preview_signature"] = preview_signature
+			_client.save_hand_equipment_draft(_item_id.text, payload)
 	_apply_button.disabled = true
-	_status.text = "Applying transactional equipment operation…"
+	_status.text = "Applying transactional hand-equipment operation..."
 
 
 func _on_equippable_toggled(_value: bool) -> void:
@@ -630,13 +811,28 @@ func _on_equippable_toggled(_value: bool) -> void:
 	_on_form_changed()
 
 
+func _on_slot_changed() -> void:
+	_update_editability()
+	_on_form_changed()
+
+
+func _on_weapon_enabled_toggled(_value: bool) -> void:
+	_update_editability()
+	_on_form_changed()
+
+
+func _on_weapon_speed_changed() -> void:
+	_update_weapon_timing()
+	_on_form_changed()
+
+
 func _update_editability() -> void:
-	var full_edit := bool(_current_item.get("editable_in_equipment", false))
-	var can_remove := bool(_current_item.get("can_remove_equipability", false))
-	var enabled := full_edit or can_remove
-	_set_form_enabled(full_edit, can_remove)
-	var metadata_enabled := full_edit and _equippable.button_pressed
-	_slot.disabled = not metadata_enabled
+	var enabled := bool(_current_item.get("editable_in_hand_equipment", false))
+	_set_form_enabled(enabled)
+	var metadata_enabled := enabled and _equippable.button_pressed
+	var slot_id := _selected_metadata(_slot)
+	var hand_slot := metadata_enabled and _is_hand_slot(slot_id)
+	var weapon_enabled := hand_slot and _weapon_enabled.button_pressed
 	_required_strength.editable = metadata_enabled
 	_add_requirement_button.disabled = not metadata_enabled
 	_add_modifier_button.disabled = not metadata_enabled
@@ -646,20 +842,28 @@ func _update_editability() -> void:
 		_set_dynamic_row_enabled(child, metadata_enabled)
 	for id in _bonus_controls:
 		(_bonus_controls[id] as SpinBox).editable = metadata_enabled
-	if not full_edit and can_remove:
-		_operation.select(0)
-		_operation.disabled = true
-	_status.text = _status_for_item(_current_item) if enabled else "This item belongs to another authoring workspace."
+	_weapon_enabled.disabled = not hand_slot
+	_weapon_profile_id.editable = weapon_enabled
+	_weapon_attack_family.disabled = not weapon_enabled
+	_weapon_attack_style.disabled = not weapon_enabled
+	_weapon_min_range.editable = weapon_enabled
+	_weapon_max_range.editable = weapon_enabled
+	_weapon_speed_units.editable = weapon_enabled
+	_add_tool_button.disabled = not hand_slot
+	for child in _tool_rows.get_children():
+		_set_tool_row_enabled(child, hand_slot)
+	_update_guidance()
 
 
-func _set_form_enabled(full_edit: bool, can_remove: bool) -> void:
-	_display_name.editable = full_edit
-	_icon.disabled = not full_edit
-	_import_button.disabled = not full_edit
-	_equippable.disabled = not (full_edit or can_remove)
-	_operation.disabled = not (full_edit or can_remove)
-	_preview_button.disabled = not (full_edit or can_remove)
-	if not (full_edit or can_remove):
+func _set_form_enabled(enabled: bool) -> void:
+	_display_name.editable = enabled
+	_icon.disabled = not enabled
+	_import_button.disabled = not enabled
+	_equippable.disabled = not enabled
+	_slot.disabled = not enabled
+	_operation.disabled = not enabled
+	_preview_button.disabled = not enabled
+	if not enabled:
 		_apply_button.disabled = true
 
 
@@ -673,14 +877,39 @@ func _set_dynamic_row_enabled(row: Node, enabled: bool) -> void:
 			(child as Button).disabled = not enabled
 
 
+func _set_tool_row_enabled(row: Node, enabled: bool) -> void:
+	if row.has_meta("capability"):
+		(row.get_meta("capability") as OptionButton).disabled = not enabled
+	if row.has_meta("power"):
+		(row.get_meta("power") as SpinBox).editable = enabled
+	if row.has_meta("action"):
+		(row.get_meta("action") as LineEdit).editable = enabled
+	if row.has_meta("effect"):
+		(row.get_meta("effect") as LineEdit).editable = enabled
+	for child in row.get_children():
+		if child is Button:
+			(child as Button).disabled = not enabled
+
+
 func _status_for_item(payload: Dictionary) -> String:
-	if bool(payload.get("editable_in_equipment", false)):
-		return "Edit wearable metadata, or turn Equippable off to atomically remove all equipment metadata."
-	if bool(payload.get("can_remove_equipability", false)):
-		return "This hand-held or legacy-classified item is not editable in T3A, but you may turn Equippable off to remove its slot and dependent equipment/combat metadata."
+	if bool(payload.get("editable_in_hand_equipment", false)):
+		return "Edit hand equipment, weapon profile, and tool capabilities. Server validation remains authoritative."
 	if str(payload.get("authoring_kind", "")) == "Consumable":
 		return "Consumables must be edited in the Consumables workspace."
 	return "This item is read-only here."
+
+
+func _update_guidance() -> void:
+	if not _equippable.button_pressed:
+		_weapon_note.text = "Not equippable: preview will clear slot, requirements, modifiers, weapon profile, combat bonuses, and tool capabilities."
+		return
+	var slot_id := _selected_metadata(_slot)
+	if not _is_hand_slot(slot_id):
+		_weapon_note.text = "Wearable slot selected: preview will remove hand-only weapon profile and tool capability rows."
+	elif slot_id == "left_hand":
+		_weapon_note.text = "left_hand tools can be drafted. Current runtime blocks left_hand weapon profile publication."
+	else:
+		_weapon_note.text = "right_hand supports current active weapon publication when a valid weapon profile is present."
 
 
 func _update_operation_default() -> void:
@@ -694,7 +923,7 @@ func _open_import() -> void:
 
 func _import_selected(path: String) -> void:
 	_client.import_item_asset(path, path.get_file())
-	_status.text = "Importing PNG into the canonical item asset directory…"
+	_status.text = "Importing PNG into the canonical item asset directory..."
 
 
 func _rebuild_icon_options(selected_path: String) -> void:
@@ -732,10 +961,7 @@ func _on_form_changed() -> void:
 func _derive_visual_key() -> String:
 	if not _equippable.button_pressed:
 		return "None"
-	var value: String = _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
-	if _selected_metadata(_slot) == "legs" and value.ends_with("_legs"):
-		value = value.trim_suffix("_legs")
-	return value
+	return _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
 
 
 func _on_visual_preview_changed() -> void:
@@ -752,17 +978,21 @@ func _update_paper_doll_preview() -> void:
 		_derive_visual_key(),
 		direction,
 		int(_preview_frame.value),
-		PAPER_DOLL_VISIBLE_SLOTS
+		HAND_VISIBLE_SLOTS
 	)
+
+
+func _update_weapon_timing() -> void:
+	var units := int(_weapon_speed_units.value) if _weapon_speed_units != null else 1
+	_weapon_timing.text = "%d units x %d ms = %d ms" % [
+		units,
+		COMBAT_UNIT_MILLISECONDS,
+		units * COMBAT_UNIT_MILLISECONDS,
+	]
 
 
 func _clear_preview() -> void:
 	_workspace_support.clear_preview(_apply_button, _changes, _validation)
-
-
-func _signature(operation: String) -> String:
-	return JSON.stringify([_item_id.text, _payload(), operation])
-
 
 
 func _fill_option(control: OptionButton, values: Array) -> void:
@@ -799,7 +1029,16 @@ func _zero_bonuses() -> Dictionary:
 
 
 func _optional(value: String, fallback: String) -> String:
-	return fallback if value.strip_edges().is_empty() or value == "<null>" else value
+	return fallback if value.strip_edges().is_empty() else value
+
+
+func _optional_payload(value: String) -> Variant:
+	var trimmed := value.strip_edges()
+	return null if trimmed.is_empty() else trimmed
+
+
+func _is_hand_slot(value: String) -> bool:
+	return value == "right_hand" or value == "left_hand"
 
 
 func _clear_rows(container: Node) -> void:

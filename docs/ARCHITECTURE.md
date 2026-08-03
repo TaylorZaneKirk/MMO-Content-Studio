@@ -26,6 +26,11 @@ Responsibilities:
 - Validation and change-summary presentation
 - Draft, publish, disable, and edit workflows
 
+`AuthoringHttpTransport` owns HTTP and envelope parsing. `AuthoringHostClient`
+owns feature-specific request methods and signals. Editors own their forms and
+payloads, while `AuthoringWorkspaceSupport` owns preview/apply lifecycle state
+and feedback rendering.
+
 ### .NET Content Authoring Host
 
 Responsibilities:
@@ -223,3 +228,10 @@ aggregate `updated_at` concurrency token. The host locks the base item row,
 replaces child collections, clears stale hand specialization rows when
 equipability or slot changes, reloads inside the transaction, commits, and then
 reloads again to verify the persisted aggregate.
+
+The Godot implementation keeps T3B in a dedicated **Weapons & Tools** workspace
+instead of extending the wearable Equipment editor. Both Equipment and Weapons &
+Tools use the shared `PaperDollPreview` helper for player-layer asset
+resolution, legacy filename normalization, N/S/E/W frame fallback, and current
+layer ordering. This keeps the directional preview behavior aligned while
+allowing each workspace to own its distinct form rules.

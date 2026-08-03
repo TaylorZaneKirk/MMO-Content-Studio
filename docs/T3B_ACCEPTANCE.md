@@ -1,7 +1,8 @@
-# T3B Acceptance: Weapon and Tool Domain Foundation
+# T3B Acceptance: Weapons & Tools Workspace
 
-T3B Phase 1 adds the backend foundation for hand-held weapons and tools. It
-does not add the full Godot weapon/tool editor.
+T3B adds the backend foundation and dedicated Godot workspace for hand-held
+weapons and tools. MMO Project runtime execution of tool capabilities remains
+deferred.
 
 ## Implemented
 
@@ -12,6 +13,9 @@ does not add the full Godot weapon/tool editor.
 - `PUT /api/v1/hand-equipment/{item_id}/draft`
 - `POST /api/v1/hand-equipment/{item_id}/publish`
 - `POST /api/v1/hand-equipment/{item_id}/disable`
+- Godot **Weapons & Tools** top-level workspace
+- current-style `AuthoringHostClient` hand-equipment signals and methods
+- shared `PaperDollPreview` helper used by both Equipment and Weapons & Tools
 
 The aggregate includes the base item, equipability, `right_hand` / `left_hand`
 slot, required Strength, skill requirements, skill modifiers, combat bonuses,
@@ -43,6 +47,34 @@ Turning equipability off clears the slot, requirements, modifiers,
 `weapon_profile`, combat bonuses, and `tool_capabilities`. Moving an item from a
 hand slot to a wearable slot clears hand-only specialization rows.
 
+## Workspace
+
+The UI supports ordinary Basic item promotion, existing hand equipment,
+weapon-only, tool-only, combined Weapon + Tool, hand equipment without
+specialization, movement to a wearable slot, and turning Equippable off.
+
+It exposes the base item fields, icon selection/import, publication metadata,
+equipability, slot, required Strength, skill requirements, skill modifiers,
+combat bonuses, optional weapon profile, and ordered tool capabilities.
+
+Weapon profile controls include profile ID, attack family/type, attack style,
+minimum and maximum range in logical tiles, and `attack_speed_units`. The UI
+displays derived timing as `N units x 600 ms = X ms` and persists only
+`attack_speed_units`.
+
+Tool capability rows preserve displayed order in the outgoing payload and expose
+capability ID, power tier, optional action animation ID, optional effect
+resource ID, move up, move down, and remove controls.
+
+`AuthoringWorkspaceSupport` owns preview state, apply eligibility, operation
+matching, logical-change rendering, and validation rendering. The editor sends
+the server-issued `preview_signature` on save, publish, and disable apply calls.
+
+The prior UI attempt was recovered selectively: list/form structure, row
+patterns, and paper-doll behavior informed the final implementation. Obsolete
+bootstrap payloads, staging chunks, recovery workflows, direct transport code,
+and editor-local preview-state fields were not restored.
+
 ## Validation
 
 Drafts are permissive enough to save incomplete hand equipment, but still reject
@@ -61,8 +93,7 @@ T3B uses existing runtime tables for base items, equipment slots, requirements,
 modifiers, `item_combat_profiles`, and `item_combat_bonuses`.
 
 The new schema handoff artifact is
-`integrations/mmo-project/prototype/sql/018_item_tool_capabilities.sql`. It must
-be reviewed and applied to the MMO Project repository before development-machine
+`integrations/mmo-project/prototype/sql/018_item_tool_capabilities.sql`. It must be reviewed and applied to the MMO Project repository before development-machine
 runtime verification. The migration creates `item_tool_capabilities`, prevents
 capabilities from attaching to non-hand items, and prevents an item from moving
 out of `right_hand` or `left_hand` while capability rows remain. Structural
@@ -72,9 +103,11 @@ migrations do not seed item-specific content.
 
 - Source contracts cover routes, aggregate contracts, validation, transaction
   shape, migration scope, bidirectional slot integrity, the absence of
-  item-specific migration seeds, and the absence of Godot SQL.
+  item-specific migration seeds, dedicated Godot navigation, T3B client methods,
+  shared preview support, paper-doll extraction, preview signatures, and the
+  absence of Godot SQL or recovery artifacts.
 - Compiled host tests cover deterministic capability normalization, canonical
   duplicate detection, derived classification labels, active runtime weapon-slot
   rules, registry values, normalization edge cases, and classification behavior.
-- Full database transaction, optimistic-concurrency, and HTTP integration
-  verification still requires the configured development PostgreSQL database.
+- Development-machine runtime verification still requires the configured
+  PostgreSQL database, asset roots, and MMO Project runtime environment.

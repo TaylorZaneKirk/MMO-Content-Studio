@@ -150,7 +150,119 @@ class T3BSourceContractTests(unittest.TestCase):
             for forbidden in ("durability", "ammo", "charges", "item_instance"):
                 self.assertNotIn(forbidden, migration.lower())
 
-    def test_t3b_has_no_godot_sql_or_full_editor_slice(self) -> None:
+    def test_godot_navigation_exposes_dedicated_weapons_and_tools_workspace(self) -> None:
+        scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
+        self.assertIn('path="res://scripts/hand_equipment_editor.gd"', scene)
+        self.assertIn('[node name="Weapons & Tools" type="HBoxContainer"', scene)
+        self.assertIn('script = ExtResource("5_hand_equipment")', scene)
+        self.assertIn('[node name="Equipment" type="HBoxContainer"', scene)
+
+    def test_godot_client_supports_hand_equipment_api_via_transport(self) -> None:
+        client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()
+        for token in (
+            "hand_equipment_options_received",
+            "hand_equipment_received",
+            "hand_equipment_item_received",
+            "hand_equipment_preview_received",
+            "hand_equipment_mutation_completed",
+            "load_hand_equipment_options",
+            "load_hand_equipment",
+            "load_hand_equipment_item",
+            "preview_hand_equipment",
+            "save_hand_equipment_draft",
+            "publish_hand_equipment",
+            "disable_hand_equipment",
+            '"/api/v1/hand-equipment/options"',
+            '"/api/v1/hand-equipment%s"',
+            '"/api/v1/hand-equipment/%s/preview"',
+            '"/api/v1/hand-equipment/%s/draft"',
+            '"/api/v1/hand-equipment/%s/publish"',
+            '"/api/v1/hand-equipment/%s/disable"',
+            "OP_HAND_EQUIPMENT_OPTIONS",
+            "OP_HAND_EQUIPMENT_SAVE_DRAFT",
+            "_transport.request",
+        ):
+            self.assertIn(token, client)
+        self.assertNotIn("HTTPRequest.new()", client)
+
+    def test_hand_equipment_editor_uses_shared_workspace_support(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
+        for token in (
+            'class_name HandEquipmentEditor',
+            'preload("res://scripts/authoring_workspace_support.gd")',
+            "WORKSPACE_SUPPORT_SCRIPT.new()",
+            "_workspace_support.clear_preview",
+            "_workspace_support.accept_preview",
+            "_workspace_support.can_apply",
+            "_workspace_support.render_changes",
+            "_workspace_support.render_validation",
+            "_workspace_support.operation_name",
+        ):
+            self.assertIn(token, editor)
+        for forbidden in (
+            "var _preview_signature",
+            "var _preview_operation",
+            "var _preview_applicable",
+            "func _render_changes",
+            "func _render_validation",
+        ):
+            self.assertNotIn(forbidden, editor)
+
+    def test_hand_equipment_editor_supports_weapon_tool_and_combined_payloads(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
+        for token in (
+            '"weapon_profile": _weapon_profile_payload() if equippable and hand_slot else null',
+            '"tool_capabilities": _collect_tool_capabilities() if equippable and hand_slot else []',
+            "_weapon_enabled",
+            "_add_tool_row",
+            "_collect_tool_capabilities",
+            "_tool_rows.get_children()",
+            '"attack_speed_units": int(_weapon_speed_units.value)',
+            "COMBAT_UNIT_MILLISECONDS := 600",
+            "units x %d ms = %d ms",
+            '"expected_updated_at_utc": _current_item.get("updated_at_utc", null)',
+            'payload["preview_signature"] = preview_signature',
+            "publish_hand_equipment(_item_id.text, expected, preview_signature)",
+            "disable_hand_equipment(_item_id.text, expected, preview_signature)",
+        ):
+            self.assertIn(token, editor)
+        self.assertNotIn("attack_speed_ms", editor)
+
+    def test_hand_equipment_editor_surfaces_slot_rules_and_form_cleanup(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
+        for token in (
+            "right_hand",
+            "left_hand",
+            "HAND_VISIBLE_SLOTS",
+            "left_hand weapon publication is blocked",
+            "right_hand supports current active weapon publication",
+            "Not equippable: preview will clear slot",
+            "Wearable slot selected: preview will remove hand-only weapon profile",
+            "_is_hand_slot",
+            "_weapon_profile_payload() if equippable and hand_slot else null",
+            "_collect_tool_capabilities() if equippable and hand_slot else []",
+        ):
+            self.assertIn(token, editor)
+
+    def test_paper_doll_behavior_is_shared_between_equipment_workspaces(self) -> None:
+        equipment = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()
+        hand = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
+        paper_doll = (ROOT / "content-studio" / "scripts" / "paper_doll_preview.gd").read_text()
+        for editor in (equipment, hand):
+            self.assertIn('preload("res://scripts/paper_doll_preview.gd")', editor)
+            self.assertIn("_paper_doll_preview.update", editor)
+        for token in (
+            'LAYER_ORDER := ["cape", "right_hand", "legs", "boots", "body", "left_hand", "gloves", "head"]',
+            'DEFAULT_VISUAL_KEYS := {"head": "head1", "body": "defbod", "legs": "defbod"}',
+            'ANCHOR_OFFSET := Vector2(-7, -7)',
+            'if direction == "N" and not values.has(4):',
+            'return 0 if direction == "W" else 30',
+            'path_join("actors").path_join("player")',
+            "normalize_visual_key",
+        ):
+            self.assertIn(token, paper_doll)
+
+    def test_t3b_godot_has_no_sql_or_database_driver(self) -> None:
         godot_sources = "\n".join(
             path.read_text(errors="ignore")
             for path in (ROOT / "content-studio").rglob("*.gd")
@@ -158,8 +270,15 @@ class T3BSourceContractTests(unittest.TestCase):
         for forbidden in ("insert into item_tool_capabilities", "npgsql", "delete from item_tool"):
             self.assertNotIn(forbidden, godot_sources)
 
-        scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
-        self.assertNotIn('text = "Weapons and Tools"', scene)
+    def test_no_bootstrap_or_recovery_artifacts_are_restored(self) -> None:
+        forbidden_paths = (
+            ROOT / ".t3b-bootstrap",
+            ROOT / ".t3b-v2-stage",
+            ROOT / ".github" / "workflows" / "apply-t3b.yml",
+            ROOT / ".github" / "workflows" / "apply-t3b-repair.yml",
+        )
+        for path in forbidden_paths:
+            self.assertFalse(path.exists(), str(path))
 
     def test_docs_track_t3b_foundation_scope(self) -> None:
         acceptance = (ROOT / "docs" / "T3B_ACCEPTANCE.md").read_text()

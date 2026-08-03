@@ -21,6 +21,11 @@ signal equipment_received(payload: Dictionary)
 signal equipment_item_received(payload: Dictionary)
 signal equipment_preview_received(payload: Dictionary)
 signal equipment_mutation_completed(payload: Dictionary)
+signal hand_equipment_options_received(payload: Dictionary)
+signal hand_equipment_received(payload: Dictionary)
+signal hand_equipment_item_received(payload: Dictionary)
+signal hand_equipment_preview_received(payload: Dictionary)
+signal hand_equipment_mutation_completed(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const TRANSPORT_SCRIPT := preload("res://scripts/http_json_client.gd")
@@ -51,6 +56,13 @@ const OP_EQUIPMENT_PREVIEW := "equipment_preview"
 const OP_EQUIPMENT_SAVE_DRAFT := "equipment_save_draft"
 const OP_EQUIPMENT_PUBLISH := "equipment_publish"
 const OP_EQUIPMENT_DISABLE := "equipment_disable"
+const OP_HAND_EQUIPMENT_OPTIONS := "hand_equipment_options"
+const OP_HAND_EQUIPMENT := "hand_equipment"
+const OP_HAND_EQUIPMENT_ITEM := "hand_equipment_item"
+const OP_HAND_EQUIPMENT_PREVIEW := "hand_equipment_preview"
+const OP_HAND_EQUIPMENT_SAVE_DRAFT := "hand_equipment_save_draft"
+const OP_HAND_EQUIPMENT_PUBLISH := "hand_equipment_publish"
+const OP_HAND_EQUIPMENT_DISABLE := "hand_equipment_disable"
 
 const CONNECTION_OPERATIONS := [
 	OP_HANDSHAKE,
@@ -62,6 +74,8 @@ const CONNECTION_OPERATIONS := [
 	OP_CONSUMABLES,
 	OP_EQUIPMENT_OPTIONS,
 	OP_EQUIPMENT,
+	OP_HAND_EQUIPMENT_OPTIONS,
+	OP_HAND_EQUIPMENT,
 ]
 
 @export var base_url := DEFAULT_BASE_URL
@@ -91,15 +105,10 @@ func retry() -> void:
 
 
 func import_item_asset(source_file_path: String, target_file_name: String = "") -> void:
-	_request(
-		OP_ITEM_ASSET_IMPORT,
-		"/api/v1/assets/items/import",
-		HTTPClient.METHOD_POST,
-		{
-			"source_file_path": source_file_path,
-			"target_file_name": target_file_name,
-		}
-	)
+	_request(OP_ITEM_ASSET_IMPORT, "/api/v1/assets/items/import", HTTPClient.METHOD_POST, {
+		"source_file_path": source_file_path,
+		"target_file_name": target_file_name,
+	})
 
 
 func load_items(search: String = "") -> void:
@@ -114,39 +123,19 @@ func load_item(item_id: String) -> void:
 
 
 func preview_item(item_id: String, payload: Dictionary) -> void:
-	_request(
-		OP_ITEM_PREVIEW,
-		"/api/v1/items/%s/preview" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		payload
-	)
+	_request(OP_ITEM_PREVIEW, "/api/v1/items/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
 
 func save_item_draft(item_id: String, payload: Dictionary) -> void:
-	_request(
-		OP_ITEM_SAVE_DRAFT,
-		"/api/v1/items/%s/draft" % item_id.uri_encode(),
-		HTTPClient.METHOD_PUT,
-		payload
-	)
+	_request(OP_ITEM_SAVE_DRAFT, "/api/v1/items/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
 
 
 func publish_item(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(
-		OP_ITEM_PUBLISH,
-		"/api/v1/items/%s/publish" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		{"expected_updated_at_utc": expected_updated_at_utc}
-	)
+	_request(OP_ITEM_PUBLISH, "/api/v1/items/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
 
 
 func disable_item(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(
-		OP_ITEM_DISABLE,
-		"/api/v1/items/%s/disable" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		{"expected_updated_at_utc": expected_updated_at_utc}
-	)
+	_request(OP_ITEM_DISABLE, "/api/v1/items/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
 
 
 func load_consumables(search: String = "") -> void:
@@ -161,39 +150,19 @@ func load_consumable(item_id: String) -> void:
 
 
 func preview_consumable(item_id: String, payload: Dictionary) -> void:
-	_request(
-		OP_CONSUMABLE_PREVIEW,
-		"/api/v1/consumables/%s/preview" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		payload
-	)
+	_request(OP_CONSUMABLE_PREVIEW, "/api/v1/consumables/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
 
 func save_consumable_draft(item_id: String, payload: Dictionary) -> void:
-	_request(
-		OP_CONSUMABLE_SAVE_DRAFT,
-		"/api/v1/consumables/%s/draft" % item_id.uri_encode(),
-		HTTPClient.METHOD_PUT,
-		payload
-	)
+	_request(OP_CONSUMABLE_SAVE_DRAFT, "/api/v1/consumables/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
 
 
 func publish_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(
-		OP_CONSUMABLE_PUBLISH,
-		"/api/v1/consumables/%s/publish" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		{"expected_updated_at_utc": expected_updated_at_utc}
-	)
+	_request(OP_CONSUMABLE_PUBLISH, "/api/v1/consumables/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
 
 
 func disable_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(
-		OP_CONSUMABLE_DISABLE,
-		"/api/v1/consumables/%s/disable" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		{"expected_updated_at_utc": expected_updated_at_utc}
-	)
+	_request(OP_CONSUMABLE_DISABLE, "/api/v1/consumables/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
 
 
 func load_equipment(search: String = "") -> void:
@@ -208,39 +177,56 @@ func load_equipment_item(item_id: String) -> void:
 
 
 func preview_equipment(item_id: String, payload: Dictionary) -> void:
-	_request(
-		OP_EQUIPMENT_PREVIEW,
-		"/api/v1/equipment/%s/preview" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		payload
-	)
+	_request(OP_EQUIPMENT_PREVIEW, "/api/v1/equipment/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
 
 func save_equipment_draft(item_id: String, payload: Dictionary) -> void:
-	_request(
-		OP_EQUIPMENT_SAVE_DRAFT,
-		"/api/v1/equipment/%s/draft" % item_id.uri_encode(),
-		HTTPClient.METHOD_PUT,
-		payload
-	)
+	_request(OP_EQUIPMENT_SAVE_DRAFT, "/api/v1/equipment/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
 
 
 func publish_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(
-		OP_EQUIPMENT_PUBLISH,
-		"/api/v1/equipment/%s/publish" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		{"expected_updated_at_utc": expected_updated_at_utc}
-	)
+	_request(OP_EQUIPMENT_PUBLISH, "/api/v1/equipment/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
 
 
 func disable_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(
-		OP_EQUIPMENT_DISABLE,
-		"/api/v1/equipment/%s/disable" % item_id.uri_encode(),
-		HTTPClient.METHOD_POST,
-		{"expected_updated_at_utc": expected_updated_at_utc}
-	)
+	_request(OP_EQUIPMENT_DISABLE, "/api/v1/equipment/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
+
+
+func load_hand_equipment_options() -> void:
+	_request(OP_HAND_EQUIPMENT_OPTIONS, "/api/v1/hand-equipment/options")
+
+
+func load_hand_equipment(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(OP_HAND_EQUIPMENT, "/api/v1/hand-equipment%s" % suffix)
+
+
+func load_hand_equipment_item(item_id: String) -> void:
+	_request(OP_HAND_EQUIPMENT_ITEM, "/api/v1/hand-equipment/%s" % item_id.uri_encode())
+
+
+func preview_hand_equipment(item_id: String, payload: Dictionary) -> void:
+	_request(OP_HAND_EQUIPMENT_PREVIEW, "/api/v1/hand-equipment/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+
+func save_hand_equipment_draft(item_id: String, payload: Dictionary) -> void:
+	_request(OP_HAND_EQUIPMENT_SAVE_DRAFT, "/api/v1/hand-equipment/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+
+func publish_hand_equipment(item_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_HAND_EQUIPMENT_PUBLISH, "/api/v1/hand-equipment/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
+func disable_hand_equipment(item_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_HAND_EQUIPMENT_DISABLE, "/api/v1/hand-equipment/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
 
 
 func _request(
@@ -289,6 +275,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			_request(OP_EQUIPMENT, "/api/v1/equipment")
 		OP_EQUIPMENT:
 			equipment_received.emit(data)
+			_request(OP_HAND_EQUIPMENT_OPTIONS, "/api/v1/hand-equipment/options")
+		OP_HAND_EQUIPMENT_OPTIONS:
+			hand_equipment_options_received.emit(data)
+			_request(OP_HAND_EQUIPMENT, "/api/v1/hand-equipment")
+		OP_HAND_EQUIPMENT:
+			hand_equipment_received.emit(data)
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
 		OP_ITEM:
 			item_received.emit(data)
@@ -308,6 +300,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			equipment_preview_received.emit(data)
 		OP_EQUIPMENT_SAVE_DRAFT, OP_EQUIPMENT_PUBLISH, OP_EQUIPMENT_DISABLE:
 			equipment_mutation_completed.emit(data)
+		OP_HAND_EQUIPMENT_ITEM:
+			hand_equipment_item_received.emit(data)
+		OP_HAND_EQUIPMENT_PREVIEW:
+			hand_equipment_preview_received.emit(data)
+		OP_HAND_EQUIPMENT_SAVE_DRAFT, OP_HAND_EQUIPMENT_PUBLISH, OP_HAND_EQUIPMENT_DISABLE:
+			hand_equipment_mutation_completed.emit(data)
 		_:
 			_on_request_failed(operation, "Unexpected request completion.", [])
 

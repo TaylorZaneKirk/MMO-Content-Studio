@@ -11,9 +11,10 @@ content workspace:
 - validation-message rendering
 - publication-operation display names
 
-Items, Consumables, and Equipment now keep ownership of their forms, payloads,
-preview requests, mutations, status wording, and visual previews while delegating
-the shared lifecycle and feedback behavior to one support instance.
+Items, Consumables, Equipment, and Weapons & Tools now keep ownership of their
+forms, payloads, preview requests, mutations, status wording, and visual
+previews while delegating the shared lifecycle and feedback behavior to one
+support instance.
 
 Every existing editor follows the same sequence:
 
@@ -23,7 +24,8 @@ Every existing editor follows the same sequence:
 4. `render_changes` and `render_validation` for host feedback.
 5. `operation_name` for consistent publication-operation labels.
 
-A future workspace should use the same support object instead of declaring its
-own preview state or feedback renderers. This preserves the safety invariant:
-a mutation can only be submitted when the latest valid preview matches both the
-selected operation and the exact current form signature.
+New workspaces, including any future workspace, should use the same support
+object instead of declaring their own preview state or feedback renderers. This
+preserves the safety invariant: a mutation can only be submitted when the latest
+valid preview matches both the selected operation and the exact current form
+signature or host-issued preview signature.

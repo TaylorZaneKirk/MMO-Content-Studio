@@ -9,7 +9,7 @@ var _assets: Array = []
 var _asset_by_path: Dictionary = {}
 var _options: Dictionary = {}
 var _current_item: Dictionary = {}
-var _workspace_support: AuthoringWorkspaceSupport
+var _workspace_support
 
 var _search: LineEdit
 var _list: VBoxContainer
@@ -42,7 +42,7 @@ var _file_dialog: FileDialog
 
 
 func _ready() -> void:
-	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new() as AuthoringWorkspaceSupport
+	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
 	_client = %AuthoringHostClient
 	_build_ui()
 	_connect_client()
@@ -696,5 +696,4 @@ func _clear_rows(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
-
 

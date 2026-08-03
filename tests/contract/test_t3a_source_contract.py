@@ -110,6 +110,7 @@ class T3ASourceContractTests(unittest.TestCase):
 
     def test_godot_editor_exposes_equippable_toggle_and_full_wearable_form(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()
+        paper_doll = (ROOT / "content-studio" / "scripts" / "paper_doll_preview.gd").read_text()
         for token in (
             'class_name EquipmentEditor',
             '"Equippable"',
@@ -122,18 +123,20 @@ class T3ASourceContractTests(unittest.TestCase):
             "Directional paper-doll preview",
             "_update_paper_doll_preview",
             "Chunk of Iron",
+            "PAPER_DOLL_PREVIEW_SCRIPT",
+            "_paper_doll_preview.update",
         ):
             self.assertIn(token, editor)
         self.assertIn('"equippable": _equippable.button_pressed', editor)
         self.assertIn('"equipment_slot_id": _selected_metadata(_slot) if _equippable.button_pressed else null', editor)
-        self.assertIn('path_join("actors").path_join("player")', editor)
-        self.assertIn("DEFAULT_VISUAL_KEYS", editor)
-        self.assertIn("_visual_frame_fallbacks", editor)
-        self.assertIn("PAPER_DOLL_STAGE_PADDING := 8.0", editor)
-        self.assertIn("PAPER_DOLL_ANCHOR_OFFSET := Vector2(-7, -7)", editor)
-        self.assertIn("_paper_doll_source_bounds", editor)
-        self.assertIn("_paper_doll_preview_scale", editor)
-        self.assertIn("_place_paper_doll_layer", editor)
+        self.assertIn('path_join("actors").path_join("player")', paper_doll)
+        self.assertIn("DEFAULT_VISUAL_KEYS", paper_doll)
+        self.assertIn("_frame_fallbacks", paper_doll)
+        self.assertIn("STAGE_PADDING := 8.0", paper_doll)
+        self.assertIn("ANCHOR_OFFSET := Vector2(-7, -7)", paper_doll)
+        self.assertIn("_source_bounds", paper_doll)
+        self.assertIn("_preview_scale", paper_doll)
+        self.assertIn("_place_layer", paper_doll)
         self.assertNotIn("image.get_used_rect().size == Vector2i.ZERO", editor)
         self.assertIn("bonuses_variant is Dictionary", editor)
 

@@ -128,8 +128,9 @@ and prevents stale authoring sessions from silently overwriting newer changes.
 
 ## Hand-equipment routes
 
-T3B Phase 1 adds backend/API support for weapons and tools through equipment
-aggregates. It does not add the full Godot weapon/tool editor.
+T3B adds backend/API support for weapons and tools through equipment aggregates.
+The Godot **Weapons & Tools** workspace consumes these routes through
+`AuthoringHostClient` and `AuthoringHttpTransport`.
 
 ### `GET /api/v1/hand-equipment/options`
 
@@ -145,6 +146,9 @@ Current runtime-supported weapon publication values are:
 - attack styles: `thrust`, `slash`, `crush`
 - attack speed storage: `attack_speed_units` where one unit is 600 milliseconds
 - range storage: logical tiles
+
+The UI may display `N units x 600 ms = X ms` for readability, but milliseconds
+are display-only and are not sent in the payload.
 
 ### `GET /api/v1/hand-equipment?search=hammer`
 
@@ -163,6 +167,10 @@ Loads one aggregate containing:
 - `combat_bonuses`
 - ordered `tool_capabilities`
 - aggregate `updated_at_utc` concurrency token
+
+The workspace preserves displayed tool-capability row order in the outgoing
+array. The server remains authoritative for duplicate, unknown, stale, or
+runtime-unsupported values.
 
 ### `POST /api/v1/hand-equipment/{itemId}/preview`
 

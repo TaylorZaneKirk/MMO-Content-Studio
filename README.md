@@ -24,19 +24,19 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T3B weapon/tool foundation implemented
+## Current state: T3B Weapons & Tools workspace implemented
 
 The repository now contains:
 
 - a Godot 4 desktop Content Studio shell
 - a loopback-only .NET 10 authoring host
 - environment, schema, and asset-root health checks
-- searchable Basic Items, Consumables, and Equipment workspaces
+- searchable Basic Items, Consumables, Equipment, and Weapons & Tools workspaces
 - canonical item-PNG selection and import
 - declarative consumable profiles, ordered requirements, and ordered effects
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
-- backend/API support for hand-equipment aggregates, weapon profiles, and tool capabilities
-- a directional paper-doll preview that follows the game client's current asset-key, frame-fallback, and layer-order rules
+- backend/API and Godot UI support for hand-equipment aggregates, weapon profiles, and tool capabilities
+- a shared directional paper-doll preview that follows the game client's current asset-key, frame-fallback, and layer-order rules
 - an explicit Equippable / Not equippable control that removes stale equipment metadata atomically
 - portions/empty-container transformations through result items
 - exact validation and logical-change previews
@@ -107,19 +107,26 @@ The default API address is `http://127.0.0.1:5187`.
 2. **T1 — Basic items** — implemented; runtime verification pending
 3. **T2 — Consumable items** — implemented; migration/runtime verification pending
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
-5. **T3B — Weapons and tools foundation** — implemented; runtime verification pending
+5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs**
 7. **T5 — Minimal NPC authoring**
 8. **Dialogue workspace**
 9. **Quest Studio evaluation**
 
 The current vertical slices author ordinary items, declarative consumables,
-wearable equipment, and the backend hand-equipment foundation for weapons/tools.
+wearable equipment, and hand-held weapons/tools.
 Equipment synchronizes the base item, slot, requirements, modifiers, combat
 bonuses, optional weapon profile, and tool capabilities in one transaction.
 Turning **Equippable** off deliberately clears every dependent equipment and
 combat/tool row, which provides a safe correction path for legacy
 misclassifications such as Chunk of Iron.
+
+The T3B Godot workspace was recovered selectively from prior attempts and
+reconciled with the hardened `AuthoringHttpTransport`,
+`AuthoringHostClient`, `AuthoringWorkspaceSupport`, and feature-owned host
+architecture. Obsolete bootstrap payloads and recovery workflows were removed
+rather than restored. MMO Project runtime execution of tool capabilities remains
+deferred to a future server-authoritative gameplay slice.
 
 ## Documentation
 
