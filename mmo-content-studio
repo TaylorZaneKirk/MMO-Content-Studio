@@ -35,7 +35,7 @@ for argument in "$@"; do
 done
 
 if [[ "${RUN_CHECKS}" -eq 1 ]]; then
-  exec "${ROOT}/tools/dev.sh" "${ARGS[@]}"
+  exec bash "${ROOT}/tools/dev.sh" "${ARGS[@]}"
 fi
 
-exec "${ROOT}/tools/dev.sh" --skip-check "${ARGS[@]}"
+exec bash "${ROOT}/tools/dev.sh" --skip-check "${ARGS[@]}"

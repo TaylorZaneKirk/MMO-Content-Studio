@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import stat
 import unittest
 from pathlib import Path
 
@@ -40,9 +41,10 @@ class DevelopmentLauncherTests(unittest.TestCase):
         script_path = ROOT / "mmo-content-studio"
         script = script_path.read_text()
         self.assertTrue(script_path.exists())
+        self.assertTrue(script_path.stat().st_mode & stat.S_IXUSR)
         self.assertIn("#!/usr/bin/env bash", script)
-        self.assertIn('"${ROOT}/tools/dev.sh" --skip-check', script)
-        self.assertIn('"${ROOT}/tools/dev.sh" "${ARGS[@]}"', script)
+        self.assertIn('bash "${ROOT}/tools/dev.sh" --skip-check', script)
+        self.assertIn('bash "${ROOT}/tools/dev.sh" "${ARGS[@]}"', script)
         self.assertIn("--check", script)
         self.assertIn("Starts the local .NET authoring host", script)
 

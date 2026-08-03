@@ -272,6 +272,25 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, editor)
 
+    def test_visual_preview_resolves_typed_game_asset_paths_from_health_root(self) -> None:
+        editor = (SCRIPTS / "mob_editor.gd").read_text()
+
+        for token in (
+            'const GAME_ASSET_PREFIX := "res://assets/"',
+            "var _game_client_assets_root := \"\"",
+            "_client.health_received.connect(_on_health_received)",
+            "func _on_health_received(payload: Dictionary) -> void:",
+            'if str(asset_root.get("id", "")) == "game_client_assets":',
+            "_game_client_assets_root = str(asset_root.get(\"path\", \"\"))",
+            "_visual_path.text_changed.connect(_on_visual_path_changed)",
+            "func _on_visual_path_changed(_value: String) -> void:",
+            "_asset_preview_file_path = \"\"",
+            "func _resolve_visual_preview_file_path() -> Dictionary:",
+            "var candidate := _game_client_assets_root.path_join(relative)",
+            "Preview uses the configured game_client_assets root.",
+        ):
+            self.assertIn(token, editor)
+
     def test_mob_workspace_layout_keeps_labels_readable_and_route_errors_actionable(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
@@ -286,6 +305,18 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             self.assertIn(token, editor)
 
         self.assertIn('text = "T4 Mob Authoring"', scene)
+
+    def test_preview_feedback_scrolls_without_hiding_operation_controls(self) -> None:
+        editor = (SCRIPTS / "mob_editor.gd").read_text()
+        feedback_block = editor.split("var feedback_scroll := ScrollContainer.new()", 1)[1].split("func _add_identity_section", 1)[0]
+
+        self.assertIn("feedback_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL", feedback_block)
+        self.assertIn("preview_content.add_child(feedback_scroll)", feedback_block)
+        self.assertIn("feedback_scroll.add_child(feedback_content)", feedback_block)
+        self.assertIn('_add_heading(feedback_content, "Exact Logical Changes", 16)', feedback_block)
+        self.assertIn("feedback_content.add_child(_changes)", feedback_block)
+        self.assertIn('_add_heading(feedback_content, "Validation", 16)', feedback_block)
+        self.assertIn("feedback_content.add_child(_validation)", feedback_block)
 
     def test_t4c_workspace_does_not_author_tiled_placement(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()

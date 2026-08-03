@@ -17,6 +17,7 @@ const DEFAULT_BONUS_FIELDS := [
 	"defence_ranged",
 	"defence_magic",
 ]
+const GAME_ASSET_PREFIX := "res://assets/"
 
 class MobVisualPreview:
 	extends Control
@@ -88,6 +89,7 @@ var _schema_available := false
 var _form_editable := false
 var _reload_mob_id := ""
 var _asset_preview_file_path := ""
+var _game_client_assets_root := ""
 var _drop_rows: Array = []
 var _bonus_fields: Array = []
 var _bonus_controls: Dictionary = {}
@@ -151,6 +153,7 @@ func _ready() -> void:
 
 
 func _connect_client() -> void:
+	_client.health_received.connect(_on_health_received)
 	_client.mob_options_received.connect(_on_mob_options_received)
 	_client.mob_catalog_received.connect(_on_mob_catalog_received)
 	_client.mob_item_received.connect(_on_mob_item_received)
@@ -233,12 +236,21 @@ func _build_ui() -> void:
 	preview_content.add_child(_apply_button)
 	_status = _wrapped_label("Load or create a mob definition.")
 	preview_content.add_child(_status)
-	_add_heading(preview_content, "Exact Logical Changes", 16)
+
+	var feedback_scroll := ScrollContainer.new()
+	feedback_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	feedback_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview_content.add_child(feedback_scroll)
+	var feedback_content := VBoxContainer.new()
+	feedback_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	feedback_content.add_theme_constant_override("separation", 10)
+	feedback_scroll.add_child(feedback_content)
+	_add_heading(feedback_content, "Exact Logical Changes", 16)
 	_changes = VBoxContainer.new()
-	preview_content.add_child(_changes)
-	_add_heading(preview_content, "Validation", 16)
+	feedback_content.add_child(_changes)
+	_add_heading(feedback_content, "Validation", 16)
 	_validation = VBoxContainer.new()
-	preview_content.add_child(_validation)
+	feedback_content.add_child(_validation)
 
 
 func _add_identity_section(parent: VBoxContainer) -> void:
@@ -254,6 +266,7 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "Visuals and Footprint", 18)
 	var grid := _grid(parent)
 	_visual_path = _line_field(grid, "Texture path", "res://assets/maps/objects/mobs/slime.png")
+	_visual_path.text_changed.connect(_on_visual_path_changed)
 	_source_width = _spin_field(grid, "Source width", 1, 2048, 32, 1)
 	_source_height = _spin_field(grid, "Source height", 1, 2048, 32, 1)
 	_anchor_x = _spin_field(grid, "Anchor offset X", -512, 512, 0, 0.25)
@@ -332,6 +345,18 @@ func _on_mob_options_received(payload: Dictionary) -> void:
 	_set_form_enabled(not _current_mob.is_empty() or _is_new)
 	if _current_mob.is_empty() and not _is_new:
 		_status.text = "Mob schema ready. Load or create a mob definition."
+
+
+func _on_health_received(payload: Dictionary) -> void:
+	_game_client_assets_root = ""
+	for variant in payload.get("asset_roots", []) as Array:
+		if variant is not Dictionary:
+			continue
+		var asset_root := variant as Dictionary
+		if str(asset_root.get("id", "")) == "game_client_assets":
+			_game_client_assets_root = str(asset_root.get("path", ""))
+			break
+	_update_visual_preview()
 
 
 func _on_mob_catalog_received(payload: Dictionary) -> void:
@@ -787,6 +812,14 @@ func _on_form_changed(_value: Variant = null) -> void:
 	_update_visual_preview()
 
 
+func _on_visual_path_changed(_value: String) -> void:
+	if _is_loading:
+		return
+	_asset_preview_file_path = ""
+	_clear_preview()
+	_update_visual_preview()
+
+
 func _on_option_changed() -> void:
 	_on_form_changed()
 
@@ -847,12 +880,11 @@ func _update_attack_interval() -> void:
 func _update_visual_preview() -> void:
 	if _visual_preview == null:
 		return
-	var file_path := _asset_preview_file_path
-	var status := "Preview uses the host-resolved asset path."
+	var resolved := _resolve_visual_preview_file_path()
+	var file_path := str(resolved.get("file_path", ""))
+	var status := str(resolved.get("status", "No mob visual selected."))
 	var texture: Texture2D = null
-	if file_path.is_empty() or not FileAccess.file_exists(file_path):
-		status = "No resolved PNG preview for %s." % _visual_path.text.strip_edges()
-	else:
+	if not file_path.is_empty():
 		var image := Image.load_from_file(file_path)
 		if image != null and not image.is_empty():
 			texture = ImageTexture.create_from_image(image)
@@ -870,6 +902,46 @@ func _update_visual_preview() -> void:
 		status
 	)
 	_visual_status.text = status
+
+
+func _resolve_visual_preview_file_path() -> Dictionary:
+	var resource_path := _visual_path.text.strip_edges()
+	if not _asset_preview_file_path.is_empty() and FileAccess.file_exists(_asset_preview_file_path):
+		return {
+			"file_path": _asset_preview_file_path,
+			"status": "Preview uses the host-resolved asset path.",
+		}
+	if resource_path.is_empty():
+		return {
+			"file_path": "",
+			"status": "No mob visual selected.",
+		}
+	if resource_path.begins_with(GAME_ASSET_PREFIX):
+		if _game_client_assets_root.is_empty() or not DirAccess.dir_exists_absolute(_game_client_assets_root):
+			return {
+				"file_path": "",
+				"status": "Configure game_client_assets to preview mob visuals.",
+			}
+		var relative := resource_path.substr(GAME_ASSET_PREFIX.length())
+		var candidate := _game_client_assets_root.path_join(relative)
+		if FileAccess.file_exists(candidate):
+			return {
+				"file_path": candidate,
+				"status": "Preview uses the configured game_client_assets root.",
+			}
+		return {
+			"file_path": "",
+			"status": "No PNG found for %s under the configured game_client_assets root." % resource_path,
+		}
+	if FileAccess.file_exists(resource_path):
+		return {
+			"file_path": resource_path,
+			"status": "Preview uses the configured file path.",
+		}
+	return {
+		"file_path": "",
+		"status": "No PNG found for %s." % resource_path,
+	}
 
 
 func _set_form_enabled(enabled: bool) -> void:
