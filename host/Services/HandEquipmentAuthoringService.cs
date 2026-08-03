@@ -135,16 +135,21 @@ public sealed class HandEquipmentAuthoringService
             }
 
             var requested = Normalize(request);
-            var effective = operation == "save_draft" ? requested : FromRecord(existing);
+            var hasUnsavedOperationChanges =
+                operation is "publish" or "disable" or "delete"
+                && !EquivalentDraft(existing, requested);
+            var effective = operation == "save_draft" || hasUnsavedOperationChanges
+                ? requested
+                : FromRecord(existing);
             var validation = await _validator.ValidateAsync(
                 itemId,
                 effective,
                 existing,
-                operation == "publish",
+                operation == "publish" && !hasUnsavedOperationChanges,
                 cancellationToken);
             var messages = validation.Messages.ToList();
 
-            if (operation is "publish" or "disable" or "delete" && !EquivalentDraft(existing, requested))
+            if (hasUnsavedOperationChanges)
             {
                 messages.Add(new ApiError(
                     "unsaved_hand_equipment_changes",

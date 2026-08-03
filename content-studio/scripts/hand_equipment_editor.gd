@@ -831,6 +831,8 @@ func _apply() -> void:
 
 
 func _on_equippable_toggled(_value: bool) -> void:
+	if not _value:
+		_select_option(_operation, "save_draft")
 	_update_editability()
 	_on_form_changed()
 

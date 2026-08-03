@@ -111,6 +111,24 @@ class T3BSourceContractTests(unittest.TestCase):
         self.assertIn('new("melee", "Melee")', registry)
         self.assertNotIn("attack_speed_ms", validator + registry)
 
+    def test_dirty_publication_previews_validate_requested_draft_shape(self) -> None:
+        service = (
+            ROOT / "host" / "Services" / "HandEquipmentAuthoringService.cs"
+        ).read_text()
+
+        for token in (
+            "var hasUnsavedOperationChanges =",
+            'operation is "publish" or "disable" or "delete"',
+            "&& !EquivalentDraft(existing, requested)",
+            'operation == "save_draft" || hasUnsavedOperationChanges',
+            "? requested",
+            ": FromRecord(existing)",
+            'operation == "publish" && !hasUnsavedOperationChanges',
+            "if (hasUnsavedOperationChanges)",
+            '"unsaved_hand_equipment_changes"',
+        ):
+            self.assertIn(token, service)
+
     def test_schema_migration_is_structural_and_bidirectionally_guarded(self) -> None:
         migration_paths = [
             ROOT
@@ -267,6 +285,7 @@ class T3BSourceContractTests(unittest.TestCase):
             "_is_hand_slot",
             "_weapon_profile_payload() if equippable and hand_slot else null",
             "_collect_tool_capabilities() if equippable and hand_slot else []",
+            'if not _value:\n\t\t_select_option(_operation, "save_draft")',
         ):
             self.assertIn(token, editor)
 
