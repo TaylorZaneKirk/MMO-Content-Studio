@@ -261,7 +261,8 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             "class MobVisualPreview",
             "draw_rect(footprint",
             "draw_circle(anchor",
-            "draw_texture_rect_region",
+            "texture.get_size() * render_scale",
+            "draw_texture_rect(texture, destination, false)",
             "Image.load_from_file(file_path)",
             "asset_preview_file_path",
             '"visual_anchor_offset_x": float(_anchor_x.value)',
@@ -271,6 +272,7 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             "_footprint_height",
         ):
             self.assertIn(token, editor)
+        self.assertNotIn("draw_texture_rect_region", editor)
 
     def test_visual_preview_resolves_typed_game_asset_paths_from_health_root(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()

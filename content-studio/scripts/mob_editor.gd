@@ -73,9 +73,9 @@ class MobVisualPreview:
 		var anchor := origin + anchor_offset
 		draw_circle(anchor, 4.0, Color(0.96, 0.45, 0.43))
 		if texture != null:
-			var scaled_size := Vector2(source_width, source_height) * render_scale
+			var scaled_size := texture.get_size() * render_scale
 			var destination := Rect2(anchor - (scaled_size * 0.5), scaled_size)
-			draw_texture_rect_region(texture, destination, Rect2(Vector2.ZERO, Vector2(source_width, source_height)))
+			draw_texture_rect(texture, destination, false)
 
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
 
