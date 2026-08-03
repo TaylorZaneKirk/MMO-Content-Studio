@@ -265,6 +265,21 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, editor)
 
+    def test_mob_workspace_layout_keeps_labels_readable_and_route_errors_actionable(self) -> None:
+        editor = (SCRIPTS / "mob_editor.gd").read_text()
+        scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
+
+        for token in (
+            "label.custom_minimum_size = Vector2(170, 0)",
+            'grid.add_theme_constant_override("h_separation", 12)',
+            'grid.add_theme_constant_override("v_separation", 6)',
+            'message.contains("route does not exist")',
+            "restart the authoring host from this branch",
+        ):
+            self.assertIn(token, editor)
+
+        self.assertIn('text = "T4 Mob Authoring"', scene)
+
     def test_t4c_does_not_modify_mmo_project_runtime(self) -> None:
         self.assertFalse(
             (MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql").exists()

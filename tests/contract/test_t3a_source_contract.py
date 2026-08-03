@@ -190,7 +190,7 @@ class T3ASourceContractTests(unittest.TestCase):
         self.assertIn("item.Equippable", catalog)
         self.assertIn('path="res://scripts/equipment_editor.gd"', scene)
         self.assertIn('[node name="Equipment" type="HBoxContainer"', scene)
-        self.assertIn('text = "T3A Wearable Equipment"', scene)
+        self.assertIn('text = "T4 Mob Authoring"', scene)
 
     def test_godot_equipment_functions_are_not_duplicated(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()

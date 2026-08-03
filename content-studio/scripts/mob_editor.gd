@@ -376,7 +376,10 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation == "mob_options" or operation == "mobs":
 		_schema_available = false
 		_set_form_enabled(false)
-		_status.text = "Mobs unavailable: %s" % message
+		if message.contains("route does not exist"):
+			_status.text = "Mobs unavailable: restart the authoring host from this branch, then relaunch Studio."
+		else:
+			_status.text = "Mobs unavailable: %s" % message
 
 
 func _apply_options() -> void:
@@ -968,6 +971,8 @@ func _grid(parent: VBoxContainer) -> GridContainer:
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 12)
+	grid.add_theme_constant_override("v_separation", 6)
 	parent.add_child(grid)
 	return grid
 
@@ -1012,6 +1017,8 @@ func _add_heading(parent: VBoxContainer, text: String, size: int) -> void:
 func _label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
+	label.custom_minimum_size = Vector2(170, 0)
+	label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 
