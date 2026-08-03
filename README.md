@@ -53,10 +53,11 @@ The repository now contains:
 
 T4 Phase 0 audited the current MMO Project mob/enemy runtime path and locked the
 implementation plan for the Mobs workspace. T4B implements the host-side API for
-reusable mob definitions. T4C adds the Godot workspace over that API. Migration
-application, runtime export, MMO Project consumption, and authoritative
-generated-spawn reference guards remain deferred to later T4 slices. Spawn
-placement stays in Tiled/generated static content.
+reusable mob definitions. T4C adds the Godot workspace over that API. T4D mirrors
+the mob schema into MMO Project and adds deterministic export of `Published`
+mob definitions into the existing runtime `mob_definition_catalog`. Authoring
+generated-spawn reference guards remain deferred to a later T4 hardening slice.
+Spawn placement stays in Tiled/generated static content.
 
 T0 through T4C still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -121,7 +122,7 @@ The default API address is `http://127.0.0.1:5187`.
 3. **T2 — Consumable items** — implemented; migration/runtime verification pending
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
-6. **T4 — Mobs** — T4C Godot workspace implemented; runtime integration pending
+6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring**
 8. **Dialogue workspace**
 9. **Quest Studio evaluation**
@@ -147,8 +148,9 @@ factions, and guaranteed drops. Tiled remains responsible for `EnemySpawn`
 placement, home position, facing, spawn behavior, and leash radius.
 
 T4B contributes the local `/api/v1/mobs` host API and transactional persistence
-boundary. T4C contributes the Godot Mobs workspace while keeping runtime export,
-Tiled spawn validation, and generated-spawn reference guards deferred.
+boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
+MMO Project and adds the runtime export handoff while keeping generated-spawn
+reference guards deferred.
 
 ## Documentation
 

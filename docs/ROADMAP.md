@@ -93,7 +93,8 @@ Exit condition:
 
 ## T4 — Mobs
 
-**Status:** T4C Godot Mobs workspace implemented; migration application, runtime integration, and runtime verification pending.
+**Status:** T4D runtime catalog export implemented; generated-spawn reference
+hardening and full runtime verification pending.
 
 Move reusable mob definitions into the database-backed authoring boundary while
 keeping spawn placement in Tiled. Add identity, visuals, footprint, stats,
@@ -130,9 +131,16 @@ T4C adds the top-level Godot **Mobs** workspace over the existing `/api/v1/mobs`
 routes. Maintainers can search, load, create, edit, validate, preview, save
 drafts, publish, and disable reusable mob definitions with identity, visuals,
 footprint, stats, faction/aggression, one primary combat profile, combat
-bonuses, and ordered guaranteed drops. It does not apply the migration to MMO
-Project, export definitions to runtime static content, enforce generated-spawn
-reference guards, or author Tiled placement.
+bonuses, and ordered guaranteed drops. It does not author Tiled placement.
+
+T4D mirrors `019_mob_authoring_schema.sql` into MMO Project and adds the
+`MapPublisher export-mob-catalog` handoff from `Published` authoring rows to the
+existing `prototype/shared/maps/mobs/catalog.json` runtime catalog. Generated
+and database-published region manifests continue to embed that catalog, and
+`EnemySpawn.mob_definition_id` remains the authoritative placement link.
+The exporter emits current MMO Project health-regeneration fields as zero
+defaults until a later authoring slice adds explicit controls. Generated-spawn
+reference guards remain deferred.
 
 ## T5 — Minimal NPC Authoring
 

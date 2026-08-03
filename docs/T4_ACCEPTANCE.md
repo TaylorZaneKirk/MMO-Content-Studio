@@ -60,11 +60,41 @@ Acceptance checks:
 - Disable preserves the authored aggregate and documents that authoritative
   generated/published `EnemySpawn` reference guards remain deferred.
 
-## Deferred
+## T4C - Godot Mobs Workspace
 
-- T4C Godot Mobs workspace is implemented with a top-level tab, catalog,
+Status: complete in Content Studio.
+
+Acceptance checks:
+
+- The Godot Mobs workspace is implemented with a top-level tab, catalog,
   aggregate form, visual/footprint preview, preview-signature apply gate, draft,
   publish, and disable actions over `/api/v1/mobs`.
-- T4D MMO Project runtime integration and migration application.
+- The workspace does not author Tiled placement.
+
+## T4D - Runtime Integration Design and Handoff
+
+Status: complete as a runtime handoff slice.
+
+Acceptance checks:
+
+- `prototype/sql/019_mob_authoring_schema.sql` is mirrored into the MMO Project
+  runtime repository.
+- MMO Project `prototype/tools/MapPublisher` exposes `export-mob-catalog`.
+- The exporter reads only `Published` mob definitions and writes deterministic
+  `mob_definition_catalog` JSON.
+- Draft and Disabled mobs are excluded from the runtime catalog.
+- Runtime-enabled item references, faction references, primary combat profiles,
+  combat bonuses, and ordered guaranteed drops are validated before writing.
+- Current MMO Project health-regeneration runtime fields are emitted with zero
+  defaults because nonzero mob regen authoring is not part of the T4 aggregate.
+- Generated-file workflows continue through the importer/publisher, where
+  `EnemySpawn.mob_definition_id` is validated against the exported catalog.
+- Database-published region workflows continue through `world_regions.manifest`,
+  which carries the same catalog read by `DatabaseWorldStaticContentSource`.
+- Runtime enemies still consume `WorldStaticContentSnapshot`; simulation code
+  does not query Content Studio authoring tables directly.
+
+## Deferred
+
 - T4E hardening around live references, generated maps, and multiplayer runtime
   validation.

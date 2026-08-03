@@ -280,10 +280,18 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
 
         self.assertIn('text = "T4 Mob Authoring"', scene)
 
-    def test_t4c_does_not_modify_mmo_project_runtime(self) -> None:
-        self.assertFalse(
-            (MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql").exists()
-        )
+    def test_t4c_workspace_does_not_author_tiled_placement(self) -> None:
+        editor = (SCRIPTS / "mob_editor.gd").read_text()
+        for forbidden in (
+            "spawn_id",
+            "map_id",
+            "region_id",
+            "home_tile",
+            "leash_radius",
+            "respawn",
+            "patrol",
+        ):
+            self.assertNotIn(forbidden, editor)
 
 
 if __name__ == "__main__":

@@ -72,12 +72,11 @@ profiles today: active weapons are `right_hand`, attack family is `melee`,
 styles are `thrust`, `slash`, or `crush`, range is logical tiles, and timing is
 stored as `attack_speed_units`.
 
-## T4A mob-authoring schema handoff
+## T4 mob-authoring schema and runtime handoff
 
 `prototype/sql/019_mob_authoring_schema.sql` is an additive handoff migration for
-future reusable mob-definition authoring. It is present only in this integration
-directory until a later, explicitly approved MMO Project runtime slice applies
-or mirrors it.
+reusable mob-definition authoring. T4D mirrors the same file into the MMO Project
+runtime repository as `prototype/sql/019_mob_authoring_schema.sql`.
 
 The migration introduces:
 
@@ -93,12 +92,21 @@ definitions, while Tiled/generated static content continues to own `EnemySpawn`
 placement, home position, facing, spawn behavior, and leash radius.
 
 The T4B Content Studio host API reads and writes this schema when it exists in
-the configured development database. This repository still does not copy or
-apply the migration into MMO Project automatically.
+the configured development database. T4D adds the MMO Project
+`MapPublisher export-mob-catalog` handoff, which exports only `Published` rows
+into `prototype/shared/maps/mobs/catalog.json` for the existing Tiled importer,
+publisher, generated-file static-content source, and database-published
+static-content source.
+
+Runtime simulation continues to consume `MobDefinitionCatalog` from immutable
+static content. It does not query these authoring tables directly.
 
 The current T4 schema/API scope intentionally supports only primary melee combat
 profiles, hostile/neutral faction dispositions, 600 ms attack-speed units,
 logical-tile ranges, normalized 13-field combat bonuses, and ordered guaranteed
-drops. It does not add random or weighted drops, respawn settings, patrols,
-placement rows, dialogue, shops, quests, arbitrary scripts, or runtime hot
-reload.
+drops. The MMO Project runtime catalog now includes health-regeneration fields;
+T4D exports `health_regeneration_amount = 0` and
+`health_regeneration_interval_ms = 0` until a later slice adds explicit
+authoring support. It does not add random or weighted drops, respawn settings,
+patrols, placement rows, dialogue, shops, quests, arbitrary scripts, or runtime
+hot reload.

@@ -12,11 +12,14 @@ MMO_PROJECT = ROOT.parents[1]
 
 
 class T4MobSourceContractTests(unittest.TestCase):
-    def test_mob_migration_is_handoff_artifact_not_runtime_copy(self) -> None:
+    def test_mob_migration_is_handoff_artifact_and_runtime_copy(self) -> None:
         migration = ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "019_mob_authoring_schema.sql"
+        runtime_migration = MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql"
         self.assertTrue(migration.exists())
+        self.assertTrue(runtime_migration.exists())
 
         source = migration.read_text()
+        self.assertEqual(source, runtime_migration.read_text())
         for token in (
             "CREATE TABLE IF NOT EXISTS mob_factions",
             "CREATE TABLE IF NOT EXISTS mob_faction_dispositions",
@@ -58,10 +61,6 @@ class T4MobSourceContractTests(unittest.TestCase):
             "JSONB",
         ):
             self.assertNotIn(forbidden, source)
-
-        self.assertFalse(
-            (MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql").exists()
-        )
 
     def test_mob_contracts_cover_foundation_without_placement(self) -> None:
         source = (ROOT / "host" / "Contracts" / "MobContracts.cs").read_text()
@@ -209,12 +208,52 @@ class T4MobSourceContractTests(unittest.TestCase):
         ):
             self.assertIn(token, validator)
 
-    def test_t4c_adds_godot_editor_without_runtime_mmo_project_changes(self) -> None:
+    def test_t4c_adds_godot_editor_without_owning_placement(self) -> None:
         self.assertTrue((ROOT / "content-studio" / "scripts" / "mob_editor.gd").exists())
         self.assertFalse((ROOT / "content-studio" / "scenes" / "MobEditor.tscn").exists())
-        self.assertFalse(
-            (MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql").exists()
-        )
+
+    def test_t4d_runtime_handoff_exports_to_existing_mob_catalog_boundary(self) -> None:
+        exporter = (MMO_PROJECT / "prototype" / "tools" / "MapPublisher" / "MobCatalogExporter.cs").read_text()
+        export_cli = (MMO_PROJECT / "prototype" / "tools" / "MapPublisher" / "MobCatalogExportCli.cs").read_text()
+        program = (MMO_PROJECT / "prototype" / "tools" / "MapPublisher" / "Program.cs").read_text()
+        importer = (MMO_PROJECT / "prototype" / "importer" / "import_tiled_region.py").read_text()
+        generated_source = (
+            MMO_PROJECT
+            / "prototype"
+            / "server"
+            / "features"
+            / "static_content"
+            / "application"
+            / "GeneratedFileWorldStaticContentSource.cs"
+        ).read_text()
+        database_source = (
+            MMO_PROJECT
+            / "prototype"
+            / "server"
+            / "features"
+            / "static_content"
+            / "application"
+            / "DatabaseWorldStaticContentSource.cs"
+        ).read_text()
+
+        for token in (
+            "export-mob-catalog",
+            "publication_state = 'Published'",
+            "prototype/shared/maps/mobs/catalog.json",
+            "DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull",
+            'JsonPropertyName("definition_id")',
+            'JsonPropertyName("attack_speed_units")',
+            'JsonPropertyName("health_regeneration_amount")',
+            'JsonPropertyName("drops")',
+            "not runtime-enabled",
+            "WriteAtomic",
+        ):
+            self.assertIn(token, exporter + export_cli + program)
+
+        self.assertIn("mob_definition_catalog", importer)
+        self.assertIn("mob_definition_id", importer)
+        self.assertIn("Generated chunk", generated_source)
+        self.assertIn("Published chunk", database_source)
 
     def test_mob_repository_keeps_spawn_and_random_drop_fields_out(self) -> None:
         source = "\n".join(

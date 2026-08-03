@@ -219,11 +219,11 @@ Exit condition:
 
 ### T4D - Runtime Integration Design and Handoff
 
-This slice touches MMO Project only after explicit permission.
+Status: complete as an MMO Project runtime handoff slice.
 
-Implement deterministic export of `Published` mob definitions into the existing
-`mob_definition_catalog` shape. The export must support both current static
-content paths:
+T4D mirrors the schema into MMO Project and implements deterministic export of
+`Published` mob definitions into the existing `mob_definition_catalog` shape.
+The export supports both current static content paths:
 
 1. generated-file workflows, where the importer/publisher validates
    `EnemySpawn.mob_definition_id` against the exported catalog;
@@ -232,6 +232,11 @@ content paths:
 
 Do not make runtime enemies query Content Studio tables directly. Keep
 `WorldStaticContentSnapshot` as the runtime consumption boundary.
+
+After MMO Project enemy health regeneration, the runtime catalog also carries
+`health_regeneration_amount` and `health_regeneration_interval_ms`. T4D exports
+those fields as deterministic `0` defaults; authoring nonzero mob regeneration
+requires a later schema/API/workspace slice.
 
 Exit condition:
 
