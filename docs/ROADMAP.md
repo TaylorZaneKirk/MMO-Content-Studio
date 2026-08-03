@@ -133,11 +133,13 @@ drafts, publish, and disable reusable mob definitions with identity, visuals,
 footprint, stats, faction/aggression, one primary combat profile, combat
 bonuses, and ordered guaranteed drops. It does not author Tiled placement.
 
-T4D mirrors `019_mob_authoring_schema.sql` into MMO Project and adds the
+T4D mirrors the mob authoring migrations into MMO Project and adds the
 `MapPublisher export-mob-catalog` handoff from `Published` authoring rows to the
 existing `prototype/shared/maps/mobs/catalog.json` runtime catalog. Generated
 and database-published region manifests continue to embed that catalog, and
 `EnemySpawn.mob_definition_id` remains the authoritative placement link.
+The handoff now includes lifecycle timing columns and an idempotent seed for
+the current runtime mobs: `slime`, `training_goblin`, and `training_guard`.
 The exporter emits current MMO Project health-regeneration fields as zero
 defaults until a later authoring slice adds explicit controls. Generated-spawn
 reference guards remain deferred.

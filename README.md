@@ -54,10 +54,12 @@ The repository now contains:
 T4 Phase 0 audited the current MMO Project mob/enemy runtime path and locked the
 implementation plan for the Mobs workspace. T4B implements the host-side API for
 reusable mob definitions. T4C adds the Godot workspace over that API. T4D mirrors
-the mob schema into MMO Project and adds deterministic export of `Published`
-mob definitions into the existing runtime `mob_definition_catalog`. Authoring
-generated-spawn reference guards remain deferred to a later T4 hardening slice.
-Spawn placement stays in Tiled/generated static content.
+the mob schema into MMO Project, includes the post-regen lifecycle timing
+columns, seeds the current runtime mobs for local authoring catalogs, and adds
+deterministic export of `Published` mob definitions into the existing runtime
+`mob_definition_catalog`. Authoring generated-spawn reference guards remain
+deferred to a later T4 hardening slice. Spawn placement stays in Tiled/generated
+static content.
 
 T0 through T4C still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 

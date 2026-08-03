@@ -135,8 +135,10 @@ Mutations require:
 
 Status: complete in Content Studio as a foundation slice.
 
-- Add integration migration under
-  `integrations/mmo-project/prototype/sql/019_mob_authoring_schema.sql`.
+- Add integration migrations under
+  `integrations/mmo-project/prototype/sql/019_mob_authoring_schema.sql`,
+  `020_mob_lifecycle_authoring.sql`, and
+  `021_seed_existing_mob_definitions.sql`.
 - Add `MobContracts.cs`.
 - Add `MobSchemaRequirements.cs`.
 - Add `MobAuthoringRegistry` and `MobDomainRules` for stable vocabulary,

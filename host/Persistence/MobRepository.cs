@@ -66,7 +66,7 @@ public sealed class MobRepository
         var records = new List<MobDefinitionRecord>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            records.Add(ReadBaseRecord(reader, null, null, [], false));
+            records.Add(ReadBaseRecord(reader, null, null, [], reader.GetBoolean(reader.GetOrdinal("has_combat_profile"))));
         }
 
         return records;

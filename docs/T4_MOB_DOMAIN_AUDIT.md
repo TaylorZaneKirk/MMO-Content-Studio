@@ -197,8 +197,8 @@ Disagreements or gaps between guide and implementation:
   - Stats, visuals, movement speed, attack profile, faction, and drops come from
     definition.
   - `ApplyDamage` sets `Alive = false` and `CurrentState = defeated` at zero
-    health.
-  - There is no mob respawn lifecycle in the current runtime.
+    health, starts the defeated-hold timer, then schedules respawn.
+  - Respawn restores the runtime instance from its spawn and definition data.
   - Mob movement occurs through pursuit/return-home routes. There is no idle
     wandering behavior for mobs.
 - `MobDefinitionValidation.cs`
@@ -309,8 +309,9 @@ catalog or system-health services.
    placement-owned leash, return home, and can cross chunk membership while
    motion updates and interest deltas are projected.
 7. Death and respawn: zero health sets `alive=false` and `current_state=defeated`.
-   Defeated mobs remain visible/non-attackable, do not move, and do not respawn.
-   Respawn settings are deferred until runtime life-generation support exists.
+   Defeated mobs remain briefly visible/non-attackable, do not move, leave
+   interest after the defeated hold, and respawn from placement plus definition
+   data after the configured delay.
 8. Drops: current drops are embedded guaranteed per-mob entries of `item_id` and
    `stack_count`; `CombatDefeatService` writes private drops for eligible player
    reward owners and public drops otherwise through the ground-item system.
@@ -374,12 +375,15 @@ catalog or system-health services.
 - Store `movement_speed_tiles_per_second` on the mob definition.
 - Store optional faction/proactive hostile-mob targeting on the definition.
 - Keep leash radius and home position on spawn placement.
-- Do not add idle wander, patrol routes, or respawn settings in the first T4
-  authoring slice because current mobs do not consume those semantics.
+- Do not add idle wander or patrol routes in the first T4 authoring slice because
+  current mobs do not consume those semantics. Preserve the runtime-defaulted
+  defeated-hold and respawn timing columns until a later workspace slice exposes
+  explicit controls.
 
 ### Death, Respawn, and Drops
 
-- Current mob defeat is terminal until server restart/static-content reload.
+- Current mob defeat enters a defeated hold, leaves interest, and respawns from
+  spawn/definition data after the configured delay.
 - Do not author respawn timers in T4 until the runtime has a mob life-generation
   and respawn model.
 - Initial drops are guaranteed rows of `item_id` and `stack_count`.
@@ -424,8 +428,8 @@ catalog or system-health services.
   source files are outside the authoring database today.
 - Current mob drops are guaranteed only. Designers may ask for random drop
   tables, but that is not supported by runtime evidence yet.
-- Current runtime has no mob respawn. Adding respawn authoring before runtime
-  support would create misleading fields.
+- Current runtime has mob respawn scheduling. T4 keeps the lifecycle columns as
+  runtime defaults for now and does not move spawn placement into Content Studio.
 - The client snapshot path uses `enemy_*` field names. API docs and code should
   explain the naming split rather than trying to rename runtime protocol in T4.
 

@@ -31,10 +31,13 @@ class T4MobSourceContractTests(unittest.TestCase):
             "attack_type IN ('melee')",
             "accuracy_style IS NULL OR accuracy_style IN ('thrust', 'slash', 'crush')",
             "attack_speed_units BETWEEN 1 AND 60",
+            "defeated_hold_duration_ms",
+            "respawn_delay_ms",
+            "mob_definitions_lifecycle_durations_check",
             "mob_definitions_proactive_targeting_check",
             "mob_drops_unique_item_per_mob",
             "REFERENCES item_definitions(item_id)",
-            "ISFINITE(",
+            "::TEXT NOT IN ('Infinity', '-Infinity', 'NaN')",
             "ON DELETE RESTRICT",
             "ON DELETE CASCADE",
         ):
@@ -47,7 +50,6 @@ class T4MobSourceContractTests(unittest.TestCase):
             "weight",
             "drop_chance",
             "roll_group",
-            "respawn",
             "patrol",
             "spawn_id",
             "map_id",
@@ -142,9 +144,12 @@ class T4MobSourceContractTests(unittest.TestCase):
             'AuthoringSchemaRequirement.Table("mob_definitions")',
             'AuthoringSchemaRequirement.Column("mob_definitions", "mob_definition_id")',
             'AuthoringSchemaRequirement.Column("mob_definitions", "combat_faction_id")',
+            'AuthoringSchemaRequirement.Column("mob_definitions", "defeated_hold_duration_ms")',
+            'AuthoringSchemaRequirement.Column("mob_definitions", "respawn_delay_ms")',
             'AuthoringSchemaRequirement.Column("mob_combat_profiles", "attack_speed_units")',
             'AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_thrust")',
             'AuthoringSchemaRequirement.Column("mob_drops", "stack_count")',
+            'AuthoringSchemaRequirement.Constraint("mob_definitions_lifecycle_durations_check")',
             'AuthoringSchemaRequirement.Constraint("mob_definitions_proactive_targeting_check")',
             'AuthoringSchemaRequirement.Constraint("mob_combat_profiles_level_bounds_check")',
             'AuthoringSchemaRequirement.Constraint("mob_drops_unique_item_per_mob")',
@@ -154,8 +159,10 @@ class T4MobSourceContractTests(unittest.TestCase):
         for forbidden in (
             "AuthoringSchemaRequirement.Index",
             "AuthoringSchemaRequirement.ForeignKey",
-            "spawn",
-            "respawn",
+            "spawn_id",
+            "home_tile",
+            "map_id",
+            "region_id",
             "patrol",
         ):
             self.assertNotIn(forbidden, source)
@@ -179,6 +186,7 @@ class T4MobSourceContractTests(unittest.TestCase):
             "updated_at = now()",
         ):
             self.assertIn(token, repository)
+        self.assertNotIn("ReadBaseRecord(reader, null, null, [], false)", repository)
 
         for token in (
             "class MobAuthoringService",
@@ -254,6 +262,29 @@ class T4MobSourceContractTests(unittest.TestCase):
         self.assertIn("mob_definition_id", importer)
         self.assertIn("Generated chunk", generated_source)
         self.assertIn("Published chunk", database_source)
+
+    def test_existing_runtime_mobs_are_seeded_for_authoring(self) -> None:
+        seed = ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "021_seed_existing_mob_definitions.sql"
+        runtime_seed = MMO_PROJECT / "prototype" / "sql" / "021_seed_existing_mob_definitions.sql"
+        self.assertTrue(seed.exists())
+        self.assertTrue(runtime_seed.exists())
+        source = seed.read_text()
+        self.assertEqual(source, runtime_seed.read_text())
+        for token in (
+            "INSERT INTO mob_factions",
+            "INSERT INTO mob_faction_dispositions",
+            "INSERT INTO mob_definitions",
+            "INSERT INTO mob_combat_profiles",
+            "INSERT INTO mob_combat_bonuses",
+            "INSERT INTO mob_drops",
+            "'slime'",
+            "'training_goblin'",
+            "'training_guard'",
+            "'inventory_2_apple'",
+            "ON CONFLICT (mob_definition_id) DO NOTHING",
+            "ON CONFLICT (source_faction_id, target_faction_id) DO NOTHING",
+        ):
+            self.assertIn(token, source)
 
     def test_mob_repository_keeps_spawn_and_random_drop_fields_out(self) -> None:
         source = "\n".join(

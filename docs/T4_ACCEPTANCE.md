@@ -12,7 +12,9 @@ Status: complete in Content Studio.
 
 Acceptance checks:
 
-- `integrations/mmo-project/prototype/sql/019_mob_authoring_schema.sql` exists
+- `integrations/mmo-project/prototype/sql/019_mob_authoring_schema.sql`,
+  `020_mob_lifecycle_authoring.sql`, and
+  `021_seed_existing_mob_definitions.sql` exist
   as an additive migration handoff artifact.
 - The migration declares `mob_factions`, `mob_faction_dispositions`,
   `mob_definitions`, `mob_combat_profiles`, `mob_combat_bonuses`, and
@@ -77,8 +79,12 @@ Status: complete as a runtime handoff slice.
 
 Acceptance checks:
 
-- `prototype/sql/019_mob_authoring_schema.sql` is mirrored into the MMO Project
-  runtime repository.
+- `prototype/sql/019_mob_authoring_schema.sql`,
+  `prototype/sql/020_mob_lifecycle_authoring.sql`, and
+  `prototype/sql/021_seed_existing_mob_definitions.sql` are mirrored into the
+  MMO Project runtime repository.
+- The current runtime catalog mobs `slime`, `training_goblin`, and
+  `training_guard` are idempotently seeded for development authoring catalogs.
 - MMO Project `prototype/tools/MapPublisher` exposes `export-mob-catalog`.
 - The exporter reads only `Published` mob definitions and writes deterministic
   `mob_definition_catalog` JSON.

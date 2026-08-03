@@ -39,6 +39,8 @@ CREATE TABLE IF NOT EXISTS mob_definitions (
     footprint_height_tiles INTEGER NOT NULL DEFAULT 1,
     max_health INTEGER NOT NULL,
     movement_speed_tiles_per_second DOUBLE PRECISION NOT NULL DEFAULT 1.25,
+    defeated_hold_duration_ms INTEGER NOT NULL DEFAULT 1000,
+    respawn_delay_ms INTEGER NOT NULL DEFAULT 5000,
     combat_faction_id TEXT NULL REFERENCES mob_factions(faction_id) ON DELETE RESTRICT,
     can_proactively_target_hostile_mobs BOOLEAN NOT NULL DEFAULT FALSE,
     mob_detection_radius_tiles INTEGER NOT NULL DEFAULT 0,
@@ -58,9 +60,9 @@ CREATE TABLE IF NOT EXISTS mob_definitions (
         CHECK (source_width > 0 AND source_height > 0),
     CONSTRAINT mob_definitions_visual_numbers_check
         CHECK (
-            ISFINITE(visual_anchor_offset_x)
-            AND ISFINITE(visual_anchor_offset_y)
-            AND ISFINITE(visual_render_scale)
+            visual_anchor_offset_x::TEXT NOT IN ('Infinity', '-Infinity', 'NaN')
+            AND visual_anchor_offset_y::TEXT NOT IN ('Infinity', '-Infinity', 'NaN')
+            AND visual_render_scale::TEXT NOT IN ('Infinity', '-Infinity', 'NaN')
             AND visual_render_scale > 0
         ),
     CONSTRAINT mob_definitions_footprint_check
@@ -69,8 +71,13 @@ CREATE TABLE IF NOT EXISTS mob_definitions (
         CHECK (max_health > 0),
     CONSTRAINT mob_definitions_movement_speed_check
         CHECK (
-            ISFINITE(movement_speed_tiles_per_second)
+            movement_speed_tiles_per_second::TEXT NOT IN ('Infinity', '-Infinity', 'NaN')
             AND movement_speed_tiles_per_second > 0
+        ),
+    CONSTRAINT mob_definitions_lifecycle_durations_check
+        CHECK (
+            defeated_hold_duration_ms BETWEEN 0 AND 86400000
+            AND respawn_delay_ms BETWEEN 0 AND 86400000
         ),
     CONSTRAINT mob_definitions_target_scan_values_check
         CHECK (
