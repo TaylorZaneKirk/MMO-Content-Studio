@@ -6,6 +6,40 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public sealed partial class MobDefinitionValidator
 {
+    private static readonly HashSet<string> DraftBlockingValidationCodes = new(StringComparer.Ordinal)
+    {
+        "invalid_mob_definition_id",
+        "mob_definition_id_immutable",
+        "invalid_mob_display_name",
+        "invalid_mob_visual_texture_path",
+        "invalid_mob_visual_dimensions",
+        "invalid_mob_visual_anchor",
+        "invalid_mob_visual_render_scale",
+        "invalid_mob_footprint",
+        "invalid_mob_max_health",
+        "invalid_mob_movement_speed",
+        "unsupported_mob_movement_behavior",
+        "invalid_mob_wander_radius",
+        "unsupported_mob_aggression_mode",
+        "invalid_mob_aggression_radius",
+        "invalid_mob_leash_radius",
+        "unsupported_mob_return_home_behavior",
+        "inconsistent_mob_behavior_radii",
+        "invalid_mob_faction",
+        "invalid_mob_proactive_targeting",
+        "unsupported_mob_attack_type",
+        "unsupported_mob_accuracy_style",
+        "invalid_mob_attack_range",
+        "invalid_mob_attack_speed_units",
+        "invalid_mob_combat_level",
+        "duplicate_mob_drop_order",
+        "duplicate_mob_drop_item",
+        "invalid_mob_drop_order",
+        "invalid_mob_drop_item_id",
+        "invalid_mob_drop_stack_count",
+        "invalid_mob_drop_item"
+    };
+
     private readonly MobRepository _repository;
     private readonly ItemAssetService _assetService;
 
@@ -51,12 +85,17 @@ public sealed partial class MobDefinitionValidator
 
         var asset = _assetService.ResolveGameAssetPng(draft.VisualTexturePath, "mob visual texture");
         var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
+        var hasDraftBlockingErrors = messages.Any(IsDraftBlocking);
         return new MobValidationOutcome(
-            !hasErrors,
+            !hasDraftBlockingErrors,
             !hasErrors && asset.Exists && draft.PrimaryCombatProfile is not null,
             messages,
             asset.FilePath);
     }
+
+    public static bool IsDraftBlocking(ApiError message) =>
+        message.Severity == ValidationSeverity.Error
+        && DraftBlockingValidationCodes.Contains(message.Code);
 
     public static void ValidateIdentity(
         string mobDefinitionId,
@@ -101,7 +140,15 @@ public sealed partial class MobDefinitionValidator
         bool forPublication)
     {
         var asset = _assetService.ResolveGameAssetPng(draft.VisualTexturePath, "mob visual texture");
-        if (!asset.Exists)
+        if (draft.VisualTexturePath.Length == 0)
+        {
+            messages.Add(new ApiError(
+                "invalid_mob_visual_texture_path",
+                "Mob visual texture path is required before the draft can be saved.",
+                ValidationSeverity.Error,
+                "visual_texture_path"));
+        }
+        else if (!asset.Exists)
         {
             messages.Add(new ApiError(
                 "mob_visual_unavailable",
@@ -227,18 +274,63 @@ public sealed partial class MobDefinitionValidator
                 ValidationSeverity.Error,
                 "return_home_behavior"));
         }
-        if (!MobDomainRules.IsBehaviorRadiusConsistent(
-                draft.MovementBehavior,
-                draft.WanderRadiusTiles,
-                draft.AggressionMode,
-                draft.AggressionRadiusTiles,
-                draft.LeashRadiusTiles))
+        var hasSupportedMovement = MobDomainRules.IsSupportedMovementBehavior(draft.MovementBehavior)
+            && MobDomainRules.IsWanderRadiusSupported(draft.WanderRadiusTiles);
+        var hasSupportedAggression = MobDomainRules.IsSupportedAggressionMode(draft.AggressionMode)
+            && MobDomainRules.IsAggressionRadiusSupported(draft.AggressionRadiusTiles);
+        var hasSupportedLeash = MobDomainRules.IsLeashRadiusSupported(draft.LeashRadiusTiles);
+
+        if (hasSupportedMovement
+            && MobDomainRules.NormalizeMovementBehavior(draft.MovementBehavior) == "static"
+            && draft.WanderRadiusTiles != 0)
         {
             messages.Add(new ApiError(
                 "inconsistent_mob_behavior_radii",
-                "Static mobs use zero wander radius, random-wander mobs require a positive wander radius, proactive aggression requires a positive aggression radius, and leash radius must cover authored wander/aggression radii.",
+                "Static mobs must use zero wander radius.",
                 ValidationSeverity.Error,
-                "leash_radius_tiles"));
+                "wander_radius_tiles"));
+        }
+        if (hasSupportedMovement
+            && MobDomainRules.NormalizeMovementBehavior(draft.MovementBehavior) == "random_wander"
+            && draft.WanderRadiusTiles <= 0)
+        {
+            messages.Add(new ApiError(
+                "inconsistent_mob_behavior_radii",
+                "Random-wander mobs require a positive wander radius.",
+                ValidationSeverity.Error,
+                "wander_radius_tiles"));
+        }
+        if (hasSupportedAggression
+            && MobDomainRules.NormalizeAggressionMode(draft.AggressionMode) is "passive" or "retaliatory"
+            && draft.AggressionRadiusTiles != 0)
+        {
+            messages.Add(new ApiError(
+                "inconsistent_mob_behavior_radii",
+                "Passive and retaliatory mobs must use zero aggression radius.",
+                ValidationSeverity.Error,
+                "aggression_radius_tiles"));
+        }
+        if (hasSupportedAggression
+            && MobDomainRules.NormalizeAggressionMode(draft.AggressionMode) == "proactive"
+            && draft.AggressionRadiusTiles <= 0)
+        {
+            messages.Add(new ApiError(
+                "inconsistent_mob_behavior_radii",
+                "Proactive mobs require a positive aggression radius.",
+                ValidationSeverity.Error,
+                "aggression_radius_tiles"));
+        }
+        if (hasSupportedMovement && hasSupportedAggression && hasSupportedLeash)
+        {
+            var minimumLeashRadiusTiles = Math.Max(draft.WanderRadiusTiles, draft.AggressionRadiusTiles);
+            if (draft.LeashRadiusTiles < minimumLeashRadiusTiles)
+            {
+                messages.Add(new ApiError(
+                    "inconsistent_mob_behavior_radii",
+                    $"Leash radius must be at least {minimumLeashRadiusTiles} logical tiles to cover the authored wander radius ({draft.WanderRadiusTiles}) and aggression radius ({draft.AggressionRadiusTiles}).",
+                    ValidationSeverity.Error,
+                    "leash_radius_tiles"));
+            }
         }
     }
 

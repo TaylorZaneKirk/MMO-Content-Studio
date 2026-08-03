@@ -315,15 +315,36 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
 
     def test_preview_feedback_scrolls_without_hiding_operation_controls(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()
-        feedback_block = editor.split("var feedback_scroll := ScrollContainer.new()", 1)[1].split("func _add_identity_section", 1)[0]
+        preview_block = editor.split("var preview_scroll := ScrollContainer.new()", 1)[1].split("func _add_identity_section", 1)[0]
 
-        self.assertIn("feedback_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL", feedback_block)
-        self.assertIn("preview_content.add_child(feedback_scroll)", feedback_block)
-        self.assertIn("feedback_scroll.add_child(feedback_content)", feedback_block)
-        self.assertIn('_add_heading(feedback_content, "Exact Logical Changes", 16)', feedback_block)
-        self.assertIn("feedback_content.add_child(_changes)", feedback_block)
-        self.assertIn('_add_heading(feedback_content, "Validation", 16)', feedback_block)
-        self.assertIn("feedback_content.add_child(_validation)", feedback_block)
+        self.assertIn("preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL", preview_block)
+        self.assertIn("preview_panel.add_child(preview_scroll)", preview_block)
+        self.assertIn("preview_scroll.add_child(preview_content)", preview_block)
+        self.assertIn("preview_content.add_child(feedback_content)", preview_block)
+        self.assertIn('_add_heading(feedback_content, "Exact Logical Changes", 16)', preview_block)
+        self.assertIn("feedback_content.add_child(_changes)", preview_block)
+        self.assertIn('_add_heading(feedback_content, "Validation", 16)', preview_block)
+        self.assertIn("feedback_content.add_child(_validation)", preview_block)
+        self.assertEqual(editor.count('_add_operation("Save as Draft", "save_draft")'), 1)
+
+    def test_save_draft_preview_allows_publication_only_mob_errors(self) -> None:
+        service = (ROOT / "host" / "Services" / "MobAuthoringService.cs").read_text()
+        validator = (ROOT / "host" / "Services" / "MobDefinitionValidator.cs").read_text()
+
+        self.assertIn('operation == "save_draft"', service)
+        self.assertIn("messages.Any(MobDefinitionValidator.IsDraftBlocking)", service)
+        self.assertIn("public static bool IsDraftBlocking(ApiError message)", validator)
+        self.assertIn('"mob_combat_profile_required"', validator)
+        self.assertNotIn('"mob_combat_profile_required",', validator.split("DraftBlockingValidationCodes", 1)[1].split("};", 1)[0])
+        self.assertNotIn('"unpublished_mob_drop_item",', validator.split("DraftBlockingValidationCodes", 1)[1].split("};", 1)[0])
+
+    def test_behavior_validation_explains_leash_radius_coverage(self) -> None:
+        editor = (SCRIPTS / "mob_editor.gd").read_text()
+        validator = (ROOT / "host" / "Services" / "MobDefinitionValidator.cs").read_text()
+
+        self.assertIn("leash must be at least the larger of wander and aggression radius", editor)
+        self.assertIn("minimumLeashRadiusTiles = Math.Max", validator)
+        self.assertIn("Leash radius must be at least", validator)
 
     def test_t4c_workspace_does_not_author_tiled_placement(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()

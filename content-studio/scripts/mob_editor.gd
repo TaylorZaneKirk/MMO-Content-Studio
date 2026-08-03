@@ -214,7 +214,14 @@ func _build_ui() -> void:
 
 	var preview_panel := _panel(Vector2(330, 0))
 	add_child(preview_panel)
-	var preview_content := _vbox(preview_panel)
+	var preview_scroll := ScrollContainer.new()
+	preview_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview_panel.add_child(preview_scroll)
+	var preview_content := VBoxContainer.new()
+	preview_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview_content.add_theme_constant_override("separation", 10)
+	preview_scroll.add_child(preview_content)
 	_add_heading(preview_content, "Preview", 20)
 	_visual_preview = MobVisualPreview.new()
 	preview_content.add_child(_visual_preview)
@@ -245,14 +252,10 @@ func _build_ui() -> void:
 	_status = _wrapped_label("Load or create a mob definition.")
 	preview_content.add_child(_status)
 
-	var feedback_scroll := ScrollContainer.new()
-	feedback_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	feedback_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview_content.add_child(feedback_scroll)
 	var feedback_content := VBoxContainer.new()
 	feedback_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	feedback_content.add_theme_constant_override("separation", 10)
-	feedback_scroll.add_child(feedback_content)
+	preview_content.add_child(feedback_content)
 	_add_heading(feedback_content, "Exact Logical Changes", 16)
 	_changes = VBoxContainer.new()
 	feedback_content.add_child(_changes)
@@ -302,7 +305,7 @@ func _add_behavior_section(parent: VBoxContainer) -> void:
 	_aggression_radius = _spin_field(grid, "Aggression radius tiles", 0, 128, 0, 1)
 	_leash_radius = _spin_field(grid, "Leash radius tiles", 0, 128, 6, 1)
 	_return_home_behavior = _option_field(grid, "Return-home behavior")
-	_behavior_note = _wrapped_label("Home comes from the Tiled EnemySpawn coordinate; wander, aggression, and leash radii are measured from that home point.")
+	_behavior_note = _wrapped_label("Home comes from the Tiled EnemySpawn coordinate. Wander, aggression, and leash radii are measured from that home point; leash must be at least the larger of wander and aggression radius.")
 	parent.add_child(_behavior_note)
 
 

@@ -201,6 +201,26 @@ public sealed class MobAuthoringServiceTests
     }
 
     [Fact]
+    public void BehaviorValidationReportsSpecificLeashCoverageError()
+    {
+        var messages = new List<ApiError>();
+        MobDefinitionValidator.ValidateBehavior(
+            SampleDraft() with
+            {
+                MovementBehavior = "random_wander",
+                WanderRadiusTiles = 10,
+                AggressionMode = "proactive",
+                AggressionRadiusTiles = 5,
+                LeashRadiusTiles = 6
+            },
+            messages);
+
+        var message = Assert.Single(messages, message => message.Code == "inconsistent_mob_behavior_radii");
+        Assert.Equal("leash_radius_tiles", message.Field);
+        Assert.Contains("at least 10 logical tiles", message.Message);
+    }
+
+    [Fact]
     public void UnsupportedAttackTypeIsRejected()
     {
         var messages = new List<ApiError>();
@@ -272,6 +292,39 @@ public sealed class MobAuthoringServiceTests
 
         Assert.DoesNotContain(draftMessages, message => message.Severity == ValidationSeverity.Error);
         Assert.Contains(publicationMessages, message => message.Code == "mob_combat_profile_required");
+    }
+
+    [Fact]
+    public void DraftValidityIgnoresPublicationOnlyErrors()
+    {
+        Assert.False(MobDefinitionValidator.IsDraftBlocking(new ApiError(
+            "mob_combat_profile_required",
+            "Published mob definitions require a primary melee combat profile.",
+            ValidationSeverity.Error,
+            "primary_combat_profile")));
+        Assert.False(MobDefinitionValidator.IsDraftBlocking(new ApiError(
+            "unpublished_mob_drop_item",
+            "Drop item must be published before the mob can be published.",
+            ValidationSeverity.Error,
+            "guaranteed_drops[0]")));
+        Assert.False(MobDefinitionValidator.IsDraftBlocking(new ApiError(
+            "invalid_mob_combat_bonus",
+            "Combat bonus exceeds the runtime-supported authoring range.",
+            ValidationSeverity.Error,
+            "combat_bonuses.attack_crush")));
+    }
+
+    [Theory]
+    [InlineData("invalid_mob_definition_id")]
+    [InlineData("invalid_mob_visual_texture_path")]
+    [InlineData("inconsistent_mob_behavior_radii")]
+    [InlineData("invalid_mob_drop_item")]
+    public void DraftValidityBlocksErrorsThatCannotBePersisted(string code)
+    {
+        Assert.True(MobDefinitionValidator.IsDraftBlocking(new ApiError(
+            code,
+            "Persistence-shape error.",
+            ValidationSeverity.Error)));
     }
 
     [Fact]

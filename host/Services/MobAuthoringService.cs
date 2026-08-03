@@ -159,10 +159,13 @@ public sealed class MobAuthoringService
             }
 
             var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
+            var validForDraft = operation == "save_draft"
+                ? validation.ValidForDraft && !messages.Any(MobDefinitionValidator.IsDraftBlocking)
+                : validation.ValidForDraft && !hasErrors;
             return AuthoringOperationResult<MobValidationResponse>.Success(
                 new MobValidationResponse(
                     operation,
-                    validation.ValidForDraft && !hasErrors,
+                    validForDraft,
                     validation.ValidForPublication && !hasErrors,
                     messages,
                     CalculateChanges(stableId, existing, requested, operation),
