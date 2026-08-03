@@ -160,7 +160,9 @@ deferred to a future server-authoritative gameplay slice.
 T4 planning confirms that Content Studio should own reusable mob definitions:
 identity, visuals, footprint, stats, primary melee attacks, movement/aggression,
 factions, and guaranteed drops. Tiled remains responsible for `EnemySpawn`
-placement, home position, facing, spawn behavior, and leash radius.
+placement, home position, facing, and the `mob_definition_id` link. Reusable
+movement, aggression, leash, and return-home behavior belongs to the mob
+definition.
 
 T4B contributes the local `/api/v1/mobs` host API and transactional persistence
 boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into

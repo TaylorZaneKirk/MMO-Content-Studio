@@ -41,6 +41,15 @@ public static class MobDomainRules
     public static string? NormalizeAccuracyStyle(string? value) =>
         NormalizeOptional(value)?.ToLowerInvariant();
 
+    public static string NormalizeMovementBehavior(string value) =>
+        NormalizeStableId(value);
+
+    public static string NormalizeAggressionMode(string value) =>
+        NormalizeStableId(value);
+
+    public static string NormalizeReturnHomeBehavior(string value) =>
+        NormalizeStableId(value);
+
     public static string NormalizeFactionDisposition(string value) =>
         NormalizeStableId(value);
 
@@ -52,6 +61,15 @@ public static class MobDomainRules
 
     public static bool IsSupportedAccuracyStyle(string? value) =>
         NormalizeAccuracyStyle(value) is "thrust" or "slash" or "crush";
+
+    public static bool IsSupportedMovementBehavior(string value) =>
+        NormalizeMovementBehavior(value) is "static" or "random_wander";
+
+    public static bool IsSupportedAggressionMode(string value) =>
+        NormalizeAggressionMode(value) is "passive" or "retaliatory" or "proactive";
+
+    public static bool IsSupportedReturnHomeBehavior(string value) =>
+        NormalizeReturnHomeBehavior(value) is "none" or "return_to_spawn";
 
     public static bool IsSupportedFactionDisposition(string value) =>
         NormalizeFactionDisposition(value) is "hostile" or "neutral";
@@ -76,6 +94,48 @@ public static class MobDomainRules
         minimumRangeTiles >= 0
         && maximumRangeTiles >= minimumRangeTiles
         && maximumRangeTiles <= MobAuthoringRegistry.MaxRangeTiles;
+
+    public static bool IsWanderRadiusSupported(int wanderRadiusTiles) =>
+        wanderRadiusTiles is >= 0 and <= MobAuthoringRegistry.MaxWanderRadiusTiles;
+
+    public static bool IsAggressionRadiusSupported(int aggressionRadiusTiles) =>
+        aggressionRadiusTiles is >= 0 and <= MobAuthoringRegistry.MaxAggressionRadiusTiles;
+
+    public static bool IsLeashRadiusSupported(int leashRadiusTiles) =>
+        leashRadiusTiles is >= 0 and <= MobAuthoringRegistry.MaxLeashRadiusTiles;
+
+    public static bool IsBehaviorRadiusConsistent(
+        string movementBehavior,
+        int wanderRadiusTiles,
+        string aggressionMode,
+        int aggressionRadiusTiles,
+        int leashRadiusTiles)
+    {
+        var normalizedMovement = NormalizeMovementBehavior(movementBehavior);
+        var normalizedAggression = NormalizeAggressionMode(aggressionMode);
+        if (normalizedMovement == "static" && wanderRadiusTiles != 0)
+        {
+            return false;
+        }
+
+        if (normalizedMovement == "random_wander" && wanderRadiusTiles <= 0)
+        {
+            return false;
+        }
+
+        if (normalizedAggression is "passive" or "retaliatory" && aggressionRadiusTiles != 0)
+        {
+            return false;
+        }
+
+        if (normalizedAggression == "proactive" && aggressionRadiusTiles <= 0)
+        {
+            return false;
+        }
+
+        return leashRadiusTiles >= wanderRadiusTiles
+            && leashRadiusTiles >= aggressionRadiusTiles;
+    }
 
     public static bool IsLevelSupported(int level) =>
         level is >= 0 and <= MobAuthoringRegistry.MaxMobLevel;

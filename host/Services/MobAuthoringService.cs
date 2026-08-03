@@ -43,6 +43,9 @@ public sealed class MobAuthoringService
                     _registry.LoadPublicationStates(),
                     _registry.LoadAttackTypes(),
                     _registry.LoadAccuracyStyles(),
+                    _registry.LoadMovementBehaviors(),
+                    _registry.LoadAggressionModes(),
+                    _registry.LoadReturnHomeBehaviors(),
                     _registry.LoadFactionDispositions(),
                     _registry.LoadCombatBonusFields(),
                     MobAuthoringRegistry.CombatUnitMilliseconds,
@@ -318,6 +321,12 @@ public sealed class MobAuthoringService
             request.FootprintHeightTiles,
             request.MaxHealth,
             request.MovementSpeedTilesPerSecond,
+            request.MovementBehavior,
+            request.WanderRadiusTiles,
+            request.AggressionMode,
+            request.AggressionRadiusTiles,
+            request.LeashRadiusTiles,
+            request.ReturnHomeBehavior,
             request.CombatFactionId,
             request.CanProactivelyTargetHostileMobs,
             request.MobDetectionRadiusTiles,
@@ -340,6 +349,12 @@ public sealed class MobAuthoringService
             request.FootprintHeightTiles,
             request.MaxHealth,
             request.MovementSpeedTilesPerSecond,
+            request.MovementBehavior,
+            request.WanderRadiusTiles,
+            request.AggressionMode,
+            request.AggressionRadiusTiles,
+            request.LeashRadiusTiles,
+            request.ReturnHomeBehavior,
             request.CombatFactionId,
             request.CanProactivelyTargetHostileMobs,
             request.MobDetectionRadiusTiles,
@@ -361,6 +376,12 @@ public sealed class MobAuthoringService
         int footprintHeightTiles,
         int maxHealth,
         double movementSpeedTilesPerSecond,
+        string movementBehavior,
+        int wanderRadiusTiles,
+        string aggressionMode,
+        int aggressionRadiusTiles,
+        int leashRadiusTiles,
+        string returnHomeBehavior,
         string? combatFactionId,
         bool canProactivelyTargetHostileMobs,
         int mobDetectionRadiusTiles,
@@ -383,6 +404,12 @@ public sealed class MobAuthoringService
             footprintHeightTiles,
             maxHealth,
             movementSpeedTilesPerSecond,
+            MobDomainRules.NormalizeMovementBehavior(movementBehavior),
+            MobDomainRules.NormalizeMovementBehavior(movementBehavior) == "static" ? 0 : wanderRadiusTiles,
+            MobDomainRules.NormalizeAggressionMode(aggressionMode),
+            MobDomainRules.NormalizeAggressionMode(aggressionMode) == "proactive" ? aggressionRadiusTiles : 0,
+            leashRadiusTiles,
+            MobDomainRules.NormalizeReturnHomeBehavior(returnHomeBehavior),
             MobDomainRules.NormalizeOptional(combatFactionId)?.ToLowerInvariant(),
             proactive,
             proactive ? mobDetectionRadiusTiles : 0,
@@ -416,6 +443,12 @@ public sealed class MobAuthoringService
             record.FootprintHeightTiles,
             record.MaxHealth,
             record.MovementSpeedTilesPerSecond,
+            record.MovementBehavior,
+            record.WanderRadiusTiles,
+            record.AggressionMode,
+            record.AggressionRadiusTiles,
+            record.LeashRadiusTiles,
+            record.ReturnHomeBehavior,
             record.CombatFactionId,
             record.CanProactivelyTargetHostileMobs,
             record.MobDetectionRadiusTiles,
@@ -470,6 +503,12 @@ public sealed class MobAuthoringService
         && record.FootprintHeightTiles == draft.FootprintHeightTiles
         && record.MaxHealth == draft.MaxHealth
         && record.MovementSpeedTilesPerSecond.Equals(draft.MovementSpeedTilesPerSecond)
+        && record.MovementBehavior == draft.MovementBehavior
+        && record.WanderRadiusTiles == draft.WanderRadiusTiles
+        && record.AggressionMode == draft.AggressionMode
+        && record.AggressionRadiusTiles == draft.AggressionRadiusTiles
+        && record.LeashRadiusTiles == draft.LeashRadiusTiles
+        && record.ReturnHomeBehavior == draft.ReturnHomeBehavior
         && string.Equals(record.CombatFactionId, draft.CombatFactionId, StringComparison.Ordinal)
         && record.CanProactivelyTargetHostileMobs == draft.CanProactivelyTargetHostileMobs
         && record.MobDetectionRadiusTiles == draft.MobDetectionRadiusTiles
@@ -493,6 +532,12 @@ public sealed class MobAuthoringService
         && left.FootprintHeightTiles == right.FootprintHeightTiles
         && left.MaxHealth == right.MaxHealth
         && left.MovementSpeedTilesPerSecond.Equals(right.MovementSpeedTilesPerSecond)
+        && left.MovementBehavior == right.MovementBehavior
+        && left.WanderRadiusTiles == right.WanderRadiusTiles
+        && left.AggressionMode == right.AggressionMode
+        && left.AggressionRadiusTiles == right.AggressionRadiusTiles
+        && left.LeashRadiusTiles == right.LeashRadiusTiles
+        && left.ReturnHomeBehavior == right.ReturnHomeBehavior
         && left.CombatFactionId == right.CombatFactionId
         && left.CanProactivelyTargetHostileMobs == right.CanProactivelyTargetHostileMobs
         && left.MobDetectionRadiusTiles == right.MobDetectionRadiusTiles
@@ -601,6 +646,12 @@ public sealed class MobAuthoringService
             record.FootprintHeightTiles,
             record.MaxHealth,
             record.MovementSpeedTilesPerSecond,
+            record.MovementBehavior,
+            record.WanderRadiusTiles,
+            record.AggressionMode,
+            record.AggressionRadiusTiles,
+            record.LeashRadiusTiles,
+            record.ReturnHomeBehavior,
             record.CombatFactionId,
             record.CombatFactionDisplayName,
             record.CanProactivelyTargetHostileMobs,
@@ -621,6 +672,8 @@ public sealed class MobAuthoringService
             record.PublicationState,
             record.VisualTexturePath,
             record.MaxHealth,
+            record.MovementBehavior,
+            record.AggressionMode,
             record.CombatFactionId,
             record.CombatFactionDisplayName,
             record.PrimaryCombatProfile is not null || record.HasCombatProfile,
@@ -647,6 +700,12 @@ public sealed class MobAuthoringService
         AddChange(changes, "footprint_height_tiles", existing?.FootprintHeightTiles.ToString(), requested.FootprintHeightTiles.ToString());
         AddChange(changes, "max_health", existing?.MaxHealth.ToString(), requested.MaxHealth.ToString());
         AddChange(changes, "movement_speed_tiles_per_second", existing?.MovementSpeedTilesPerSecond.ToString("R"), requested.MovementSpeedTilesPerSecond.ToString("R"));
+        AddChange(changes, "movement_behavior", existing?.MovementBehavior, requested.MovementBehavior);
+        AddChange(changes, "wander_radius_tiles", existing?.WanderRadiusTiles.ToString(), requested.WanderRadiusTiles.ToString());
+        AddChange(changes, "aggression_mode", existing?.AggressionMode, requested.AggressionMode);
+        AddChange(changes, "aggression_radius_tiles", existing?.AggressionRadiusTiles.ToString(), requested.AggressionRadiusTiles.ToString());
+        AddChange(changes, "leash_radius_tiles", existing?.LeashRadiusTiles.ToString(), requested.LeashRadiusTiles.ToString());
+        AddChange(changes, "return_home_behavior", existing?.ReturnHomeBehavior, requested.ReturnHomeBehavior);
         AddChange(changes, "combat_faction_id", existing?.CombatFactionId, requested.CombatFactionId);
         AddChange(changes, "can_proactively_target_hostile_mobs", existing?.CanProactivelyTargetHostileMobs.ToString(), requested.CanProactivelyTargetHostileMobs.ToString());
         AddChange(changes, "mob_detection_radius_tiles", existing?.MobDetectionRadiusTiles.ToString(), requested.MobDetectionRadiusTiles.ToString());

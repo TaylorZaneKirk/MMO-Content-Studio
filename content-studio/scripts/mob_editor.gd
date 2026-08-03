@@ -113,6 +113,13 @@ var _footprint_width: SpinBox
 var _footprint_height: SpinBox
 var _max_health: SpinBox
 var _movement_speed: SpinBox
+var _movement_behavior: OptionButton
+var _wander_radius: SpinBox
+var _aggression_mode: OptionButton
+var _aggression_radius: SpinBox
+var _leash_radius: SpinBox
+var _return_home_behavior: OptionButton
+var _behavior_note: Label
 var _faction: OptionButton
 var _proactive: CheckBox
 var _detection_radius: SpinBox
@@ -199,6 +206,7 @@ func _build_ui() -> void:
 	_add_identity_section(form)
 	_add_visual_section(form)
 	_add_stats_section(form)
+	_add_behavior_section(form)
 	_add_faction_section(form)
 	_add_attack_section(form)
 	_add_bonuses_section(form)
@@ -277,14 +285,29 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 
 
 func _add_stats_section(parent: VBoxContainer) -> void:
-	_add_heading(parent, "Stats and Movement", 18)
+	_add_heading(parent, "Stats", 18)
 	var grid := _grid(parent)
 	_max_health = _spin_field(grid, "Maximum health", 1, 10000, 10, 1)
 	_movement_speed = _spin_field(grid, "Movement speed tiles/s", 0, 64, 2, 0.1)
 
 
+func _add_behavior_section(parent: VBoxContainer) -> void:
+	_add_heading(parent, "Movement and Aggression", 18)
+	var grid := _grid(parent)
+	_movement_behavior = _option_field(grid, "Movement behavior")
+	_movement_behavior.item_selected.connect(_on_behavior_changed.unbind(1))
+	_wander_radius = _spin_field(grid, "Wander radius tiles", 0, 128, 0, 1)
+	_aggression_mode = _option_field(grid, "Aggression mode")
+	_aggression_mode.item_selected.connect(_on_behavior_changed.unbind(1))
+	_aggression_radius = _spin_field(grid, "Aggression radius tiles", 0, 128, 0, 1)
+	_leash_radius = _spin_field(grid, "Leash radius tiles", 0, 128, 6, 1)
+	_return_home_behavior = _option_field(grid, "Return-home behavior")
+	_behavior_note = _wrapped_label("Home comes from the Tiled EnemySpawn coordinate; wander, aggression, and leash radii are measured from that home point.")
+	parent.add_child(_behavior_note)
+
+
 func _add_faction_section(parent: VBoxContainer) -> void:
-	_add_heading(parent, "Faction and Aggression", 18)
+	_add_heading(parent, "Faction and Hostile-Mob Targeting", 18)
 	var grid := _grid(parent)
 	_faction = _option_field(grid, "Faction")
 	_proactive = CheckBox.new()
@@ -428,12 +451,19 @@ func _apply_options() -> void:
 	_attack_speed_unit_milliseconds = int(defaults.get("attack_speed_unit_milliseconds", _options.get("attack_speed_unit_milliseconds", _attack_speed_unit_milliseconds)))
 	_set_spin_limits(_minimum_range, 0, int(limits.get("max_range_tiles", 128)))
 	_set_spin_limits(_maximum_range, 0, int(limits.get("max_range_tiles", 128)))
+	_set_spin_limits(_wander_radius, 0, int(limits.get("max_wander_radius_tiles", 128)))
+	_set_spin_limits(_aggression_radius, 0, int(limits.get("max_aggression_radius_tiles", 128)))
+	_set_spin_limits(_leash_radius, 0, int(limits.get("max_leash_radius_tiles", 128)))
 	_set_spin_limits(_attack_speed_units, int(limits.get("min_attack_speed_units", 1)), int(limits.get("max_attack_speed_units", 60)))
 	for field_name in _bonus_controls:
 		_set_spin_limits(_bonus_controls[field_name] as SpinBox, -int(limits.get("max_combat_bonus_magnitude", 10000)), int(limits.get("max_combat_bonus_magnitude", 10000)))
 	_fill_authoring_options(_attack_type, _options.get("attack_types", []) as Array)
 	_fill_authoring_options(_accuracy_style, _options.get("accuracy_styles", []) as Array)
+	_fill_authoring_options(_movement_behavior, _options.get("movement_behaviors", []) as Array)
+	_fill_authoring_options(_aggression_mode, _options.get("aggression_modes", []) as Array)
+	_fill_authoring_options(_return_home_behavior, _options.get("return_home_behaviors", []) as Array)
 	_fill_factions("")
+	_update_behavior_controls()
 	_update_attack_interval()
 
 
@@ -487,6 +517,12 @@ func _load_mob(payload: Dictionary) -> void:
 	_footprint_height.value = int(payload.get("footprint_height_tiles", 1))
 	_max_health.value = int(payload.get("max_health", 10))
 	_movement_speed.value = float(payload.get("movement_speed_tiles_per_second", 2.0))
+	_select_option(_movement_behavior, str(payload.get("movement_behavior", "static")))
+	_wander_radius.value = int(payload.get("wander_radius_tiles", 0))
+	_select_option(_aggression_mode, str(payload.get("aggression_mode", "retaliatory")))
+	_aggression_radius.value = int(payload.get("aggression_radius_tiles", 0))
+	_leash_radius.value = int(payload.get("leash_radius_tiles", 6))
+	_select_option(_return_home_behavior, str(payload.get("return_home_behavior", "return_to_spawn")))
 	_fill_factions(str(payload.get("combat_faction_id", "")))
 	_proactive.button_pressed = bool(payload.get("can_proactively_target_hostile_mobs", false))
 	_detection_radius.value = int(payload.get("mob_detection_radius_tiles", 0))
@@ -498,6 +534,7 @@ func _load_mob(payload: Dictionary) -> void:
 	_asset_preview_file_path = str(payload.get("asset_preview_file_path", ""))
 	_set_form_enabled(bool(payload.get("editable_in_mobs", true)) and _schema_available)
 	_update_operation_default()
+	_update_behavior_controls()
 	_update_targeting_controls()
 	_update_attack_controls()
 	_update_visual_preview()
@@ -526,6 +563,12 @@ func _start_new_mob() -> void:
 	_footprint_height.value = int(defaults.get("footprint_height_tiles", 1))
 	_max_health.value = 10
 	_movement_speed.value = float(defaults.get("movement_speed_tiles_per_second", 2.0))
+	_select_option(_movement_behavior, str(defaults.get("movement_behavior", "static")))
+	_wander_radius.value = int(defaults.get("wander_radius_tiles", 0))
+	_select_option(_aggression_mode, str(defaults.get("aggression_mode", "retaliatory")))
+	_aggression_radius.value = int(defaults.get("aggression_radius_tiles", 0))
+	_leash_radius.value = int(defaults.get("leash_radius_tiles", 6))
+	_select_option(_return_home_behavior, str(defaults.get("return_home_behavior", "return_to_spawn")))
 	_fill_factions("")
 	_proactive.button_pressed = bool(defaults.get("can_proactively_target_hostile_mobs", false))
 	_detection_radius.value = int(defaults.get("mob_detection_radius_tiles", 0))
@@ -545,6 +588,7 @@ func _start_new_mob() -> void:
 	_asset_preview_file_path = ""
 	_operation.select(0)
 	_set_form_enabled(_schema_available)
+	_update_behavior_controls()
 	_update_targeting_controls()
 	_update_attack_controls()
 	_update_visual_preview()
@@ -653,6 +697,12 @@ func _payload() -> Dictionary:
 		"footprint_height_tiles": int(_footprint_height.value),
 		"max_health": int(_max_health.value),
 		"movement_speed_tiles_per_second": float(_movement_speed.value),
+		"movement_behavior": _selected_metadata(_movement_behavior),
+		"wander_radius_tiles": int(_wander_radius.value),
+		"aggression_mode": _selected_metadata(_aggression_mode),
+		"aggression_radius_tiles": int(_aggression_radius.value),
+		"leash_radius_tiles": int(_leash_radius.value),
+		"return_home_behavior": _selected_metadata(_return_home_behavior),
 		"combat_faction_id": _selected_metadata(_faction),
 		"can_proactively_target_hostile_mobs": proactive,
 		"mob_detection_radius_tiles": int(_detection_radius.value) if proactive else 0,
@@ -833,6 +883,11 @@ func _on_proactive_toggled(_value: bool) -> void:
 	_on_form_changed()
 
 
+func _on_behavior_changed() -> void:
+	_update_behavior_controls()
+	_on_form_changed()
+
+
 func _on_attack_toggled(_value: bool) -> void:
 	_update_attack_controls()
 	_on_form_changed()
@@ -857,6 +912,21 @@ func _update_targeting_controls() -> void:
 		_detection_radius.value = 0
 		_scan_interval.value = 0
 		_candidate_limit.value = 0
+
+
+func _update_behavior_controls() -> void:
+	if _movement_behavior == null or _aggression_mode == null:
+		return
+	var movement := _selected_metadata(_movement_behavior)
+	var aggression := _selected_metadata(_aggression_mode)
+	var can_edit_wander := _form_editable and movement == "random_wander"
+	var can_edit_aggression_radius := _form_editable and aggression == "proactive"
+	_wander_radius.editable = can_edit_wander
+	_aggression_radius.editable = can_edit_aggression_radius
+	if movement == "static":
+		_wander_radius.value = 0
+	if aggression != "proactive":
+		_aggression_radius.value = 0
 
 
 func _update_attack_controls() -> void:
@@ -967,6 +1037,7 @@ func _set_form_enabled(enabled: bool) -> void:
 	if not editable:
 		_apply_button.disabled = true
 	_update_targeting_controls()
+	_update_behavior_controls()
 	_update_attack_controls()
 	_update_drop_controls()
 

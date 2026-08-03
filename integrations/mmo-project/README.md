@@ -98,7 +98,9 @@ their own mob drafts.
 
 The schema follows the T4 audit boundary: Content Studio owns reusable mob
 definitions, while Tiled/generated static content continues to own `EnemySpawn`
-placement, home position, facing, spawn behavior, and leash radius.
+placement, home position, facing, and the `mob_definition_id` link.
+`prototype/sql/022_mob_behavior_ownership.sql` moves reusable movement,
+aggression, leash, and return-home behavior onto `mob_definitions`.
 
 The T4B Content Studio host API reads and writes this schema when it exists in
 the configured development database. T4D adds the MMO Project

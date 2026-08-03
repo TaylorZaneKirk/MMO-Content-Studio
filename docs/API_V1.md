@@ -270,6 +270,8 @@ Loads one complete mob aggregate:
 - identity and `publication_state`
 - visual texture path, source dimensions, anchor offsets, and render scale
 - footprint, max health, and movement speed
+- reusable movement behavior, wander radius, aggression mode, aggression
+  radius, leash radius, and return-home behavior
 - optional combat faction and proactive hostile-mob targeting settings
 - optional primary combat profile
 - optional shared 13-field combat bonuses
@@ -317,7 +319,7 @@ disable previews and mutations report that limitation as a warning. Runtime
 reference enforcement remains T4E/runtime-integration work.
 
 Mob contracts intentionally exclude Tiled placement fields such as spawn id,
-map/region, home tile, leash radius, patrol, respawn, and spawn count.
+map/region, home tile, patrol paths, and spawn count.
 
 The T4C Godot **Mobs** workspace consumes these routes through
 `AuthoringHostClient` and `AuthoringHttpTransport`. It sends complete draft and

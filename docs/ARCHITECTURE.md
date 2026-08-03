@@ -258,8 +258,9 @@ bonuses, movement speed, optional faction/aggression settings, guaranteed drops,
 publication state, and aggregate concurrency.
 
 Tiled and generated/static-content publication continue to own placement facts:
-spawn id, source position, home position, facing, spawn behavior, and leash
-radius. The game runtime composes those placement facts with a
+spawn id, source position, home position, facing, and `mob_definition_id`
+linkage. Reusable movement, aggression, leash, and return-home behavior belongs
+to the mob definition. The game runtime composes those placement facts with a
 `mob_definition_catalog` into runtime enemies during static-content startup.
 
 Initial T4 authoring deliberately excludes mob respawn timers, random/weighted

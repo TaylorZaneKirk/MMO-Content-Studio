@@ -33,6 +33,12 @@ public sealed class MobRepository
                 m.footprint_height_tiles,
                 m.max_health,
                 m.movement_speed_tiles_per_second,
+                m.movement_behavior,
+                m.wander_radius_tiles,
+                m.aggression_mode,
+                m.aggression_radius_tiles,
+                m.leash_radius_tiles,
+                m.return_home_behavior,
                 m.combat_faction_id,
                 f.display_name as combat_faction_display_name,
                 m.can_proactively_target_hostile_mobs,
@@ -256,6 +262,12 @@ public sealed class MobRepository
                 m.footprint_height_tiles,
                 m.max_health,
                 m.movement_speed_tiles_per_second,
+                m.movement_behavior,
+                m.wander_radius_tiles,
+                m.aggression_mode,
+                m.aggression_radius_tiles,
+                m.leash_radius_tiles,
+                m.return_home_behavior,
                 m.combat_faction_id,
                 f.display_name as combat_faction_display_name,
                 m.can_proactively_target_hostile_mobs,
@@ -403,6 +415,12 @@ public sealed class MobRepository
                 footprint_height_tiles,
                 max_health,
                 movement_speed_tiles_per_second,
+                movement_behavior,
+                wander_radius_tiles,
+                aggression_mode,
+                aggression_radius_tiles,
+                leash_radius_tiles,
+                return_home_behavior,
                 combat_faction_id,
                 can_proactively_target_hostile_mobs,
                 mob_detection_radius_tiles,
@@ -424,6 +442,12 @@ public sealed class MobRepository
                 @footprint_height_tiles,
                 @max_health,
                 @movement_speed_tiles_per_second,
+                @movement_behavior,
+                @wander_radius_tiles,
+                @aggression_mode,
+                @aggression_radius_tiles,
+                @leash_radius_tiles,
+                @return_home_behavior,
                 @combat_faction_id,
                 @can_proactively_target_hostile_mobs,
                 @mob_detection_radius_tiles,
@@ -460,6 +484,12 @@ public sealed class MobRepository
                 footprint_height_tiles = @footprint_height_tiles,
                 max_health = @max_health,
                 movement_speed_tiles_per_second = @movement_speed_tiles_per_second,
+                movement_behavior = @movement_behavior,
+                wander_radius_tiles = @wander_radius_tiles,
+                aggression_mode = @aggression_mode,
+                aggression_radius_tiles = @aggression_radius_tiles,
+                leash_radius_tiles = @leash_radius_tiles,
+                return_home_behavior = @return_home_behavior,
                 combat_faction_id = @combat_faction_id,
                 can_proactively_target_hostile_mobs = @can_proactively_target_hostile_mobs,
                 mob_detection_radius_tiles = @mob_detection_radius_tiles,
@@ -654,6 +684,12 @@ public sealed class MobRepository
         command.Parameters.AddWithValue("footprint_height_tiles", draft.FootprintHeightTiles);
         command.Parameters.AddWithValue("max_health", draft.MaxHealth);
         command.Parameters.AddWithValue("movement_speed_tiles_per_second", draft.MovementSpeedTilesPerSecond);
+        command.Parameters.AddWithValue("movement_behavior", draft.MovementBehavior);
+        command.Parameters.AddWithValue("wander_radius_tiles", draft.WanderRadiusTiles);
+        command.Parameters.AddWithValue("aggression_mode", draft.AggressionMode);
+        command.Parameters.AddWithValue("aggression_radius_tiles", draft.AggressionRadiusTiles);
+        command.Parameters.AddWithValue("leash_radius_tiles", draft.LeashRadiusTiles);
+        command.Parameters.AddWithValue("return_home_behavior", draft.ReturnHomeBehavior);
         command.Parameters.Add("combat_faction_id", NpgsqlDbType.Text).Value =
             (object?)draft.CombatFactionId ?? DBNull.Value;
         command.Parameters.AddWithValue("can_proactively_target_hostile_mobs", draft.CanProactivelyTargetHostileMobs);
@@ -704,6 +740,12 @@ public sealed class MobRepository
             reader.GetInt32(reader.GetOrdinal("footprint_height_tiles")),
             reader.GetInt32(reader.GetOrdinal("max_health")),
             reader.GetDouble(reader.GetOrdinal("movement_speed_tiles_per_second")),
+            reader.GetString(reader.GetOrdinal("movement_behavior")),
+            reader.GetInt32(reader.GetOrdinal("wander_radius_tiles")),
+            reader.GetString(reader.GetOrdinal("aggression_mode")),
+            reader.GetInt32(reader.GetOrdinal("aggression_radius_tiles")),
+            reader.GetInt32(reader.GetOrdinal("leash_radius_tiles")),
+            reader.GetString(reader.GetOrdinal("return_home_behavior")),
             reader.IsDBNull(factionOrdinal) ? null : reader.GetString(factionOrdinal),
             reader.IsDBNull(factionDisplayOrdinal) ? null : reader.GetString(factionDisplayOrdinal),
             reader.GetBoolean(reader.GetOrdinal("can_proactively_target_hostile_mobs")),
@@ -758,6 +800,12 @@ public sealed record MobDefinitionRecord(
     int FootprintHeightTiles,
     int MaxHealth,
     double MovementSpeedTilesPerSecond,
+    string MovementBehavior,
+    int WanderRadiusTiles,
+    string AggressionMode,
+    int AggressionRadiusTiles,
+    int LeashRadiusTiles,
+    string ReturnHomeBehavior,
     string? CombatFactionId,
     string? CombatFactionDisplayName,
     bool CanProactivelyTargetHostileMobs,

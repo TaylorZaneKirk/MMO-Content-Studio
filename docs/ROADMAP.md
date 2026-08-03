@@ -105,7 +105,8 @@ Locked boundaries:
 
 - Content Studio owns reusable mob definitions.
 - Tiled/generated static content owns `EnemySpawn` placement, home position,
-  facing, spawn behavior, and leash radius.
+  facing, and the `mob_definition_id` link; reusable behavior and leash radius
+  belong to the mob definition.
 - The current runtime consumes a `mob_definition_catalog`; T4 should preserve
   that shape during integration.
 - Mob respawn, weighted drop tables, patrols, dialogue, shops, quests, arbitrary

@@ -22,6 +22,12 @@ public sealed class MobAuthoringServiceTests
             1,
             12,
             1.25,
+            MobAuthoringRegistry.DefaultMovementBehavior,
+            MobAuthoringRegistry.DefaultWanderRadiusTiles,
+            MobAuthoringRegistry.DefaultAggressionMode,
+            MobAuthoringRegistry.DefaultAggressionRadiusTiles,
+            MobAuthoringRegistry.DefaultLeashRadiusTiles,
+            MobAuthoringRegistry.DefaultReturnHomeBehavior,
             " mobs ",
             false,
             6,
@@ -56,6 +62,12 @@ public sealed class MobAuthoringServiceTests
             1,
             20,
             1.25,
+            " Random_Wander ",
+            3,
+            " Proactive ",
+            4,
+            6,
+            " Return_To_Spawn ",
             "MOBS",
             true,
             4,
@@ -66,6 +78,9 @@ public sealed class MobAuthoringServiceTests
             [new(2, "iron_ore", 1), new(1, "Apple", 3)]);
 
         Assert.Equal("mobs", draft.CombatFactionId);
+        Assert.Equal("random_wander", draft.MovementBehavior);
+        Assert.Equal("proactive", draft.AggressionMode);
+        Assert.Equal("return_to_spawn", draft.ReturnHomeBehavior);
         Assert.Equal("melee", draft.PrimaryCombatProfile?.AttackType);
         Assert.Equal("crush", draft.PrimaryCombatProfile?.AccuracyStyle);
         Assert.Equal([1, 2], draft.GuaranteedDrops.Select(drop => drop.DropOrder));
@@ -385,6 +400,12 @@ public sealed class MobAuthoringServiceTests
             1,
             12,
             1.25,
+            MobAuthoringRegistry.DefaultMovementBehavior,
+            MobAuthoringRegistry.DefaultWanderRadiusTiles,
+            MobAuthoringRegistry.DefaultAggressionMode,
+            MobAuthoringRegistry.DefaultAggressionRadiusTiles,
+            MobAuthoringRegistry.DefaultLeashRadiusTiles,
+            MobAuthoringRegistry.DefaultReturnHomeBehavior,
             null,
             false,
             0,
@@ -423,6 +444,12 @@ public sealed class MobAuthoringServiceTests
             1,
             12,
             1.25,
+            MobAuthoringRegistry.DefaultMovementBehavior,
+            MobAuthoringRegistry.DefaultWanderRadiusTiles,
+            MobAuthoringRegistry.DefaultAggressionMode,
+            MobAuthoringRegistry.DefaultAggressionRadiusTiles,
+            MobAuthoringRegistry.DefaultLeashRadiusTiles,
+            MobAuthoringRegistry.DefaultReturnHomeBehavior,
             null,
             null,
             false,

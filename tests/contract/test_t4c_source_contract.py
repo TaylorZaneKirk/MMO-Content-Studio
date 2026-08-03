@@ -107,6 +107,12 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             '"footprint_height_tiles": int(_footprint_height.value)',
             '"max_health": int(_max_health.value)',
             '"movement_speed_tiles_per_second": float(_movement_speed.value)',
+            '"movement_behavior": _selected_metadata(_movement_behavior)',
+            '"wander_radius_tiles": int(_wander_radius.value)',
+            '"aggression_mode": _selected_metadata(_aggression_mode)',
+            '"aggression_radius_tiles": int(_aggression_radius.value)',
+            '"leash_radius_tiles": int(_leash_radius.value)',
+            '"return_home_behavior": _selected_metadata(_return_home_behavior)',
             '"combat_faction_id": _selected_metadata(_faction)',
             '"can_proactively_target_hostile_mobs": proactive',
             '"mob_detection_radius_tiles": int(_detection_radius.value) if proactive else 0',
@@ -126,7 +132,6 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             "home_tile",
             "patrol",
             "respawn",
-            "leash_radius",
         ):
             self.assertNotIn(forbidden, editor)
 
@@ -327,7 +332,6 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             "map_id",
             "region_id",
             "home_tile",
-            "leash_radius",
             "respawn",
             "patrol",
         ):

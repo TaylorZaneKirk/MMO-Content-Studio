@@ -74,7 +74,7 @@ from mounted authored spawns at server startup.
 | Add directed faction dispositions under `faction_dispositions`; missing directions are neutral. | Still authoritative. | The catalog reader builds `MobFactionDispositionKey` pairs, and `MobFactionCombatRelationshipProvider`/combat permission flow treats relationships directionally. |
 | Open `prototype/shared/maps/tiled/regions/starter_region.tmj`. | Still authoritative for the starter region. | The `.tmj` file exists and contains the authored `training_slime_001` enemy spawn. A `.tmx` copy also exists, but the publish command requires `.tmj`. |
 | Add a point object on the `Enemy Spawns` layer with object type/class `EnemySpawn` and a stable object Name as `spawn_id`. | Still authoritative. | Importer validation requires object layer `Enemy Spawns`, type `EnemySpawn`, point objects, unique nonempty names, and emits `spawn_id`. |
-| Add `mob_definition_id`, `spawn_behavior`, optional `facing`, and `leash_radius_tiles`. | Still authoritative with a restriction. | `mob_definition_id` is required and must match the catalog; `spawn_behavior` defaults to and currently only supports `static`; `facing` is normalized; `leash_radius_tiles` is nonnegative and placement-owned. |
+| Add `mob_definition_id` and optional `facing`. | Corrected authoritative boundary. | `mob_definition_id` is required and must match the catalog; `facing` is normalized. Routine behavior fields such as `spawn_behavior` and `leash_radius_tiles` now belong to reusable mob definitions and are rejected on ordinary `EnemySpawn` objects. |
 | Keep point-to-tile conversion as `floor(pixel / 128)` and keep footprint in bounds. | Still authoritative. | Importer constants use 128px Tiled source tiles and validate footprint bounds before assigning the spawn to a `17x9` generated chunk. |
 | Run `python3 tools/maps/publish_region.py --source prototype/shared/maps/tiled/regions/starter_region.tmj --validate-only`. | Still authoritative and non-destructive. | `publish_region.py` supports `--validate-only`, compiles to a temp bundle, validates, and does not replace output or publish. |
 | Run the same command with `--import-only` to replace generated output. | Still authoritative, but outside this T4 audit. | The publisher compares generated JSON and replaces checked-in output only when changed. T4 Phase 0 did not run import-only because it would modify runtime generated files. |
@@ -125,7 +125,7 @@ Preserve outside Content Studio:
 
 - placing `EnemySpawn` objects in Tiled
 - choosing map coordinates and point-object placement
-- keeping spawn id, facing, spawn behavior, and leash radius placement-owned
+- keeping spawn id, facing, and the `mob_definition_id` link placement-owned
 - running import/publish workflows when generated/static map content changes
 - requiring server restart/static-content reload until a runtime hot-reload seam
   exists
@@ -159,8 +159,9 @@ Disagreements or gaps between guide and implementation:
     proactive targeting settings, drops, and faction dispositions.
   - Reads Tiled objects of type `EnemySpawn`.
   - Requires each spawn's `mob_definition_id` to exist in the catalog.
-  - Writes generated `enemy_spawns` with position, facing, `spawn_behavior`, and
-    `leash_radius_tiles`.
+  - Writes generated `enemy_spawns` with placement identity, position, facing,
+    and `mob_definition_id`; reusable behavior remains in the embedded
+    `mob_definition_catalog`.
 - `prototype/importer/README.md`
   - Documents the starter slime as an `EnemySpawn` using `mob_definition_id =
     slime`.
@@ -193,8 +194,9 @@ Disagreements or gaps between guide and implementation:
 - `EnemyRuntimeService.cs`
   - Initializes in-memory enemies from every region chunk `EnemySpawn`.
   - Runtime enemy id is `"{mountId}:{spawnId}"`.
-  - Home position and leash radius come from placement.
-  - Stats, visuals, movement speed, attack profile, faction, and drops come from
+  - Home position comes from placement.
+  - Stats, visuals, movement speed, movement behavior, aggression mode, leash
+    radius, return-home behavior, attack profile, faction, and drops come from
     definition.
   - `ApplyDamage` sets `Alive = false` and `CurrentState = defeated` at zero
     health, starts the defeated-hold timer, then schedules respawn.
@@ -353,8 +355,10 @@ catalog or system-health services.
 ### Ownership Boundary
 
 - Content Studio owns reusable mob definitions.
-- Tiled owns `EnemySpawn` placement, including spawn id, position, facing,
-  `spawn_behavior`, and `leash_radius_tiles`.
+- Tiled owns `EnemySpawn` placement, including spawn id, position, facing, and
+  the `mob_definition_id` link. Reusable behavior, including movement mode,
+  aggression mode, leash radius, and return-home policy, belongs to the mob
+  definition.
 - Generated or database-published static content remains the bridge between the
   two.
 - T4 does not author individual runtime enemy instances.
@@ -374,7 +378,8 @@ catalog or system-health services.
 
 - Store `movement_speed_tiles_per_second` on the mob definition.
 - Store optional faction/proactive hostile-mob targeting on the definition.
-- Keep leash radius and home position on spawn placement.
+- Keep home position on spawn placement.
+- Store leash radius and return-home policy on the mob definition.
 - Do not add idle wander or patrol routes in the first T4 authoring slice because
   current mobs do not consume those semantics. Preserve the runtime-defaulted
   defeated-hold and respawn timing columns until a later workspace slice exposes

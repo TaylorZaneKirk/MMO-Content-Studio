@@ -28,6 +28,7 @@ public sealed partial class MobDefinitionValidator
         ValidateIdentity(mobDefinitionId, draft, existing, messages);
         ValidateVisuals(draft, messages, forPublication);
         ValidateFootprintHealthMovement(draft, messages);
+        ValidateBehavior(draft, messages);
 
         var factions = await _repository.LoadFactionsAsync(cancellationToken);
         var factionIds = factions.Select(faction => faction.FactionId).ToHashSet(StringComparer.Ordinal);
@@ -171,6 +172,73 @@ public sealed partial class MobDefinitionValidator
                 "Movement speed must be finite and greater than zero.",
                 ValidationSeverity.Error,
                 "movement_speed_tiles_per_second"));
+        }
+    }
+
+    public static void ValidateBehavior(
+        NormalizedMobDraft draft,
+        ICollection<ApiError> messages)
+    {
+        if (!MobDomainRules.IsSupportedMovementBehavior(draft.MovementBehavior))
+        {
+            messages.Add(new ApiError(
+                "unsupported_mob_movement_behavior",
+                "Mob movement behavior must be static or random_wander.",
+                ValidationSeverity.Error,
+                "movement_behavior"));
+        }
+        if (!MobDomainRules.IsWanderRadiusSupported(draft.WanderRadiusTiles))
+        {
+            messages.Add(new ApiError(
+                "invalid_mob_wander_radius",
+                $"Wander radius must be between 0 and {MobAuthoringRegistry.MaxWanderRadiusTiles} logical tiles.",
+                ValidationSeverity.Error,
+                "wander_radius_tiles"));
+        }
+        if (!MobDomainRules.IsSupportedAggressionMode(draft.AggressionMode))
+        {
+            messages.Add(new ApiError(
+                "unsupported_mob_aggression_mode",
+                "Mob aggression mode must be passive, retaliatory, or proactive.",
+                ValidationSeverity.Error,
+                "aggression_mode"));
+        }
+        if (!MobDomainRules.IsAggressionRadiusSupported(draft.AggressionRadiusTiles))
+        {
+            messages.Add(new ApiError(
+                "invalid_mob_aggression_radius",
+                $"Aggression radius must be between 0 and {MobAuthoringRegistry.MaxAggressionRadiusTiles} logical tiles.",
+                ValidationSeverity.Error,
+                "aggression_radius_tiles"));
+        }
+        if (!MobDomainRules.IsLeashRadiusSupported(draft.LeashRadiusTiles))
+        {
+            messages.Add(new ApiError(
+                "invalid_mob_leash_radius",
+                $"Leash radius must be between 0 and {MobAuthoringRegistry.MaxLeashRadiusTiles} logical tiles.",
+                ValidationSeverity.Error,
+                "leash_radius_tiles"));
+        }
+        if (!MobDomainRules.IsSupportedReturnHomeBehavior(draft.ReturnHomeBehavior))
+        {
+            messages.Add(new ApiError(
+                "unsupported_mob_return_home_behavior",
+                "Mob return-home behavior must be none or return_to_spawn.",
+                ValidationSeverity.Error,
+                "return_home_behavior"));
+        }
+        if (!MobDomainRules.IsBehaviorRadiusConsistent(
+                draft.MovementBehavior,
+                draft.WanderRadiusTiles,
+                draft.AggressionMode,
+                draft.AggressionRadiusTiles,
+                draft.LeashRadiusTiles))
+        {
+            messages.Add(new ApiError(
+                "inconsistent_mob_behavior_radii",
+                "Static mobs use zero wander radius, random-wander mobs require a positive wander radius, proactive aggression requires a positive aggression radius, and leash radius must cover authored wander/aggression radii.",
+                ValidationSeverity.Error,
+                "leash_radius_tiles"));
         }
     }
 
@@ -397,6 +465,12 @@ public sealed record NormalizedMobDraft(
     int FootprintHeightTiles,
     int MaxHealth,
     double MovementSpeedTilesPerSecond,
+    string MovementBehavior,
+    int WanderRadiusTiles,
+    string AggressionMode,
+    int AggressionRadiusTiles,
+    int LeashRadiusTiles,
+    string ReturnHomeBehavior,
     string? CombatFactionId,
     bool CanProactivelyTargetHostileMobs,
     int MobDetectionRadiusTiles,
