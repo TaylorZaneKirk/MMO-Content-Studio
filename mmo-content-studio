@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+RUN_CHECKS=0
+ARGS=()
+
+usage() {
+  cat <<'USAGE'
+Usage: ./mmo-content-studio [--check] [--help]
+
+Starts the local .NET authoring host, waits for it to become reachable, then
+launches the Godot Content Studio client. By default this skips the full test
+suite for a quick edit-run loop.
+
+Options:
+  --check   Run the repository checks before launching.
+  --help    Show this help text.
+USAGE
+}
+
+for argument in "$@"; do
+  case "${argument}" in
+    --check)
+      RUN_CHECKS=1
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      ARGS+=("${argument}")
+      ;;
+  esac
+done
+
+if [[ "${RUN_CHECKS}" -eq 1 ]]; then
+  exec "${ROOT}/tools/dev.sh" "${ARGS[@]}"
+fi
+
+exec "${ROOT}/tools/dev.sh" --skip-check "${ARGS[@]}"

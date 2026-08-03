@@ -103,13 +103,24 @@ Run all available checks:
 ./tools/test.sh
 ```
 
-Run the host:
+Launch the full local Studio:
+
+```bash
+./mmo-content-studio
+```
+
+That executable starts or reuses the local .NET authoring host, waits for its
+health endpoint, and then launches the Godot Studio client. Use
+`./mmo-content-studio --check` when you want the full repository checks before
+launch.
+
+Run the host separately for debugging:
 
 ```bash
 ./tools/run-host.sh
 ```
 
-Run the Godot Studio in another terminal:
+Run only the Godot Studio client in another terminal:
 
 ```bash
 ./tools/run-studio.sh

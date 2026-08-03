@@ -36,11 +36,21 @@ class DevelopmentLauncherTests(unittest.TestCase):
         self.assertIn("--help", script)
         self.assertIn("Unknown argument", script)
 
+    def test_root_executable_launches_host_and_client(self) -> None:
+        script_path = ROOT / "mmo-content-studio"
+        script = script_path.read_text()
+        self.assertTrue(script_path.exists())
+        self.assertIn("#!/usr/bin/env bash", script)
+        self.assertIn('"${ROOT}/tools/dev.sh" --skip-check', script)
+        self.assertIn('"${ROOT}/tools/dev.sh" "${ARGS[@]}"', script)
+        self.assertIn("--check", script)
+        self.assertIn("Starts the local .NET authoring host", script)
+
     def test_ci_and_local_checks_parse_shell_scripts(self) -> None:
         workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
         local_check = (ROOT / "tools" / "check.sh").read_text()
         self.assertIn("bash -n tools/*.sh", workflow)
-        self.assertIn('bash -n "${ROOT}"/tools/*.sh', local_check)
+        self.assertIn('bash -n "${ROOT}"/tools/*.sh "${ROOT}/mmo-content-studio"', local_check)
 
 
 if __name__ == "__main__":
