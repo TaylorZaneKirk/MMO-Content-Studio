@@ -3,19 +3,19 @@ class_name MobEditor
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const DEFAULT_BONUS_FIELDS := [
-	"attack_stab",
+	"attack_thrust",
 	"attack_slash",
 	"attack_crush",
-	"attack_magic",
 	"attack_ranged",
-	"defence_stab",
+	"attack_magic",
+	"strength_melee",
+	"strength_ranged",
+	"strength_magic",
+	"defence_thrust",
 	"defence_slash",
 	"defence_crush",
-	"defence_magic",
 	"defence_ranged",
-	"melee_strength",
-	"ranged_strength",
-	"magic_damage",
+	"defence_magic",
 ]
 
 class MobVisualPreview:

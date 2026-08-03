@@ -86,8 +86,6 @@ const CONNECTION_OPERATIONS := [
 	OP_CONSUMABLES,
 	OP_EQUIPMENT_OPTIONS,
 	OP_EQUIPMENT,
-	OP_HAND_EQUIPMENT_OPTIONS,
-	OP_HAND_EQUIPMENT,
 ]
 
 @export var base_url := DEFAULT_BASE_URL
@@ -324,14 +322,14 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			_request(OP_EQUIPMENT, "/api/v1/equipment")
 		OP_EQUIPMENT:
 			equipment_received.emit(data)
+			connection_state_changed.emit("connected", "Connected to the local authoring host.")
 			_request(OP_HAND_EQUIPMENT_OPTIONS, "/api/v1/hand-equipment/options")
 		OP_HAND_EQUIPMENT_OPTIONS:
 			hand_equipment_options_received.emit(data)
 			_request(OP_HAND_EQUIPMENT, "/api/v1/hand-equipment")
 		OP_HAND_EQUIPMENT:
 			hand_equipment_received.emit(data)
-			connection_state_changed.emit("connected", "Connected to the local authoring host.")
-			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
+			_continue_after_hand_equipment_initialization()
 		OP_MOB_OPTIONS:
 			mob_options_received.emit(data)
 			_request(OP_MOBS, "/api/v1/mobs")
@@ -375,3 +373,9 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
+	if operation == OP_HAND_EQUIPMENT_OPTIONS or operation == OP_HAND_EQUIPMENT:
+		_continue_after_hand_equipment_initialization()
+
+
+func _continue_after_hand_equipment_initialization() -> void:
+	_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")

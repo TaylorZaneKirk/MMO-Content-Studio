@@ -127,6 +127,40 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, editor)
 
+    def test_mob_bonus_fallback_fields_match_shared_contract(self) -> None:
+        editor = (SCRIPTS / "mob_editor.gd").read_text()
+        equipment_contract = (ROOT / "host" / "Contracts" / "EquipmentContracts.cs").read_text()
+        expected_fields = (
+            "attack_thrust",
+            "attack_slash",
+            "attack_crush",
+            "attack_ranged",
+            "attack_magic",
+            "strength_melee",
+            "strength_ranged",
+            "strength_magic",
+            "defence_thrust",
+            "defence_slash",
+            "defence_crush",
+            "defence_ranged",
+            "defence_magic",
+        )
+
+        fallback = editor.split("const DEFAULT_BONUS_FIELDS := [", 1)[1].split("]", 1)[0]
+        self.assertEqual(26, fallback.count('"'))
+        for field in expected_fields:
+            self.assertIn(f'"{field}"', fallback)
+            self.assertIn(f'JsonPropertyName("{field}")', equipment_contract)
+
+        for stale_field in (
+            "attack_stab",
+            "defence_stab",
+            "melee_strength",
+            "ranged_strength",
+            "magic_damage",
+        ):
+            self.assertNotIn(stale_field, fallback)
+
     def test_editor_models_current_runtime_combat_not_a_general_attack_system(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()
 
@@ -199,6 +233,19 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             "_is_loading",
         ):
             self.assertIn(token, editor)
+
+    def test_mob_startup_continues_after_hand_equipment_failure(self) -> None:
+        facade = (SCRIPTS / "authoring_host_client.gd").read_text()
+        connection_operations = facade.split("const CONNECTION_OPERATIONS := [", 1)[1].split("]", 1)[0]
+
+        self.assertNotIn("OP_HAND_EQUIPMENT_OPTIONS", connection_operations)
+        self.assertNotIn("OP_HAND_EQUIPMENT,", connection_operations)
+        self.assertNotIn("OP_MOB_OPTIONS", connection_operations)
+        self.assertIn("connection_state_changed.emit(\"connected\"", facade)
+        self.assertIn("func _continue_after_hand_equipment_initialization", facade)
+        self.assertIn("OP_HAND_EQUIPMENT:\n\t\t\thand_equipment_received.emit(data)\n\t\t\t_continue_after_hand_equipment_initialization()", facade)
+        self.assertIn("if operation == OP_HAND_EQUIPMENT_OPTIONS or operation == OP_HAND_EQUIPMENT:", facade)
+        self.assertIn("_request(OP_MOB_OPTIONS, \"/api/v1/mobs/options\")", facade)
 
     def test_visual_preview_uses_host_resolved_png_and_footprint(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()
