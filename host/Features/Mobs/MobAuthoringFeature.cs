@@ -91,6 +91,16 @@ public static class MobAuthoringFeature
                 context,
                 await service.DisableAsync(mobDefinitionId, request, cancellationToken)));
 
+        mobs.MapPost("/{mobDefinitionId}/delete", async (
+            HttpContext context,
+            string mobDefinitionId,
+            DeleteMutationRequest request,
+            MobAuthoringService service,
+            CancellationToken cancellationToken) =>
+            AuthoringHttpResults.FromOperation(
+                context,
+                await service.DeleteAsync(mobDefinitionId, request, cancellationToken)));
+
         return endpoints;
     }
 }

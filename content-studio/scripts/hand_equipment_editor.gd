@@ -294,7 +294,7 @@ func _build_ui() -> void:
 	operation_row.add_theme_constant_override("separation", 8)
 	editor.add_child(operation_row)
 	_operation = OptionButton.new()
-	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"]]:
+	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
 		_operation.add_item(option[0])
 		_operation.set_item_metadata(_operation.item_count - 1, option[1])
 	_operation.item_selected.connect(_on_form_changed.unbind(1))
@@ -507,11 +507,19 @@ func _on_preview_received(payload: Dictionary) -> void:
 
 
 func _on_mutation_completed(payload: Dictionary) -> void:
+	var operation := str(payload.get("operation", "operation"))
+	if operation == "delete":
+		var deleted_id := str(payload.get("deleted_id", _item_id.text))
+		_reload_item_id = ""
+		_clear_selection_after_delete(deleted_id)
+		_status.text = "Deleted %s." % deleted_id
+		_client.load_hand_equipment(_search.text)
+		return
 	var item := payload.get("item", {}) as Dictionary
 	_reload_item_id = str(item.get("item_id", _item_id.text))
 	_clear_preview()
-	_status.text = "%s completed. Reloading item..." % _workspace_support.operation_name(str(payload.get("operation", "operation")))
-	_client.load_hand_equipment()
+	_status.text = "%s completed. Reloading item..." % _workspace_support.operation_name(operation)
+	_client.load_hand_equipment(_search.text)
 
 
 func _on_request_failed(operation: String, message: String, errors: Array) -> void:
@@ -798,6 +806,8 @@ func _apply() -> void:
 			_client.publish_hand_equipment(_item_id.text, expected, preview_signature)
 		"disable":
 			_client.disable_hand_equipment(_item_id.text, expected, preview_signature)
+		"delete":
+			_client.delete_hand_equipment(_item_id.text, expected, preview_signature)
 		_:
 			var payload := _payload()
 			payload["preview_signature"] = preview_signature
@@ -915,6 +925,30 @@ func _update_guidance() -> void:
 func _update_operation_default() -> void:
 	var state := str(_current_item.get("publication_state", "Draft"))
 	_operation.select(2 if state == "Published" else 0)
+
+
+func _clear_selection_after_delete(_deleted_id: String) -> void:
+	_current_item = {}
+	_item_id.text = ""
+	_display_name.text = ""
+	_publication.text = "No item selected"
+	_kind.text = "Unknown"
+	_classification.text = "Unknown"
+	_updated.text = "Unknown"
+	_equippable.button_pressed = false
+	_select_option(_slot, "")
+	_required_strength.value = 1
+	_visual_key.text = "None"
+	_visual_model.text = "Current runtime derives visual keys."
+	_clear_rows(_requirements)
+	_clear_rows(_modifiers)
+	_apply_bonus_values({})
+	_apply_weapon_profile(null)
+	_clear_rows(_tool_rows)
+	_update_icon_preview("")
+	_update_paper_doll_preview()
+	_set_form_enabled(false)
+	_clear_preview()
 
 
 func _open_import() -> void:

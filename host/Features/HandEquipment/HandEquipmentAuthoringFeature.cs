@@ -91,6 +91,16 @@ public static class HandEquipmentAuthoringFeature
                 context,
                 await service.DisableAsync(itemId, request, cancellationToken)));
 
+        handEquipment.MapPost("/{itemId}/delete", async (
+            HttpContext context,
+            string itemId,
+            DeleteMutationRequest request,
+            HandEquipmentAuthoringService service,
+            CancellationToken cancellationToken) =>
+            AuthoringHttpResults.FromOperation(
+                context,
+                await service.DeleteAsync(itemId, request, cancellationToken)));
+
         return endpoints;
     }
 }

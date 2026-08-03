@@ -96,6 +96,16 @@ public static class EquipmentAuthoringFeature
                     request.ExpectedUpdatedAtUtc,
                     cancellationToken)));
 
+        equipment.MapPost("/{itemId}/delete", async (
+            HttpContext context,
+            string itemId,
+            DeleteMutationRequest request,
+            EquipmentItemAuthoringService service,
+            CancellationToken cancellationToken) =>
+            AuthoringHttpResults.FromOperation(
+                context,
+                await service.DeleteAsync(itemId, request, cancellationToken)));
+
         return endpoints;
     }
 }

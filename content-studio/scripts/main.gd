@@ -75,6 +75,8 @@ func _configure_target_operations() -> void:
 	target_operation.set_item_metadata(1, "publish")
 	target_operation.add_item("Disable")
 	target_operation.set_item_metadata(2, "disable")
+	target_operation.add_item("Delete")
+	target_operation.set_item_metadata(3, "delete")
 
 
 func _on_connection_state_changed(state: String, message: String) -> void:
@@ -239,8 +241,14 @@ func _on_item_preview_received(payload: Dictionary) -> void:
 
 
 func _on_item_mutation_completed(payload: Dictionary) -> void:
-	var item := payload.get("item", {}) as Dictionary
 	var operation := str(payload.get("operation", "mutation"))
+	if operation == "delete":
+		var deleted_id := str(payload.get("deleted_id", item_id_edit.text))
+		_start_new_item()
+		operation_status.text = "Deleted %s." % deleted_id
+		authoring_host_client.load_items(item_search.text)
+		return
+	var item := payload.get("item", {}) as Dictionary
 	operation_status.text = "%s completed successfully." % _workspace_support.operation_name(operation)
 	_current_item = item
 	_on_item_received(item)
@@ -344,6 +352,8 @@ func _apply_previewed_operation() -> void:
 			authoring_host_client.publish_item(item_id, expected)
 		"disable":
 			authoring_host_client.disable_item(item_id, expected)
+		"delete":
+			authoring_host_client.delete_item(item_id, expected)
 		_:
 			authoring_host_client.save_item_draft(item_id, {
 				"display_name": display_name_edit.text,

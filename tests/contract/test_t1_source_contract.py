@@ -24,6 +24,7 @@ class T1SourceContractTests(unittest.TestCase):
             'MapPut("/{itemId}/draft"',
             'MapPost("/{itemId}/publish"',
             'MapPost("/{itemId}/disable"',
+            'MapPost("/{itemId}/delete"',
         ):
             self.assertIn(route, feature)
 
@@ -55,7 +56,28 @@ class T1SourceContractTests(unittest.TestCase):
         service = (ROOT / "host" / "Services" / "BasicItemAuthoringService.cs").read_text()
         self.assertIn("invalid_target_operation", service)
         self.assertIn('"save_draft" => "save_draft"', service)
+        self.assertIn('"delete" => "delete"', service)
         self.assertIn("_ => null", service)
+
+    def test_delete_operation_requires_preview_and_removes_basic_item(self) -> None:
+        feature = (ROOT / "host" / "Features" / "Items" / "ItemAuthoringFeature.cs").read_text()
+        repository = (ROOT / "host" / "Persistence" / "BasicItemRepository.cs").read_text()
+        service = (ROOT / "host" / "Services" / "BasicItemAuthoringService.cs").read_text()
+        client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()
+        main = (ROOT / "content-studio" / "scripts" / "main.gd").read_text()
+        publication = (ROOT / "host" / "Contracts" / "PublicationContracts.cs").read_text()
+
+        self.assertIn("DeleteMutationRequest", publication)
+        self.assertIn("DeleteMutationResponse", publication)
+        self.assertIn("service.DeleteAsync", feature)
+        self.assertIn("delete from item_definitions", repository)
+        self.assertIn("delete_requires_disabled_item", service)
+        self.assertIn("item_delete_blocked_by_references", service)
+        self.assertIn('target_operation.add_item("Delete")', main)
+        self.assertIn('target_operation.set_item_metadata(3, "delete")', main)
+        self.assertIn("func delete_item", client)
+        self.assertIn('"/api/v1/items/%s/delete"', client)
+        self.assertIn("OP_ITEM_DELETE", client)
 
     def test_godot_requires_preview_before_apply(self) -> None:
         main = (ROOT / "content-studio" / "scripts" / "main.gd").read_text()

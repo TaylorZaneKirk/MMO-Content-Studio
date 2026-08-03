@@ -96,6 +96,16 @@ public static class ConsumableAuthoringFeature
                     request.ExpectedUpdatedAtUtc,
                     cancellationToken)));
 
+        consumables.MapPost("/{itemId}/delete", async (
+            HttpContext context,
+            string itemId,
+            DeleteMutationRequest request,
+            ConsumableItemAuthoringService service,
+            CancellationToken cancellationToken) =>
+            AuthoringHttpResults.FromOperation(
+                context,
+                await service.DeleteAsync(itemId, request, cancellationToken)));
+
         return endpoints;
     }
 }

@@ -181,7 +181,7 @@ func _build_ui() -> void:
 	operation_row.add_theme_constant_override("separation", 8)
 	editor.add_child(operation_row)
 	_operation = OptionButton.new()
-	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"]]:
+	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
 		_operation.add_item(option[0])
 		_operation.set_item_metadata(_operation.item_count - 1, option[1])
 	_operation.item_selected.connect(_on_form_changed.unbind(1))
@@ -383,8 +383,15 @@ func _on_preview_received(payload: Dictionary) -> void:
 
 
 func _on_mutation_completed(payload: Dictionary) -> void:
+	var operation := str(payload.get("operation", "mutation"))
+	if operation == "delete":
+		var deleted_id := str(payload.get("deleted_id", _item_id.text))
+		_start_new()
+		_status.text = "Deleted %s." % deleted_id
+		_client.load_consumables(_search.text)
+		return
 	var item := payload.get("item", {}) as Dictionary
-	_status.text = "%s completed successfully." % _workspace_support.operation_name(str(payload.get("operation", "mutation")))
+	_status.text = "%s completed successfully." % _workspace_support.operation_name(operation)
 	_on_consumable_received(item)
 	_client.load_consumables(_search.text)
 
@@ -600,6 +607,8 @@ func _apply() -> void:
 			_client.publish_consumable(item_id, expected)
 		"disable":
 			_client.disable_consumable(item_id, expected)
+		"delete":
+			_client.delete_consumable(item_id, expected)
 		_:
 			_client.save_consumable_draft(item_id, _payload())
 	_apply_button.disabled = true
@@ -696,4 +705,3 @@ func _clear_rows(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
-

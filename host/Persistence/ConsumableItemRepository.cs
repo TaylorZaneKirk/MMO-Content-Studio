@@ -291,6 +291,39 @@ public sealed class ConsumableItemRepository
         return saved;
     }
 
+    public async Task DeleteAsync(
+        string itemId,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var existing = await LoadBaseAsync(connection, transaction, itemId, true, cancellationToken)
+            ?? throw new ConsumableNotFoundException(itemId);
+        EnsureExpectedVersion(existing, expectedUpdatedAtUtc);
+        EnsureConsumableEditable(existing);
+        if (!existing.HasConsumableProfile)
+        {
+            throw new ConsumableProfileMissingException(itemId);
+        }
+        if (existing.RuntimeEnabled)
+        {
+            throw new ConsumablePublishedDeleteException(itemId);
+        }
+
+        await ExecuteDeleteAsync(connection, transaction, "item_consumable_requirements", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_consumable_effects", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_consumable_profiles", itemId, cancellationToken);
+
+        const string sql = "delete from item_definitions where item_id = @item_id;";
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("item_id", itemId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async Task EnsurePublicationReferencesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -577,6 +610,19 @@ public sealed class ConsumableItemRepository
     private static void AddNullableText(NpgsqlCommand command, string name, string? value) =>
         command.Parameters.Add(name, NpgsqlDbType.Text).Value = (object?)value ?? DBNull.Value;
 
+    private static async Task ExecuteDeleteAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string table,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        var sql = $"delete from {table} where item_id = @item_id;";
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static void EnsureConsumableEditable(ConsumableItemRecord? existing)
     {
         if (existing is not null
@@ -680,4 +726,12 @@ public sealed class ConsumableConcurrencyException : Exception
     }
 
     public DateTimeOffset CurrentUpdatedAtUtc { get; }
+}
+
+public sealed class ConsumablePublishedDeleteException : Exception
+{
+    public ConsumablePublishedDeleteException(string itemId)
+        : base($"Consumable '{itemId}' must be disabled before it can be deleted.")
+    {
+    }
 }

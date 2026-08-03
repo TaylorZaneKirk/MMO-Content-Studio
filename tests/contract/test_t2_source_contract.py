@@ -30,6 +30,7 @@ class T2SourceContractTests(unittest.TestCase):
             'MapPut("/{itemId}/draft"',
             'MapPost("/{itemId}/publish"',
             'MapPost("/{itemId}/disable"',
+            'MapPost("/{itemId}/delete"',
         ):
             self.assertIn(route, feature)
 
@@ -127,8 +128,27 @@ class T2SourceContractTests(unittest.TestCase):
         self.assertIn("_workspace_support.can_apply", editor)
         self.assertIn("_workspace_support.accept_preview", editor)
         self.assertIn("Preview the operation again", editor)
+        self.assertIn('["Delete", "delete"]', editor)
+        self.assertIn("delete_consumable(item_id, expected)", editor)
         self.assertIn("_collect_requirements", editor)
         self.assertIn("_collect_effects", editor)
+
+    def test_delete_operation_removes_consumable_aggregate(self) -> None:
+        repository = (ROOT / "host" / "Persistence" / "ConsumableItemRepository.cs").read_text()
+        service = (ROOT / "host" / "Services" / "ConsumableItemAuthoringService.cs").read_text()
+        client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()
+
+        for table in (
+            "item_consumable_requirements",
+            "item_consumable_effects",
+            "item_consumable_profiles",
+        ):
+            self.assertIn(f'ExecuteDeleteAsync(connection, transaction, "{table}"', repository)
+        self.assertIn("delete_requires_disabled_item", service)
+        self.assertIn("item_delete_blocked_by_references", service)
+        self.assertIn("func delete_consumable", client)
+        self.assertIn('"/api/v1/consumables/%s/delete"', client)
+        self.assertIn("OP_CONSUMABLE_DELETE", client)
 
     def test_godot_consumable_functions_are_not_duplicated(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "consumable_editor.gd").read_text()

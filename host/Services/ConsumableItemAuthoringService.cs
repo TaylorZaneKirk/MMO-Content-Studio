@@ -110,17 +110,17 @@ public sealed class ConsumableItemAuthoringService
             {
                 return AuthoringOperationResult<ConsumableValidationResponse>.Failure(new ApiError(
                     "invalid_target_operation",
-                    "Target operation must be save_draft, publish, or disable.",
+                    "Target operation must be save_draft, publish, disable, or delete.",
                     ValidationSeverity.Error,
                     "target_operation"));
             }
 
-            if ((targetOperation is "publish" or "disable") && existing is null)
+            if ((targetOperation is "publish" or "disable" or "delete") && existing is null)
             {
                 return AuthoringOperationResult<ConsumableValidationResponse>.Failure(ItemNotFound(itemId));
             }
 
-            if ((targetOperation is "publish" or "disable") && existing?.HasConsumableProfile != true)
+            if ((targetOperation is "publish" or "disable" or "delete") && existing?.HasConsumableProfile != true)
             {
                 return AuthoringOperationResult<ConsumableValidationResponse>.Failure(new ApiError(
                     "consumable_profile_missing",
@@ -134,7 +134,7 @@ public sealed class ConsumableItemAuthoringService
                 ? requested
                 : existing is null ? requested : FromRecord(existing);
             var hasUnsavedChanges = existing is not null
-                && (targetOperation is "publish" or "disable")
+                && (targetOperation is "publish" or "disable" or "delete")
                 && !EquivalentDraft(existing, requested);
             var validation = await _validator.ValidateAsync(
                 itemId,
@@ -164,6 +164,10 @@ public sealed class ConsumableItemAuthoringService
                 {
                     messages.Add(PublishedConsumableReferenceError(itemId));
                 }
+            }
+            if (targetOperation == "delete" && existing?.RuntimeEnabled == true)
+            {
+                messages.Add(DeleteRequiresDisabledError(itemId));
             }
 
             var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
@@ -265,6 +269,69 @@ public sealed class ConsumableItemAuthoringService
         DateTimeOffset? expectedUpdatedAtUtc,
         CancellationToken cancellationToken = default) =>
         SetPublicationAsync(itemId, false, expectedUpdatedAtUtc, cancellationToken);
+
+    public async Task<AuthoringOperationResult<DeleteMutationResponse>> DeleteAsync(
+        string itemId,
+        DeleteMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var existing = await _repository.LoadAsync(itemId, cancellationToken);
+            if (existing is null)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(ItemNotFound(itemId));
+            }
+            if (!existing.HasConsumableProfile)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(new ApiError(
+                    "consumable_profile_missing",
+                    $"Item '{itemId}' has no consumable profile. Save a draft first.",
+                    ValidationSeverity.Error,
+                    "item_id"));
+            }
+            if (existing.RuntimeEnabled)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(itemId));
+            }
+
+            await _repository.DeleteAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken);
+            return AuthoringOperationResult<DeleteMutationResponse>.Success(
+                new DeleteMutationResponse("delete", itemId, []));
+        }
+        catch (ConsumablePublishedDeleteException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(itemId));
+        }
+        catch (PostgresException exception) when (IsForeignKeyViolation(exception))
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteReferenceError(itemId));
+        }
+        catch (ConsumableConcurrencyException)
+        {
+            return VersionConflict<DeleteMutationResponse>(itemId);
+        }
+        catch (ConsumableKindConflictException exception)
+        {
+            return KindConflict<DeleteMutationResponse>(exception.Message);
+        }
+        catch (ConsumableProfileMissingException exception)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(new ApiError(
+                "consumable_profile_missing",
+                exception.Message,
+                ValidationSeverity.Error,
+                "item_id"));
+        }
+        catch (ConsumableNotFoundException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(ItemNotFound(itemId));
+        }
+        catch (Exception exception) when (IsDatabaseFailure(exception))
+        {
+            return DatabaseFailure<DeleteMutationResponse>(exception);
+        }
+    }
 
     private async Task<AuthoringOperationResult<ConsumableMutationResponse>> SetPublicationAsync(
         string itemId,
@@ -547,7 +614,12 @@ public sealed class ConsumableItemAuthoringService
         }
 
         var beforeState = existing is null ? null : existing.RuntimeEnabled ? "Published" : "Draft";
-        var afterState = operation == "publish" ? "Published" : "Draft";
+        var afterState = operation switch
+        {
+            "publish" => "Published",
+            "delete" => "Deleted",
+            _ => "Draft"
+        };
         AddChange(changes, "publication_state", beforeState, afterState);
         return changes;
     }
@@ -615,6 +687,7 @@ public sealed class ConsumableItemAuthoringService
             "save_draft" => "save_draft",
             "publish" => "publish",
             "disable" => "disable",
+            "delete" => "delete",
             _ => null
         };
 
@@ -641,6 +714,22 @@ public sealed class ConsumableItemAuthoringService
             "publication_state",
             "Disable or update every published consumable that references this result item first.");
 
+    private static ApiError DeleteRequiresDisabledError(string itemId) =>
+        new(
+            "delete_requires_disabled_item",
+            $"Consumable '{itemId}' must be disabled before it can be deleted.",
+            ValidationSeverity.Error,
+            "publication_state",
+            "Disable the consumable, preview Delete again, then apply the delete operation.");
+
+    private static ApiError DeleteReferenceError(string itemId) =>
+        new(
+            "item_delete_blocked_by_references",
+            $"Consumable '{itemId}' cannot be deleted while another table references it.",
+            ValidationSeverity.Error,
+            "item_id",
+            "Remove inventory, ground-item, result-item, mob-drop, or other content references before deleting.");
+
     private static bool IsPublishedConsumableReferenceGuard(PostgresException exception) =>
         exception.MessageText.Contains(
             "published consumable references it",
@@ -648,6 +737,9 @@ public sealed class ConsumableItemAuthoringService
 
     private static bool IsLiveReferenceGuard(PostgresException exception) =>
         exception.MessageText.Contains("Cannot disable runtime item", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsForeignKeyViolation(PostgresException exception) =>
+        exception.SqlState == PostgresErrorCodes.ForeignKeyViolation;
 
     private static AuthoringOperationResult<T> VersionConflict<T>(string itemId) =>
         AuthoringOperationResult<T>.Failure(new ApiError(

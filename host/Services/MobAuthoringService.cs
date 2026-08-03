@@ -123,7 +123,7 @@ public sealed class MobAuthoringService
             {
                 return VersionConflict<MobValidationResponse>(stableId);
             }
-            if (existing is null && operation is "publish" or "disable")
+            if (existing is null && operation is "publish" or "disable" or "delete")
             {
                 return AuthoringOperationResult<MobValidationResponse>.Failure(MobNotFound(stableId));
             }
@@ -138,17 +138,21 @@ public sealed class MobAuthoringService
                 cancellationToken);
             var messages = validation.Messages.ToList();
 
-            if (operation is "publish" or "disable" && !EquivalentDraft(existing!, requested))
+            if (operation is "publish" or "disable" or "delete" && !EquivalentDraft(existing!, requested))
             {
                 messages.Add(new ApiError(
                     "unsaved_mob_changes",
-                    "Save the edited mob definition as a draft before changing publication state.",
+                    "Save the edited mob definition as a draft before changing publication state or deleting it.",
                     ValidationSeverity.Error,
                     "publication_state"));
             }
-            if (operation == "disable")
+            if (operation is "disable" or "delete")
             {
                 AddDeferredSpawnReferenceWarning(messages);
+            }
+            if (operation == "delete" && existing!.PublicationState == "Published")
+            {
+                messages.Add(DeleteRequiresDisabledError(stableId));
             }
 
             var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
@@ -249,6 +253,57 @@ public sealed class MobAuthoringService
         MobPublicationRequest request,
         CancellationToken cancellationToken = default) =>
         SetPublicationAsync(mobDefinitionId, "Disabled", "disable", request, cancellationToken);
+
+    public async Task<AuthoringOperationResult<DeleteMutationResponse>> DeleteAsync(
+        string mobDefinitionId,
+        DeleteMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var stableId = MobDomainRules.NormalizeStableId(mobDefinitionId);
+            var existing = await _repository.LoadAsync(stableId, cancellationToken);
+            if (existing is null)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(MobNotFound(stableId));
+            }
+
+            var draft = FromRecord(existing);
+            if (!IsMatchingPreview(
+                    stableId,
+                    "delete",
+                    draft,
+                    request.ExpectedUpdatedAtUtc,
+                    request.PreviewSignature))
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(PreviewMismatch("delete"));
+            }
+            if (existing.PublicationState == "Published")
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(stableId));
+            }
+
+            await _repository.DeleteAsync(stableId, request.ExpectedUpdatedAtUtc, cancellationToken);
+            return AuthoringOperationResult<DeleteMutationResponse>.Success(
+                new DeleteMutationResponse("delete", stableId, []));
+        }
+        catch (MobDefinitionNotFoundException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(MobNotFound(mobDefinitionId));
+        }
+        catch (MobDefinitionConcurrencyException)
+        {
+            return VersionConflict<DeleteMutationResponse>(MobDomainRules.NormalizeStableId(mobDefinitionId));
+        }
+        catch (PostgresException exception) when (IsInvalidReference(exception))
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteReferenceError(mobDefinitionId));
+        }
+        catch (Exception exception) when (IsDatabaseFailure(exception))
+        {
+            return DatabaseFailure<DeleteMutationResponse>(exception);
+        }
+    }
 
     public static NormalizedMobDraft Normalize(SaveMobDraftRequest request) =>
         Normalize(
@@ -604,6 +659,7 @@ public sealed class MobAuthoringService
         {
             "publish" => "Published",
             "disable" => "Disabled",
+            "delete" => "Deleted",
             _ => "Draft"
         };
         AddChange(changes, "publication_state", existing?.PublicationState, targetState);
@@ -631,7 +687,7 @@ public sealed class MobAuthoringService
     private static string? NormalizePreviewOperation(string? value)
     {
         var normalized = value?.Trim().ToLowerInvariant();
-        return normalized is "save_draft" or "publish" or "disable" ? normalized : null;
+        return normalized is "save_draft" or "publish" or "disable" or "delete" ? normalized : null;
     }
 
     public static bool HasVersionConflict(
@@ -653,9 +709,16 @@ public sealed class MobAuthoringService
 
     private static ApiError InvalidTargetOperation() => new(
         "invalid_target_operation",
-        "Target operation must be save_draft, publish, or disable.",
+        "Target operation must be save_draft, publish, disable, or delete.",
         ValidationSeverity.Error,
         "target_operation");
+
+    private static ApiError DeleteRequiresDisabledError(string mobDefinitionId) => new(
+        "delete_requires_disabled_mob",
+        $"Mob definition '{mobDefinitionId}' must be disabled before it can be deleted.",
+        ValidationSeverity.Error,
+        "publication_state",
+        "Disable the mob definition, preview Delete again, then apply the delete operation.");
 
     private static ApiError MobNotFound(string mobDefinitionId) => new(
         "mob_not_found",
@@ -682,6 +745,13 @@ public sealed class MobAuthoringService
         exception.ConstraintName?.Contains("faction", StringComparison.OrdinalIgnoreCase) == true
             ? "combat_faction_id"
             : "guaranteed_drops");
+
+    private static ApiError DeleteReferenceError(string mobDefinitionId) => new(
+        "mob_delete_blocked_by_references",
+        $"Mob definition '{MobDomainRules.NormalizeStableId(mobDefinitionId)}' cannot be deleted while another table references it.",
+        ValidationSeverity.Error,
+        "mob_definition_id",
+        "Remove generated, spawn, or other content references before deleting.");
 
     private static AuthoringOperationResult<T> VersionConflict<T>(string mobDefinitionId) =>
         AuthoringOperationResult<T>.Failure(new ApiError(

@@ -213,6 +213,7 @@ func _build_ui() -> void:
 	_add_operation("Save as Draft", "save_draft")
 	_add_operation("Publish", "publish")
 	_add_operation("Disable", "disable")
+	_add_operation("Delete", "delete")
 	_operation.item_selected.connect(_on_option_changed.unbind(1))
 	preview_content.add_child(_operation)
 	_preview_button = Button.new()
@@ -358,12 +359,20 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 
 
 func _on_mob_mutation_completed(payload: Dictionary) -> void:
+	var operation := str(payload.get("operation", "operation"))
+	if operation == "delete":
+		var deleted_id := str(payload.get("deleted_id", _mob_id.text))
+		_reload_mob_id = ""
+		_start_new_mob()
+		_status.text = "Deleted %s." % deleted_id
+		_client.load_mobs(_search.text)
+		return
 	var mob := payload.get("mob", {}) as Dictionary
 	_reload_mob_id = str(mob.get("mob_definition_id", _mob_id.text))
 	_is_new = false
 	_current_mob = mob
 	_clear_preview()
-	_status.text = "%s completed. Reloading mob..." % _workspace_support.operation_name(str(payload.get("operation", "operation")))
+	_status.text = "%s completed. Reloading mob..." % _workspace_support.operation_name(operation)
 	_client.load_mobs(_search.text)
 
 
@@ -580,6 +589,9 @@ func _apply() -> void:
 		"disable":
 			_client.disable_mob(mob_definition_id, expected, preview_signature)
 			_status.text = "Disabling mob definition. Generated-spawn reference guards are not integrated yet."
+		"delete":
+			_client.delete_mob(mob_definition_id, expected, preview_signature)
+			_status.text = "Deleting mob definition..."
 		_:
 			var payload := _payload()
 			payload["preview_signature"] = preview_signature

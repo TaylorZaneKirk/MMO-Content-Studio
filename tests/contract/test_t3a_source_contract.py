@@ -31,6 +31,7 @@ class T3ASourceContractTests(unittest.TestCase):
             'MapPut("/{itemId}/draft"',
             'MapPost("/{itemId}/publish"',
             'MapPost("/{itemId}/disable"',
+            'MapPost("/{itemId}/delete"',
         ):
             self.assertIn(route, feature)
         for service in (
@@ -149,8 +150,10 @@ class T3ASourceContractTests(unittest.TestCase):
             "save_equipment_draft",
             "publish_equipment",
             "disable_equipment",
+            "delete_equipment",
             "OP_EQUIPMENT_PREVIEW",
             "OP_EQUIPMENT_SAVE_DRAFT",
+            "OP_EQUIPMENT_DELETE",
         ):
             self.assertIn(token, client)
 
@@ -205,6 +208,19 @@ class T3ASourceContractTests(unittest.TestCase):
         editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text().lower()
         for forbidden in ("npgsql", "insert into", "update item_", "delete from"):
             self.assertNotIn(forbidden, editor)
+
+    def test_delete_operation_removes_equipment_aggregate(self) -> None:
+        repository = (ROOT / "host" / "Persistence" / "EquipmentItemRepository.cs").read_text()
+        service = (ROOT / "host" / "Services" / "EquipmentItemAuthoringService.cs").read_text()
+        editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()
+
+        self.assertIn("DeleteAsync", repository)
+        self.assertIn("DeleteEquipmentMetadataAsync", repository)
+        self.assertIn("delete from item_definitions", repository)
+        self.assertIn("delete_requires_disabled_item", service)
+        self.assertIn("item_delete_blocked_by_references", service)
+        self.assertIn('["Delete", "delete"]', editor)
+        self.assertIn("delete_equipment(_item_id.text, expected)", editor)
 
 
 if __name__ == "__main__":

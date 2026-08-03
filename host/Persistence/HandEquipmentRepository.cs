@@ -212,6 +212,33 @@ public sealed class HandEquipmentRepository
         return saved;
     }
 
+    public async Task DeleteAsync(
+        string itemId,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken)
+            ?? throw new EquipmentItemNotFoundException(itemId);
+        EnsureExpectedVersion(existing, expectedUpdatedAtUtc);
+        EnsureNotConsumable(existing);
+        if (existing.RuntimeEnabled)
+        {
+            throw new EquipmentPublishedDeleteException(itemId);
+        }
+
+        await DeleteAllEquipmentMetadataAsync(connection, transaction, itemId, cancellationToken);
+
+        const string sql = "delete from item_definitions where item_id = @item_id;";
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("item_id", itemId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     public static bool HasHandMetadata(HandEquipmentItemRecord record) =>
         record.EquipmentSlotId is not null
         || record.RequiredStrength != 1

@@ -80,14 +80,19 @@ public sealed class BasicItemAuthoringService
             {
                 return AuthoringOperationResult<BasicItemValidationResponse>.Failure(new ApiError(
                     "invalid_target_operation",
-                    "Target operation must be save_draft, publish, or disable.",
+                    "Target operation must be save_draft, publish, disable, or delete.",
                     ValidationSeverity.Error,
                     "target_operation"));
             }
 
-            if ((targetOperation is "publish" or "disable") && existing is null)
+            if ((targetOperation is "publish" or "disable" or "delete") && existing is null)
             {
-                var verb = targetOperation == "publish" ? "published" : "disabled";
+                var verb = targetOperation switch
+                {
+                    "publish" => "published",
+                    "disable" => "disabled",
+                    _ => "deleted"
+                };
                 return AuthoringOperationResult<BasicItemValidationResponse>.Failure(new ApiError(
                     "item_not_found",
                     $"Item '{itemId}' must be saved as a draft before it can be {verb}.",
@@ -98,7 +103,7 @@ public sealed class BasicItemAuthoringService
             var requestedName = (request.DisplayName ?? string.Empty).Trim();
             var requestedIcon = (request.IconTexturePath ?? string.Empty).Trim();
             var hasUnsavedChanges = existing is not null
-                && (targetOperation is "publish" or "disable")
+                && (targetOperation is "publish" or "disable" or "delete")
                 && (!string.Equals(existing.DisplayName, requestedName, StringComparison.Ordinal)
                     || !string.Equals(existing.IconTexturePath, requestedIcon, StringComparison.Ordinal));
 
@@ -121,6 +126,10 @@ public sealed class BasicItemAuthoringService
                 {
                     messages.Add(PublishedConsumableReferenceError(itemId));
                 }
+            }
+            if (targetOperation == "delete" && existing?.RuntimeEnabled == true)
+            {
+                messages.Add(DeleteRequiresDisabledError(itemId));
             }
             if (hasUnsavedChanges)
             {
@@ -231,6 +240,61 @@ public sealed class BasicItemAuthoringService
         DateTimeOffset? expectedUpdatedAtUtc,
         CancellationToken cancellationToken = default) =>
         SetPublicationAsync(itemId, false, expectedUpdatedAtUtc, cancellationToken);
+
+    public async Task<AuthoringOperationResult<DeleteMutationResponse>> DeleteAsync(
+        string itemId,
+        DeleteMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var existing = await _repository.LoadAsync(itemId, cancellationToken);
+            if (existing is null)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(new ApiError(
+                    "item_not_found",
+                    $"Item '{itemId}' does not exist.",
+                    ValidationSeverity.Error,
+                    "item_id"));
+            }
+            if (existing.RuntimeEnabled)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(itemId));
+            }
+
+            await _repository.DeleteAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken);
+            return AuthoringOperationResult<DeleteMutationResponse>.Success(
+                new DeleteMutationResponse("delete", itemId, []));
+        }
+        catch (BasicItemPublishedDeleteException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(itemId));
+        }
+        catch (PostgresException exception) when (IsForeignKeyViolation(exception))
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteReferenceError(itemId));
+        }
+        catch (BasicItemNotFoundException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(new ApiError(
+                "item_not_found",
+                $"Item '{itemId}' does not exist.",
+                ValidationSeverity.Error,
+                "item_id"));
+        }
+        catch (BasicItemConcurrencyException)
+        {
+            return VersionConflict<DeleteMutationResponse>(itemId);
+        }
+        catch (BasicItemKindConflictException exception)
+        {
+            return KindConflict<DeleteMutationResponse>(exception);
+        }
+        catch (Exception exception) when (IsDatabaseFailure(exception))
+        {
+            return DatabaseFailure<DeleteMutationResponse>(exception);
+        }
+    }
 
     private async Task<AuthoringOperationResult<BasicItemMutationResponse>> SetPublicationAsync(
         string itemId,
@@ -364,6 +428,7 @@ public sealed class BasicItemAuthoringService
         {
             "publish" => "Published",
             "disable" => "Draft",
+            "delete" => "Deleted",
             _ => "Draft"
         };
         if (!string.Equals(beforeState, afterState, StringComparison.Ordinal))
@@ -403,6 +468,22 @@ public sealed class BasicItemAuthoringService
             "publication_state",
             "Disable or update every published consumable that references this result item first.");
 
+    private static ApiError DeleteRequiresDisabledError(string itemId) =>
+        new(
+            "delete_requires_disabled_item",
+            $"Item '{itemId}' must be disabled before it can be deleted.",
+            ValidationSeverity.Error,
+            "publication_state",
+            "Disable the item, preview Delete again, then apply the delete operation.");
+
+    private static ApiError DeleteReferenceError(string itemId) =>
+        new(
+            "item_delete_blocked_by_references",
+            $"Item '{itemId}' cannot be deleted while another table references it.",
+            ValidationSeverity.Error,
+            "item_id",
+            "Remove inventory, equipment, ground-item, consumable-result, mob-drop, or other content references before deleting.");
+
     private static bool IsPublishedConsumableReferenceGuard(PostgresException exception) =>
         exception.MessageText.Contains(
             "published consumable references it",
@@ -412,6 +493,9 @@ public sealed class BasicItemAuthoringService
         exception.MessageText.Contains(
             "Cannot disable runtime item",
             StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsForeignKeyViolation(PostgresException exception) =>
+        exception.SqlState == PostgresErrorCodes.ForeignKeyViolation;
 
     private static bool IsBasicRecord(BasicItemRecord record) =>
         record.EquipmentSlotId is null
@@ -429,6 +513,7 @@ public sealed class BasicItemAuthoringService
             "save_draft" => "save_draft",
             "publish" => "publish",
             "disable" => "disable",
+            "delete" => "delete",
             _ => null
         };
 

@@ -32,6 +32,7 @@ class T3BSourceContractTests(unittest.TestCase):
             'MapPut("/{itemId}/draft"',
             'MapPost("/{itemId}/publish"',
             'MapPost("/{itemId}/disable"',
+            'MapPost("/{itemId}/delete"',
         ):
             self.assertIn(route, feature)
         for service in (
@@ -172,14 +173,17 @@ class T3BSourceContractTests(unittest.TestCase):
             "save_hand_equipment_draft",
             "publish_hand_equipment",
             "disable_hand_equipment",
+            "delete_hand_equipment",
             '"/api/v1/hand-equipment/options"',
             '"/api/v1/hand-equipment%s"',
             '"/api/v1/hand-equipment/%s/preview"',
             '"/api/v1/hand-equipment/%s/draft"',
             '"/api/v1/hand-equipment/%s/publish"',
             '"/api/v1/hand-equipment/%s/disable"',
+            '"/api/v1/hand-equipment/%s/delete"',
             "OP_HAND_EQUIPMENT_OPTIONS",
             "OP_HAND_EQUIPMENT_SAVE_DRAFT",
+            "OP_HAND_EQUIPMENT_DELETE",
             "_transport.request",
         ):
             self.assertIn(token, client)
@@ -224,9 +228,28 @@ class T3BSourceContractTests(unittest.TestCase):
             'payload["preview_signature"] = preview_signature',
             "publish_hand_equipment(_item_id.text, expected, preview_signature)",
             "disable_hand_equipment(_item_id.text, expected, preview_signature)",
+            "delete_hand_equipment(_item_id.text, expected, preview_signature)",
         ):
             self.assertIn(token, editor)
         self.assertNotIn("attack_speed_ms", editor)
+
+    def test_delete_operation_removes_hand_equipment_aggregate(self) -> None:
+        repository = (ROOT / "host" / "Persistence" / "HandEquipmentRepository.cs").read_text()
+        service = (ROOT / "host" / "Services" / "HandEquipmentAuthoringService.cs").read_text()
+        editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
+
+        for table in (
+            "item_skill_requirements",
+            "item_skill_modifiers",
+            "item_combat_profiles",
+            "item_combat_bonuses",
+            "item_tool_capabilities",
+        ):
+            self.assertIn(f'ExecuteDeleteAsync(connection, transaction, "{table}"', repository)
+        self.assertIn("delete_requires_disabled_item", service)
+        self.assertIn("item_delete_blocked_by_references", service)
+        self.assertIn('["Delete", "delete"]', editor)
+        self.assertIn("preview_signature_mismatch", service)
 
     def test_hand_equipment_editor_surfaces_slot_rules_and_form_cleanup(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()

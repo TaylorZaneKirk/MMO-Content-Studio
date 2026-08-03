@@ -188,6 +188,31 @@ public sealed class MobRepository
         return saved;
     }
 
+    public async Task DeleteAsync(
+        string mobDefinitionId,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var existing = await LoadAggregateAsync(connection, transaction, mobDefinitionId, true, cancellationToken)
+            ?? throw new MobDefinitionNotFoundException(mobDefinitionId);
+        EnsureExpectedVersion(existing, expectedUpdatedAtUtc, mobDefinitionId);
+
+        await ExecuteDeleteAsync(connection, transaction, "mob_drops", mobDefinitionId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "mob_combat_bonuses", mobDefinitionId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "mob_combat_profiles", mobDefinitionId, cancellationToken);
+
+        const string sql = "delete from mob_definitions where mob_definition_id = @mob_definition_id;";
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("mob_definition_id", mobDefinitionId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async Task<MobDefinitionRecord?> LoadAggregateAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,

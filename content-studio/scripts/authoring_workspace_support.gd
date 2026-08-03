@@ -82,6 +82,8 @@ func operation_name(operation: String) -> String:
 			return "Publish"
 		"disable":
 			return "Disable"
+		"delete":
+			return "Delete"
 		_:
 			return operation.capitalize()
 

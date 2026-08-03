@@ -128,6 +128,7 @@ class T4MobSourceContractTests(unittest.TestCase):
             'MapPut("/{mobDefinitionId}/draft"',
             'MapPost("/{mobDefinitionId}/publish"',
             'MapPost("/{mobDefinitionId}/disable"',
+            'MapPost("/{mobDefinitionId}/delete"',
             "AuthoringHttpResults.FromOperation",
             "CancellationToken cancellationToken",
         ):
@@ -195,11 +196,14 @@ class T4MobSourceContractTests(unittest.TestCase):
             "IsMatchingPreview",
             "preview_signature_mismatch",
             "mob_version_conflict",
+            "delete_requires_disabled_mob",
+            "mob_delete_blocked_by_references",
             "Equivalent(",
             "reload-and-verify",
             "unsaved_mob_changes",
             "mob_spawn_reference_guard_deferred",
             "SetPublicationAsync",
+            "DeleteAsync",
         ):
             self.assertIn(token, service)
 

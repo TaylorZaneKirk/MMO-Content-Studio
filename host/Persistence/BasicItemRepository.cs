@@ -205,6 +205,29 @@ public sealed class BasicItemRepository
         return saved;
     }
 
+    public async Task DeleteAsync(
+        string itemId,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        var existing = await LoadAsync(connection, transaction, itemId, true, cancellationToken)
+            ?? throw new BasicItemNotFoundException(itemId);
+        EnsureExpectedVersion(existing, expectedUpdatedAtUtc);
+        EnsureBasicEditable(existing);
+        if (existing.RuntimeEnabled)
+        {
+            throw new BasicItemPublishedDeleteException(itemId);
+        }
+
+        const string sql = "delete from item_definitions where item_id = @item_id;";
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+    }
+
     private static async Task<BasicItemRecord?> LoadAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
@@ -318,4 +341,12 @@ public sealed class BasicItemConcurrencyException : Exception
     }
 
     public DateTimeOffset CurrentUpdatedAtUtc { get; }
+}
+
+public sealed class BasicItemPublishedDeleteException : Exception
+{
+    public BasicItemPublishedDeleteException(string itemId)
+        : base($"Item '{itemId}' must be disabled before it can be deleted.")
+    {
+    }
 }

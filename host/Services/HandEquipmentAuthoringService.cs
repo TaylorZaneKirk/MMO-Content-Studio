@@ -129,7 +129,7 @@ public sealed class HandEquipmentAuthoringService
             {
                 return AuthoringOperationResult<HandEquipmentValidationResponse>.Failure(new ApiError(
                     "invalid_target_operation",
-                    "Target operation must be save_draft, publish, or disable.",
+                    "Target operation must be save_draft, publish, disable, or delete.",
                     ValidationSeverity.Error,
                     "target_operation"));
             }
@@ -144,11 +144,11 @@ public sealed class HandEquipmentAuthoringService
                 cancellationToken);
             var messages = validation.Messages.ToList();
 
-            if (operation is "publish" or "disable" && !EquivalentDraft(existing, requested))
+            if (operation is "publish" or "disable" or "delete" && !EquivalentDraft(existing, requested))
             {
                 messages.Add(new ApiError(
                     "unsaved_hand_equipment_changes",
-                    "Save the edited hand-equipment definition as a draft before changing publication state.",
+                    "Save the edited hand-equipment definition as a draft before changing publication state or deleting it.",
                     ValidationSeverity.Error,
                     "publication_state"));
             }
@@ -156,6 +156,10 @@ public sealed class HandEquipmentAuthoringService
             if (existing.RuntimeEnabled && (operation == "save_draft" || operation == "disable"))
             {
                 await AddDisableReferenceErrorsAsync(itemId, messages, cancellationToken);
+            }
+            if (operation == "delete" && existing.RuntimeEnabled)
+            {
+                messages.Add(DeleteRequiresDisabledError(itemId));
             }
 
             var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
@@ -266,6 +270,60 @@ public sealed class HandEquipmentAuthoringService
         HandEquipmentPublicationRequest request,
         CancellationToken cancellationToken = default) =>
         SetPublicationAsync(itemId, false, request, cancellationToken);
+
+    public async Task<AuthoringOperationResult<DeleteMutationResponse>> DeleteAsync(
+        string itemId,
+        DeleteMutationRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var existing = await _repository.LoadAsync(itemId, cancellationToken);
+            if (existing is null)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(ItemNotFound(itemId));
+            }
+
+            var draft = FromRecord(existing);
+            if (!IsMatchingPreview(itemId, "delete", draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature))
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(PreviewMismatch("delete"));
+            }
+
+            if (existing.RuntimeEnabled)
+            {
+                return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(itemId));
+            }
+
+            await _repository.DeleteAsync(itemId, request.ExpectedUpdatedAtUtc, cancellationToken);
+            return AuthoringOperationResult<DeleteMutationResponse>.Success(
+                new DeleteMutationResponse("delete", itemId, []));
+        }
+        catch (EquipmentPublishedDeleteException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteRequiresDisabledError(itemId));
+        }
+        catch (PostgresException exception) when (IsForeignKeyViolation(exception))
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(DeleteReferenceError(itemId));
+        }
+        catch (EquipmentItemNotFoundException)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(ItemNotFound(itemId));
+        }
+        catch (EquipmentConcurrencyException)
+        {
+            return VersionConflict<DeleteMutationResponse>(itemId);
+        }
+        catch (EquipmentKindConflictException exception)
+        {
+            return KindConflict<DeleteMutationResponse>(exception.Message);
+        }
+        catch (Exception exception) when (IsDatabaseFailure(exception))
+        {
+            return DatabaseFailure<DeleteMutationResponse>(exception);
+        }
+    }
 
     private async Task<AuthoringOperationResult<HandEquipmentMutationResponse>> SetPublicationAsync(
         string itemId,
@@ -545,8 +603,13 @@ public sealed class HandEquipmentAuthoringService
         AddChange(changes, "weapon_profile", JsonSerializer.Serialize(existing.WeaponProfile), JsonSerializer.Serialize(requested.WeaponProfile));
         AddChange(changes, "combat_bonuses", JsonSerializer.Serialize(existing.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero), JsonSerializer.Serialize(requested.CombatBonuses));
         AddChange(changes, "tool_capabilities", SerializeToolCapabilities(existing), JsonSerializer.Serialize(requested.ToolCapabilities));
-        var targetPublished = operation == "publish";
-        AddChange(changes, "publication_state", existing.RuntimeEnabled ? "Published" : "Draft", targetPublished ? "Published" : "Draft");
+        var targetState = operation switch
+        {
+            "publish" => "Published",
+            "delete" => "Deleted",
+            _ => "Draft"
+        };
+        AddChange(changes, "publication_state", existing.RuntimeEnabled ? "Published" : "Draft", targetState);
         return changes;
     }
 
@@ -683,7 +746,7 @@ public sealed class HandEquipmentAuthoringService
     private static string? NormalizePreviewOperation(string? value)
     {
         var normalized = value?.Trim().ToLowerInvariant();
-        return normalized is "save_draft" or "publish" or "disable" ? normalized : null;
+        return normalized is "save_draft" or "publish" or "disable" or "delete" ? normalized : null;
     }
 
     private static bool HasVersionConflict(HandEquipmentItemRecord existing, DateTimeOffset? expected) =>
@@ -706,6 +769,20 @@ public sealed class HandEquipmentAuthoringService
         $"Item '{itemId}' is referenced by live inventory, equipment, or ground-item state and cannot be unpublished.",
         ValidationSeverity.Error,
         "publication_state");
+
+    private static ApiError DeleteRequiresDisabledError(string itemId) => new(
+        "delete_requires_disabled_item",
+        $"Hand-equipment item '{itemId}' must be disabled before it can be deleted.",
+        ValidationSeverity.Error,
+        "publication_state",
+        "Disable the hand-equipment item, preview Delete again, then apply the delete operation.");
+
+    private static ApiError DeleteReferenceError(string itemId) => new(
+        "item_delete_blocked_by_references",
+        $"Hand-equipment item '{itemId}' cannot be deleted while another table references it.",
+        ValidationSeverity.Error,
+        "item_id",
+        "Remove inventory, equipment, ground-item, result-item, mob-drop, or other content references before deleting.");
 
     private static AuthoringOperationResult<T> VersionConflict<T>(string itemId) =>
         AuthoringOperationResult<T>.Failure(new ApiError(
@@ -734,6 +811,9 @@ public sealed class HandEquipmentAuthoringService
     private static bool IsLiveReferenceGuard(PostgresException exception) =>
         exception.MessageText.Contains("Cannot disable runtime item", StringComparison.OrdinalIgnoreCase)
         || exception.ConstraintName?.Contains("runtime", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool IsForeignKeyViolation(PostgresException exception) =>
+        exception.SqlState == PostgresErrorCodes.ForeignKeyViolation;
 
     private static bool IsDatabaseFailure(Exception exception) =>
         exception is AuthoringDatabaseUnavailableException
