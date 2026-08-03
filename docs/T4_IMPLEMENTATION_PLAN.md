@@ -143,7 +143,7 @@ Status: complete in Content Studio as a foundation slice.
   defaults, and source-only normalization helpers.
 - Add contract tests that assert the schema, route, and source boundaries.
 - Replace the planned Mobs catalog provider with a feature-owned provider that
-  remains `implemented = false` until the API exists.
+  was initially `implemented = false` until the T4B API existed.
 - Keep `/api/v1/mobs` routes, repositories, validation service, Godot UI, runtime
   export, and MMO Project application of the migration out of T4A.
 
@@ -153,6 +153,8 @@ Exit condition:
 > contracts for the Mobs workspace without adding runtime behavior.
 
 ### T4B - Repository, Validation, and API
+
+Status: complete in Content Studio as the host-side authoring boundary.
 
 - Add `MobRepository`.
 - Add `MobDefinitionValidator`.
@@ -172,6 +174,17 @@ Exit condition:
 
 > The API can safely author a full mob-definition aggregate in PostgreSQL with
 > deterministic preview/apply behavior.
+
+Implementation notes:
+
+- Draft save creates new definitions and replaces existing aggregates as
+  complete logical payloads.
+- Publish and disable use the saved aggregate rather than arbitrary request body
+  content.
+- Preview signatures include mob definition ID, normalized operation,
+  normalized draft, and expected concurrency token.
+- Disable reference checks for generated/published `EnemySpawn` rows remain
+  deferred until runtime integration exposes an authoritative reference seam.
 
 ### T4C - Godot Mobs Workspace
 
@@ -278,17 +291,14 @@ Host:
 - `host/Features/Mobs/MobAuthoringFeature.cs`
 - `host/Features/Mobs/MobCatalogSectionProvider.cs`
 - `host/Features/Mobs/MobSchemaRequirements.cs`
+- `host/Persistence/MobRepository.cs`
+- `host/Services/MobAuthoringService.cs`
+- `host/Services/MobDefinitionValidator.cs`
 - `host/Services/MobAuthoringRegistry.cs`
 - `host/Services/MobDomainRules.cs`
 - `host/Features/AuthoringFeatureExtensions.cs`
 
-Deferred to T4B:
-
-- `host/Persistence/MobRepository.cs`
-- `host/Services/MobAuthoringService.cs`
-- `host/Services/MobDefinitionValidator.cs`
-
-Godot:
+Deferred to T4C:
 
 - `content-studio/scenes/Main.tscn`
 - `content-studio/scripts/authoring_host_client.gd`

@@ -72,8 +72,17 @@ public static class MobDomainRules
         attackSpeedUnits is >= MobAuthoringRegistry.MinAttackSpeedUnits
             and <= MobAuthoringRegistry.MaxAttackSpeedUnits;
 
+    public static bool IsRangeSupported(int minimumRangeTiles, int maximumRangeTiles) =>
+        minimumRangeTiles >= 0
+        && maximumRangeTiles >= minimumRangeTiles
+        && maximumRangeTiles <= MobAuthoringRegistry.MaxRangeTiles;
+
     public static bool IsLevelSupported(int level) =>
         level is >= 0 and <= MobAuthoringRegistry.MaxMobLevel;
+
+    public static bool IsCombatBonusSupported(int value) =>
+        value is >= -MobAuthoringRegistry.MaxCombatBonusMagnitude
+            and <= MobAuthoringRegistry.MaxCombatBonusMagnitude;
 
     public static bool IsDropOrderSupported(int dropOrder) =>
         dropOrder is >= 0 and <= MobAuthoringRegistry.MaxDropOrder;

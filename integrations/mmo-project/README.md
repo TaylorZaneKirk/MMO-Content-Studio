@@ -92,8 +92,13 @@ The schema follows the T4 audit boundary: Content Studio owns reusable mob
 definitions, while Tiled/generated static content continues to own `EnemySpawn`
 placement, home position, facing, spawn behavior, and leash radius.
 
-T4A intentionally supports only primary melee combat profiles, hostile/neutral
-faction dispositions, 600 ms attack-speed units, logical-tile ranges, normalized
-13-field combat bonuses, and ordered guaranteed drops. It does not add random or
-weighted drops, respawn settings, patrols, placement rows, dialogue, shops,
-quests, arbitrary scripts, or runtime hot reload.
+The T4B Content Studio host API reads and writes this schema when it exists in
+the configured development database. This repository still does not copy or
+apply the migration into MMO Project automatically.
+
+The current T4 schema/API scope intentionally supports only primary melee combat
+profiles, hostile/neutral faction dispositions, 600 ms attack-speed units,
+logical-tile ranges, normalized 13-field combat bonuses, and ordered guaranteed
+drops. It does not add random or weighted drops, respawn settings, patrols,
+placement rows, dialogue, shops, quests, arbitrary scripts, or runtime hot
+reload.

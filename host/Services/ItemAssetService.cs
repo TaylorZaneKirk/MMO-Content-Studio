@@ -94,6 +94,52 @@ public sealed class ItemAssetService
             : new ItemAssetResolution(false, fullPath, "The selected item icon does not exist on disk.");
     }
 
+    public ItemAssetResolution ResolveGameAssetPng(
+        string resourcePath,
+        string description)
+    {
+        if (string.IsNullOrWhiteSpace(resourcePath))
+        {
+            return new ItemAssetResolution(false, null, $"A {description} is required.");
+        }
+
+        if (!resourcePath.StartsWith(AssetsResourcePrefix, StringComparison.Ordinal))
+        {
+            return new ItemAssetResolution(
+                false,
+                null,
+                $"{description} paths must use the canonical '{AssetsResourcePrefix}' resource prefix.");
+        }
+
+        if (!string.Equals(Path.GetExtension(resourcePath), ".png", StringComparison.OrdinalIgnoreCase))
+        {
+            return new ItemAssetResolution(false, null, $"{description} paths must reference PNG files.");
+        }
+
+        if (!TryGetGameAssetsRoot(out var assetsRoot))
+        {
+            return new ItemAssetResolution(false, null, "The game_client_assets root is not configured.");
+        }
+
+        var relative = resourcePath[AssetsResourcePrefix.Length..].Replace('/', Path.DirectorySeparatorChar);
+        if (relative.Split(Path.DirectorySeparatorChar).Any(segment => segment is ".." or "."))
+        {
+            return new ItemAssetResolution(false, null, $"{description} paths may not contain traversal segments.");
+        }
+
+        var fullPath = Path.GetFullPath(Path.Combine(assetsRoot, relative));
+        var normalizedRoot = Path.GetFullPath(assetsRoot).TrimEnd(Path.DirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        if (!fullPath.StartsWith(normalizedRoot, PathComparison))
+        {
+            return new ItemAssetResolution(false, null, $"The {description} resolves outside the configured asset root.");
+        }
+
+        return File.Exists(fullPath)
+            ? new ItemAssetResolution(true, fullPath, null)
+            : new ItemAssetResolution(false, fullPath, $"The selected {description} does not exist on disk.");
+    }
+
     private bool TryGetGameAssetsRoot(out string assetsRoot)
     {
         assetsRoot = string.Empty;

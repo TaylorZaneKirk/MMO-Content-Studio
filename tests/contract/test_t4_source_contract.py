@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source contracts for the T4A mob schema and host contract foundation."""
+"""Source contracts for the T4B mob authoring host boundary."""
 
 from __future__ import annotations
 
@@ -82,6 +82,12 @@ class T4MobSourceContractTests(unittest.TestCase):
             'JsonPropertyName("combat_bonuses")',
             'JsonPropertyName("guaranteed_drops")',
             'JsonPropertyName("preview_signature")',
+            'JsonPropertyName("attack_speed_unit_milliseconds")',
+            'JsonPropertyName("supported_limits")',
+            'JsonPropertyName("factions")',
+            'JsonPropertyName("published_drop_items")',
+            'JsonPropertyName("visual_assets")',
+            'JsonPropertyName("editable_in_mobs")',
             "EquipmentCombatBonusDefinition? CombatBonuses",
         ):
             self.assertIn(token, source)
@@ -101,24 +107,34 @@ class T4MobSourceContractTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, source)
 
-    def test_mob_feature_registers_foundation_without_routes(self) -> None:
+    def test_mob_feature_owns_registration_and_routes(self) -> None:
         feature = (ROOT / "host" / "Features" / "Mobs" / "MobAuthoringFeature.cs").read_text()
         aggregator = (ROOT / "host" / "Features" / "AuthoringFeatureExtensions.cs").read_text()
 
         for token in (
+            "AddSingleton<MobRepository>()",
             "AddSingleton<MobAuthoringRegistry>()",
+            "AddSingleton<MobDefinitionValidator>()",
+            "AddSingleton<MobAuthoringService>()",
             "AddSingleton<IAuthoringSchemaRequirementProvider, MobSchemaRequirements>()",
             "AddSingleton<IAuthoringCatalogSectionProvider, MobCatalogSectionProvider>()",
             "MapMobAuthoring(",
+            'MapGroup($"{AuthoringApi.RoutePrefix}/mobs")',
+            'MapGet("/options"',
+            'MapGet(string.Empty',
+            'MapGet("/{mobDefinitionId}"',
+            'MapPost("/{mobDefinitionId}/preview"',
+            'MapPut("/{mobDefinitionId}/draft"',
+            'MapPost("/{mobDefinitionId}/publish"',
+            'MapPost("/{mobDefinitionId}/disable"',
+            "AuthoringHttpResults.FromOperation",
+            "CancellationToken cancellationToken",
         ):
             self.assertIn(token, feature)
 
         self.assertIn("services.AddMobAuthoring();", aggregator)
         self.assertIn("endpoints.MapMobAuthoring();", aggregator)
         self.assertNotIn('new PlannedCatalogSectionProvider("mobs"', aggregator)
-
-        for forbidden in ("MapGroup", "MapGet", "MapPost", "MapPut", "/mobs"):
-            self.assertNotIn(forbidden, feature)
 
     def test_mob_schema_requirements_are_feature_owned(self) -> None:
         source = (ROOT / "host" / "Features" / "Mobs" / "MobSchemaRequirements.cs").read_text()
@@ -142,6 +158,88 @@ class T4MobSourceContractTests(unittest.TestCase):
             "spawn",
             "respawn",
             "patrol",
+        ):
+            self.assertNotIn(forbidden, source)
+
+    def test_mob_repository_service_and_validator_own_t4b_behavior(self) -> None:
+        repository = (ROOT / "host" / "Persistence" / "MobRepository.cs").read_text()
+        service = (ROOT / "host" / "Services" / "MobAuthoringService.cs").read_text()
+        validator = (ROOT / "host" / "Services" / "MobDefinitionValidator.cs").read_text()
+
+        for token in (
+            "class MobRepository",
+            "BeginTransactionAsync",
+            "for update",
+            "EnsureExpectedVersion",
+            "ReplaceCombatProfileAsync",
+            "ReplaceCombatBonusesAsync",
+            "ReplaceGuaranteedDropsAsync",
+            "LoadFactionsAsync",
+            "LoadDropItemsAsync",
+            "CommitAsync",
+            "updated_at = now()",
+        ):
+            self.assertIn(token, repository)
+
+        for token in (
+            "class MobAuthoringService",
+            "ComputePreviewSignature",
+            "SHA256.HashData",
+            "IsMatchingPreview",
+            "preview_signature_mismatch",
+            "mob_version_conflict",
+            "Equivalent(",
+            "reload-and-verify",
+            "unsaved_mob_changes",
+            "mob_spawn_reference_guard_deferred",
+            "SetPublicationAsync",
+        ):
+            self.assertIn(token, service)
+
+        for token in (
+            "class MobDefinitionValidator",
+            "ValidateIdentity",
+            "ValidateVisuals",
+            "ResolveGameAssetPng",
+            "ValidateFactionAndTargeting",
+            "ValidateCombatProfile",
+            "ValidateGuaranteedDrops",
+            "unpublished_mob_drop_item",
+            "mob_combat_profile_required",
+        ):
+            self.assertIn(token, validator)
+
+    def test_t4b_does_not_add_godot_or_runtime_mob_editor(self) -> None:
+        self.assertFalse((ROOT / "content-studio" / "scripts" / "mob_editor.gd").exists())
+        self.assertFalse((ROOT / "content-studio" / "scenes" / "MobEditor.tscn").exists())
+        self.assertFalse(
+            (MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql").exists()
+        )
+
+    def test_mob_repository_keeps_spawn_and_random_drop_fields_out(self) -> None:
+        source = "\n".join(
+            [
+                (ROOT / "host" / "Persistence" / "MobRepository.cs").read_text(),
+                (ROOT / "host" / "Services" / "MobAuthoringService.cs").read_text(),
+                (ROOT / "host" / "Services" / "MobDefinitionValidator.cs").read_text(),
+                (ROOT / "host" / "Contracts" / "MobContracts.cs").read_text(),
+            ]
+        )
+        for forbidden in (
+            "spawn_id",
+            "region_id",
+            "map_id",
+            "home_tile",
+            "leash_radius",
+            "respawn",
+            "patrol",
+            "probability",
+            "weight",
+            "drop_chance",
+            "random_quantity",
+            "roll_group",
+            "script_id",
+            "script_body",
         ):
             self.assertNotIn(forbidden, source)
 

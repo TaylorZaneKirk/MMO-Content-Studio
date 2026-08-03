@@ -37,15 +37,16 @@ content operation is attempted.
 ### `GET /api/v1/system/health`
 
 Reports the active database profile, PostgreSQL connectivity, feature-owned
-schema contracts, and configured asset-root status. T4A adds mob schema
-requirements to this health surface, but does not apply the migration.
+schema contracts, and configured asset-root status. Mob schema requirements are
+included in the health surface, but Content Studio still does not apply the MMO
+Project migration automatically.
 
 ### `GET /api/v1/catalog`
 
 Returns the top-level content catalog. Items, Consumables, Equipment, and
-Weapons and Tools are implemented. T4A contributes a feature-owned Mobs catalog
-section that is still marked unimplemented until mob API/UI slices land; NPCs
-remain a planned workspace.
+Weapons and Tools are implemented. T4B marks Mobs implemented in the host catalog
+and returns repository-backed mob summaries when the configured database has the
+mob-authoring schema. NPCs remain a planned workspace.
 
 ## Item asset routes
 
@@ -234,20 +235,15 @@ Disables the saved aggregate after preview/signature and live-reference checks.
 Saving or disabling a published item returns it to draft state and remains
 blocked while live inventory, equipment, or ground-item state references it.
 
-## Mob contracts reservation
+## Mob routes
 
-T4A reserves compile-time contracts for future Mobs authoring without mapping
-runtime routes yet. `/api/v1/mobs` remains unavailable until the T4B repository,
-validation, and transactional API slice.
+T4B adds host-side authoring routes for reusable mob definitions. These routes do
+not export to MMO Project runtime static content yet and do not author Tiled
+`EnemySpawn` placement.
 
-The reserved aggregate is a reusable mob definition, not a spawn placement. It
-contains identity, `publication_state`, visual texture/source/anchor/render-scale
-fields, footprint, max health, movement speed, optional combat faction,
-proactive hostile-mob targeting settings, one optional primary melee combat
-profile, shared 13-field `EquipmentCombatBonusDefinition` bonuses, ordered
-guaranteed drops, `updated_at_utc`, and an optional sprite preview path.
+### `GET /api/v1/mobs/options`
 
-Future mob options are reserved for:
+Returns static and database-backed mob authoring options:
 
 - publication states: `Draft`, `Published`, `Disabled`
 - attack type: `melee`
@@ -255,8 +251,72 @@ Future mob options are reserved for:
 - faction dispositions: `hostile`, `neutral`
 - attack speed: `attack_speed_units`, where one unit is 600 milliseconds
 - range: logical tiles
+- supported limits and defaults
+- database-backed faction options
+- published item options for guaranteed drops
+- mob visual preview capability metadata using `res://assets/maps/objects/mobs/`
 
-The contracts intentionally exclude Tiled placement fields such as spawn id,
+### `GET /api/v1/mobs?search=slime`
+
+Searches mob definition ID and display name. Results are ordered by display name
+and stable ID, and include publication state, visual path, max health, faction
+summary, combat-profile presence, guaranteed-drop count, editable status, and
+`updated_at_utc`.
+
+### `GET /api/v1/mobs/{mobDefinitionId}`
+
+Loads one complete mob aggregate:
+
+- identity and `publication_state`
+- visual texture path, source dimensions, anchor offsets, and render scale
+- footprint, max health, and movement speed
+- optional combat faction and proactive hostile-mob targeting settings
+- optional primary combat profile
+- optional shared 13-field combat bonuses
+- ordered guaranteed drops
+- aggregate `updated_at_utc`
+- local sprite preview file path when the asset resolves
+
+### `POST /api/v1/mobs/{mobDefinitionId}/preview`
+
+Validates `save_draft`, `publish`, or `disable`, normalizes the complete draft
+payload, calculates exact logical changes, and returns a deterministic
+`preview_signature`.
+
+`publish` and `disable` previews use the currently saved aggregate as the
+effective payload. If the request body differs from the saved aggregate, the
+preview reports `unsaved_mob_changes`.
+
+### `PUT /api/v1/mobs/{mobDefinitionId}/draft`
+
+Creates a new draft when the ID does not exist, or updates an existing aggregate.
+The request must include the same complete draft that was previewed plus
+`preview_signature`. Existing definitions also require `expected_updated_at_utc`.
+
+Saving replaces optional child rows as complete sets:
+
+- `mob_combat_profiles`
+- `mob_combat_bonuses`
+- `mob_drops`
+
+Saving always sets `publication_state = Draft`.
+
+### `POST /api/v1/mobs/{mobDefinitionId}/publish`
+
+Publishes the already saved aggregate after strict validation. The request body
+contains only `expected_updated_at_utc` and `preview_signature`; it does not
+carry unsaved form data. Publication requires a valid visual asset, positive
+stats/movement, a primary melee combat profile, valid faction/aggression
+consistency, valid bonuses, and published guaranteed-drop items.
+
+### `POST /api/v1/mobs/{mobDefinitionId}/disable`
+
+Sets `publication_state = Disabled` without deleting the aggregate. T4B does not
+yet have an authoritative generated/published `EnemySpawn` reference guard, so
+disable previews and mutations report that limitation as a warning. Runtime
+reference enforcement remains T4E/runtime-integration work.
+
+Mob contracts intentionally exclude Tiled placement fields such as spawn id,
 map/region, home tile, leash radius, patrol, respawn, and spawn count.
 
 ## Request correlation

@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T4 mob schema foundation
+## Current state: T4 mob host API
 
 The repository now contains:
 
@@ -36,8 +36,9 @@ The repository now contains:
 - declarative consumable profiles, ordered requirements, and ordered effects
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
 - backend/API and Godot UI support for hand-equipment aggregates, weapon profiles, and tool capabilities
-- a T4A mob-authoring schema handoff migration, host contracts, schema-health
-  requirements, domain registry/rules, and feature-owned catalog placeholder
+- a T4B mob-authoring host boundary with schema handoff, repository, validation,
+  options, catalog, load, preview, draft, publish, disable, concurrency, and
+  preview-signature support
 - a shared directional paper-doll preview that follows the game client's current asset-key, frame-fallback, and layer-order rules
 - an explicit Equippable / Not equippable control that removes stale equipment metadata atomically
 - portions/empty-container transformations through result items
@@ -48,9 +49,10 @@ The repository now contains:
 - source and optional runtime contract tests
 
 T4 Phase 0 audited the current MMO Project mob/enemy runtime path and locked the
-implementation plan for a future Mobs workspace. T4A adds the schema/contracts
-foundation only; repository operations, API routes, Godot UI, and runtime
-integration remain deferred to later T4 slices. Spawn placement stays in
+implementation plan for a future Mobs workspace. T4B implements the host-side
+API for reusable mob definitions. Godot UI, migration application, runtime
+export, MMO Project consumption, and authoritative generated-spawn reference
+guards remain deferred to later T4 slices. Spawn placement stays in
 Tiled/generated static content.
 
 T0 through T3B still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
@@ -116,7 +118,7 @@ The default API address is `http://127.0.0.1:5187`.
 3. **T2 — Consumable items** — implemented; migration/runtime verification pending
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
-6. **T4 — Mobs** — Phase 0 audit/plan and T4A schema/contracts foundation complete
+6. **T4 — Mobs** — T4B host repository/API implemented; Godot/runtime integration pending
 7. **T5 — Minimal NPC authoring**
 8. **Dialogue workspace**
 9. **Quest Studio evaluation**
@@ -141,9 +143,8 @@ identity, visuals, footprint, stats, primary melee attacks, movement/aggression,
 factions, and guaranteed drops. Tiled remains responsible for `EnemySpawn`
 placement, home position, facing, spawn behavior, and leash radius.
 
-T4A contributes only additive foundation artifacts. The Content Studio host can
-advertise mob schema-health requirements and compile against mob authoring
-contracts, but no `/api/v1/mobs` routes or Godot Mobs workspace are active yet.
+T4B contributes the local `/api/v1/mobs` host API and transactional persistence
+boundary. The Godot Mobs workspace is not active yet.
 
 ## Documentation
 

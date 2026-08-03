@@ -28,15 +28,40 @@ Acceptance checks:
   manifest under feature id `prototype-mob-authoring-v1`.
 - `host/Features/Mobs/MobAuthoringFeature.cs` registers schema health, catalog,
   and registry seams without mapping `/api/v1/mobs` routes.
-- The top-level catalog includes a feature-owned Mobs section that remains
-  `implemented = false` until T4B/T4C.
+- The top-level catalog includes a feature-owned Mobs section; T4A introduced it
+  as `implemented = false` until the T4B API made it repository-backed.
 - `docs/CONTENT_AUTHORING_GUIDE.md` is a reference page to the authoritative MMO
   Project guide rather than a copied runtime guide.
 
+## T4B - Repository, Validation, Preview, and Mutation API
+
+Status: complete in Content Studio.
+
+Acceptance checks:
+
+- `host/Persistence/MobRepository.cs` owns mob persistence and transaction
+  behavior.
+- `host/Services/MobDefinitionValidator.cs` owns draft and publication
+  validation.
+- `host/Services/MobAuthoringService.cs` owns options, catalog, aggregate load,
+  preview, save draft, publish, disable, preview signatures, optimistic
+  concurrency, and reload verification.
+- `host/Features/Mobs/MobAuthoringFeature.cs` maps the `/api/v1/mobs` route
+  family and keeps route ownership inside the feature.
+- `MobCatalogSectionProvider` is repository-backed and reports Mobs as
+  implemented in the host catalog.
+- Draft saves create or replace complete aggregates and set
+  `publication_state = Draft`.
+- Publish and disable operate only on the currently saved aggregate and require
+  matching preview signatures.
+- Existing-definition mutations require `expected_updated_at_utc`.
+- Child rows for combat profile, combat bonuses, and guaranteed drops are
+  replaced as complete sets.
+- Disable preserves the authored aggregate and documents that authoritative
+  generated/published `EnemySpawn` reference guards remain deferred.
+
 ## Deferred
 
-- T4B repository, validator, service, routes, transactional preview/apply, and
-  database-backed catalog rows.
 - T4C Godot Mobs workspace.
 - T4D MMO Project runtime integration and migration application.
 - T4E hardening around live references, generated maps, and multiplayer runtime

@@ -93,7 +93,7 @@ Exit condition:
 
 ## T4 — Mobs
 
-**Status:** Phase 0 audit/plan and T4A schema/contracts foundation complete; repository, API, Godot workspace, and runtime integration pending.
+**Status:** T4B mob repository, validation, preview, and mutation API implemented; Godot workspace, migration application, runtime integration, and runtime verification pending.
 
 Move reusable mob definitions into the database-backed authoring boundary while
 keeping spawn placement in Tiled. Add identity, visuals, footprint, stats,
@@ -116,12 +116,17 @@ Phase 0 references:
 - [`T4_IMPLEMENTATION_PLAN.md`](T4_IMPLEMENTATION_PLAN.md)
 - [`T4_ACCEPTANCE.md`](T4_ACCEPTANCE.md)
 
-T4A adds the additive handoff migration
+T4A added the additive handoff migration
 `integrations/mmo-project/prototype/sql/019_mob_authoring_schema.sql`,
 compile-time host contracts, feature-owned schema-health requirements, a narrow
-mob registry/domain-rules seam, and a Mobs catalog section that remains marked
-unimplemented until API/UI slices land. It does not map `/api/v1/mobs` routes,
-apply the migration to MMO Project, or author Tiled placement.
+mob registry/domain-rules seam, and a feature-owned Mobs catalog section.
+
+T4B adds database-backed repository behavior, validation, options, catalog
+listing, aggregate loading, preview signatures, draft save, publish, disable,
+optimistic concurrency, transaction-scoped child replacement, and reload
+verification. It does not add the Godot Mobs workspace, apply the migration to
+MMO Project, export definitions to runtime static content, or author Tiled
+placement.
 
 ## T5 — Minimal NPC Authoring
 

@@ -50,6 +50,11 @@ class HostFeatureModuleTests(unittest.TestCase):
                 'MapGroup($"{AuthoringApi.RoutePrefix}/equipment")',
                 'MapPost("/{itemId}/preview"',
             ),
+            "Mobs/MobAuthoringFeature.cs": (
+                "MobRepository",
+                'MapGroup($"{AuthoringApi.RoutePrefix}/mobs")',
+                'MapPost("/{mobDefinitionId}/preview"',
+            ),
         }
         for relative_path, tokens in expectations.items():
             content = (HOST / "Features" / relative_path).read_text()

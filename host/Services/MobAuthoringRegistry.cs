@@ -10,6 +10,8 @@ public sealed class MobAuthoringRegistry
     public const int MaxMobLevel = 1_000_000;
     public const int MaxDropOrder = 255;
     public const int MaxStackCount = 1_000_000;
+    public const int MaxRangeTiles = 32;
+    public const int MaxCombatBonusMagnitude = 1_000_000;
     public const double DefaultMovementSpeedTilesPerSecond = 1.25;
     public const double DefaultVisualRenderScale = 0.25;
 
@@ -80,4 +82,13 @@ public sealed class MobAuthoringRegistry
     public IReadOnlyList<AuthoringOption> LoadFactionDispositions() => FactionDispositions;
 
     public IReadOnlyList<AuthoringOption> LoadCombatBonusFields() => CombatBonusFields;
+
+    public MobSupportedLimits LoadSupportedLimits() => new(
+        MaxMobLevel,
+        MaxDropOrder,
+        MaxStackCount,
+        MaxRangeTiles,
+        MaxCombatBonusMagnitude,
+        MinAttackSpeedUnits,
+        MaxAttackSpeedUnits);
 }

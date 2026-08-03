@@ -16,6 +16,7 @@ public sealed record MobDefinitionSummary(
     [property: JsonPropertyName("combat_faction_display_name")] string? CombatFactionDisplayName,
     [property: JsonPropertyName("has_combat_profile")] bool HasCombatProfile,
     [property: JsonPropertyName("guaranteed_drop_count")] int GuaranteedDropCount,
+    [property: JsonPropertyName("editable_in_mobs")] bool EditableInMobs,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc);
 
 public sealed record MobDefinition(
@@ -135,7 +136,34 @@ public sealed record MobAuthoringOptionsResponse(
     [property: JsonPropertyName("accuracy_styles")] IReadOnlyList<AuthoringOption> AccuracyStyles,
     [property: JsonPropertyName("faction_dispositions")] IReadOnlyList<AuthoringOption> FactionDispositions,
     [property: JsonPropertyName("combat_bonus_fields")] IReadOnlyList<AuthoringOption> CombatBonusFields,
+    [property: JsonPropertyName("attack_speed_unit_milliseconds")] int AttackSpeedUnitMilliseconds,
+    [property: JsonPropertyName("supported_limits")] MobSupportedLimits SupportedLimits,
+    [property: JsonPropertyName("factions")] IReadOnlyList<MobFactionOption> Factions,
+    [property: JsonPropertyName("published_drop_items")] IReadOnlyList<MobDropItemOption> PublishedDropItems,
+    [property: JsonPropertyName("visual_assets")] MobVisualAssetOptions VisualAssets,
     [property: JsonPropertyName("defaults")] MobAuthoringDefaults Defaults);
+
+public sealed record MobFactionOption(
+    [property: JsonPropertyName("faction_id")] string FactionId,
+    [property: JsonPropertyName("display_name")] string DisplayName);
+
+public sealed record MobDropItemOption(
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("display_name")] string DisplayName);
+
+public sealed record MobVisualAssetOptions(
+    [property: JsonPropertyName("can_resolve_previews")] bool CanResolvePreviews,
+    [property: JsonPropertyName("resource_prefix")] string ResourcePrefix,
+    [property: JsonPropertyName("game_assets_root")] string? GameAssetsRoot);
+
+public sealed record MobSupportedLimits(
+    [property: JsonPropertyName("max_mob_level")] int MaxMobLevel,
+    [property: JsonPropertyName("max_drop_order")] int MaxDropOrder,
+    [property: JsonPropertyName("max_stack_count")] int MaxStackCount,
+    [property: JsonPropertyName("max_range_tiles")] int MaxRangeTiles,
+    [property: JsonPropertyName("max_combat_bonus_magnitude")] int MaxCombatBonusMagnitude,
+    [property: JsonPropertyName("min_attack_speed_units")] int MinAttackSpeedUnits,
+    [property: JsonPropertyName("max_attack_speed_units")] int MaxAttackSpeedUnits);
 
 public sealed record MobAuthoringDefaults(
     [property: JsonPropertyName("attack_type")] string AttackType,

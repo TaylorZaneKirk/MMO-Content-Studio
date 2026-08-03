@@ -49,8 +49,9 @@ class FeatureCatalogProviderTests(unittest.TestCase):
             "Mobs": (
                 "MobCatalogSectionProvider.cs",
                 "mobs",
-                'new ContentCatalogSection(',
-                "false",
+                "MobAuthoringService",
+                "mob.MobDefinitionId",
+                "true",
             ),
         }
         for feature, (file_name, *tokens) in expectations.items():
