@@ -148,6 +148,79 @@ reference guards remain deferred.
 
 Add reusable NPC identity, visuals, movement profiles, interaction capabilities, service references, and dialogue-reference placeholders before the NPC interaction slice.
 
+## T6 — Interactable World Objects Foundation
+
+**Status:** Planned; design direction documented.
+
+Establish reusable interactable world-object definitions while preserving Tiled
+placement and server-authoritative execution.
+
+Capabilities:
+
+- Audit the current MMO Project static world-object implementation before
+  production schema or runtime work
+- Establish reusable object definitions with stable IDs, visuals, footprint,
+  collision policy, interaction distance, interaction options, and typed
+  capability configuration
+- Preserve Tiled ownership of placement, coordinates, facing/rotation,
+  map-specific configuration, and linked placement IDs
+- Add stable definition-to-placement linkage from `WorldObjectSpawn` to
+  `WorldObjectDefinition`
+- Add runtime instance identity and mutable state owned by MMO Project
+- Add click-to-approach-and-interact through server-authoritative reachability
+  and action resolution
+- Add typed capability dispatch without arbitrary executable scripting
+- Add visual states, footprint, and collision behavior tied to runtime state
+- Add basic inspect, toggle, and search examples
+- Add linked placement actions such as lever-to-gate interactions
+- Add multiplayer state publication and revisioned updates
+- Establish explicit state-scope rules for shared, per-player, temporary, and
+  instance-scoped object state
+
+Exit condition:
+
+> A maintainer can author a reusable interactable object definition, place an
+> instance in Tiled, and interact with the authoritative runtime instance
+> through a typed capability without custom executable scripting.
+
+## T7 — Gathering Resources and Processing Stations
+
+**Status:** Planned; depends on the T6 interactable world-object foundation.
+
+Build resource-node and processing-station gameplay on the shared world-object
+definition, placement, and runtime-instance model.
+
+Capabilities:
+
+- Mining rocks and other resource nodes
+- Tool-capability requirements using T3B typed tool capabilities
+- Action timing and interruption
+- Skill and XP integration
+- Item production through authoritative inventory services
+- Depletion and regeneration
+- Cooking ranges, furnaces, anvils, looms, and workbenches
+- Recipe/crafting-domain references without embedding recipes into each station
+- Contention and reservation behavior
+- Runtime persistence and recovery for state that must survive restart
+
+Exit condition:
+
+> Gathering nodes and processing stations use the shared world-object foundation
+> and existing authoritative skill, tool, inventory, and activity systems
+> without duplicating recipes or hard-coding specific tools.
+
+## Ordering Note
+
+T5 establishes reusable noncombat actors and interaction foundations. T6
+establishes non-actor world interactions. T7 adds skill-specific gathering and
+production behavior. Dialogue and Quest Studio then gain both NPC and
+world-object interaction targets; this ordering provides infrastructure they can
+consume and does not reduce their importance.
+
+Design reference:
+
+- [`INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
+
 ## Later Workspaces
 
 - Dialogue graph authoring

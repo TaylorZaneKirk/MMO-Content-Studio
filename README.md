@@ -137,8 +137,10 @@ The default API address is `http://127.0.0.1:5187`.
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring**
-8. **Dialogue workspace**
-9. **Quest Studio evaluation**
+8. **T6 — Interactable world objects foundation**
+9. **T7 — Gathering resources and processing stations**
+10. **Dialogue workspace**
+11. **Quest Studio evaluation**
 
 The current vertical slices author ordinary items, declarative consumables,
 wearable equipment, and hand-held weapons/tools.
@@ -165,6 +167,12 @@ boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
 
+Future planned work includes reusable interactable world-object authoring for
+typed-capability objects such as levers, searchable containers, gathering
+resources, and processing stations while preserving Tiled placement and
+server-authoritative runtime execution. See
+[`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md).
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
@@ -177,5 +185,6 @@ reference guards deferred.
 - [`docs/T4_ACCEPTANCE.md`](docs/T4_ACCEPTANCE.md)
 - [`docs/T4_MOB_DOMAIN_AUDIT.md`](docs/T4_MOB_DOMAIN_AUDIT.md)
 - [`docs/T4_IMPLEMENTATION_PLAN.md`](docs/T4_IMPLEMENTATION_PLAN.md)
+- [`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
