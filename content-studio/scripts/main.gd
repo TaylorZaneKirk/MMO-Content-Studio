@@ -25,6 +25,7 @@ const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_sup
 @onready var updated_value: Label = %UpdatedValue
 @onready var target_operation: OptionButton = %TargetOperation
 @onready var preview_button: Button = %PreviewButton
+@onready var delete_button: Button = %DeleteButton
 @onready var apply_button: Button = %ApplyButton
 @onready var changes_list: VBoxContainer = %ChangesList
 @onready var validation_list: VBoxContainer = %ValidationList
@@ -61,6 +62,7 @@ func _ready() -> void:
 	asset_file_dialog.file_selected.connect(_on_asset_file_selected)
 	target_operation.item_selected.connect(_on_target_operation_changed)
 	preview_button.pressed.connect(_preview_changes)
+	delete_button.pressed.connect(_preview_delete)
 	apply_button.pressed.connect(_apply_previewed_operation)
 	_configure_target_operations()
 	_set_form_enabled(false)
@@ -339,6 +341,14 @@ func _preview_changes() -> void:
 	operation_status.text = "Calculating validation and change summary…"
 
 
+func _preview_delete() -> void:
+	if _current_item.is_empty():
+		operation_status.text = "Select a saved item before deleting."
+		return
+	_select_operation("delete")
+	_preview_changes()
+
+
 func _apply_previewed_operation() -> void:
 	var operation := _selected_operation()
 	if not _workspace_support.can_apply(operation, _form_signature(operation)):
@@ -378,6 +388,13 @@ func _selected_operation() -> String:
 	return str(target_operation.get_item_metadata(target_operation.selected))
 
 
+func _select_operation(operation: String) -> void:
+	for index in range(target_operation.item_count):
+		if str(target_operation.get_item_metadata(index)) == operation:
+			target_operation.select(index)
+			return
+
+
 func _selected_icon_path() -> String:
 	if icon_option.selected < 0:
 		return ""
@@ -398,6 +415,7 @@ func _set_form_enabled(enabled: bool) -> void:
 	import_asset_button.disabled = not enabled
 	target_operation.disabled = not enabled
 	preview_button.disabled = not enabled
+	delete_button.disabled = not enabled or _current_item.is_empty()
 	if not enabled:
 		apply_button.disabled = true
 

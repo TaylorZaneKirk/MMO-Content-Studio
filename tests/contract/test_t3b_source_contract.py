@@ -249,6 +249,9 @@ class T3BSourceContractTests(unittest.TestCase):
         self.assertIn("delete_requires_disabled_item", service)
         self.assertIn("item_delete_blocked_by_references", service)
         self.assertIn('["Delete", "delete"]', editor)
+        self.assertIn("_delete_button.text = \"Delete\"", editor)
+        self.assertIn("_delete_button.pressed.connect(_preview_delete)", editor)
+        self.assertIn("func _preview_delete", editor)
         self.assertIn("preview_signature_mismatch", service)
 
     def test_hand_equipment_editor_surfaces_slot_rules_and_form_cleanup(self) -> None:

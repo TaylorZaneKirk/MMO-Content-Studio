@@ -130,6 +130,7 @@ var _drops: VBoxContainer
 var _add_drop_button: Button
 var _operation: OptionButton
 var _preview_button: Button
+var _delete_button: Button
 var _apply_button: Button
 var _status: Label
 var _changes: VBoxContainer
@@ -220,6 +221,11 @@ func _build_ui() -> void:
 	_preview_button.text = "Validate and Preview Changes"
 	_preview_button.pressed.connect(_preview)
 	preview_content.add_child(_preview_button)
+	_delete_button = Button.new()
+	_delete_button.text = "Delete"
+	_delete_button.disabled = true
+	_delete_button.pressed.connect(_preview_delete)
+	preview_content.add_child(_delete_button)
 	_apply_button = Button.new()
 	_apply_button.text = "Apply Previewed Operation"
 	_apply_button.disabled = true
@@ -573,6 +579,14 @@ func _preview() -> void:
 	_status.text = "Calculating validation and exact database changes..."
 
 
+func _preview_delete() -> void:
+	if _current_mob.is_empty():
+		_status.text = "Select a saved mob definition before deleting."
+		return
+	_select_option(_operation, "delete")
+	_preview()
+
+
 func _apply() -> void:
 	var operation := _selected_metadata(_operation)
 	var preview_signature: String = _workspace_support.preview_signature
@@ -877,6 +891,7 @@ func _set_form_enabled(enabled: bool) -> void:
 	_mob_id.editable = editable and _is_new
 	_operation.disabled = not editable
 	_preview_button.disabled = not editable
+	_delete_button.disabled = not editable or _current_mob.is_empty()
 	if not editable:
 		_apply_button.disabled = true
 	_update_targeting_controls()

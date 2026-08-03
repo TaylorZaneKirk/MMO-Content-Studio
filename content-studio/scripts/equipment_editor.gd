@@ -38,6 +38,7 @@ var _modifiers: VBoxContainer
 var _bonus_grid: GridContainer
 var _operation: OptionButton
 var _preview_button: Button
+var _delete_button: Button
 var _apply_button: Button
 var _status: Label
 var _changes: VBoxContainer
@@ -249,6 +250,11 @@ func _build_ui() -> void:
 	_preview_button.text = "Validate and Preview Changes"
 	_preview_button.pressed.connect(_preview)
 	operation_row.add_child(_preview_button)
+	_delete_button = Button.new()
+	_delete_button.text = "Delete"
+	_delete_button.disabled = true
+	_delete_button.pressed.connect(_preview_delete)
+	operation_row.add_child(_delete_button)
 	_apply_button = Button.new()
 	_apply_button.text = "Apply Previewed Operation"
 	_apply_button.disabled = true
@@ -615,6 +621,14 @@ func _preview() -> void:
 	_status.text = "Calculating validation and exact database changes…"
 
 
+func _preview_delete() -> void:
+	if _current_item.is_empty():
+		_status.text = "Select a saved equipment item before deleting."
+		return
+	_select_option(_operation, "delete")
+	_preview()
+
+
 func _apply() -> void:
 	var operation := _selected_metadata(_operation)
 	if not _workspace_support.can_apply(operation, _signature(operation)):
@@ -669,6 +683,7 @@ func _set_form_enabled(full_edit: bool, can_remove: bool) -> void:
 	_equippable.disabled = not (full_edit or can_remove)
 	_operation.disabled = not (full_edit or can_remove)
 	_preview_button.disabled = not (full_edit or can_remove)
+	_delete_button.disabled = not (full_edit or can_remove) or _current_item.is_empty()
 	if not (full_edit or can_remove):
 		_apply_button.disabled = true
 

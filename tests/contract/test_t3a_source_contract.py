@@ -220,6 +220,9 @@ class T3ASourceContractTests(unittest.TestCase):
         self.assertIn("delete_requires_disabled_item", service)
         self.assertIn("item_delete_blocked_by_references", service)
         self.assertIn('["Delete", "delete"]', editor)
+        self.assertIn("_delete_button.text = \"Delete\"", editor)
+        self.assertIn("_delete_button.pressed.connect(_preview_delete)", editor)
+        self.assertIn("func _preview_delete", editor)
         self.assertIn("delete_equipment(_item_id.text, expected)", editor)
 
 
