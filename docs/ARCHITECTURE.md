@@ -235,3 +235,33 @@ Tools use the shared `PaperDollPreview` helper for player-layer asset
 resolution, legacy filename normalization, N/S/E/W frame fallback, and current
 layer ordering. This keeps the directional preview behavior aligned while
 allowing each workspace to own its distinct form rules.
+
+## T4 mob-definition boundary
+
+T4 keeps mob authoring aligned with the current MMO Project static-content
+contract:
+
+```text
+mob_definitions
+  ├─ mob_combat_profiles
+  ├─ mob_combat_bonuses
+  ├─ mob_drops
+  └─ faction/aggression fields
+
+Tiled EnemySpawn placement
+  └─ mob_definition_id reference
+```
+
+Content Studio owns reusable mob definitions: stable id, display name, visuals,
+footprint, max health, primary melee attack profile, combat levels, combat
+bonuses, movement speed, optional faction/aggression settings, guaranteed drops,
+publication state, and aggregate concurrency.
+
+Tiled and generated/static-content publication continue to own placement facts:
+spawn id, source position, home position, facing, spawn behavior, and leash
+radius. The game runtime composes those placement facts with a
+`mob_definition_catalog` into runtime enemies during static-content startup.
+
+Initial T4 authoring deliberately excludes mob respawn timers, random/weighted
+drop tables, patrol routes, dialogue, shops, quests, arbitrary scripts, and hot
+reload until matching runtime contracts exist.

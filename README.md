@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T3B Weapons & Tools workspace implemented
+## Current state: T4 mob-domain planning complete
 
 The repository now contains:
 
@@ -44,6 +44,11 @@ The repository now contains:
 - strict publication and disable operations
 - optimistic aggregate concurrency and reload-after-commit verification
 - source and optional runtime contract tests
+
+T4 Phase 0 has audited the current MMO Project mob/enemy runtime path and locked
+the implementation plan for a future Mobs workspace. The next T4 slices should
+author reusable mob definitions in Content Studio while leaving spawn placement
+in Tiled/generated static content.
 
 T0 through T3B still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -108,7 +113,7 @@ The default API address is `http://127.0.0.1:5187`.
 3. **T2 — Consumable items** — implemented; migration/runtime verification pending
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
-6. **T4 — Mobs**
+6. **T4 — Mobs** — Phase 0 audit/plan complete; implementation pending
 7. **T5 — Minimal NPC authoring**
 8. **Dialogue workspace**
 9. **Quest Studio evaluation**
@@ -128,6 +133,11 @@ architecture. Obsolete bootstrap payloads and recovery workflows were removed
 rather than restored. MMO Project runtime execution of tool capabilities remains
 deferred to a future server-authoritative gameplay slice.
 
+T4 planning confirms that Content Studio should own reusable mob definitions:
+identity, visuals, footprint, stats, primary melee attacks, movement/aggression,
+factions, and guaranteed drops. Tiled remains responsible for `EnemySpawn`
+placement, home position, facing, spawn behavior, and leash radius.
+
 ## Documentation
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
@@ -137,5 +147,7 @@ deferred to a future server-authoritative gameplay slice.
 - [`docs/T2_ACCEPTANCE.md`](docs/T2_ACCEPTANCE.md)
 - [`docs/T3A_ACCEPTANCE.md`](docs/T3A_ACCEPTANCE.md)
 - [`docs/T3B_ACCEPTANCE.md`](docs/T3B_ACCEPTANCE.md)
+- [`docs/T4_MOB_DOMAIN_AUDIT.md`](docs/T4_MOB_DOMAIN_AUDIT.md)
+- [`docs/T4_IMPLEMENTATION_PLAN.md`](docs/T4_IMPLEMENTATION_PLAN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)

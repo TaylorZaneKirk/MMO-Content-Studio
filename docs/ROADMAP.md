@@ -93,7 +93,27 @@ Exit condition:
 
 ## T4 — Mobs
 
-Move reusable mob definitions into the database-backed authoring boundary while keeping spawn placement in Tiled. Add stats, attacks, movement/aggression profiles, factions, visuals, and drop-table authoring.
+**Status:** Phase 0 domain audit and implementation plan complete; implementation pending.
+
+Move reusable mob definitions into the database-backed authoring boundary while
+keeping spawn placement in Tiled. Add identity, visuals, footprint, stats,
+primary melee attack profiles, movement/aggression settings, factions,
+guaranteed drops, preview/apply workflows, and runtime publication guards.
+
+Locked boundaries:
+
+- Content Studio owns reusable mob definitions.
+- Tiled/generated static content owns `EnemySpawn` placement, home position,
+  facing, spawn behavior, and leash radius.
+- The current runtime consumes a `mob_definition_catalog`; T4 should preserve
+  that shape during integration.
+- Mob respawn, weighted drop tables, patrols, dialogue, shops, quests, arbitrary
+  behavior scripts, and hot reload remain deferred.
+
+Phase 0 references:
+
+- [`T4_MOB_DOMAIN_AUDIT.md`](T4_MOB_DOMAIN_AUDIT.md)
+- [`T4_IMPLEMENTATION_PLAN.md`](T4_IMPLEMENTATION_PLAN.md)
 
 ## T5 — Minimal NPC Authoring
 
