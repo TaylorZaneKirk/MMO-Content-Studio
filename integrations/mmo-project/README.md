@@ -71,3 +71,29 @@ The Content Studio host intentionally publishes only runtime-supported weapon
 profiles today: active weapons are `right_hand`, attack family is `melee`,
 styles are `thrust`, `slash`, or `crush`, range is logical tiles, and timing is
 stored as `attack_speed_units`.
+
+## T4A mob-authoring schema handoff
+
+`prototype/sql/019_mob_authoring_schema.sql` is an additive handoff migration for
+future reusable mob-definition authoring. It is present only in this integration
+directory until a later, explicitly approved MMO Project runtime slice applies
+or mirrors it.
+
+The migration introduces:
+
+- `mob_factions`
+- `mob_faction_dispositions`
+- `mob_definitions`
+- `mob_combat_profiles`
+- `mob_combat_bonuses`
+- `mob_drops`
+
+The schema follows the T4 audit boundary: Content Studio owns reusable mob
+definitions, while Tiled/generated static content continues to own `EnemySpawn`
+placement, home position, facing, spawn behavior, and leash radius.
+
+T4A intentionally supports only primary melee combat profiles, hostile/neutral
+faction dispositions, 600 ms attack-speed units, logical-tile ranges, normalized
+13-field combat bonuses, and ordered guaranteed drops. It does not add random or
+weighted drops, respawn settings, patrols, placement rows, dialogue, shops,
+quests, arbitrary scripts, or runtime hot reload.

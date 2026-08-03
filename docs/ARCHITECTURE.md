@@ -265,3 +265,10 @@ radius. The game runtime composes those placement facts with a
 Initial T4 authoring deliberately excludes mob respawn timers, random/weighted
 drop tables, patrol routes, dialogue, shops, quests, arbitrary scripts, and hot
 reload until matching runtime contracts exist.
+
+T4A adds only the Content Studio foundation for that boundary: an additive MMO
+Project migration handoff artifact, host-side mob contracts, a feature-owned
+schema-health manifest, a narrow registry/domain-rules seam, and a Mobs catalog
+section still marked unimplemented. No mob routes are mapped, no repository or
+Godot editor exists yet, and the runtime repository is not modified by this
+slice.

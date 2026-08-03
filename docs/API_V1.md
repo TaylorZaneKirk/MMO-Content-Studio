@@ -36,12 +36,16 @@ content operation is attempted.
 
 ### `GET /api/v1/system/health`
 
-Reports the active database profile, PostgreSQL connectivity, the T3A item, consumable, and
-equipment schema contract, and configured asset-root status.
+Reports the active database profile, PostgreSQL connectivity, feature-owned
+schema contracts, and configured asset-root status. T4A adds mob schema
+requirements to this health surface, but does not apply the migration.
 
 ### `GET /api/v1/catalog`
 
-Returns the top-level content catalog. Items, Consumables, Equipment, and Weapons and Tools are implemented; Mobs and NPCs remain planned workspaces.
+Returns the top-level content catalog. Items, Consumables, Equipment, and
+Weapons and Tools are implemented. T4A contributes a feature-owned Mobs catalog
+section that is still marked unimplemented until mob API/UI slices land; NPCs
+remain a planned workspace.
 
 ## Item asset routes
 
@@ -229,6 +233,31 @@ weapon profiles are rejected until the runtime resolves them.
 Disables the saved aggregate after preview/signature and live-reference checks.
 Saving or disabling a published item returns it to draft state and remains
 blocked while live inventory, equipment, or ground-item state references it.
+
+## Mob contracts reservation
+
+T4A reserves compile-time contracts for future Mobs authoring without mapping
+runtime routes yet. `/api/v1/mobs` remains unavailable until the T4B repository,
+validation, and transactional API slice.
+
+The reserved aggregate is a reusable mob definition, not a spawn placement. It
+contains identity, `publication_state`, visual texture/source/anchor/render-scale
+fields, footprint, max health, movement speed, optional combat faction,
+proactive hostile-mob targeting settings, one optional primary melee combat
+profile, shared 13-field `EquipmentCombatBonusDefinition` bonuses, ordered
+guaranteed drops, `updated_at_utc`, and an optional sprite preview path.
+
+Future mob options are reserved for:
+
+- publication states: `Draft`, `Published`, `Disabled`
+- attack type: `melee`
+- accuracy styles: `thrust`, `slash`, `crush`
+- faction dispositions: `hostile`, `neutral`
+- attack speed: `attack_speed_units`, where one unit is 600 milliseconds
+- range: logical tiles
+
+The contracts intentionally exclude Tiled placement fields such as spawn id,
+map/region, home tile, leash radius, patrol, respawn, and spawn count.
 
 ## Request correlation
 

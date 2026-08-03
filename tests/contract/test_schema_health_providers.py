@@ -49,6 +49,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
             "Consumables/ConsumableAuthoringFeature.cs": "ConsumableSchemaRequirements",
             "Equipment/EquipmentAuthoringFeature.cs": "EquipmentSchemaRequirements",
             "HandEquipment/HandEquipmentAuthoringFeature.cs": "HandEquipmentSchemaRequirements",
+            "Mobs/MobAuthoringFeature.cs": "MobSchemaRequirements",
         }
         for relative_path, provider in expectations.items():
             feature = (HOST / "Features" / relative_path).read_text()
@@ -79,6 +80,11 @@ class SchemaHealthProviderTests(unittest.TestCase):
                 "item_tool_capabilities_power_tier_check",
                 "item_tool_capabilities_hand_slot_guard",
             ),
+            "Mobs/MobSchemaRequirements.cs": (
+                "mob_definitions",
+                "mob_combat_profiles",
+                "mob_definitions_proactive_targeting_check",
+            ),
         }
         for relative_path, tokens in expectations.items():
             manifest = (HOST / "Features" / relative_path).read_text()
@@ -99,6 +105,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
         self.assertNotIn("ConsumableSchemaRequirements", program)
         self.assertNotIn("EquipmentSchemaRequirements", program)
         self.assertNotIn("HandEquipmentSchemaRequirements", program)
+        self.assertNotIn("MobSchemaRequirements", program)
 
 
 if __name__ == "__main__":

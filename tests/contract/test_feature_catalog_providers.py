@@ -46,6 +46,12 @@ class FeatureCatalogProviderTests(unittest.TestCase):
                 "HandEquipmentAuthoringService",
                 "EquipmentItemRepository.IsHandSlot",
             ),
+            "Mobs": (
+                "MobCatalogSectionProvider.cs",
+                "mobs",
+                'new ContentCatalogSection(',
+                "false",
+            ),
         }
         for feature, (file_name, *tokens) in expectations.items():
             source = (FEATURES / feature / file_name).read_text()
@@ -58,6 +64,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
             ("Consumables", "ConsumableAuthoringFeature.cs", "ConsumableCatalogSectionProvider"),
             ("Equipment", "EquipmentAuthoringFeature.cs", "EquipmentCatalogSectionProvider"),
             ("HandEquipment", "HandEquipmentAuthoringFeature.cs", "HandEquipmentCatalogSectionProvider"),
+            ("Mobs", "MobAuthoringFeature.cs", "MobCatalogSectionProvider"),
         )
         for feature, file_name, provider in expectations:
             source = (FEATURES / feature / file_name).read_text()
@@ -78,18 +85,17 @@ class FeatureCatalogProviderTests(unittest.TestCase):
             "ConsumableItemAuthoringService",
             "EquipmentItemAuthoringService",
             "HandEquipmentAuthoringService",
+            "MobAuthoringRegistry",
             "item.HasConsumableProfile",
             "item.Equippable",
         ):
             self.assertNotIn(forbidden, service)
 
-    def test_planned_sections_are_registered_once_in_aggregator(self) -> None:
+    def test_only_unimplemented_future_sections_are_planned_in_aggregator(self) -> None:
         aggregator = (FEATURES / "AuthoringFeatureExtensions.cs").read_text()
-        for token in (
-            'new PlannedCatalogSectionProvider("mobs", "Mobs", 400)',
-            'new PlannedCatalogSectionProvider("npcs", "NPCs", 500)',
-        ):
-            self.assertIn(token, aggregator)
+        self.assertIn('new PlannedCatalogSectionProvider("npcs", "NPCs", 500)', aggregator)
+        self.assertNotIn('new PlannedCatalogSectionProvider("mobs", "Mobs", 400)', aggregator)
+        self.assertIn("services.AddMobAuthoring();", aggregator)
 
 
 if __name__ == "__main__":

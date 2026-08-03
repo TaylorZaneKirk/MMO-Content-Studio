@@ -133,13 +133,19 @@ Mutations require:
 
 ### T4A - Schema and Contracts
 
+Status: complete in Content Studio as a foundation slice.
+
 - Add integration migration under
   `integrations/mmo-project/prototype/sql/019_mob_authoring_schema.sql`.
 - Add `MobContracts.cs`.
 - Add `MobSchemaRequirements.cs`.
+- Add `MobAuthoringRegistry` and `MobDomainRules` for stable vocabulary,
+  defaults, and source-only normalization helpers.
 - Add contract tests that assert the schema, route, and source boundaries.
-- Replace the planned Mobs catalog provider with a feature-owned provider once
-  the service exists.
+- Replace the planned Mobs catalog provider with a feature-owned provider that
+  remains `implemented = false` until the API exists.
+- Keep `/api/v1/mobs` routes, repositories, validation service, Godot UI, runtime
+  export, and MMO Project application of the migration out of T4A.
 
 Exit condition:
 
@@ -149,11 +155,9 @@ Exit condition:
 ### T4B - Repository, Validation, and API
 
 - Add `MobRepository`.
-- Add `MobAuthoringRegistry` for attack types, accuracy styles, dispositions,
-  and defaults.
 - Add `MobDefinitionValidator`.
 - Add `MobAuthoringService`.
-- Add `MobAuthoringFeature`.
+- Extend `MobAuthoringFeature` with `/api/v1/mobs` route mappings.
 - Implement list, load, preview, draft, publish, and disable.
 - Implement transaction semantics:
   - lock the aggregate root row
@@ -274,11 +278,15 @@ Host:
 - `host/Features/Mobs/MobAuthoringFeature.cs`
 - `host/Features/Mobs/MobCatalogSectionProvider.cs`
 - `host/Features/Mobs/MobSchemaRequirements.cs`
-- `host/Persistence/MobRepository.cs`
 - `host/Services/MobAuthoringRegistry.cs`
+- `host/Services/MobDomainRules.cs`
+- `host/Features/AuthoringFeatureExtensions.cs`
+
+Deferred to T4B:
+
+- `host/Persistence/MobRepository.cs`
 - `host/Services/MobAuthoringService.cs`
 - `host/Services/MobDefinitionValidator.cs`
-- `host/Features/AuthoringFeatureExtensions.cs`
 
 Godot:
 
