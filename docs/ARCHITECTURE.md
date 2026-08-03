@@ -236,6 +236,41 @@ resolution, legacy filename normalization, N/S/E/W frame fallback, and current
 layer ordering. This keeps the directional preview behavior aligned while
 allowing each workspace to own its distinct form rules.
 
+## Planned unified item-authoring boundary
+
+The T1-T3B slices intentionally shipped as separate vertical workspaces, but
+they all mutate one runtime root: `item_definitions`. The planned unified item
+authoring boundary will expose one public `ItemDefinition` aggregate while
+keeping specialization internals modular:
+
+```text
+item_definitions
+  ├─ item_consumable_profiles
+  │    ├─ item_consumable_requirements
+  │    └─ item_consumable_effects
+  ├─ item_skill_requirements
+  ├─ item_skill_modifiers
+  ├─ item_combat_bonuses
+  ├─ item_combat_profiles (optional weapon_profile)
+  └─ item_tool_capabilities (independent item capabilities)
+```
+
+This future boundary treats consumable behavior, equipability, weapon profile,
+combat bonuses, and tool capabilities as contextual item specializations rather
+than separate top-level item domains. Tool capabilities are independent of
+equipability; removing equipability clears equipment and weapon metadata but
+must preserve tool capability rows. Weapon profiles remain contextual to
+runtime-supported weapon-capable slots, initially `right_hand`.
+
+The current separate routes and Godot tabs remain compatibility surfaces until
+the unified item aggregate and workspace are implemented. During that migration,
+legacy routes should adapt through the unified service so a partial workspace
+cannot silently overwrite child rows owned by another specialization.
+
+Detailed evidence and the phased migration plan live in
+[`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md) and
+[`UNIFIED_ITEM_AUTHORING_PLAN.md`](UNIFIED_ITEM_AUTHORING_PLAN.md).
+
 ## T4 mob-definition boundary
 
 T4 keeps mob authoring aligned with the current MMO Project static-content

@@ -145,6 +145,42 @@ The exporter emits current MMO Project health-regeneration fields as zero
 defaults until a later authoring slice adds explicit controls. Generated-spawn
 reference guards remain deferred.
 
+## U - Unified Item Authoring
+
+**Status:** Planned; audit and consolidation plan complete.
+
+Collapse Basic Items, Consumables, Equipment, and Weapons and Tools into one
+public item aggregate and one contextual Godot Items workspace.
+
+Locked boundaries:
+
+- Consumable behavior, equipability, weapon profile, combat bonuses, and tool
+  capabilities are optional specializations of `ItemDefinition`.
+- Tool capability does not require equipability, a hand slot, or the item being
+  currently equipped.
+- Removing equipability clears equipment-owned and weapon-owned metadata but
+  preserves independent tool capabilities.
+- Weapon profiles are contextual to weapon-capable slots; initially only
+  `right_hand` is runtime-publishable.
+- Combat bonuses remain equipment metadata and apply while equipped.
+- One preview signature and one `updated_at` concurrency token cover the
+  complete item aggregate.
+- Existing T1-T3B routes should become compatibility adapters before retirement.
+
+References:
+
+- [`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md)
+- [`UNIFIED_ITEM_AUTHORING_PLAN.md`](UNIFIED_ITEM_AUTHORING_PLAN.md)
+
+Phased plan:
+
+- U1 decouples tool capabilities from hand equipment and preserves them when
+  equipability is removed.
+- U2 adds the unified item host aggregate and compatibility adapters.
+- U3 replaces specialization tabs with one contextual Items workspace.
+- U4 retires obsolete routes and tabs after callers are migrated.
+- U5 adds runtime tool resolution across equipped and inventory items.
+
 ## T5 — Minimal NPC Authoring
 
 Add reusable NPC identity, visuals, movement profiles, interaction capabilities, service references, and dialogue-reference placeholders before the NPC interaction slice.

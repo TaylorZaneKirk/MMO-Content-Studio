@@ -169,6 +169,14 @@ boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
 
+Unified item-authoring planning now documents how Basic Items, Consumables,
+Equipment, and Weapons & Tools should collapse into one contextual Items
+workspace and one complete item aggregate. The current tabs and routes are still
+separate; the plan is a future consolidation path that preserves existing T1-T3B
+behavior while decoupling tool capabilities from equipability. See
+[`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
+and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).
+
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering
 resources, and processing stations while preserving Tiled placement and
@@ -187,6 +195,8 @@ server-authoritative runtime execution. See
 - [`docs/T4_ACCEPTANCE.md`](docs/T4_ACCEPTANCE.md)
 - [`docs/T4_MOB_DOMAIN_AUDIT.md`](docs/T4_MOB_DOMAIN_AUDIT.md)
 - [`docs/T4_IMPLEMENTATION_PLAN.md`](docs/T4_IMPLEMENTATION_PLAN.md)
+- [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
+- [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md)
 - [`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
