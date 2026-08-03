@@ -93,7 +93,7 @@ Exit condition:
 
 ## T4 — Mobs
 
-**Status:** T4B mob repository, validation, preview, and mutation API implemented; Godot workspace, migration application, runtime integration, and runtime verification pending.
+**Status:** T4C Godot Mobs workspace implemented; migration application, runtime integration, and runtime verification pending.
 
 Move reusable mob definitions into the database-backed authoring boundary while
 keeping spawn placement in Tiled. Add identity, visuals, footprint, stats,
@@ -124,9 +124,15 @@ mob registry/domain-rules seam, and a feature-owned Mobs catalog section.
 T4B adds database-backed repository behavior, validation, options, catalog
 listing, aggregate loading, preview signatures, draft save, publish, disable,
 optimistic concurrency, transaction-scoped child replacement, and reload
-verification. It does not add the Godot Mobs workspace, apply the migration to
-MMO Project, export definitions to runtime static content, or author Tiled
-placement.
+verification.
+
+T4C adds the top-level Godot **Mobs** workspace over the existing `/api/v1/mobs`
+routes. Maintainers can search, load, create, edit, validate, preview, save
+drafts, publish, and disable reusable mob definitions with identity, visuals,
+footprint, stats, faction/aggression, one primary combat profile, combat
+bonuses, and ordered guaranteed drops. It does not apply the migration to MMO
+Project, export definitions to runtime static content, enforce generated-spawn
+reference guards, or author Tiled placement.
 
 ## T5 — Minimal NPC Authoring
 

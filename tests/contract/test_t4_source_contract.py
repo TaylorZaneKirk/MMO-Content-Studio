@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Source contracts for the T4B mob authoring host boundary."""
+"""Source contracts for the T4 mob authoring boundary."""
 
 from __future__ import annotations
 
@@ -209,8 +209,8 @@ class T4MobSourceContractTests(unittest.TestCase):
         ):
             self.assertIn(token, validator)
 
-    def test_t4b_does_not_add_godot_or_runtime_mob_editor(self) -> None:
-        self.assertFalse((ROOT / "content-studio" / "scripts" / "mob_editor.gd").exists())
+    def test_t4c_adds_godot_editor_without_runtime_mmo_project_changes(self) -> None:
+        self.assertTrue((ROOT / "content-studio" / "scripts" / "mob_editor.gd").exists())
         self.assertFalse((ROOT / "content-studio" / "scenes" / "MobEditor.tscn").exists())
         self.assertFalse(
             (MMO_PROJECT / "prototype" / "sql" / "019_mob_authoring_schema.sql").exists()

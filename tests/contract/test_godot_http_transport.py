@@ -34,7 +34,7 @@ class GodotHttpTransportTests(unittest.TestCase):
         self.assertNotIn("JSON.parse_string", facade)
         self.assertNotIn("enum RequestKind", facade)
         self.assertNotIn("func _extract_error_message", facade)
-        self.assertLess(len(facade.splitlines()), 370)
+        self.assertLess(len(facade.splitlines()), 430)
 
     def test_public_client_surface_remains_available(self) -> None:
         facade = (SCRIPTS / "authoring_host_client.gd").read_text()
@@ -44,9 +44,11 @@ class GodotHttpTransportTests(unittest.TestCase):
             "func preview_item",
             "func preview_consumable",
             "func preview_equipment",
+            "func preview_mob",
             "signal item_mutation_completed",
             "signal consumable_mutation_completed",
             "signal equipment_mutation_completed",
+            "signal mob_mutation_completed",
         ):
             self.assertIn(token, facade)
 
@@ -57,6 +59,7 @@ class GodotHttpTransportTests(unittest.TestCase):
             'OP_ITEM_PREVIEW := "item_preview"',
             'OP_CONSUMABLE_PREVIEW := "consumable_preview"',
             'OP_EQUIPMENT_PREVIEW := "equipment_preview"',
+            'OP_MOB_PREVIEW := "mob_preview"',
         ):
             self.assertIn(token, facade)
 

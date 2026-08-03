@@ -319,6 +319,12 @@ reference enforcement remains T4E/runtime-integration work.
 Mob contracts intentionally exclude Tiled placement fields such as spawn id,
 map/region, home tile, leash radius, patrol, respawn, and spawn count.
 
+The T4C Godot **Mobs** workspace consumes these routes through
+`AuthoringHostClient` and `AuthoringHttpTransport`. It sends complete draft and
+preview aggregates for save/preview, sends only `expected_updated_at_utc` plus
+`preview_signature` for publish/disable, clears the apply gate after every form
+edit, and disables mob editing when the mob-authoring schema is unavailable.
+
 ## Request correlation
 
 The GUI sends `X-Request-Id`. The host preserves a non-empty supplied value or

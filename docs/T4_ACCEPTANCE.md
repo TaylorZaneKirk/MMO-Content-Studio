@@ -62,7 +62,9 @@ Acceptance checks:
 
 ## Deferred
 
-- T4C Godot Mobs workspace.
+- T4C Godot Mobs workspace is implemented with a top-level tab, catalog,
+  aggregate form, visual/footprint preview, preview-signature apply gate, draft,
+  publish, and disable actions over `/api/v1/mobs`.
 - T4D MMO Project runtime integration and migration application.
 - T4E hardening around live references, generated maps, and multiplayer runtime
   validation.

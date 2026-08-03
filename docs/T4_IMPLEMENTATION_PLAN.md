@@ -188,6 +188,8 @@ Implementation notes:
 
 ### T4C - Godot Mobs Workspace
 
+Status: implemented in the Godot workspace.
+
 - Add a top-level **Mobs** tab.
 - Add `mob_editor.gd`.
 - Add `AuthoringHostClient` mob methods and signals.
@@ -202,8 +204,13 @@ Implementation notes:
   - Validation and exact changes
 - Add a sprite preview that applies source dimensions, anchor offsets, render
   scale, and footprint.
-- Keep spawn/leash/home-position fields out of the editor, but show a reference
-  note when known references are available from later integration.
+- Keep spawn/leash/home-position fields out of the editor. Disable warns that
+  generated-spawn reference guards are not integrated yet.
+- Keep mob API calls behind `AuthoringHostClient` and
+  `AuthoringHttpTransport`; the editor does not parse envelopes, call SQL, or
+  talk to PostgreSQL directly.
+- Load mob options and catalog after the core studio connection completes so a
+  missing mob-authoring schema disables only the Mobs workspace.
 
 Exit condition:
 

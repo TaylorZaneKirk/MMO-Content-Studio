@@ -26,6 +26,11 @@ signal hand_equipment_received(payload: Dictionary)
 signal hand_equipment_item_received(payload: Dictionary)
 signal hand_equipment_preview_received(payload: Dictionary)
 signal hand_equipment_mutation_completed(payload: Dictionary)
+signal mob_options_received(payload: Dictionary)
+signal mob_catalog_received(payload: Dictionary)
+signal mob_item_received(payload: Dictionary)
+signal mob_preview_received(payload: Dictionary)
+signal mob_mutation_completed(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const TRANSPORT_SCRIPT := preload("res://scripts/http_json_client.gd")
@@ -63,6 +68,13 @@ const OP_HAND_EQUIPMENT_PREVIEW := "hand_equipment_preview"
 const OP_HAND_EQUIPMENT_SAVE_DRAFT := "hand_equipment_save_draft"
 const OP_HAND_EQUIPMENT_PUBLISH := "hand_equipment_publish"
 const OP_HAND_EQUIPMENT_DISABLE := "hand_equipment_disable"
+const OP_MOB_OPTIONS := "mob_options"
+const OP_MOBS := "mobs"
+const OP_MOB_ITEM := "mob_item"
+const OP_MOB_PREVIEW := "mob_preview"
+const OP_MOB_SAVE_DRAFT := "mob_save_draft"
+const OP_MOB_PUBLISH := "mob_publish"
+const OP_MOB_DISABLE := "mob_disable"
 
 const CONNECTION_OPERATIONS := [
 	OP_HANDSHAKE,
@@ -229,6 +241,43 @@ func disable_hand_equipment(item_id: String, expected_updated_at_utc: Variant, p
 	})
 
 
+func load_mob_options() -> void:
+	_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
+
+
+func load_mobs(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(OP_MOBS, "/api/v1/mobs%s" % suffix)
+
+
+func load_mob(mob_definition_id: String) -> void:
+	_request(OP_MOB_ITEM, "/api/v1/mobs/%s" % mob_definition_id.uri_encode())
+
+
+func preview_mob(mob_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_MOB_PREVIEW, "/api/v1/mobs/%s/preview" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+
+func save_mob_draft(mob_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_MOB_SAVE_DRAFT, "/api/v1/mobs/%s/draft" % mob_definition_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+
+func publish_mob(mob_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_MOB_PUBLISH, "/api/v1/mobs/%s/publish" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
+func disable_mob(mob_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_MOB_DISABLE, "/api/v1/mobs/%s/disable" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
 func _request(
 	operation: String,
 	path: String,
@@ -282,6 +331,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		OP_HAND_EQUIPMENT:
 			hand_equipment_received.emit(data)
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
+			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
+		OP_MOB_OPTIONS:
+			mob_options_received.emit(data)
+			_request(OP_MOBS, "/api/v1/mobs")
+		OP_MOBS:
+			mob_catalog_received.emit(data)
 		OP_ITEM:
 			item_received.emit(data)
 		OP_ITEM_PREVIEW:
@@ -306,6 +361,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			hand_equipment_preview_received.emit(data)
 		OP_HAND_EQUIPMENT_SAVE_DRAFT, OP_HAND_EQUIPMENT_PUBLISH, OP_HAND_EQUIPMENT_DISABLE:
 			hand_equipment_mutation_completed.emit(data)
+		OP_MOB_ITEM:
+			mob_item_received.emit(data)
+		OP_MOB_PREVIEW:
+			mob_preview_received.emit(data)
+		OP_MOB_SAVE_DRAFT, OP_MOB_PUBLISH, OP_MOB_DISABLE:
+			mob_mutation_completed.emit(data)
 		_:
 			_on_request_failed(operation, "Unexpected request completion.", [])
 
