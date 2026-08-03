@@ -110,7 +110,7 @@ class T3BSourceContractTests(unittest.TestCase):
         self.assertIn('new("melee", "Melee")', registry)
         self.assertNotIn("attack_speed_ms", validator + registry)
 
-    def test_schema_migration_is_declarative_tool_capabilities_only(self) -> None:
+    def test_schema_migration_is_structural_and_bidirectionally_guarded(self) -> None:
         migration_paths = [
             ROOT
             / "integrations"
@@ -118,13 +118,20 @@ class T3BSourceContractTests(unittest.TestCase):
             / "prototype"
             / "sql"
             / "018_item_tool_capabilities.sql",
+        ]
+        mirrored = (
             MMO_ROOT
             / "prototype"
             / "sql"
-            / "018_item_tool_capabilities.sql",
-        ]
+            / "018_item_tool_capabilities.sql"
+        )
+        if mirrored.exists():
+            migration_paths.append(mirrored)
+
         migrations = [path.read_text() for path in migration_paths]
-        self.assertEqual(migrations[0], migrations[1])
+        if len(migrations) == 2:
+            self.assertEqual(migrations[0], migrations[1])
+
         for migration in migrations:
             for token in (
                 "CREATE TABLE IF NOT EXISTS item_tool_capabilities",
@@ -132,10 +139,14 @@ class T3BSourceContractTests(unittest.TestCase):
                 "capability_order INTEGER NOT NULL",
                 "power_tier INTEGER NOT NULL DEFAULT 1",
                 "item_tool_capabilities_hand_slot_guard",
+                "item_definitions_tool_capability_slot_guard",
+                "prevent_non_hand_slot_with_tool_capabilities",
+                "DEFERRABLE INITIALLY DEFERRED",
                 "'right_hand', 'left_hand'",
-                "inventory_17_mining_hammer",
             ):
                 self.assertIn(token, migration)
+            self.assertNotIn("inventory_17_mining_hammer", migration)
+            self.assertNotIn("INSERT INTO ITEM_TOOL_CAPABILITIES", migration.upper())
             for forbidden in ("durability", "ammo", "charges", "item_instance"):
                 self.assertNotIn(forbidden, migration.lower())
 
@@ -163,6 +174,9 @@ class T3BSourceContractTests(unittest.TestCase):
         ):
             self.assertIn(token, acceptance)
             self.assertIn(token, api)
+        self.assertIn("handoff artifact", acceptance)
+        self.assertIn("must be reviewed and applied", acceptance)
+        self.assertNotIn("mirrored into the local MMO Project runtime path", acceptance)
 
 
 if __name__ == "__main__":

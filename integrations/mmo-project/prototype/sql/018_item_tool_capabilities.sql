@@ -55,22 +55,47 @@ BEFORE INSERT OR UPDATE ON item_tool_capabilities
 FOR EACH ROW
 EXECUTE FUNCTION ensure_item_tool_capabilities_hand_slot();
 
-INSERT INTO item_tool_capabilities (
-    item_id,
-    capability_id,
-    capability_order,
-    power_tier
-)
-SELECT
-    item_definitions.item_id,
-    'mining',
-    0,
-    1
-FROM item_definitions
-WHERE item_definitions.item_id = 'inventory_17_mining_hammer'
-  AND item_definitions.equipment_slot_id IN ('right_hand', 'left_hand')
-ON CONFLICT (item_id, capability_id) DO UPDATE
-SET
-    capability_order = EXCLUDED.capability_order,
-    power_tier = EXCLUDED.power_tier,
-    updated_at = NOW();
+CREATE OR REPLACE FUNCTION prevent_non_hand_slot_with_tool_capabilities()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.equipment_slot_id IS NOT NULL
+       AND NEW.equipment_slot_id NOT IN ('right_hand', 'left_hand')
+       AND EXISTS (
+           SELECT 1
+           FROM item_tool_capabilities
+           WHERE item_id = NEW.item_id
+       ) THEN
+        RAISE EXCEPTION
+            'Item % cannot move to slot % while tool capabilities remain attached.',
+            NEW.item_id,
+            NEW.equipment_slot_id
+            USING ERRCODE = '23514';
+    END IF;
+
+    IF NEW.equipment_slot_id IS NULL
+       AND EXISTS (
+           SELECT 1
+           FROM item_tool_capabilities
+           WHERE item_id = NEW.item_id
+       ) THEN
+        RAISE EXCEPTION
+            'Item % cannot become non-equippable while tool capabilities remain attached.',
+            NEW.item_id
+            USING ERRCODE = '23514';
+    END IF;
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS item_definitions_tool_capability_slot_guard
+ON item_definitions;
+
+CREATE CONSTRAINT TRIGGER item_definitions_tool_capability_slot_guard
+AFTER UPDATE OF equipment_slot_id ON item_definitions
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+WHEN (OLD.equipment_slot_id IS DISTINCT FROM NEW.equipment_slot_id)
+EXECUTE FUNCTION prevent_non_hand_slot_with_tool_capabilities();
