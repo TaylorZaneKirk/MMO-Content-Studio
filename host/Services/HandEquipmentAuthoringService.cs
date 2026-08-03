@@ -79,10 +79,14 @@ public sealed class HandEquipmentAuthoringService
         try
         {
             var records = await _repository.ListAsync(search, cancellationToken);
+            var hasSearch = !string.IsNullOrWhiteSpace(search);
             return AuthoringOperationResult<HandEquipmentCatalogResponse>.Success(
                 new HandEquipmentCatalogResponse(
                     DateTimeOffset.UtcNow,
-                    records.Select(ToSummary).ToArray()));
+                    records
+                        .Where(record => VisibleInHandEquipmentCatalog(record, hasSearch))
+                        .Select(ToSummary)
+                        .ToArray()));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -480,6 +484,15 @@ public sealed class HandEquipmentAuthoringService
             || EquipmentItemRepository.IsWearableSlot(record.EquipmentSlotId)
             || record.HasCombatProfile
             || record.HasToolCapabilities);
+
+    private static bool VisibleInHandEquipmentCatalog(
+        HandEquipmentItemRecord record,
+        bool hasSearch) =>
+        !record.HasConsumableProfile
+        && (EquipmentItemRepository.IsHandSlot(record.EquipmentSlotId)
+            || record.HasCombatProfile
+            || record.HasToolCapabilities
+            || (hasSearch && EditableInHandEquipment(record)));
 
     private static string AuthoringKind(HandEquipmentItemRecord record) =>
         record.HasConsumableProfile ? "Consumable" : ClassificationLabel(record);

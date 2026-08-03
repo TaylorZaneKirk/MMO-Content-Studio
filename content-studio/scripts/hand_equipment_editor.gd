@@ -522,6 +522,13 @@ func _on_mutation_completed(payload: Dictionary) -> void:
 		_client.load_hand_equipment(_search.text)
 		return
 	var item := payload.get("item", {}) as Dictionary
+	if not _belongs_in_hand_equipment_catalog(item):
+		var saved_id := str(item.get("item_id", _item_id.text))
+		_reload_item_id = ""
+		_clear_selection_after_delete(saved_id)
+		_status.text = "%s saved as Basic. It is now available in Basic Items." % saved_id
+		_client.load_hand_equipment(_search.text)
+		return
 	_reload_item_id = str(item.get("item_id", _item_id.text))
 	_clear_preview()
 	_status.text = "%s completed. Reloading item..." % _workspace_support.operation_name(operation)
@@ -924,6 +931,16 @@ func _status_for_item(payload: Dictionary) -> String:
 	if str(payload.get("authoring_kind", "")) == "Consumable":
 		return "Consumables must be edited in the Consumables workspace."
 	return "This item is read-only here."
+
+
+func _belongs_in_hand_equipment_catalog(payload: Dictionary) -> bool:
+	return bool(payload.get("equippable", false)) and (
+		_is_hand_slot(str(payload.get("equipment_slot_id", "")))
+		or payload.get("weapon_profile", null) is Dictionary
+		or bool(payload.get("has_weapon_profile", false))
+		or (payload.get("tool_capabilities", []) as Array).size() > 0
+		or bool(payload.get("has_tool_capabilities", false))
+	)
 
 
 func _update_guidance() -> void:

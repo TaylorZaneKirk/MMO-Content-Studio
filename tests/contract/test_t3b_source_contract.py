@@ -129,6 +129,31 @@ class T3BSourceContractTests(unittest.TestCase):
         ):
             self.assertIn(token, service)
 
+    def test_default_catalog_hides_declassified_basic_items(self) -> None:
+        service = (
+            ROOT / "host" / "Services" / "HandEquipmentAuthoringService.cs"
+        ).read_text()
+        editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
+
+        for token in (
+            "var hasSearch = !string.IsNullOrWhiteSpace(search);",
+            ".Where(record => VisibleInHandEquipmentCatalog(record, hasSearch))",
+            "private static bool VisibleInHandEquipmentCatalog(",
+            "EquipmentItemRepository.IsHandSlot(record.EquipmentSlotId)",
+            "record.HasCombatProfile",
+            "record.HasToolCapabilities",
+            "hasSearch && EditableInHandEquipment(record)",
+        ):
+            self.assertIn(token, service)
+
+        for token in (
+            "func _belongs_in_hand_equipment_catalog(payload: Dictionary) -> bool:",
+            "if not _belongs_in_hand_equipment_catalog(item):",
+            "saved as Basic. It is now available in Basic Items.",
+            "_client.load_hand_equipment(_search.text)",
+        ):
+            self.assertIn(token, editor)
+
     def test_schema_migration_is_structural_and_bidirectionally_guarded(self) -> None:
         migration_paths = [
             ROOT
