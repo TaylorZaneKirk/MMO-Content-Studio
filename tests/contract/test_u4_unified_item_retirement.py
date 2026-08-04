@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Source contracts for U4 unified item retirement."""
+
+from __future__ import annotations
+
+import subprocess
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+HOST = ROOT / "host"
+SCRIPTS = ROOT / "content-studio" / "scripts"
+
+
+class U4UnifiedItemRetirementTests(unittest.TestCase):
+    def test_legacy_item_route_groups_are_not_registered(self) -> None:
+        sources = "\n".join(path.read_text() for path in (HOST / "Features").rglob("*.cs"))
+        for route in (
+            "/api/v1/consumables",
+            "/api/v1/equipment",
+            "/api/v1/hand-equipment",
+            'MapGroup($"{AuthoringApi.RoutePrefix}/consumables")',
+            'MapGroup($"{AuthoringApi.RoutePrefix}/equipment")',
+            'MapGroup($"{AuthoringApi.RoutePrefix}/hand-equipment")',
+        ):
+            self.assertNotIn(route, sources)
+
+    def test_unified_item_routes_are_the_only_item_mutation_surface(self) -> None:
+        feature = (HOST / "Features" / "Items" / "ItemAuthoringFeature.cs").read_text()
+        for token in (
+            'MapGroup("/items")',
+            'MapGet("/options"',
+            "PreviewItemRequest request",
+            "SaveItemDraftRequest request",
+            "ItemPublicationRequest request",
+            'MapPost("/{itemId}/delete"',
+            "UnifiedItemAuthoringService",
+        ):
+            self.assertIn(token, feature)
+        for token in ("JsonElement request", "IsUnifiedItemRequest", "PreviewBasicAsync", "SaveBasicDraftAsync"):
+            self.assertNotIn(token, feature)
+
+    def test_obsolete_repositories_services_and_editors_are_removed(self) -> None:
+        for relative in (
+            "host/Persistence/BasicItemRepository.cs",
+            "host/Persistence/ConsumableItemRepository.cs",
+            "host/Persistence/EquipmentItemRepository.cs",
+            "host/Persistence/HandEquipmentRepository.cs",
+            "host/Services/BasicItemAuthoringService.cs",
+            "host/Services/ConsumableItemAuthoringService.cs",
+            "host/Services/EquipmentItemAuthoringService.cs",
+            "host/Services/HandEquipmentAuthoringService.cs",
+            "content-studio/scripts/consumable_editor.gd",
+            "content-studio/scripts/equipment_editor.gd",
+            "content-studio/scripts/hand_equipment_editor.gd",
+        ):
+            self.assertFalse((ROOT / relative).exists(), relative)
+
+    def test_unified_item_repository_and_validator_are_authoritative(self) -> None:
+        feature = (HOST / "Features" / "Items" / "ItemAuthoringFeature.cs").read_text()
+        self.assertIn("IUnifiedItemRepository, UnifiedItemRepository", feature)
+        self.assertIn("UnifiedItemValidator", feature)
+        self.assertIn("UnifiedItemAuthoringService", feature)
+        for token in (
+            "BasicItemRepository",
+            "ConsumableItemRepository",
+            "EquipmentItemRepository",
+            "HandEquipmentRepository",
+            "BasicItemAuthoringService",
+            "ConsumableItemAuthoringService",
+            "EquipmentItemAuthoringService",
+            "HandEquipmentAuthoringService",
+        ):
+            self.assertNotIn(token, feature)
+
+    def test_client_and_scene_reference_only_current_editors(self) -> None:
+        scene_sources = "\n".join(path.read_text() for path in (ROOT / "content-studio").rglob("*.tscn"))
+        client = (SCRIPTS / "authoring_host_client.gd").read_text()
+        for token in ("consumable_editor", "equipment_editor", "hand_equipment_editor"):
+            self.assertNotIn(token, scene_sources)
+            self.assertNotIn(token, client)
+        for route in ("/api/v1/consumables", "/api/v1/equipment", "/api/v1/hand-equipment"):
+            self.assertNotIn(route, client)
+
+    def test_one_item_catalog_and_schema_boundary_remain(self) -> None:
+        catalog = (HOST / "Features" / "Items" / "ItemCatalogSectionProvider.cs").read_text()
+        schema = (HOST / "Features" / "Items" / "ItemSchemaRequirements.cs").read_text()
+        self.assertIn("UnifiedItemAuthoringService", catalog)
+        for token in (
+            "item_definitions",
+            "item_consumable_profiles",
+            "item_skill_requirements",
+            "item_combat_profiles",
+            "item_tool_capabilities",
+        ):
+            self.assertIn(token, schema)
+
+    def test_u5_runtime_tool_resolution_remains_pending(self) -> None:
+        contracts = (HOST / "Contracts" / "ItemContracts.cs").read_text()
+        service = (HOST / "Services" / "UnifiedItemAuthoringService.cs").read_text()
+        self.assertIn('supports_runtime_tool_resolution', contracts)
+        self.assertIn("false));", service)
+
+    def test_mmo_project_checkout_is_not_modified_by_u4(self) -> None:
+        parent = ROOT.parents[1]
+        if not (parent / ".git").exists():
+            self.skipTest("MMO Project checkout is unavailable.")
+        result = subprocess.run(
+            ["git", "status", "--short"],
+            cwd=parent,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        unrelated = [
+            line for line in result.stdout.splitlines()
+            if not line.strip().endswith("tools/MMO-Content-Studio")
+        ]
+        self.assertEqual([], unrelated)
+
+
+if __name__ == "__main__":
+    unittest.main()

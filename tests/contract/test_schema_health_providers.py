@@ -46,9 +46,6 @@ class SchemaHealthProviderTests(unittest.TestCase):
     def test_each_feature_registers_a_schema_provider(self) -> None:
         expectations = {
             "Items/ItemAuthoringFeature.cs": "ItemSchemaRequirements",
-            "Consumables/ConsumableAuthoringFeature.cs": "ConsumableSchemaRequirements",
-            "Equipment/EquipmentAuthoringFeature.cs": "EquipmentSchemaRequirements",
-            "HandEquipment/HandEquipmentAuthoringFeature.cs": "HandEquipmentSchemaRequirements",
             "Mobs/MobAuthoringFeature.cs": "MobSchemaRequirements",
         }
         for relative_path, provider in expectations.items():
@@ -63,20 +60,14 @@ class SchemaHealthProviderTests(unittest.TestCase):
             "Items/ItemSchemaRequirements.cs": (
                 "item_definitions",
                 "character_inventory",
-                "item_definitions_runtime_disable_guard",
-            ),
-            "Consumables/ConsumableSchemaRequirements.cs": (
                 "item_consumable_profiles",
+                "item_combat_profiles",
+                "item_tool_capabilities",
+                "item_definitions_runtime_disable_guard",
                 "item_consumable_effects_amount_range_check",
                 "item_consumable_profiles_result_publication_guard",
-            ),
-            "Equipment/EquipmentSchemaRequirements.cs": (
                 "equipment_slot_definitions",
-                "item_combat_profiles",
                 "item_combat_profiles_attack_type_accuracy_style_check",
-            ),
-            "HandEquipment/HandEquipmentSchemaRequirements.cs": (
-                "item_tool_capabilities",
                 "item_tool_capabilities_power_tier_check",
                 'AbsentTrigger("item_tool_capabilities", "item_tool_capabilities_hand_slot_guard")',
                 'AbsentTrigger("item_definitions", "item_definitions_tool_capability_slot_guard")',

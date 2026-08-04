@@ -141,7 +141,7 @@ public sealed record MobValidationResponse(
     [property: JsonPropertyName("valid_for_draft")] bool ValidForDraft,
     [property: JsonPropertyName("valid_for_publication")] bool ValidForPublication,
     [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages,
-    [property: JsonPropertyName("changes")] IReadOnlyList<BasicItemChange> Changes,
+    [property: JsonPropertyName("changes")] IReadOnlyList<AuthoringChange> Changes,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("preview_signature")] string PreviewSignature);
 

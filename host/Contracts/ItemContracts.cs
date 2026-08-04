@@ -2,56 +2,28 @@ using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
 
-public sealed record BasicItemCatalogResponse(
-    [property: JsonPropertyName("generated_at_utc")] DateTimeOffset GeneratedAtUtc,
-    [property: JsonPropertyName("items")] IReadOnlyList<BasicItemSummary> Items);
-
-public sealed record BasicItemSummary(
-    [property: JsonPropertyName("item_id")] string ItemId,
-    [property: JsonPropertyName("display_name")] string DisplayName,
-    [property: JsonPropertyName("icon_texture_path")] string IconTexturePath,
-    [property: JsonPropertyName("publication_state")] string PublicationState,
-    [property: JsonPropertyName("authoring_kind")] string AuthoringKind,
-    [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc);
-
-public sealed record BasicItemDefinition(
-    [property: JsonPropertyName("item_id")] string ItemId,
-    [property: JsonPropertyName("display_name")] string DisplayName,
-    [property: JsonPropertyName("icon_texture_path")] string IconTexturePath,
-    [property: JsonPropertyName("publication_state")] string PublicationState,
-    [property: JsonPropertyName("authoring_kind")] string AuthoringKind,
-    [property: JsonPropertyName("editable_in_basic_items")] bool EditableInBasicItems,
-    [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
-    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath);
-
-public sealed record SaveBasicItemDraftRequest(
-    [property: JsonPropertyName("display_name")] string DisplayName,
-    [property: JsonPropertyName("icon_texture_path")] string IconTexturePath,
-    [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc);
-
-public sealed record BasicItemPreviewRequest(
-    [property: JsonPropertyName("display_name")] string DisplayName,
-    [property: JsonPropertyName("icon_texture_path")] string IconTexturePath,
-    [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("target_operation")] string TargetOperation);
-
-public sealed record BasicItemValidationResponse(
-    [property: JsonPropertyName("target_operation")] string TargetOperation,
-    [property: JsonPropertyName("valid_for_draft")] bool ValidForDraft,
-    [property: JsonPropertyName("valid_for_publication")] bool ValidForPublication,
-    [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages,
-    [property: JsonPropertyName("changes")] IReadOnlyList<BasicItemChange> Changes,
-    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath);
-
-public sealed record BasicItemChange(
+public sealed record AuthoringChange(
     [property: JsonPropertyName("field")] string Field,
     [property: JsonPropertyName("before")] string? Before,
     [property: JsonPropertyName("after")] string? After);
 
-public sealed record BasicItemMutationResponse(
-    [property: JsonPropertyName("operation")] string Operation,
-    [property: JsonPropertyName("item")] BasicItemDefinition Item,
-    [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages);
+public sealed record ItemPublicationRequest(
+    [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
+    [property: JsonPropertyName("preview_signature")] string? PreviewSignature);
+
+public sealed record ItemToolCapabilityDefinition(
+    [property: JsonPropertyName("capability_id")] string CapabilityId,
+    [property: JsonPropertyName("capability_display_name")] string CapabilityDisplayName,
+    [property: JsonPropertyName("capability_order")] int CapabilityOrder,
+    [property: JsonPropertyName("power_tier")] int PowerTier,
+    [property: JsonPropertyName("action_animation_id")] string? ActionAnimationId,
+    [property: JsonPropertyName("effect_resource_id")] string? EffectResourceId);
+
+public sealed record ItemToolCapabilityDraft(
+    [property: JsonPropertyName("capability_id")] string CapabilityId,
+    [property: JsonPropertyName("power_tier")] int PowerTier,
+    [property: JsonPropertyName("action_animation_id")] string? ActionAnimationId,
+    [property: JsonPropertyName("effect_resource_id")] string? EffectResourceId);
 
 public sealed record ItemCatalogResponse(
     [property: JsonPropertyName("generated_at_utc")] DateTimeOffset GeneratedAtUtc,
@@ -77,10 +49,9 @@ public sealed record ItemDefinition(
     [property: JsonPropertyName("publication_state")] string PublicationState,
     [property: JsonPropertyName("classification_label")] string ClassificationLabel,
     [property: JsonPropertyName("authoring_kind")] string AuthoringKind,
-    [property: JsonPropertyName("editable_in_basic_items")] bool EditableInBasicItems,
     [property: JsonPropertyName("consumable_behavior")] ItemConsumableBehaviorDefinition? ConsumableBehavior,
     [property: JsonPropertyName("equipment")] ItemEquipmentMetadataDefinition? Equipment,
-    [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<HandEquipmentToolCapabilityDefinition> ToolCapabilities,
+    [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath);
 
@@ -110,7 +81,7 @@ public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("icon_texture_path")] string IconTexturePath,
     [property: JsonPropertyName("consumable_behavior")] ItemConsumableBehaviorDraft? ConsumableBehavior,
     [property: JsonPropertyName("equipment")] ItemEquipmentMetadataDraft? Equipment,
-    [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<HandEquipmentToolCapabilityDraft>? ToolCapabilities,
+    [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDraft>? ToolCapabilities,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature);
 
@@ -119,7 +90,7 @@ public sealed record PreviewItemRequest(
     [property: JsonPropertyName("icon_texture_path")] string IconTexturePath,
     [property: JsonPropertyName("consumable_behavior")] ItemConsumableBehaviorDraft? ConsumableBehavior,
     [property: JsonPropertyName("equipment")] ItemEquipmentMetadataDraft? Equipment,
-    [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<HandEquipmentToolCapabilityDraft>? ToolCapabilities,
+    [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDraft>? ToolCapabilities,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("target_operation")] string TargetOperation);
 
@@ -148,7 +119,7 @@ public sealed record ItemPreviewResponse(
     [property: JsonPropertyName("valid_for_draft")] bool ValidForDraft,
     [property: JsonPropertyName("valid_for_publication")] bool ValidForPublication,
     [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages,
-    [property: JsonPropertyName("changes")] IReadOnlyList<BasicItemChange> Changes,
+    [property: JsonPropertyName("changes")] IReadOnlyList<AuthoringChange> Changes,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("preview_signature")] string PreviewSignature);
 

@@ -11,9 +11,9 @@ The central `ContentCatalogService` only:
 - invokes each provider
 - returns the combined versioned catalog response
 
-Items, Consumables, and Equipment project their own entries. Mobs and NPCs use
-planned empty providers until their real feature slices replace those
-registrations.
+Items now projects one unified item catalog section. Mobs provides its own
+section, and NPCs use a planned empty provider until their real feature slice
+replaces that registration.
 
 A new workspace therefore does not modify `ContentCatalogService`. It adds its
 own provider and registers it from the feature module. This keeps catalog growth

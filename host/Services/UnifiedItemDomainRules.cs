@@ -21,7 +21,7 @@ public static partial class UnifiedItemDomainRules
         string iconTexturePath,
         ItemConsumableBehaviorDraft? consumableBehavior,
         ItemEquipmentMetadataDraft? equipment,
-        IReadOnlyList<HandEquipmentToolCapabilityDraft>? toolCapabilities)
+        IReadOnlyList<ItemToolCapabilityDraft>? toolCapabilities)
     {
         var normalizedEquipment = NormalizeEquipment(equipment);
         return new NormalizedItemDraft(
@@ -58,7 +58,7 @@ public static partial class UnifiedItemDomainRules
                     record.CombatBonuses,
                     record.WeaponProfile)
                 : null,
-            record.ToolCapabilities.Select(value => new HandEquipmentToolCapabilityDraft(
+            record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
                 value.PowerTier,
                 value.ActionAnimationId,
@@ -79,7 +79,7 @@ public static partial class UnifiedItemDomainRules
     public static string Classify(
         bool hasConsumable,
         NormalizedItemEquipmentMetadata? equipment,
-        IReadOnlyList<HandEquipmentToolCapabilityDraft> toolCapabilities)
+        IReadOnlyList<ItemToolCapabilityDraft> toolCapabilities)
     {
         var labels = new List<string>();
         if (hasConsumable)
@@ -108,10 +108,13 @@ public static partial class UnifiedItemDomainRules
     public static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    public static bool HasDuplicateToolCapabilities(IReadOnlyList<HandEquipmentToolCapabilityDraft> capabilities) =>
+    public static bool HasDuplicateToolCapabilities(IReadOnlyList<ItemToolCapabilityDraft> capabilities) =>
         capabilities
             .GroupBy(value => value.CapabilityId, StringComparer.Ordinal)
             .Any(group => group.Count() > 1);
+
+    public static bool IsHandSlot(string? slotId) =>
+        slotId is "right_hand" or "left_hand";
 
     private static NormalizedItemConsumableBehavior? NormalizeConsumable(
         ItemConsumableBehaviorDraft? consumable)
@@ -167,7 +170,7 @@ public static partial class UnifiedItemDomainRules
             return null;
         }
 
-        var weaponProfile = EquipmentItemRepository.IsHandSlot(slotId)
+        var weaponProfile = IsHandSlot(slotId)
             ? NormalizeWeaponProfile(equipment.WeaponProfile)
             : null;
         return new NormalizedItemEquipmentMetadata(
@@ -206,10 +209,10 @@ public static partial class UnifiedItemDomainRules
             profile.AttackSpeedUnits);
     }
 
-    private static IReadOnlyList<HandEquipmentToolCapabilityDraft> NormalizeToolCapabilities(
-        IReadOnlyList<HandEquipmentToolCapabilityDraft>? capabilities) =>
+    private static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(
+        IReadOnlyList<ItemToolCapabilityDraft>? capabilities) =>
         (capabilities ?? [])
-            .Select(value => new HandEquipmentToolCapabilityDraft(
+            .Select(value => new ItemToolCapabilityDraft(
                 NormalizeRequired(value.CapabilityId),
                 value.PowerTier,
                 NormalizeOptional(value.ActionAnimationId),
@@ -230,7 +233,7 @@ public sealed record NormalizedItemDraft(
     string IconTexturePath,
     NormalizedItemConsumableBehavior? ConsumableBehavior,
     NormalizedItemEquipmentMetadata? Equipment,
-    IReadOnlyList<HandEquipmentToolCapabilityDraft> ToolCapabilities);
+    IReadOnlyList<ItemToolCapabilityDraft> ToolCapabilities);
 
 public sealed record NormalizedItemConsumableBehavior(
     string UseAction,

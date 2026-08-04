@@ -27,25 +27,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
 
     def test_each_implemented_feature_owns_its_catalog_projection(self) -> None:
         expectations = {
-            "Items": ("ItemCatalogSectionProvider.cs", "items", "BasicItemAuthoringService", "item.ItemId"),
-            "Consumables": (
-                "ConsumableCatalogSectionProvider.cs",
-                "consumables",
-                "ConsumableItemAuthoringService",
-                "item.HasConsumableProfile",
-            ),
-            "Equipment": (
-                "EquipmentCatalogSectionProvider.cs",
-                "equipment",
-                "EquipmentItemAuthoringService",
-                "item.Equippable",
-            ),
-            "HandEquipment": (
-                "HandEquipmentCatalogSectionProvider.cs",
-                "hand_equipment",
-                "HandEquipmentAuthoringService",
-                "EquipmentItemRepository.IsHandSlot",
-            ),
+            "Items": ("ItemCatalogSectionProvider.cs", "items", "UnifiedItemAuthoringService", "item.ItemId"),
             "Mobs": (
                 "MobCatalogSectionProvider.cs",
                 "mobs",
@@ -62,9 +44,6 @@ class FeatureCatalogProviderTests(unittest.TestCase):
     def test_feature_modules_register_their_catalog_provider(self) -> None:
         expectations = (
             ("Items", "ItemAuthoringFeature.cs", "ItemCatalogSectionProvider"),
-            ("Consumables", "ConsumableAuthoringFeature.cs", "ConsumableCatalogSectionProvider"),
-            ("Equipment", "EquipmentAuthoringFeature.cs", "EquipmentCatalogSectionProvider"),
-            ("HandEquipment", "HandEquipmentAuthoringFeature.cs", "HandEquipmentCatalogSectionProvider"),
             ("Mobs", "MobAuthoringFeature.cs", "MobCatalogSectionProvider"),
         )
         for feature, file_name, provider in expectations:

@@ -15,12 +15,12 @@ public sealed class UnifiedItemValidator
         new HashSet<string>(["skill_minimum"], StringComparer.Ordinal);
 
     private readonly IUnifiedItemRepository _repository;
-    private readonly HandEquipmentAuthoringRegistry _registry;
+    private readonly ItemAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
 
     public UnifiedItemValidator(
         IUnifiedItemRepository repository,
-        HandEquipmentAuthoringRegistry registry,
+        ItemAuthoringRegistry registry,
         ItemAssetService assetService)
     {
         _repository = repository;
@@ -166,7 +166,7 @@ public sealed class UnifiedItemValidator
     }
 
     private async Task ValidateToolCapabilitiesAsync(
-        IReadOnlyList<HandEquipmentToolCapabilityDraft> capabilities,
+        IReadOnlyList<ItemToolCapabilityDraft> capabilities,
         ICollection<ApiError> messages,
         CancellationToken cancellationToken)
     {
@@ -484,7 +484,7 @@ public sealed class UnifiedItemValidator
         bool forPublication,
         ICollection<ApiError> messages)
     {
-        if (equipment.EquipmentSlotId == HandEquipmentAuthoringRegistry.ActiveWeaponSlotId
+        if (equipment.EquipmentSlotId == ItemAuthoringRegistry.ActiveWeaponSlotId
             && forPublication
             && equipment.WeaponProfile is null)
         {
@@ -506,7 +506,7 @@ public sealed class UnifiedItemValidator
         {
             return;
         }
-        if (equipment.EquipmentSlotId != HandEquipmentAuthoringRegistry.ActiveWeaponSlotId)
+        if (equipment.EquipmentSlotId != ItemAuthoringRegistry.ActiveWeaponSlotId)
         {
             messages.Add(new ApiError(
                 "weapon_slot_not_runtime_supported",

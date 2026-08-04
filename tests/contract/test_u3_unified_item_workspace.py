@@ -35,13 +35,13 @@ class U3UnifiedItemWorkspaceTests(unittest.TestCase):
         self.assertNotIn('[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
         self.assertNotIn('[node name="Weapons & Tools" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
-    def test_legacy_editors_remain_as_u4_cleanup_candidates_only(self) -> None:
+    def test_legacy_editors_are_removed_after_u4(self) -> None:
         for relative in (
             "content-studio/scripts/consumable_editor.gd",
             "content-studio/scripts/equipment_editor.gd",
             "content-studio/scripts/hand_equipment_editor.gd",
         ):
-            self.assertTrue((ROOT / relative).exists(), relative)
+            self.assertFalse((ROOT / relative).exists(), relative)
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
         self.assertNotIn("consumable_editor.gd", scene)
         self.assertNotIn("equipment_editor.gd", scene)

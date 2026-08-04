@@ -217,17 +217,16 @@ POST /api/v1/items/{itemId}/delete
 
 Compatibility strategy:
 
-- Keep existing `/api/v1/items`, `/api/v1/consumables`, `/api/v1/equipment`,
-  and `/api/v1/hand-equipment` routes during U2 and U3.
-- Convert legacy routes into adapters over the unified service.
-- Each adapter must load the full aggregate, apply the legacy subset, preserve
-  hidden specializations, preview the complete normalized result, and mutate
+- U2 and U3 kept existing `/api/v1/items`, `/api/v1/consumables`,
+  `/api/v1/equipment`, and `/api/v1/hand-equipment` routes while callers
+  migrated.
+- Legacy routes were adapters over the unified service during that transition.
+- Each adapter loaded the full aggregate, applied the legacy subset, preserved
+  hidden specializations, previewed the complete normalized result, and mutated
   only through the unified repository.
-- Legacy route mutation responses should include enough existing fields to keep
-  current Godot tabs working during transition.
-- Mark legacy routes deprecated in docs after the unified workspace is usable.
-- Remove legacy routes only in U4 after tests prove no in-repo callers depend
-  on them.
+- U4 removed the compatibility adapters and retired the old specialization
+  route groups after source tests proved no in-repo callers depended on them.
+- After U4, `/api/v1/items` is the only public item-authoring route family.
 
 ## Godot Workspace Consolidation
 
@@ -314,7 +313,8 @@ Repository mutation safety:
 
 - Unified save must update the base row and replace only child collections that
   are present in the complete draft.
-- Legacy adapters must preserve children that their old payloads cannot express.
+- The temporary U2/U3 legacy adapters had to preserve children that their old
+  payloads could not express; U4 retired those adapters.
 - Turning off equipability deletes only equipment-owned and weapon-owned child
   rows.
 - Turning off consumable behavior deletes only consumable child rows.
@@ -328,7 +328,7 @@ Source-contract tests:
 
 - unified planning docs exist and contain the locked model
 - audit names current destructive behavior and tool/equipability coupling
-- plan names schema-trigger removal and compatibility adapters
+- plan names schema-trigger removal and the completed adapter retirement
 - plan states tool capabilities remain independent of equipability
 - plan states one preview signature over the complete item draft
 - README, ROADMAP, and ARCHITECTURE link the unified plan without claiming it is
@@ -338,8 +338,8 @@ Host tests during implementation:
 
 - schema-health checks for corrected tool constraints
 - repository save preserves tool capabilities when equipability is removed
-- repository save preserves consumable/equipment/tool children across legacy
-  adapter saves
+- repository save preserves consumable/equipment/tool children across complete
+  aggregate saves
 - unified preview detects changes across every specialization
 - stale `expected_updated_at_utc` blocks all mutations
 - stale or mismatched preview signature blocks save/publish/disable/delete
@@ -378,13 +378,12 @@ Status: implemented.
 
 Exit condition:
 
-> A non-equipable item can retain tool capabilities in storage and through the
-> current compatibility routes.
+> A non-equipable item can retain tool capabilities in storage.
 
 ### U2 - Unified Item Host Aggregate
 
-Status: implemented in the host. The unified Godot workspace is now implemented
-in U3; route retirement and runtime tool resolution remain pending.
+Status: implemented. The compatibility adapters described here were temporary
+and were retired in U4.
 
 - Add unified item contracts and options.
 - Add a unified repository orchestration layer that locks `item_definitions`,
@@ -394,18 +393,18 @@ in U3; route retirement and runtime tool resolution remain pending.
 - Add preview signatures to all unified mutations.
 - Add `/api/v1/items/options` and make `/api/v1/items` return complete unified
   definitions.
-- Convert old Consumables, Equipment, and HandEquipment routes into adapters
-  over the unified service.
-- Preserve existing response shapes for old routes.
-- Temporary rule before U4: unified routes require server preview
-  signatures, while legacy compatibility routes keep their pre-U2 request
-  shapes and use unified full-aggregate validation/concurrency without
-  uniformly requiring the new signature field.
+- Convert old Consumables, Equipment, and HandEquipment routes into temporary
+  adapters over the unified service.
+- Preserve existing response shapes for old routes until U4.
+- Temporary rule before U4: unified routes required server preview
+  signatures, while legacy compatibility routes kept their pre-U2 request
+  shapes and used unified full-aggregate validation/concurrency without
+  uniformly requiring the new signature field. U4 removed those legacy routes.
 
 Exit condition:
 
-> All current T1-T3B flows still work, but no old route can silently delete a
-> hidden specialization.
+> All current T1-T3B flows still worked during migration, but no old route could
+> silently delete a hidden specialization.
 
 ### U3 - Unified Godot Items Workspace
 
@@ -414,7 +413,7 @@ Status: implemented.
 - Replace the current top-level item specialization tabs with one contextual
   Items workspace.
 - Keep old editor scripts as compatibility cleanup candidates until U4, without
-  normal navigation entries.
+  normal navigation entries. U4 later removed those scripts.
 - Reuse dynamic-row helpers where practical.
 - Reuse paper-doll preview only in the equipable visual section.
 - Use one operation panel with scrollable validation and exact changes.
@@ -427,10 +426,12 @@ Exit condition:
 
 ### U4 - Route And Tab Retirement
 
+Status: implemented.
+
 - Verify no in-repo Godot or tests call the old routes.
 - Remove compatibility adapters.
 - Remove obsolete feature route registrations and duplicate contracts.
-- Keep internal specialization modules and tests.
+- Keep internal specialization helpers and tests.
 - Update API docs, roadmap, and acceptance docs to describe the final unified
   boundary.
 
@@ -475,12 +476,12 @@ The completed unified authoring work must satisfy:
 
 ## Deprecation And Removal Plan
 
-- U2: legacy routes remain supported as adapters.
-- U3: legacy tabs are hidden or marked deprecated after the unified Items
+- U2: legacy routes remained supported as adapters.
+- U3: legacy tabs were hidden or marked deprecated after the unified Items
   workspace reaches parity.
-- U4: old public routes and obsolete Godot tabs are removed after source tests
+- U4: old public routes and obsolete Godot tabs were removed after source tests
   prove no callers remain.
-- Keep docs explicit that old routes are temporary compatibility surfaces, not
+- Keep docs explicit that old routes were temporary compatibility surfaces, not
   separate item domains.
 
 ## Deferred Work

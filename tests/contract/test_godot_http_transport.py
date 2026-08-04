@@ -42,12 +42,8 @@ class GodotHttpTransportTests(unittest.TestCase):
             "func connect_and_load",
             "func import_item_asset",
             "func preview_item",
-            "func preview_consumable",
-            "func preview_equipment",
             "func preview_mob",
             "signal item_mutation_completed",
-            "signal consumable_mutation_completed",
-            "signal equipment_mutation_completed",
             "signal mob_mutation_completed",
         ):
             self.assertIn(token, facade)
@@ -57,11 +53,15 @@ class GodotHttpTransportTests(unittest.TestCase):
         for token in (
             'OP_HANDSHAKE := "handshake"',
             'OP_ITEM_PREVIEW := "item_preview"',
-            'OP_CONSUMABLE_PREVIEW := "consumable_preview"',
-            'OP_EQUIPMENT_PREVIEW := "equipment_preview"',
             'OP_MOB_PREVIEW := "mob_preview"',
         ):
             self.assertIn(token, facade)
+        for token in (
+            "consumable_preview",
+            "equipment_preview",
+            "hand_equipment_preview",
+        ):
+            self.assertNotIn(token, facade)
 
     def test_godot_functions_are_unique(self) -> None:
         for file_name in ("http_json_client.gd", "authoring_host_client.gd"):

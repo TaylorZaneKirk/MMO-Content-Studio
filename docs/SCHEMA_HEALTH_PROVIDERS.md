@@ -11,8 +11,7 @@ host/
     SchemaHealthInspector.cs
   Features/
     Items/ItemSchemaRequirements.cs
-    Consumables/ConsumableSchemaRequirements.cs
-    Equipment/EquipmentSchemaRequirements.cs
+    Mobs/MobSchemaRequirements.cs
 ```
 
 A requirement describes one PostgreSQL object:
@@ -37,6 +36,9 @@ A new feature should:
 4. Add source contracts for important migration objects.
 5. Leave PostgreSQL metadata-query details in `SchemaHealthInspector`.
 
-Shared dependencies may appear in more than one manifest. The aggregator removes
-duplicates while preserving first-registration order, allowing each workspace
-to describe its own requirements without coordinating a global hardcoded list.
+Shared dependencies may appear in more than one manifest. The unified Items
+manifest owns the complete item aggregate schema after U4, including consumable,
+equipment, weapon, combat-bonus, and tool-capability tables. The aggregator
+removes duplicates while preserving first-registration order, allowing each
+workspace to describe its own requirements without coordinating a global
+hardcoded list.

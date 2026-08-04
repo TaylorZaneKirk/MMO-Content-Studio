@@ -147,7 +147,7 @@ reference guards remain deferred.
 
 ## U - Unified Item Authoring
 
-**Status:** U3 unified Godot Items workspace implemented; obsolete route/tab retirement and runtime tool resolution remain pending.
+**Status:** U4 obsolete route/tab retirement implemented; runtime tool resolution remains pending.
 
 Collapse Basic Items, Consumables, Equipment, and Weapons and Tools into one
 public item aggregate and one contextual Godot Items workspace.
@@ -165,7 +165,8 @@ Locked boundaries:
 - Combat bonuses remain equipment metadata and apply while equipped.
 - One preview signature and one `updated_at` concurrency token cover the
   complete item aggregate.
-- Existing T1-T3B routes should become compatibility adapters before retirement.
+- U4 retired the old T1-T3B public route families and kept `/api/v1/items` as
+  the only public item-authoring route family.
 
 References:
 
@@ -176,9 +177,9 @@ Phased plan:
 
 - U1 decouples tool capabilities from hand equipment and preserves them when
   equipability is removed.
-- U2 adds the unified item host aggregate and compatibility adapters.
-- U3 replaces specialization tabs with one contextual Items workspace.
-- U4 retires obsolete routes and tabs after callers are migrated.
+- U2 added the unified item host aggregate and temporary compatibility adapters.
+- U3 replaced specialization tabs with one contextual Items workspace.
+- U4 retired obsolete routes, adapters, duplicate providers, and legacy editor scripts.
 - U5 adds runtime tool resolution across equipped and inventory items.
 
 ## T5 — Minimal NPC Authoring

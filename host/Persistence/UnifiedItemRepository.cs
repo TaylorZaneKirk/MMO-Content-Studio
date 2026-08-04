@@ -122,22 +122,71 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     public async Task<IReadOnlyList<EquipmentSlotRecord>> LoadSlotsAsync(
         CancellationToken cancellationToken = default)
     {
-        var equipment = new EquipmentItemRepository(_connectionFactory);
-        return await equipment.LoadSlotsAsync(cancellationToken);
+        const string sql = """
+            select slot_id, display_name
+            from equipment_slot_definitions
+            order by sort_order, display_name, slot_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var records = new List<EquipmentSlotRecord>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            records.Add(new EquipmentSlotRecord(
+                reader.GetString(reader.GetOrdinal("slot_id")),
+                reader.GetString(reader.GetOrdinal("display_name"))));
+        }
+
+        return records;
     }
 
     public async Task<IReadOnlyList<EquipmentSkillRecord>> LoadSkillsAsync(
         CancellationToken cancellationToken = default)
     {
-        var equipment = new EquipmentItemRepository(_connectionFactory);
-        return await equipment.LoadSkillsAsync(cancellationToken);
+        const string sql = """
+            select skill_id, display_name
+            from skill_definitions
+            order by sort_order, display_name, skill_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var records = new List<EquipmentSkillRecord>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            records.Add(new EquipmentSkillRecord(
+                reader.GetString(reader.GetOrdinal("skill_id")),
+                reader.GetString(reader.GetOrdinal("display_name"))));
+        }
+
+        return records;
     }
 
     public async Task<IReadOnlyList<EquipmentSkillRecord>> LoadGatheringCapabilitiesAsync(
         CancellationToken cancellationToken = default)
     {
-        var handEquipment = new HandEquipmentRepository(_connectionFactory);
-        return await handEquipment.LoadGatheringCapabilitiesAsync(cancellationToken);
+        const string sql = """
+            select skill_id, display_name
+            from skill_definitions
+            where category = 'gathering'
+            order by sort_order, display_name, skill_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var records = new List<EquipmentSkillRecord>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            records.Add(new EquipmentSkillRecord(
+                reader.GetString(reader.GetOrdinal("skill_id")),
+                reader.GetString(reader.GetOrdinal("display_name"))));
+        }
+
+        return records;
     }
 
     public async Task<IReadOnlyList<AuthoringOption>> LoadPublishedItemOptionsAsync(
@@ -167,16 +216,40 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         string itemId,
         CancellationToken cancellationToken = default)
     {
-        var basic = new BasicItemRepository(_connectionFactory);
-        return await basic.HasLiveReferencesAsync(itemId, cancellationToken);
+        const string sql = """
+            select exists (
+                select 1 from character_inventory where item_id = @item_id
+                union all
+                select 1 from character_equipment where item_id = @item_id
+                union all
+                select 1 from ground_items where item_id = @item_id
+            );
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("item_id", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
     }
 
     public async Task<bool> HasPublishedConsumableResultReferencesAsync(
         string itemId,
         CancellationToken cancellationToken = default)
     {
-        var basic = new BasicItemRepository(_connectionFactory);
-        return await basic.HasPublishedConsumableResultReferencesAsync(itemId, cancellationToken);
+        const string sql = """
+            select exists (
+                select 1
+                from item_consumable_profiles profile
+                join item_definitions source_item on source_item.item_id = profile.item_id
+                where profile.result_item_id = @item_id
+                  and source_item.runtime_enabled = true
+            );
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("item_id", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
     }
 
     public async Task<ReferencedItemRecord?> LoadReferencedItemAsync(
@@ -602,7 +675,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             : null;
     }
 
-    private static async Task<IReadOnlyList<HandEquipmentToolCapabilityDefinition>> LoadToolCapabilitiesAsync(
+    private static async Task<IReadOnlyList<ItemToolCapabilityDefinition>> LoadToolCapabilitiesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         string itemId,
@@ -624,10 +697,10 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        var records = new List<HandEquipmentToolCapabilityDefinition>();
+        var records = new List<ItemToolCapabilityDefinition>();
         while (await reader.ReadAsync(cancellationToken))
         {
-            records.Add(new HandEquipmentToolCapabilityDefinition(
+            records.Add(new ItemToolCapabilityDefinition(
                 reader.GetString(reader.GetOrdinal("capability_id")),
                 reader.GetString(reader.GetOrdinal("capability_display_name")),
                 reader.GetInt32(reader.GetOrdinal("capability_order")),
@@ -972,7 +1045,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string itemId,
-        IReadOnlyList<HandEquipmentToolCapabilityDraft> capabilities,
+        IReadOnlyList<ItemToolCapabilityDraft> capabilities,
         CancellationToken cancellationToken)
     {
         await ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities", itemId, cancellationToken);
@@ -1032,7 +1105,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         IReadOnlyList<EquipmentSkillRequirementDefinition> requirements,
         EquipmentCombatProfileDefinition? weaponProfile,
         EquipmentCombatBonusDefinition? combatBonuses,
-        IReadOnlyList<HandEquipmentToolCapabilityDefinition> toolCapabilities)
+        IReadOnlyList<ItemToolCapabilityDefinition> toolCapabilities)
     {
         var slotOrdinal = reader.GetOrdinal("equipment_slot_id");
         var slotDisplayOrdinal = reader.GetOrdinal("equipment_slot_display_name");
@@ -1112,7 +1185,7 @@ public sealed record UnifiedItemRecord(
     IReadOnlyList<EquipmentSkillModifierDefinition> SkillModifiers,
     EquipmentCombatProfileDefinition? WeaponProfile,
     EquipmentCombatBonusDefinition? CombatBonuses,
-    IReadOnlyList<HandEquipmentToolCapabilityDefinition> ToolCapabilities,
+    IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     DateTimeOffset UpdatedAtUtc);
 
 public sealed record ConsumableProfileDraft(
@@ -1124,6 +1197,12 @@ public sealed record ConsumableProfileDraft(
     int CooldownMs,
     string? UseAnimationId,
     string? UseSoundResourcePath);
+
+public sealed record EquipmentSlotRecord(string SlotId, string DisplayName);
+
+public sealed record EquipmentSkillRecord(string SkillId, string DisplayName);
+
+public sealed record ReferencedItemRecord(string ItemId, string DisplayName, bool RuntimeEnabled);
 
 public sealed class UnifiedItemNotFoundException : Exception
 {

@@ -37,7 +37,7 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
             "Removing equipability must preserve tool capabilities.",
             "One preview signature covers the complete normalized item draft.",
             "Drop `item_tool_capabilities_hand_slot_guard`.",
-            "compatibility adapters",
+            "completed adapter retirement",
             "/api/v1/items/options",
             "Weapon Profile shows only when a weapon-capable slot is selected.",
             "Rank by higher `power_tier`",
@@ -58,8 +58,8 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
             self.assertIn("UNIFIED_ITEM_AUTHORING_PLAN.md", document)
 
         self.assertIn("unified item-authoring boundary", architecture.lower())
-        self.assertIn("Status:** U3 unified Godot Items workspace implemented", roadmap)
-        self.assertIn("one contextual Godot Items workspace", readme)
+        self.assertIn("Status:** U4 obsolete route/tab retirement implemented", roadmap)
+        self.assertIn("one contextual Godot Items", readme)
 
 
 if __name__ == "__main__":

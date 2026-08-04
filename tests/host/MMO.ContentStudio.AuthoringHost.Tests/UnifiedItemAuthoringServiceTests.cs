@@ -71,14 +71,17 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var service = CreateService(repository);
         var before = repository.Records[ItemId].UpdatedAtUtc;
 
-        var result = await service.SaveEquipmentDraftAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            EquipmentSaveRequest(before) with
+            UnifiedSaveRequest(before) with
             {
-                RequiredStrength = 9,
-                Requirements = [new EquipmentSkillRequirementDraft("strength", 7)]
-            },
-            TestContext.Current.CancellationToken);
+                Equipment = EquipmentDraft() with
+                {
+                    RequiredStrength = 9,
+                    Requirements = [new EquipmentSkillRequirementDraft("strength", 7)]
+                }
+            });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -95,10 +98,13 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var service = CreateService(repository);
         var before = repository.Records[ItemId];
 
-        var result = await service.SaveEquipmentDraftAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            EquipmentSaveRequest(before.UpdatedAtUtc) with { RequiredStrength = 12 },
-            TestContext.Current.CancellationToken);
+            ToSaveRequest(before, before.UpdatedAtUtc) with
+            {
+                Equipment = EquipmentDraft() with { RequiredStrength = 12 }
+            });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -114,10 +120,16 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var service = CreateService(repository);
         var before = repository.Records[ItemId];
 
-        var result = await service.SaveConsumableDraftAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            ConsumableSaveRequest(before.UpdatedAtUtc) with { SuccessMessage = "Crunch." },
-            TestContext.Current.CancellationToken);
+            ToSaveRequest(before, before.UpdatedAtUtc) with
+            {
+                ConsumableBehavior = ConsumableDraft() with
+                {
+                    SuccessMessage = "Crunch."
+                }
+            });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -129,22 +141,19 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task HandEquipmentEditsPreserveHiddenConsumableBehavior()
+    public async Task WeaponAndToolEditsPreserveHiddenConsumableBehavior()
     {
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord());
         var service = CreateService(repository);
         var before = repository.Records[ItemId];
-        var request = HandEquipmentSaveRequest(before.UpdatedAtUtc) with { RequiredStrength = 14 };
-        var preview = await service.PreviewHandEquipmentAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            ToPreview(request, "save_draft"),
-            TestContext.Current.CancellationToken);
-
-        var result = await service.SaveHandEquipmentDraftAsync(
-            ItemId,
-            request with { PreviewSignature = preview.Value!.PreviewSignature },
-            TestContext.Current.CancellationToken);
+            ToSaveRequest(before, before.UpdatedAtUtc) with
+            {
+                Equipment = EquipmentDraft() with { RequiredStrength = 14 }
+            });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -160,10 +169,10 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var service = CreateService(repository);
         var expected = repository.Records[ItemId].UpdatedAtUtc;
 
-        var result = await service.SaveEquipmentDraftAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            EquipmentSaveRequest(expected) with { Equippable = false, EquipmentSlotId = null },
-            TestContext.Current.CancellationToken);
+            ToSaveRequest(repository.Records[ItemId], expected) with { Equipment = null });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -172,22 +181,20 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task HandEquipmentDisablePreservesSubmittedToolCapabilities()
+    public async Task EquipmentDisablePreservesSubmittedToolCapabilities()
     {
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord());
         var service = CreateService(repository);
         var expected = repository.Records[ItemId].UpdatedAtUtc;
-        var request = HandEquipmentSaveRequest(expected) with { Equippable = false, EquipmentSlotId = null };
-        var preview = await service.PreviewHandEquipmentAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            ToPreview(request, "save_draft"),
-            TestContext.Current.CancellationToken);
-
-        var result = await service.SaveHandEquipmentDraftAsync(
-            ItemId,
-            request with { PreviewSignature = preview.Value!.PreviewSignature },
-            TestContext.Current.CancellationToken);
+            ToSaveRequest(repository.Records[ItemId], expected) with
+            {
+                Equipment = null,
+                ToolCapabilities = [ToolDraft()]
+            });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -202,38 +209,33 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         repository.Put(CompleteRecord());
         var service = CreateService(repository);
         var expected = repository.Records[ItemId].UpdatedAtUtc;
-        var request = HandEquipmentSaveRequest(expected) with
+        var request = ToSaveRequest(repository.Records[ItemId], expected) with
         {
-            Equippable = false,
-            EquipmentSlotId = null,
+            Equipment = null,
             ToolCapabilities = []
         };
-        var preview = await service.PreviewHandEquipmentAsync(
-            ItemId,
-            ToPreview(request, "save_draft"),
-            TestContext.Current.CancellationToken);
-
-        var result = await service.SaveHandEquipmentDraftAsync(
-            ItemId,
-            request with { PreviewSignature = preview.Value!.PreviewSignature },
-            TestContext.Current.CancellationToken);
+        var result = await SaveDraftWithPreviewAsync(service, ItemId, request);
 
         AssertSucceeded(result);
         Assert.Empty(repository.Records[ItemId].ToolCapabilities);
     }
 
     [Fact]
-    public async Task BasicAdapterPreservesEverySpecialization()
+    public async Task IdentityEditPreservesEverySpecialization()
     {
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord());
         var service = CreateService(repository);
         var before = repository.Records[ItemId];
 
-        var result = await service.SaveBasicDraftAsync(
+        var result = await SaveDraftWithPreviewAsync(
+            service,
             ItemId,
-            new SaveBasicItemDraftRequest("Renamed Pick", "res://assets/items/renamed_pick.png", before.UpdatedAtUtc),
-            TestContext.Current.CancellationToken);
+            ToSaveRequest(before, before.UpdatedAtUtc) with
+            {
+                DisplayName = "Renamed Pick",
+                IconTexturePath = "res://assets/items/renamed_pick.png"
+            });
 
         AssertSucceeded(result);
         var after = repository.Records[ItemId];
@@ -253,9 +255,9 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         repository.Put(CompleteRecord(consumableEffects: []));
         var service = CreateService(repository);
 
-        var result = await service.PublishEquipmentAsync(
+        var result = await service.PublishAsync(
             ItemId,
-            repository.Records[ItemId].UpdatedAtUtc,
+            new ItemPublicationRequest(repository.Records[ItemId].UpdatedAtUtc, null),
             TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
@@ -264,38 +266,39 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task StaleConcurrencyIsEnforcedThroughEveryCompatibilityAdapter()
+    public async Task StaleConcurrencyIsEnforcedThroughUnifiedMutations()
     {
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord());
         var service = CreateService(repository);
         var stale = repository.Records[ItemId].UpdatedAtUtc.AddMinutes(-1);
 
-        var basic = await service.SaveBasicDraftAsync(
+        var save = await service.SaveDraftAsync(
             ItemId,
-            new SaveBasicItemDraftRequest("Battle Pick", IconPath, stale),
+            UnifiedSaveRequest(stale) with { PreviewSignature = "stale" },
             TestContext.Current.CancellationToken);
-        var consumable = await service.SaveConsumableDraftAsync(ItemId, ConsumableSaveRequest(stale), TestContext.Current.CancellationToken);
-        var equipment = await service.SaveEquipmentDraftAsync(ItemId, EquipmentSaveRequest(stale), TestContext.Current.CancellationToken);
-        var handEquipment = await service.SaveHandEquipmentDraftAsync(ItemId, HandEquipmentSaveRequest(stale), TestContext.Current.CancellationToken);
-        var publishBasic = await service.PublishBasicAsync(ItemId, stale, TestContext.Current.CancellationToken);
-        var publishConsumable = await service.PublishConsumableAsync(ItemId, stale, TestContext.Current.CancellationToken);
-        var publishEquipment = await service.PublishEquipmentAsync(ItemId, stale, TestContext.Current.CancellationToken);
-        var publishHandEquipment = await service.PublishAsync(
+        Assert.False(save.Succeeded);
+        Assert.Contains(save.Errors, error => error.Code == "preview_signature_mismatch");
+
+        var publish = await service.PublishAsync(
             ItemId,
-            new HandEquipmentPublicationRequest(stale, null),
+            new ItemPublicationRequest(stale, null),
             TestContext.Current.CancellationToken);
+        var disable = await service.DisableAsync(
+            ItemId,
+            new ItemPublicationRequest(stale, null),
+            TestContext.Current.CancellationToken);
+        var delete = await service.DeleteAsync(
+            ItemId,
+            new DeleteMutationRequest(stale, null),
+            TestContext.Current.CancellationToken);
+        Assert.False(delete.Succeeded);
+        Assert.Contains(delete.Errors, error => error.Code == "preview_signature_mismatch");
 
         foreach (var result in new AuthoringOperationResult<object>[]
         {
-            CastFailure(basic),
-            CastFailure(consumable),
-            CastFailure(equipment),
-            CastFailure(handEquipment),
-            CastFailure(publishBasic),
-            CastFailure(publishConsumable),
-            CastFailure(publishEquipment),
-            CastFailure(publishHandEquipment)
+            CastFailure(publish),
+            CastFailure(disable)
         })
         {
             Assert.False(result.Succeeded);
@@ -332,7 +335,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
         var publish = await service.PublishAsync(
             ItemId,
-            new HandEquipmentPublicationRequest(expected, null),
+            new ItemPublicationRequest(expected, null),
             TestContext.Current.CancellationToken);
         AssertSucceeded(publish);
         Assert.True(repository.Records[ItemId].RuntimeEnabled);
@@ -340,7 +343,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var publishedAt = repository.Records[ItemId].UpdatedAtUtc;
         var disable = await service.DisableAsync(
             ItemId,
-            new HandEquipmentPublicationRequest(publishedAt, null),
+            new ItemPublicationRequest(publishedAt, null),
             TestContext.Current.CancellationToken);
         AssertSucceeded(disable);
         Assert.False(repository.Records[ItemId].RuntimeEnabled);
@@ -367,9 +370,24 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var service = CreateService(repository);
         var expected = repository.Records[ItemId].UpdatedAtUtc;
 
-        var result = await service.SaveBasicDraftAsync(
+        var preview = await service.PreviewAsync(
             ItemId,
-            new SaveBasicItemDraftRequest("Renamed Pick", "res://assets/items/renamed_pick.png", expected),
+            ToPreview(
+                ToSaveRequest(repository.Records[ItemId], expected) with
+                {
+                    DisplayName = "Renamed Pick",
+                    IconTexturePath = "res://assets/items/renamed_pick.png"
+                },
+                "save_draft"),
+            TestContext.Current.CancellationToken);
+        var result = await service.SaveDraftAsync(
+            ItemId,
+            ToSaveRequest(repository.Records[ItemId], expected) with
+            {
+                DisplayName = "Renamed Pick",
+                IconTexturePath = "res://assets/items/renamed_pick.png",
+                PreviewSignature = preview.Value!.PreviewSignature
+            },
             TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
@@ -408,7 +426,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                 ["game_client_assets"] = _assetRoot
             }
         }));
-        var registry = new HandEquipmentAuthoringRegistry();
+        var registry = new ItemAuthoringRegistry();
         var validator = new UnifiedItemValidator(repository, registry, assetService);
         return new UnifiedItemAuthoringService(
             repository,
@@ -438,63 +456,54 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             request.ExpectedUpdatedAtUtc,
             operation);
 
-    private static SaveConsumableDraftRequest ConsumableSaveRequest(DateTimeOffset? expected) =>
-        new(
-            "Battle Pick",
-            IconPath,
-            "eat",
-            1,
-            null,
-            "Restored.",
-            false,
-            0,
-            null,
-            null,
-            [],
-            [new ConsumableEffectDefinition(0, "restore_resource", "health", 1, 3)],
-            expected);
-
-    private static SaveEquipmentDraftRequest EquipmentSaveRequest(DateTimeOffset? expected) =>
-        new(
-            "Battle Pick",
-            IconPath,
-            true,
-            "right_hand",
-            5,
-            [new EquipmentSkillRequirementDraft("strength", 3)],
-            [new EquipmentSkillModifierDraft("attack", 1)],
-            EquipmentCombatBonusDefinition.Zero,
-            expected);
-
-    private static SaveHandEquipmentDraftRequest HandEquipmentSaveRequest(DateTimeOffset? expected) =>
-        new(
-            "Battle Pick",
-            IconPath,
-            true,
-            "right_hand",
-            5,
-            [new EquipmentSkillRequirementDraft("strength", 3)],
-            [new EquipmentSkillModifierDraft("attack", 1)],
-            WeaponProfile(),
-            EquipmentCombatBonusDefinition.Zero,
-            [ToolDraft()],
+    private static SaveItemDraftRequest ToSaveRequest(UnifiedItemRecord record, DateTimeOffset? expected)
+    {
+        var draft = UnifiedItemDomainRules.FromRecord(record);
+        return new SaveItemDraftRequest(
+            draft.DisplayName,
+            draft.IconTexturePath,
+            draft.ConsumableBehavior is null
+                ? null
+                : new ItemConsumableBehaviorDraft(
+                    draft.ConsumableBehavior.UseAction,
+                    draft.ConsumableBehavior.ConsumeQuantity,
+                    draft.ConsumableBehavior.ResultItemId,
+                    draft.ConsumableBehavior.SuccessMessage,
+                    draft.ConsumableBehavior.UsableInCombat,
+                    draft.ConsumableBehavior.CooldownMs,
+                    draft.ConsumableBehavior.UseAnimationId,
+                    draft.ConsumableBehavior.UseSoundResourcePath,
+                    draft.ConsumableBehavior.Requirements,
+                    draft.ConsumableBehavior.Effects),
+            draft.Equipment is null
+                ? null
+                : new ItemEquipmentMetadataDraft(
+                    draft.Equipment.EquipmentSlotId,
+                    draft.Equipment.RequiredStrength,
+                    draft.Equipment.Requirements,
+                    draft.Equipment.SkillModifiers,
+                    draft.Equipment.CombatBonuses,
+                    draft.Equipment.WeaponProfile),
+            draft.ToolCapabilities,
             expected,
             null);
+    }
 
-    private static HandEquipmentPreviewRequest ToPreview(SaveHandEquipmentDraftRequest request, string operation) =>
-        new(
-            request.DisplayName,
-            request.IconTexturePath,
-            request.Equippable,
-            request.EquipmentSlotId,
-            request.RequiredStrength,
-            request.Requirements,
-            request.SkillModifiers,
-            request.WeaponProfile,
-            request.CombatBonuses,
-            request.ToolCapabilities,
-            request.ExpectedUpdatedAtUtc,
-            operation);
+    private static async Task<AuthoringOperationResult<ItemMutationResponse>> SaveDraftWithPreviewAsync(
+        UnifiedItemAuthoringService service,
+        string itemId,
+        SaveItemDraftRequest request)
+    {
+        var preview = await service.PreviewAsync(
+            itemId,
+            ToPreview(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(preview);
+        return await service.SaveDraftAsync(
+            itemId,
+            request with { PreviewSignature = preview.Value!.PreviewSignature },
+            TestContext.Current.CancellationToken);
+    }
 
     private static ItemConsumableBehaviorDraft ConsumableDraft() =>
         new(
@@ -521,7 +530,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     private static EquipmentCombatProfileDefinition WeaponProfile() =>
         new("battle_pick", "melee", "crush", 1, 1, 4);
 
-    private static HandEquipmentToolCapabilityDraft ToolDraft() =>
+    private static ItemToolCapabilityDraft ToolDraft() =>
         new("mining", 1, "swing", null);
 
     private static UnifiedItemRecord CompleteRecord(
@@ -547,7 +556,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             [new EquipmentSkillModifierDefinition("attack", "Attack", 1)],
             WeaponProfile(),
             EquipmentCombatBonusDefinition.Zero,
-            [new HandEquipmentToolCapabilityDefinition("mining", "Mining", 0, 1, "swing", null)],
+            [new ItemToolCapabilityDefinition("mining", "Mining", 0, 1, "swing", null)],
             new DateTimeOffset(2026, 8, 4, 12, 0, 0, TimeSpan.Zero));
 
     private static AuthoringOperationResult<object> CastFailure<T>(AuthoringOperationResult<T> result) =>
@@ -762,7 +771,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                 equipment?.WeaponProfile,
                 equipment?.CombatBonuses,
                 draft.ToolCapabilities
-                    .Select((value, index) => new HandEquipmentToolCapabilityDefinition(
+                    .Select((value, index) => new ItemToolCapabilityDefinition(
                         value.CapabilityId,
                         value.CapabilityId,
                         index,

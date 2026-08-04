@@ -11,14 +11,14 @@ public sealed class UnifiedItemAuthoringService
 {
     private readonly IUnifiedItemRepository _repository;
     private readonly UnifiedItemValidator _validator;
-    private readonly HandEquipmentAuthoringRegistry _registry;
+    private readonly ItemAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
     private readonly ILogger<UnifiedItemAuthoringService> _logger;
 
     public UnifiedItemAuthoringService(
         IUnifiedItemRepository repository,
         UnifiedItemValidator validator,
-        HandEquipmentAuthoringRegistry registry,
+        ItemAuthoringRegistry registry,
         ItemAssetService assetService,
         ILogger<UnifiedItemAuthoringService> logger)
     {
@@ -42,7 +42,7 @@ public sealed class UnifiedItemAuthoringService
                 new ItemOptionsResponse(
                     slots.Select(slot => new AuthoringOption(slot.SlotId, slot.DisplayName)).ToArray(),
                     slots
-                        .Where(slot => slot.SlotId == HandEquipmentAuthoringRegistry.ActiveWeaponSlotId)
+                        .Where(slot => slot.SlotId == ItemAuthoringRegistry.ActiveWeaponSlotId)
                         .Select(slot => new AuthoringOption(slot.SlotId, slot.DisplayName))
                         .ToArray(),
                     skills.Select(skill => new AuthoringOption(skill.SkillId, skill.DisplayName)).ToArray(),
@@ -55,7 +55,7 @@ public sealed class UnifiedItemAuthoringService
                     [new("health", "Health"), new("concentration", "Concentration"), new("special", "Special")],
                     [new("skill_minimum", "Skill Minimum")],
                     publishedItems,
-                    HandEquipmentAuthoringRegistry.CombatUnitMilliseconds,
+                    ItemAuthoringRegistry.CombatUnitMilliseconds,
                     UnifiedItemDomainRules.MaximumPowerTier,
                     false));
         }
@@ -224,13 +224,13 @@ public sealed class UnifiedItemAuthoringService
 
     public Task<AuthoringOperationResult<ItemMutationResponse>> PublishAsync(
         string itemId,
-        HandEquipmentPublicationRequest request,
+        ItemPublicationRequest request,
         CancellationToken cancellationToken = default) =>
         SetPublicationAsync(itemId, true, request.ExpectedUpdatedAtUtc, request.PreviewSignature, cancellationToken);
 
     public Task<AuthoringOperationResult<ItemMutationResponse>> DisableAsync(
         string itemId,
-        HandEquipmentPublicationRequest request,
+        ItemPublicationRequest request,
         CancellationToken cancellationToken = default) =>
         SetPublicationAsync(itemId, false, request.ExpectedUpdatedAtUtc, request.PreviewSignature, cancellationToken);
 
@@ -275,370 +275,6 @@ public sealed class UnifiedItemAuthoringService
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
             return DatabaseFailure<DeleteMutationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<BasicItemValidationResponse>> PreviewBasicAsync(
-        string itemId,
-        BasicItemPreviewRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyBasic(existing, request.DisplayName, request.IconTexturePath);
-            var result = await PreviewCompleteAsync(itemId, draft, request.ExpectedUpdatedAtUtc, request.TargetOperation, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<BasicItemValidationResponse>.Success(new BasicItemValidationResponse(
-                    result.Value.TargetOperation,
-                    result.Value.ValidForDraft,
-                    result.Value.ValidForPublication,
-                    result.Value.Messages,
-                    result.Value.Changes,
-                    result.Value.AssetPreviewFilePath))
-                : AuthoringOperationResult<BasicItemValidationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<BasicItemValidationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<BasicItemMutationResponse>> SaveBasicDraftAsync(
-        string itemId,
-        SaveBasicItemDraftRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyBasic(existing, request.DisplayName, request.IconTexturePath);
-            var result = await SaveCompleteDraftAsync(itemId, draft, request.ExpectedUpdatedAtUtc, null, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<BasicItemMutationResponse>.Success(
-                    new BasicItemMutationResponse("save_draft", ToBasicDefinition(result.Value.Item), result.Value.Messages))
-                : AuthoringOperationResult<BasicItemMutationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<BasicItemMutationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<ConsumableValidationResponse>> PreviewConsumableAsync(
-        string itemId,
-        ConsumablePreviewRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyConsumable(existing, request);
-            var result = await PreviewCompleteAsync(itemId, draft, request.ExpectedUpdatedAtUtc, request.TargetOperation, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<ConsumableValidationResponse>.Success(new ConsumableValidationResponse(
-                    result.Value.TargetOperation,
-                    result.Value.ValidForDraft,
-                    result.Value.ValidForPublication,
-                    result.Value.Messages,
-                    result.Value.Changes,
-                    result.Value.AssetPreviewFilePath))
-                : AuthoringOperationResult<ConsumableValidationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<ConsumableValidationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<ConsumableMutationResponse>> SaveConsumableDraftAsync(
-        string itemId,
-        SaveConsumableDraftRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyConsumable(existing, request);
-            var result = await SaveCompleteDraftAsync(itemId, draft, request.ExpectedUpdatedAtUtc, null, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<ConsumableMutationResponse>.Success(
-                    new ConsumableMutationResponse("save_draft", ToConsumableDefinition(result.Value.Item), result.Value.Messages))
-                : AuthoringOperationResult<ConsumableMutationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<ConsumableMutationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<EquipmentValidationResponse>> PreviewEquipmentAsync(
-        string itemId,
-        EquipmentPreviewRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyEquipment(existing, request);
-            var result = await PreviewCompleteAsync(itemId, draft, request.ExpectedUpdatedAtUtc, request.TargetOperation, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<EquipmentValidationResponse>.Success(new EquipmentValidationResponse(
-                    result.Value.TargetOperation,
-                    result.Value.ValidForDraft,
-                    result.Value.ValidForPublication,
-                    result.Value.Messages,
-                    result.Value.Changes,
-                    result.Value.AssetPreviewFilePath))
-                : AuthoringOperationResult<EquipmentValidationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<EquipmentValidationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<EquipmentMutationResponse>> SaveEquipmentDraftAsync(
-        string itemId,
-        SaveEquipmentDraftRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyEquipment(existing, request);
-            var result = await SaveCompleteDraftAsync(itemId, draft, request.ExpectedUpdatedAtUtc, null, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<EquipmentMutationResponse>.Success(
-                    new EquipmentMutationResponse("save_draft", ToEquipmentDefinition(result.Value.Item), result.Value.Messages))
-                : AuthoringOperationResult<EquipmentMutationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<EquipmentMutationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<HandEquipmentValidationResponse>> PreviewHandEquipmentAsync(
-        string itemId,
-        HandEquipmentPreviewRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyHandEquipment(existing, request);
-            var result = await PreviewCompleteAsync(itemId, draft, request.ExpectedUpdatedAtUtc, request.TargetOperation, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<HandEquipmentValidationResponse>.Success(new HandEquipmentValidationResponse(
-                    result.Value.TargetOperation,
-                    result.Value.ValidForDraft,
-                    result.Value.ValidForPublication,
-                    result.Value.Messages,
-                    result.Value.Changes,
-                    result.Value.AssetPreviewFilePath,
-                    result.Value.PreviewSignature))
-                : AuthoringOperationResult<HandEquipmentValidationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<HandEquipmentValidationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<HandEquipmentMutationResponse>> SaveHandEquipmentDraftAsync(
-        string itemId,
-        SaveHandEquipmentDraftRequest request,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var existing = await _repository.LoadAsync(itemId, cancellationToken);
-            var draft = ApplyHandEquipment(existing, request);
-            var result = await SaveCompleteDraftAsync(itemId, draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature, existing, cancellationToken);
-            return result.Succeeded && result.Value is not null
-                ? AuthoringOperationResult<HandEquipmentMutationResponse>.Success(
-                    new HandEquipmentMutationResponse("save_draft", ToHandEquipmentDefinition(result.Value.Item), result.Value.Messages))
-                : AuthoringOperationResult<HandEquipmentMutationResponse>.Failure(result.Errors);
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<HandEquipmentMutationResponse>(exception);
-        }
-    }
-
-    public async Task<AuthoringOperationResult<BasicItemMutationResponse>> PublishBasicAsync(
-        string itemId,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await SetPublicationAsync(itemId, true, expectedUpdatedAtUtc, null, cancellationToken);
-        return result.Succeeded && result.Value is not null
-            ? AuthoringOperationResult<BasicItemMutationResponse>.Success(
-                new BasicItemMutationResponse("publish", ToBasicDefinition(result.Value.Item), result.Value.Messages))
-            : AuthoringOperationResult<BasicItemMutationResponse>.Failure(result.Errors);
-    }
-
-    public async Task<AuthoringOperationResult<BasicItemMutationResponse>> DisableBasicAsync(
-        string itemId,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await SetPublicationAsync(itemId, false, expectedUpdatedAtUtc, null, cancellationToken);
-        return result.Succeeded && result.Value is not null
-            ? AuthoringOperationResult<BasicItemMutationResponse>.Success(
-                new BasicItemMutationResponse("disable", ToBasicDefinition(result.Value.Item), result.Value.Messages))
-            : AuthoringOperationResult<BasicItemMutationResponse>.Failure(result.Errors);
-    }
-
-    public async Task<AuthoringOperationResult<ConsumableMutationResponse>> PublishConsumableAsync(
-        string itemId,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await SetPublicationAsync(itemId, true, expectedUpdatedAtUtc, null, cancellationToken);
-        return result.Succeeded && result.Value is not null
-            ? AuthoringOperationResult<ConsumableMutationResponse>.Success(
-                new ConsumableMutationResponse("publish", ToConsumableDefinition(result.Value.Item), result.Value.Messages))
-            : AuthoringOperationResult<ConsumableMutationResponse>.Failure(result.Errors);
-    }
-
-    public async Task<AuthoringOperationResult<ConsumableMutationResponse>> DisableConsumableAsync(
-        string itemId,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await SetPublicationAsync(itemId, false, expectedUpdatedAtUtc, null, cancellationToken);
-        return result.Succeeded && result.Value is not null
-            ? AuthoringOperationResult<ConsumableMutationResponse>.Success(
-                new ConsumableMutationResponse("disable", ToConsumableDefinition(result.Value.Item), result.Value.Messages))
-            : AuthoringOperationResult<ConsumableMutationResponse>.Failure(result.Errors);
-    }
-
-    public async Task<AuthoringOperationResult<EquipmentMutationResponse>> PublishEquipmentAsync(
-        string itemId,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await SetPublicationAsync(itemId, true, expectedUpdatedAtUtc, null, cancellationToken);
-        return result.Succeeded && result.Value is not null
-            ? AuthoringOperationResult<EquipmentMutationResponse>.Success(
-                new EquipmentMutationResponse("publish", ToEquipmentDefinition(result.Value.Item), result.Value.Messages))
-            : AuthoringOperationResult<EquipmentMutationResponse>.Failure(result.Errors);
-    }
-
-    public async Task<AuthoringOperationResult<EquipmentMutationResponse>> DisableEquipmentAsync(
-        string itemId,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await SetPublicationAsync(itemId, false, expectedUpdatedAtUtc, null, cancellationToken);
-        return result.Succeeded && result.Value is not null
-            ? AuthoringOperationResult<EquipmentMutationResponse>.Success(
-                new EquipmentMutationResponse("disable", ToEquipmentDefinition(result.Value.Item), result.Value.Messages))
-            : AuthoringOperationResult<EquipmentMutationResponse>.Failure(result.Errors);
-    }
-
-    private async Task<AuthoringOperationResult<ItemPreviewResponse>> PreviewCompleteAsync(
-        string itemId,
-        NormalizedItemDraft requested,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        string targetOperation,
-        UnifiedItemRecord? existing,
-        CancellationToken cancellationToken)
-    {
-        if (HasVersionConflict(existing, expectedUpdatedAtUtc))
-        {
-            return VersionConflict<ItemPreviewResponse>(itemId);
-        }
-        var operation = NormalizePreviewOperation(targetOperation);
-        if (operation is null)
-        {
-            return AuthoringOperationResult<ItemPreviewResponse>.Failure(InvalidTargetOperation());
-        }
-        var hasUnsavedOperationChanges =
-            existing is not null
-            && operation is "publish" or "disable" or "delete"
-            && !EquivalentDraft(existing, requested);
-        var effective = operation == "save_draft" || hasUnsavedOperationChanges
-            ? requested
-            : existing is null ? requested : UnifiedItemDomainRules.FromRecord(existing);
-        var validation = await _validator.ValidateAsync(
-            itemId,
-            effective,
-            existing,
-            operation == "publish" && !hasUnsavedOperationChanges,
-            cancellationToken);
-        var messages = validation.Messages.ToList();
-        if (hasUnsavedOperationChanges)
-        {
-            messages.Add(new ApiError(
-                "unsaved_item_changes",
-                "Save the edited complete item definition as a draft before changing publication state or deleting it.",
-                ValidationSeverity.Error,
-                "publication_state"));
-        }
-        await AddPublicationLifecycleErrorsAsync(itemId, existing, operation, messages, cancellationToken);
-        var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
-        return AuthoringOperationResult<ItemPreviewResponse>.Success(new ItemPreviewResponse(
-            operation,
-            validation.ValidForDraft && !hasErrors,
-            validation.ValidForPublication && !hasErrors,
-            messages,
-            CalculateChanges(existing, requested, operation),
-            validation.AssetPreviewFilePath,
-            ComputePreviewSignature(itemId, operation, effective, expectedUpdatedAtUtc)));
-    }
-
-    private async Task<AuthoringOperationResult<ItemMutationResponse>> SaveCompleteDraftAsync(
-        string itemId,
-        NormalizedItemDraft draft,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        string? previewSignature,
-        UnifiedItemRecord? existing,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            if (previewSignature is not null
-                && !IsMatchingPreview(itemId, "save_draft", draft, expectedUpdatedAtUtc, previewSignature))
-            {
-                return AuthoringOperationResult<ItemMutationResponse>.Failure(PreviewMismatch("save_draft"));
-            }
-            var validation = await _validator.ValidateAsync(itemId, draft, existing, false, cancellationToken);
-            if (!validation.ValidForDraft)
-            {
-                return AuthoringOperationResult<ItemMutationResponse>.Failure(validation.Messages);
-            }
-            if (existing?.RuntimeEnabled == true)
-            {
-                var referenceErrors = new List<ApiError>();
-                await AddDisableReferenceErrorsAsync(itemId, referenceErrors, cancellationToken);
-                if (referenceErrors.Count > 0)
-                {
-                    return AuthoringOperationResult<ItemMutationResponse>.Failure(referenceErrors);
-                }
-            }
-            var saved = await _repository.SaveDraftAsync(itemId, draft, expectedUpdatedAtUtc, existing is null, cancellationToken);
-            var verified = await _repository.LoadAsync(itemId, cancellationToken);
-            if (verified is null || !Equivalent(saved, verified))
-            {
-                throw new InvalidOperationException("The saved item aggregate failed reload-and-verify.");
-            }
-            return AuthoringOperationResult<ItemMutationResponse>.Success(
-                new ItemMutationResponse("save_draft", ToDefinition(verified), validation.Messages));
-        }
-        catch (UnifiedItemConcurrencyException)
-        {
-            return VersionConflict<ItemMutationResponse>(itemId);
-        }
-        catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
-        {
-            return AuthoringOperationResult<ItemMutationResponse>.Failure(LiveReferenceError(itemId));
-        }
-        catch (Exception exception) when (IsDatabaseFailure(exception))
-        {
-            return DatabaseFailure<ItemMutationResponse>(exception);
         }
     }
 
@@ -699,102 +335,6 @@ public sealed class UnifiedItemAuthoringService
             return DatabaseFailure<ItemMutationResponse>(exception);
         }
     }
-
-    private NormalizedItemDraft ApplyBasic(UnifiedItemRecord? existing, string displayName, string iconTexturePath)
-    {
-        var current = existing is null
-            ? UnifiedItemDomainRules.Normalize(displayName, iconTexturePath, null, null, [])
-            : UnifiedItemDomainRules.FromRecord(existing);
-        return current with
-        {
-            DisplayName = UnifiedItemDomainRules.NormalizeRequired(displayName),
-            IconTexturePath = UnifiedItemDomainRules.NormalizeRequired(iconTexturePath)
-        };
-    }
-
-    private NormalizedItemDraft ApplyConsumable(UnifiedItemRecord? existing, dynamic request)
-    {
-        var current = ApplyBasic(existing, request.DisplayName, request.IconTexturePath);
-        var consumable = new ItemConsumableBehaviorDraft(
-            request.UseAction,
-            request.ConsumeQuantity,
-            request.ResultItemId,
-            request.SuccessMessage,
-            request.UsableInCombat,
-            request.CooldownMs,
-            request.UseAnimationId,
-            request.UseSoundResourcePath,
-            request.Requirements,
-            request.Effects);
-        return UnifiedItemDomainRules.Normalize(
-            current.DisplayName,
-            current.IconTexturePath,
-            consumable,
-            current.Equipment is null ? null : ToEquipmentDraft(current.Equipment),
-            current.ToolCapabilities);
-    }
-
-    private NormalizedItemDraft ApplyEquipment(UnifiedItemRecord? existing, dynamic request)
-    {
-        var current = ApplyBasic(existing, request.DisplayName, request.IconTexturePath);
-        ItemEquipmentMetadataDraft? equipment = request.Equippable
-            ? new ItemEquipmentMetadataDraft(
-                request.EquipmentSlotId,
-                request.RequiredStrength,
-                request.Requirements,
-                request.SkillModifiers,
-                request.CombatBonuses,
-                current.Equipment?.WeaponProfile)
-            : null;
-        return UnifiedItemDomainRules.Normalize(
-            current.DisplayName,
-            current.IconTexturePath,
-            current.ConsumableBehavior is null ? null : ToConsumableDraft(current.ConsumableBehavior),
-            equipment,
-            current.ToolCapabilities);
-    }
-
-    private NormalizedItemDraft ApplyHandEquipment(UnifiedItemRecord? existing, dynamic request)
-    {
-        var current = ApplyBasic(existing, request.DisplayName, request.IconTexturePath);
-        ItemEquipmentMetadataDraft? equipment = request.Equippable
-            ? new ItemEquipmentMetadataDraft(
-                request.EquipmentSlotId,
-                request.RequiredStrength,
-                request.Requirements,
-                request.SkillModifiers,
-                request.CombatBonuses,
-                request.WeaponProfile)
-            : null;
-        return UnifiedItemDomainRules.Normalize(
-            current.DisplayName,
-            current.IconTexturePath,
-            current.ConsumableBehavior is null ? null : ToConsumableDraft(current.ConsumableBehavior),
-            equipment,
-            request.ToolCapabilities);
-    }
-
-    private static ItemEquipmentMetadataDraft ToEquipmentDraft(NormalizedItemEquipmentMetadata equipment) =>
-        new(
-            equipment.EquipmentSlotId,
-            equipment.RequiredStrength,
-            equipment.Requirements,
-            equipment.SkillModifiers,
-            equipment.CombatBonuses,
-            equipment.WeaponProfile);
-
-    private static ItemConsumableBehaviorDraft ToConsumableDraft(NormalizedItemConsumableBehavior consumable) =>
-        new(
-            consumable.UseAction,
-            consumable.ConsumeQuantity,
-            consumable.ResultItemId,
-            consumable.SuccessMessage,
-            consumable.UsableInCombat,
-            consumable.CooldownMs,
-            consumable.UseAnimationId,
-            consumable.UseSoundResourcePath,
-            consumable.Requirements,
-            consumable.Effects);
 
     private async Task AddPublicationLifecycleErrorsAsync(
         string itemId,
@@ -877,7 +417,6 @@ public sealed class UnifiedItemAuthoringService
             PublicationState(record.RuntimeEnabled),
             label,
             label,
-            true,
             draft.ConsumableBehavior is null ? null : ToConsumableDefinition(draft.ConsumableBehavior),
             draft.Equipment is null ? null : ToEquipmentDefinition(draft.Equipment, record.EquipmentSlotDisplayName),
             record.ToolCapabilities,
@@ -914,17 +453,6 @@ public sealed class UnifiedItemAuthoringService
             equipment.CombatBonuses,
             equipment.WeaponProfile);
 
-    private static BasicItemDefinition ToBasicDefinition(ItemDefinition item) =>
-        new(
-            item.ItemId,
-            item.DisplayName,
-            item.IconTexturePath,
-            item.PublicationState,
-            item.AuthoringKind,
-            true,
-            item.UpdatedAtUtc,
-            item.AssetPreviewFilePath);
-
     private static string ClassifySummary(
         bool hasConsumable,
         bool hasEquipment,
@@ -951,90 +479,13 @@ public sealed class UnifiedItemAuthoringService
 
         return labels.Count == 0 ? "Basic" : string.Join(" + ", labels);
     }
-
-    private static ConsumableItemDefinition ToConsumableDefinition(ItemDefinition item)
-    {
-        var consumable = item.ConsumableBehavior;
-        return new ConsumableItemDefinition(
-            item.ItemId,
-            item.DisplayName,
-            item.IconTexturePath,
-            item.PublicationState,
-            item.AuthoringKind,
-            consumable is not null,
-            true,
-            consumable?.UseAction ?? "eat",
-            consumable?.ConsumeQuantity ?? 1,
-            consumable?.ResultItemId,
-            consumable?.SuccessMessage,
-            consumable?.UsableInCombat ?? false,
-            consumable?.CooldownMs ?? 0,
-            consumable?.UseAnimationId,
-            consumable?.UseSoundResourcePath,
-            consumable?.Requirements ?? [],
-            consumable?.Effects ?? [],
-            item.UpdatedAtUtc,
-            item.AssetPreviewFilePath);
-    }
-
-    private static EquipmentItemDefinition ToEquipmentDefinition(ItemDefinition item)
-    {
-        var equipment = item.Equipment;
-        return new EquipmentItemDefinition(
-            item.ItemId,
-            item.DisplayName,
-            item.IconTexturePath,
-            item.PublicationState,
-            item.AuthoringKind,
-            equipment is not null,
-            equipment?.EquipmentSlotId,
-            equipment?.EquipmentSlotDisplayName,
-            equipment?.RequiredStrength ?? 1,
-            equipment?.Requirements ?? [],
-            equipment?.SkillModifiers ?? [],
-            equipment?.WeaponProfile,
-            equipment?.CombatBonuses,
-            true,
-            true,
-            null,
-            "Current runtime derives visual keys.",
-            item.UpdatedAtUtc,
-            item.AssetPreviewFilePath);
-    }
-
-    private static HandEquipmentItemDefinition ToHandEquipmentDefinition(ItemDefinition item)
-    {
-        var equipment = item.Equipment;
-        return new HandEquipmentItemDefinition(
-            item.ItemId,
-            item.DisplayName,
-            item.IconTexturePath,
-            item.PublicationState,
-            item.AuthoringKind,
-            item.ClassificationLabel,
-            equipment is not null,
-            equipment?.EquipmentSlotId,
-            equipment?.EquipmentSlotDisplayName,
-            equipment?.RequiredStrength ?? 1,
-            equipment?.Requirements ?? [],
-            equipment?.SkillModifiers ?? [],
-            equipment?.WeaponProfile,
-            equipment?.CombatBonuses,
-            item.ToolCapabilities,
-            true,
-            null,
-            "Current runtime derives visual keys.",
-            item.UpdatedAtUtc,
-            item.AssetPreviewFilePath);
-    }
-
-    private static IReadOnlyList<BasicItemChange> CalculateChanges(
+    private static IReadOnlyList<AuthoringChange> CalculateChanges(
         UnifiedItemRecord? existing,
         NormalizedItemDraft requested,
         string operation)
     {
         var current = existing is null ? null : UnifiedItemDomainRules.FromRecord(existing);
-        var changes = new List<BasicItemChange>();
+        var changes = new List<AuthoringChange>();
         AddChange(changes, "display_name", current?.DisplayName, requested.DisplayName);
         AddChange(changes, "icon_texture_path", current?.IconTexturePath, requested.IconTexturePath);
         AddChange(changes, "consumable_behavior", Serialize(current?.ConsumableBehavior), Serialize(requested.ConsumableBehavior));
@@ -1051,11 +502,11 @@ public sealed class UnifiedItemAuthoringService
         return changes;
     }
 
-    private static void AddChange(ICollection<BasicItemChange> changes, string field, string? before, string? after)
+    private static void AddChange(ICollection<AuthoringChange> changes, string field, string? before, string? after)
     {
         if (!string.Equals(before, after, StringComparison.Ordinal))
         {
-            changes.Add(new BasicItemChange(field, before, after));
+            changes.Add(new AuthoringChange(field, before, after));
         }
     }
 
@@ -1186,9 +637,10 @@ public sealed class UnifiedItemAuthoringService
             || existing.UpdatedAtUtc.ToUniversalTime() != expectedUpdatedAtUtc.Value.ToUniversalTime());
 
     private static bool IsDatabaseFailure(Exception exception) =>
-        exception is NpgsqlException
-        || exception is TimeoutException
-        || exception is InvalidOperationException;
+        exception is AuthoringDatabaseUnavailableException
+            or NpgsqlException
+            or TimeoutException
+            or InvalidOperationException;
 
     private static bool IsLiveReferenceGuard(PostgresException exception) =>
         exception.SqlState == PostgresErrorCodes.RaiseException

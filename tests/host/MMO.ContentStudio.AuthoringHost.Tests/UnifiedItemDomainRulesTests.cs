@@ -15,7 +15,7 @@ public sealed class UnifiedItemDomainRulesTests
             null,
             null,
             [
-                new HandEquipmentToolCapabilityDraft(" mining ", 2, " swing ", " spark ")
+                new ItemToolCapabilityDraft(" mining ", 2, " swing ", " spark ")
             ]);
 
         Assert.Null(draft.Equipment);
@@ -42,7 +42,7 @@ public sealed class UnifiedItemDomainRulesTests
             new ItemConsumableBehaviorDraft("eat", 1, null, null, false, 0, null, null, [], []),
             equipment,
             [
-                new HandEquipmentToolCapabilityDraft("mining", 1, null, null)
+                new ItemToolCapabilityDraft("mining", 1, null, null)
             ]);
 
         Assert.Equal(

@@ -246,7 +246,7 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, editor)
 
-    def test_mob_startup_continues_after_hand_equipment_failure(self) -> None:
+    def test_mob_startup_is_independent_of_retired_item_workspaces(self) -> None:
         facade = (SCRIPTS / "authoring_host_client.gd").read_text()
         connection_operations = facade.split("const CONNECTION_OPERATIONS := [", 1)[1].split("]", 1)[0]
 
@@ -254,9 +254,8 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
         self.assertNotIn("OP_HAND_EQUIPMENT,", connection_operations)
         self.assertNotIn("OP_MOB_OPTIONS", connection_operations)
         self.assertIn("connection_state_changed.emit(\"connected\"", facade)
-        self.assertIn("func _continue_after_hand_equipment_initialization", facade)
-        self.assertIn("OP_HAND_EQUIPMENT:\n\t\t\thand_equipment_received.emit(data)\n\t\t\t_continue_after_hand_equipment_initialization()", facade)
-        self.assertIn("if operation == OP_HAND_EQUIPMENT_OPTIONS or operation == OP_HAND_EQUIPMENT:", facade)
+        self.assertNotIn("func _continue_after_hand_equipment_initialization", facade)
+        self.assertNotIn("OP_HAND_EQUIPMENT", facade)
         self.assertIn("_request(OP_MOB_OPTIONS, \"/api/v1/mobs/options\")", facade)
 
     def test_visual_preview_uses_host_resolved_png_and_footprint(self) -> None:

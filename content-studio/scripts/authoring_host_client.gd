@@ -15,21 +15,6 @@ signal item_received(payload: Dictionary)
 signal item_preview_received(payload: Dictionary)
 signal item_mutation_completed(payload: Dictionary)
 signal item_delete_completed(payload: Dictionary)
-signal consumable_options_received(payload: Dictionary)
-signal consumables_received(payload: Dictionary)
-signal consumable_received(payload: Dictionary)
-signal consumable_preview_received(payload: Dictionary)
-signal consumable_mutation_completed(payload: Dictionary)
-signal equipment_options_received(payload: Dictionary)
-signal equipment_received(payload: Dictionary)
-signal equipment_item_received(payload: Dictionary)
-signal equipment_preview_received(payload: Dictionary)
-signal equipment_mutation_completed(payload: Dictionary)
-signal hand_equipment_options_received(payload: Dictionary)
-signal hand_equipment_received(payload: Dictionary)
-signal hand_equipment_item_received(payload: Dictionary)
-signal hand_equipment_preview_received(payload: Dictionary)
-signal hand_equipment_mutation_completed(payload: Dictionary)
 signal mob_options_received(payload: Dictionary)
 signal mob_catalog_received(payload: Dictionary)
 signal mob_item_received(payload: Dictionary)
@@ -53,30 +38,6 @@ const OP_ITEM_SAVE_DRAFT := "item_save_draft"
 const OP_ITEM_PUBLISH := "item_publish"
 const OP_ITEM_DISABLE := "item_disable"
 const OP_ITEM_DELETE := "item_delete"
-const OP_CONSUMABLE_OPTIONS := "consumable_options"
-const OP_CONSUMABLES := "consumables"
-const OP_CONSUMABLE := "consumable"
-const OP_CONSUMABLE_PREVIEW := "consumable_preview"
-const OP_CONSUMABLE_SAVE_DRAFT := "consumable_save_draft"
-const OP_CONSUMABLE_PUBLISH := "consumable_publish"
-const OP_CONSUMABLE_DISABLE := "consumable_disable"
-const OP_CONSUMABLE_DELETE := "consumable_delete"
-const OP_EQUIPMENT_OPTIONS := "equipment_options"
-const OP_EQUIPMENT := "equipment"
-const OP_EQUIPMENT_ITEM := "equipment_item"
-const OP_EQUIPMENT_PREVIEW := "equipment_preview"
-const OP_EQUIPMENT_SAVE_DRAFT := "equipment_save_draft"
-const OP_EQUIPMENT_PUBLISH := "equipment_publish"
-const OP_EQUIPMENT_DISABLE := "equipment_disable"
-const OP_EQUIPMENT_DELETE := "equipment_delete"
-const OP_HAND_EQUIPMENT_OPTIONS := "hand_equipment_options"
-const OP_HAND_EQUIPMENT := "hand_equipment"
-const OP_HAND_EQUIPMENT_ITEM := "hand_equipment_item"
-const OP_HAND_EQUIPMENT_PREVIEW := "hand_equipment_preview"
-const OP_HAND_EQUIPMENT_SAVE_DRAFT := "hand_equipment_save_draft"
-const OP_HAND_EQUIPMENT_PUBLISH := "hand_equipment_publish"
-const OP_HAND_EQUIPMENT_DISABLE := "hand_equipment_disable"
-const OP_HAND_EQUIPMENT_DELETE := "hand_equipment_delete"
 const OP_MOB_OPTIONS := "mob_options"
 const OP_MOBS := "mobs"
 const OP_MOB_ITEM := "mob_item"
@@ -188,112 +149,6 @@ func delete_item(item_id: String, expected_updated_at_utc: Variant, preview_sign
 	})
 
 
-func load_consumables(search: String = "") -> void:
-	var suffix := ""
-	if not search.strip_edges().is_empty():
-		suffix = "?search=%s" % search.strip_edges().uri_encode()
-	_request(OP_CONSUMABLES, "/api/v1/consumables%s" % suffix)
-
-
-func load_consumable(item_id: String) -> void:
-	_request(OP_CONSUMABLE, "/api/v1/consumables/%s" % item_id.uri_encode())
-
-
-func preview_consumable(item_id: String, payload: Dictionary) -> void:
-	_request(OP_CONSUMABLE_PREVIEW, "/api/v1/consumables/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
-
-
-func save_consumable_draft(item_id: String, payload: Dictionary) -> void:
-	_request(OP_CONSUMABLE_SAVE_DRAFT, "/api/v1/consumables/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
-
-func publish_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_CONSUMABLE_PUBLISH, "/api/v1/consumables/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
-
-
-func disable_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_CONSUMABLE_DISABLE, "/api/v1/consumables/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
-
-
-func delete_consumable(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_CONSUMABLE_DELETE, "/api/v1/consumables/%s/delete" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
-
-
-func load_equipment(search: String = "") -> void:
-	var suffix := ""
-	if not search.strip_edges().is_empty():
-		suffix = "?search=%s" % search.strip_edges().uri_encode()
-	_request(OP_EQUIPMENT, "/api/v1/equipment%s" % suffix)
-
-
-func load_equipment_item(item_id: String) -> void:
-	_request(OP_EQUIPMENT_ITEM, "/api/v1/equipment/%s" % item_id.uri_encode())
-
-
-func preview_equipment(item_id: String, payload: Dictionary) -> void:
-	_request(OP_EQUIPMENT_PREVIEW, "/api/v1/equipment/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
-
-
-func save_equipment_draft(item_id: String, payload: Dictionary) -> void:
-	_request(OP_EQUIPMENT_SAVE_DRAFT, "/api/v1/equipment/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
-
-func publish_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_EQUIPMENT_PUBLISH, "/api/v1/equipment/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
-
-
-func disable_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_EQUIPMENT_DISABLE, "/api/v1/equipment/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
-
-
-func delete_equipment(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_EQUIPMENT_DELETE, "/api/v1/equipment/%s/delete" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
-
-
-func load_hand_equipment_options() -> void:
-	_request(OP_HAND_EQUIPMENT_OPTIONS, "/api/v1/hand-equipment/options")
-
-
-func load_hand_equipment(search: String = "") -> void:
-	var suffix := ""
-	if not search.strip_edges().is_empty():
-		suffix = "?search=%s" % search.strip_edges().uri_encode()
-	_request(OP_HAND_EQUIPMENT, "/api/v1/hand-equipment%s" % suffix)
-
-
-func load_hand_equipment_item(item_id: String) -> void:
-	_request(OP_HAND_EQUIPMENT_ITEM, "/api/v1/hand-equipment/%s" % item_id.uri_encode())
-
-
-func preview_hand_equipment(item_id: String, payload: Dictionary) -> void:
-	_request(OP_HAND_EQUIPMENT_PREVIEW, "/api/v1/hand-equipment/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
-
-
-func save_hand_equipment_draft(item_id: String, payload: Dictionary) -> void:
-	_request(OP_HAND_EQUIPMENT_SAVE_DRAFT, "/api/v1/hand-equipment/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
-
-func publish_hand_equipment(item_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
-	_request(OP_HAND_EQUIPMENT_PUBLISH, "/api/v1/hand-equipment/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
-		"expected_updated_at_utc": expected_updated_at_utc,
-		"preview_signature": preview_signature,
-	})
-
-
-func disable_hand_equipment(item_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
-	_request(OP_HAND_EQUIPMENT_DISABLE, "/api/v1/hand-equipment/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
-		"expected_updated_at_utc": expected_updated_at_utc,
-		"preview_signature": preview_signature,
-	})
-
-
-func delete_hand_equipment(item_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
-	_request(OP_HAND_EQUIPMENT_DELETE, "/api/v1/hand-equipment/%s/delete" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
-		"expected_updated_at_utc": expected_updated_at_utc,
-		"preview_signature": preview_signature,
-	})
-
-
 func load_mob_options() -> void:
 	_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
 
@@ -378,25 +233,6 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			items_received.emit(data)
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
 			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
-		OP_CONSUMABLE_OPTIONS:
-			consumable_options_received.emit(data)
-			_request(OP_CONSUMABLES, "/api/v1/consumables")
-		OP_CONSUMABLES:
-			consumables_received.emit(data)
-			_request(OP_EQUIPMENT_OPTIONS, "/api/v1/equipment/options")
-		OP_EQUIPMENT_OPTIONS:
-			equipment_options_received.emit(data)
-			_request(OP_EQUIPMENT, "/api/v1/equipment")
-		OP_EQUIPMENT:
-			equipment_received.emit(data)
-			connection_state_changed.emit("connected", "Connected to the local authoring host.")
-			_request(OP_HAND_EQUIPMENT_OPTIONS, "/api/v1/hand-equipment/options")
-		OP_HAND_EQUIPMENT_OPTIONS:
-			hand_equipment_options_received.emit(data)
-			_request(OP_HAND_EQUIPMENT, "/api/v1/hand-equipment")
-		OP_HAND_EQUIPMENT:
-			hand_equipment_received.emit(data)
-			_continue_after_hand_equipment_initialization()
 		OP_MOB_OPTIONS:
 			mob_options_received.emit(data)
 			_request(OP_MOBS, "/api/v1/mobs")
@@ -411,24 +247,6 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			item_delete_completed.emit(data)
 		OP_ITEM_SAVE_DRAFT, OP_ITEM_PUBLISH, OP_ITEM_DISABLE:
 			item_mutation_completed.emit(data)
-		OP_CONSUMABLE:
-			consumable_received.emit(data)
-		OP_CONSUMABLE_PREVIEW:
-			consumable_preview_received.emit(data)
-		OP_CONSUMABLE_SAVE_DRAFT, OP_CONSUMABLE_PUBLISH, OP_CONSUMABLE_DISABLE, OP_CONSUMABLE_DELETE:
-			consumable_mutation_completed.emit(data)
-		OP_EQUIPMENT_ITEM:
-			equipment_item_received.emit(data)
-		OP_EQUIPMENT_PREVIEW:
-			equipment_preview_received.emit(data)
-		OP_EQUIPMENT_SAVE_DRAFT, OP_EQUIPMENT_PUBLISH, OP_EQUIPMENT_DISABLE, OP_EQUIPMENT_DELETE:
-			equipment_mutation_completed.emit(data)
-		OP_HAND_EQUIPMENT_ITEM:
-			hand_equipment_item_received.emit(data)
-		OP_HAND_EQUIPMENT_PREVIEW:
-			hand_equipment_preview_received.emit(data)
-		OP_HAND_EQUIPMENT_SAVE_DRAFT, OP_HAND_EQUIPMENT_PUBLISH, OP_HAND_EQUIPMENT_DISABLE, OP_HAND_EQUIPMENT_DELETE:
-			hand_equipment_mutation_completed.emit(data)
 		OP_MOB_ITEM:
 			mob_item_received.emit(data)
 		OP_MOB_PREVIEW:
@@ -443,9 +261,3 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
-	if operation == OP_HAND_EQUIPMENT_OPTIONS or operation == OP_HAND_EQUIPMENT:
-		_continue_after_hand_equipment_initialization()
-
-
-func _continue_after_hand_equipment_initialization() -> void:
-	_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")

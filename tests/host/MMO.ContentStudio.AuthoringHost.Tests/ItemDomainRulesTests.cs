@@ -4,12 +4,12 @@ using Xunit;
 
 namespace MMO.ContentStudio.AuthoringHost.Tests;
 
-public sealed class HandEquipmentDomainRulesTests
+public sealed class ItemDomainRulesTests
 {
     [Fact]
     public void NormalizeToolCapabilitiesSortsAndTrimsCapabilities()
     {
-        var capabilities = HandEquipmentDomainRules.NormalizeToolCapabilities(
+        var capabilities = ItemDomainRules.NormalizeToolCapabilities(
         [
             new(" mining ", 2, " swing ", null),
             new("fishing", 1, null, " splash ")
@@ -23,7 +23,7 @@ public sealed class HandEquipmentDomainRulesTests
     [Fact]
     public void NormalizeToolCapabilitiesPreservesDuplicateCanonicalIdsForValidation()
     {
-        var capabilities = HandEquipmentDomainRules.NormalizeToolCapabilities(
+        var capabilities = ItemDomainRules.NormalizeToolCapabilities(
         [
             new(" mining ", 1, null, null),
             new("mining", 2, null, null)
@@ -31,13 +31,13 @@ public sealed class HandEquipmentDomainRulesTests
 
         Assert.Equal(2, capabilities.Count);
         Assert.All(capabilities, value => Assert.Equal("mining", value.CapabilityId));
-        Assert.True(HandEquipmentDomainRules.HasDuplicateToolCapabilities(capabilities));
+        Assert.True(ItemDomainRules.HasDuplicateToolCapabilities(capabilities));
     }
 
     [Fact]
     public void NormalizeToolCapabilitiesTreatsBlankOptionalReferencesAsNull()
     {
-        var capability = Assert.Single(HandEquipmentDomainRules.NormalizeToolCapabilities(
+        var capability = Assert.Single(ItemDomainRules.NormalizeToolCapabilities(
         [
             new("mining", 1, "   ", "\t")
         ]));
@@ -49,13 +49,13 @@ public sealed class HandEquipmentDomainRulesTests
     [Fact]
     public void HasDuplicateToolCapabilitiesUsesCanonicalIds()
     {
-        var capabilities = HandEquipmentDomainRules.NormalizeToolCapabilities(
+        var capabilities = ItemDomainRules.NormalizeToolCapabilities(
         [
             new("mining", 1, null, null),
             new(" mining ", 2, null, null)
         ]);
 
-        Assert.True(HandEquipmentDomainRules.HasDuplicateToolCapabilities(capabilities));
+        Assert.True(ItemDomainRules.HasDuplicateToolCapabilities(capabilities));
     }
 
     [Theory]
@@ -74,13 +74,13 @@ public sealed class HandEquipmentDomainRulesTests
         var tools = tool
             ? new[]
             {
-                new HandEquipmentToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
+                new ItemToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
             }
             : [];
 
         Assert.Equal(
             expected,
-            HandEquipmentDomainRules.Classify(false, "right_hand", profile, tools));
+            ItemDomainRules.Classify(false, "right_hand", profile, tools));
     }
 
     [Fact]
@@ -89,12 +89,12 @@ public sealed class HandEquipmentDomainRulesTests
         var profile = new EquipmentCombatProfileDefinition("test_profile", "melee", "slash", 1, 1, 4);
         var tools = new[]
         {
-            new HandEquipmentToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
+            new ItemToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
         };
 
         Assert.Equal(
             "Consumable",
-            HandEquipmentDomainRules.Classify(true, "right_hand", profile, tools));
+            ItemDomainRules.Classify(true, "right_hand", profile, tools));
     }
 
     [Fact]
@@ -102,10 +102,10 @@ public sealed class HandEquipmentDomainRulesTests
     {
         Assert.Equal(
             "Equipment",
-            HandEquipmentDomainRules.Classify(false, "right_hand", null, []));
+            ItemDomainRules.Classify(false, "right_hand", null, []));
         Assert.Equal(
             "Equipment",
-            HandEquipmentDomainRules.Classify(false, "left_hand", null, []));
+            ItemDomainRules.Classify(false, "left_hand", null, []));
     }
 
     [Fact]
@@ -113,12 +113,12 @@ public sealed class HandEquipmentDomainRulesTests
     {
         var tools = new[]
         {
-            new HandEquipmentToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
+            new ItemToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
         };
 
         Assert.Equal(
             "Tool",
-            HandEquipmentDomainRules.Classify(false, null, null, tools));
+            ItemDomainRules.Classify(false, null, null, tools));
     }
 
     [Fact]
@@ -126,10 +126,10 @@ public sealed class HandEquipmentDomainRulesTests
     {
         var profile = new EquipmentCombatProfileDefinition("test_profile", "melee", "slash", 1, 1, 4);
 
-        Assert.True(HandEquipmentDomainRules.IsActiveRuntimeWeapon("right_hand", profile));
-        Assert.False(HandEquipmentDomainRules.IsActiveRuntimeWeapon("left_hand", profile));
-        Assert.False(HandEquipmentDomainRules.IsActiveRuntimeWeapon("right_hand", null));
-        Assert.False(HandEquipmentDomainRules.IsActiveRuntimeWeapon(null, profile));
+        Assert.True(ItemDomainRules.IsActiveRuntimeWeapon("right_hand", profile));
+        Assert.False(ItemDomainRules.IsActiveRuntimeWeapon("left_hand", profile));
+        Assert.False(ItemDomainRules.IsActiveRuntimeWeapon("right_hand", null));
+        Assert.False(ItemDomainRules.IsActiveRuntimeWeapon(null, profile));
     }
 
     [Theory]
@@ -138,7 +138,7 @@ public sealed class HandEquipmentDomainRulesTests
     [InlineData("\t", "")]
     public void NormalizeRequiredTrimsPersistedIdentifiers(string value, string expected)
     {
-        Assert.Equal(expected, HandEquipmentDomainRules.NormalizeRequired(value));
+        Assert.Equal(expected, ItemDomainRules.NormalizeRequired(value));
     }
 
     [Theory]
@@ -147,13 +147,13 @@ public sealed class HandEquipmentDomainRulesTests
     [InlineData("   ")]
     public void NormalizeOptionalReturnsNullForMissingValues(string? value)
     {
-        Assert.Null(HandEquipmentDomainRules.NormalizeOptional(value));
+        Assert.Null(ItemDomainRules.NormalizeOptional(value));
     }
 
     [Fact]
     public void RegistryExposesOnlyRuntimePersistableWeaponTaxonomy()
     {
-        var registry = new HandEquipmentAuthoringRegistry();
+        var registry = new ItemAuthoringRegistry();
 
         Assert.Equal(["melee"], registry.LoadAttackFamilies().Select(option => option.Id));
         Assert.Equal(["thrust", "slash", "crush"], registry.LoadAttackStyles().Select(option => option.Id));

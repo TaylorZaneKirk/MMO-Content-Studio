@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: U3 unified item workspace
+## Current state: U4 unified item authoring
 
 The repository now contains:
 
@@ -35,7 +35,7 @@ The repository now contains:
 - canonical item-PNG selection and import
 - declarative consumable profiles, ordered requirements, and ordered effects
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
-- backend/API and Godot UI support for hand-equipment aggregates, weapon profiles, and tool capabilities
+- backend/API and Godot UI support for unified item aggregates, weapon profiles, and tool capabilities
 - a T4B mob-authoring host boundary with schema handoff, repository, validation,
   options, catalog, load, preview, draft, publish, disable, concurrency, and
   preview-signature support
@@ -170,17 +170,18 @@ boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
 
-Unified item-authoring now has a host-side complete item aggregate, unified
-mutation authority, and one contextual Godot Items workspace. U2 delivered the
-host aggregate and compatibility adapters; U3 makes that aggregate the normal
-Godot workflow. Legacy Basic payloads and specialization routes remain
-compatibility adapters until U4, but the normal authoring workflow no longer
-exposes separate Consumables, Equipment, or Weapons and Tools tabs.
+Unified item-authoring now has one public item route family, one host-side
+complete item aggregate, one mutation authority, and one contextual Godot Items
+workspace. U2 delivered the host aggregate and temporary compatibility
+adapters, U3 made that aggregate the normal Godot workflow, and U4 removed the
+obsolete Basic payload branch, specialization route groups, duplicate services,
+duplicate repositories, duplicate catalog/schema providers, and legacy Godot
+editor scripts. `/api/v1/items` is the only public item-authoring route family.
 See
 [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).
-U3 unified Godot Items workspace implemented; obsolete route/tab retirement and
-runtime tool resolution remain pending.
+U4 unified route/tab retirement is implemented; U5 runtime tool resolution
+remains pending.
 
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering

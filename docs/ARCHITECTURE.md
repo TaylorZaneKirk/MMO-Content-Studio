@@ -230,11 +230,11 @@ equipability or slot changes, reloads inside the transaction, commits, and then
 reloads again to verify the persisted aggregate.
 
 The T3B Godot implementation originally kept hand equipment in a dedicated
-**Weapons & Tools** workspace. U3 replaces the visible item-specialization tabs
+**Weapons & Tools** workspace. U3 replaced the visible item-specialization tabs
 with one contextual **Items** workspace backed by the complete `/api/v1/items`
-aggregate. The legacy `consumable_editor.gd`, `equipment_editor.gd`, and
-`hand_equipment_editor.gd` files remain in source as U4 cleanup candidates, but
-normal navigation no longer instantiates them.
+aggregate. U4 removed the legacy `consumable_editor.gd`,
+`equipment_editor.gd`, and `hand_equipment_editor.gd` files and retired the old
+specialization route groups.
 
 ## Unified item-authoring boundary
 
@@ -261,10 +261,11 @@ are independent of equipability; removing equipability clears equipment and
 weapon metadata but must preserve tool capability rows. Weapon profiles remain
 contextual to runtime-supported weapon-capable slots, initially `right_hand`.
 
-U3 makes that aggregate the active Godot item workflow. Legacy Basic payloads
-and specialization mutation routes remain compatibility surfaces until U4 and
-adapt through the unified service so a partial caller cannot silently overwrite
-child rows owned by another specialization.
+U3 made that aggregate the active Godot item workflow. U4 made the same
+aggregate the only public item mutation surface by removing the legacy Basic
+payload branch and retired `/api/v1/consumables`, `/api/v1/equipment`, and
+`/api/v1/hand-equipment` route groups. All item mutations now flow through
+`UnifiedItemAuthoringService` and `UnifiedItemRepository`.
 
 Detailed evidence and the phased migration plan live in
 [`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md) and

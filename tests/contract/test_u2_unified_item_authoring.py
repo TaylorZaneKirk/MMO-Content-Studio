@@ -22,9 +22,11 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
             "public sealed record ItemPreviewResponse(",
             "public sealed record ItemMutationResponse(",
             'JsonPropertyName("preview_signature")',
-            'JsonPropertyName("editable_in_basic_items")',
+            "public sealed record ItemPublicationRequest(",
+            "public sealed record ItemToolCapabilityDefinition(",
         ):
             self.assertIn(token, contracts)
+        self.assertNotIn('JsonPropertyName("editable_in_basic_items")', contracts)
 
         for path in (
             ROOT / "host" / "Persistence" / "UnifiedItemRepository.cs",
@@ -53,12 +55,16 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
         cleanup = cleanup.split("private static async Task ReplaceRequirementsAsync", 1)[0]
         self.assertNotIn('"item_tool_capabilities"', cleanup)
 
-    def test_unified_service_owns_signature_and_compatibility_adapters(self) -> None:
+    def test_unified_service_owns_signature_without_compatibility_adapters(self) -> None:
         service = (ROOT / "host" / "Services" / "UnifiedItemAuthoringService.cs").read_text()
         for token in (
             "ComputePreviewSignature",
             "NormalizedItemDraft",
             "EquivalentDraft",
+            "preview_signature_mismatch",
+        ):
+            self.assertIn(token, service)
+        for token in (
             "PreviewBasicAsync",
             "SaveBasicDraftAsync",
             "PreviewConsumableAsync",
@@ -70,40 +76,31 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
             "ApplyConsumable",
             "ApplyEquipment",
             "ApplyHandEquipment",
-            "current.ConsumableBehavior",
-            "current.ToolCapabilities",
-            "preview_signature_mismatch",
         ):
-            self.assertIn(token, service)
+            self.assertNotIn(token, service)
 
-    def test_routes_expose_unified_items_and_keep_legacy_adapters(self) -> None:
+    def test_routes_expose_unified_items_and_retire_legacy_adapters(self) -> None:
         items = (ROOT / "host" / "Features" / "Items" / "ItemAuthoringFeature.cs").read_text()
-        consumables = (ROOT / "host" / "Features" / "Consumables" / "ConsumableAuthoringFeature.cs").read_text()
-        equipment = (ROOT / "host" / "Features" / "Equipment" / "EquipmentAuthoringFeature.cs").read_text()
-        hand = (ROOT / "host" / "Features" / "HandEquipment" / "HandEquipmentAuthoringFeature.cs").read_text()
 
         for token in (
             "UnifiedItemRepository",
             "UnifiedItemValidator",
             "UnifiedItemAuthoringService",
             'items.MapGet("/options"',
-            "JsonElement request",
-            "IsUnifiedItemRequest",
             "PreviewItemRequest",
             "SaveItemDraftRequest",
-            "PreviewBasicAsync",
-            "SaveBasicDraftAsync",
-            "HandEquipmentPublicationRequest",
+            "ItemPublicationRequest",
         ):
             self.assertIn(token, items)
 
-        self.assertIn("PreviewConsumableAsync", consumables)
-        self.assertIn("SaveConsumableDraftAsync", consumables)
-        self.assertIn("PreviewEquipmentAsync", equipment)
-        self.assertIn("SaveEquipmentDraftAsync", equipment)
-        self.assertIn("PreviewHandEquipmentAsync", hand)
-        self.assertIn("SaveHandEquipmentDraftAsync", hand)
-        self.assertNotIn("await service.SaveDraftAsync(itemId, request, cancellationToken)", consumables + equipment + hand)
+        for token in ("JsonElement request", "IsUnifiedItemRequest", "PreviewBasicAsync", "SaveBasicDraftAsync"):
+            self.assertNotIn(token, items)
+        for relative in (
+            "host/Features/Consumables/ConsumableAuthoringFeature.cs",
+            "host/Features/Equipment/EquipmentAuthoringFeature.cs",
+            "host/Features/HandEquipment/HandEquipmentAuthoringFeature.cs",
+        ):
+            self.assertFalse((ROOT / relative).exists(), relative)
 
     def test_godot_workspace_is_consolidated_after_u3(self) -> None:
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
@@ -116,21 +113,22 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
         self.assertNotIn('[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
         self.assertNotIn('[node name="Weapons & Tools" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
-    def test_docs_record_u2_and_u3_without_claiming_u4_or_runtime_tool_resolution(self) -> None:
+    def test_docs_record_u2_u3_and_u4_without_claiming_runtime_tool_resolution(self) -> None:
         readme = (ROOT / "README.md").read_text()
         roadmap = (ROOT / "docs" / "ROADMAP.md").read_text()
         api = (ROOT / "docs" / "API_V1.md").read_text()
         architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text()
         acceptance = (ROOT / "docs" / "UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md").read_text()
+        api_inline = api.replace("\n", " ")
 
         for document in (readme, roadmap, api, architecture, acceptance):
             self.assertIn("U2", document)
-        self.assertIn("U3 unified Godot Items workspace implemented", roadmap)
-        self.assertIn("obsolete route/tab retirement and runtime tool resolution remain pending", roadmap)
-        self.assertIn("U3 consolidates the Godot item workflow", api)
-        self.assertIn("unified routes require server-issued", api)
-        self.assertIn("uniformly require the new signature field", api)
-        self.assertIn("Legacy Basic Items payloads and the Consumables, Equipment, and Weapons &", acceptance)
+        self.assertIn("U3 replaced specialization tabs with one contextual Items workspace", roadmap)
+        self.assertIn("U4 obsolete route/tab retirement implemented; runtime tool resolution remains pending", roadmap)
+        self.assertIn("U3 consolidated the Godot item workflow", api)
+        self.assertIn("/api/v1/items` is now the only public item-authoring route family", api_inline)
+        self.assertIn("Unified routes require server preview signatures", acceptance)
+        self.assertIn("U4 removed the compatibility adapters", acceptance)
 
 
 if __name__ == "__main__":

@@ -684,13 +684,13 @@ public sealed class MobAuthoringService
             true,
             record.UpdatedAtUtc);
 
-    private static IReadOnlyList<BasicItemChange> CalculateChanges(
+    private static IReadOnlyList<AuthoringChange> CalculateChanges(
         string mobDefinitionId,
         MobDefinitionRecord? existing,
         NormalizedMobDraft requested,
         string operation)
     {
-        var changes = new List<BasicItemChange>();
+        var changes = new List<AuthoringChange>();
         AddChange(changes, "mob_definition_id", existing?.MobDefinitionId, mobDefinitionId);
         AddChange(changes, "display_name", existing?.DisplayName, requested.DisplayName);
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
@@ -735,14 +735,14 @@ public sealed class MobAuthoringService
             drop.StackCount)));
 
     private static void AddChange(
-        ICollection<BasicItemChange> changes,
+        ICollection<AuthoringChange> changes,
         string field,
         string? before,
         string? after)
     {
         if (!string.Equals(before, after, StringComparison.Ordinal))
         {
-            changes.Add(new BasicItemChange(field, before, after));
+            changes.Add(new AuthoringChange(field, before, after));
         }
     }
 

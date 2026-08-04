@@ -392,10 +392,11 @@ POST /api/v1/items/{itemId}/disable
 POST /api/v1/items/{itemId}/delete
 ```
 
-Existing `/api/v1/consumables`, `/api/v1/equipment`, and
-`/api/v1/hand-equipment` routes should become compatibility adapters during the
-migration. They must load the full aggregate, apply only the legacy subset, and
-preserve hidden specializations.
+During U2 and U3, existing `/api/v1/consumables`, `/api/v1/equipment`, and
+`/api/v1/hand-equipment` routes became compatibility adapters. They loaded the
+full aggregate, applied only the legacy subset, and preserved hidden
+specializations. U4 retired those adapters after the unified Items workspace
+became the only in-repo caller.
 
 ### 10. Unified Godot Workspace
 

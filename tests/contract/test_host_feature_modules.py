@@ -25,30 +25,29 @@ class HostFeatureModuleTests(unittest.TestCase):
         feature = (HOST / "Features" / "AuthoringFeatureExtensions.cs").read_text()
         for token in (
             "AddItemAuthoring()",
-            "AddConsumableAuthoring()",
-            "AddEquipmentAuthoring()",
             "MapItemAuthoring()",
-            "MapConsumableAuthoring()",
-            "MapEquipmentAuthoring()",
+            "AddMobAuthoring()",
+            "MapMobAuthoring()",
         ):
             self.assertIn(token, feature)
+        for token in (
+            "AddConsumableAuthoring()",
+            "AddEquipmentAuthoring()",
+            "AddHandEquipmentAuthoring()",
+            "MapConsumableAuthoring()",
+            "MapEquipmentAuthoring()",
+            "MapHandEquipmentAuthoring()",
+        ):
+            self.assertNotIn(token, feature)
 
     def test_each_feature_owns_registration_and_routes(self) -> None:
         expectations = {
             "Items/ItemAuthoringFeature.cs": (
-                "BasicItemRepository",
+                "IUnifiedItemRepository",
                 'MapGroup("/items")',
                 'MapPost("/assets/items/import"',
-            ),
-            "Consumables/ConsumableAuthoringFeature.cs": (
-                "ConsumableItemRepository",
-                'MapGroup($"{AuthoringApi.RoutePrefix}/consumables")',
                 'MapPost("/{itemId}/preview"',
-            ),
-            "Equipment/EquipmentAuthoringFeature.cs": (
-                "EquipmentItemRepository",
-                'MapGroup($"{AuthoringApi.RoutePrefix}/equipment")',
-                'MapPost("/{itemId}/preview"',
+                "UnifiedItemAuthoringService",
             ),
             "Mobs/MobAuthoringFeature.cs": (
                 "MobRepository",

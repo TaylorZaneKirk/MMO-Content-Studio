@@ -5,7 +5,7 @@ using MMO.ContentStudio.AuthoringHost.Services;
 namespace MMO.ContentStudio.AuthoringHost.Features.Items;
 
 public sealed class ItemCatalogSectionProvider(
-    BasicItemAuthoringService basicItems) : IAuthoringCatalogSectionProvider
+    UnifiedItemAuthoringService items) : IAuthoringCatalogSectionProvider
 {
     public string ContentType => "items";
 
@@ -13,7 +13,7 @@ public sealed class ItemCatalogSectionProvider(
 
     public async Task<ContentCatalogSection> LoadAsync(CancellationToken cancellationToken)
     {
-        var result = await basicItems.ListAsync(null, cancellationToken);
+        var result = await items.ListAsync(null, cancellationToken);
         IReadOnlyList<ContentCatalogEntry> entries =
             result.Succeeded && result.Value is not null
                 ? result.Value.Items.Select(item => new ContentCatalogEntry(

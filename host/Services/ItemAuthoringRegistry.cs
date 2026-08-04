@@ -2,7 +2,7 @@ using MMO.ContentStudio.AuthoringHost.Contracts;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
 
-public sealed class HandEquipmentAuthoringRegistry
+public sealed class ItemAuthoringRegistry
 {
     public const int CombatUnitMilliseconds = 600;
     public const string ActiveWeaponSlotId = "right_hand";
@@ -49,7 +49,7 @@ public sealed class HandEquipmentAuthoringRegistry
         databaseCapabilities.Contains(capabilityId) || DefaultToolCapabilityIds.Contains(capabilityId);
 }
 
-public static class HandEquipmentDomainRules
+public static class ItemDomainRules
 {
     public const int MaximumRequirements = 16;
     public const int MaximumModifiers = 16;
@@ -59,10 +59,10 @@ public static class HandEquipmentDomainRules
     public const int MaximumRangeTiles = 32;
     public const int MaximumPowerTier = 1_000;
 
-    public static IReadOnlyList<HandEquipmentToolCapabilityDraft> NormalizeToolCapabilities(
-        IReadOnlyList<HandEquipmentToolCapabilityDraft>? capabilities) =>
+    public static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(
+        IReadOnlyList<ItemToolCapabilityDraft>? capabilities) =>
         (capabilities ?? [])
-            .Select(value => new HandEquipmentToolCapabilityDraft(
+            .Select(value => new ItemToolCapabilityDraft(
                 NormalizeRequired(value.CapabilityId),
                 value.PowerTier,
                 NormalizeOptional(value.ActionAnimationId),
@@ -75,7 +75,7 @@ public static class HandEquipmentDomainRules
             .ToArray();
 
     public static bool HasDuplicateToolCapabilities(
-        IReadOnlyList<HandEquipmentToolCapabilityDraft> capabilities) =>
+        IReadOnlyList<ItemToolCapabilityDraft> capabilities) =>
         capabilities
             .GroupBy(value => value.CapabilityId, StringComparer.Ordinal)
             .Any(group => group.Count() > 1);
@@ -84,7 +84,7 @@ public static class HandEquipmentDomainRules
         bool hasConsumableProfile,
         string? equipmentSlotId,
         EquipmentCombatProfileDefinition? weaponProfile,
-        IReadOnlyList<HandEquipmentToolCapabilityDefinition> toolCapabilities)
+        IReadOnlyList<ItemToolCapabilityDefinition> toolCapabilities)
     {
         if (hasConsumableProfile)
         {
@@ -105,7 +105,7 @@ public static class HandEquipmentDomainRules
     public static bool IsActiveRuntimeWeapon(
         string? equipmentSlotId,
         EquipmentCombatProfileDefinition? weaponProfile) =>
-        equipmentSlotId == HandEquipmentAuthoringRegistry.ActiveWeaponSlotId
+        equipmentSlotId == ItemAuthoringRegistry.ActiveWeaponSlotId
         && weaponProfile is not null;
 
     public static string NormalizeRequired(string? value) =>

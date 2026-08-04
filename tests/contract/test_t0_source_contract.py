@@ -41,7 +41,7 @@ class T0SourceContractTests(unittest.TestCase):
             path.read_text()
             for path in (ROOT / "host" / "Features").rglob("*.cs")
         )
-        for content_type in ("items", "consumables", "equipment", "mobs", "npcs"):
+        for content_type in ("items", "mobs", "npcs"):
             self.assertIn(f'"{content_type}"', feature_sources)
 
     def test_godot_main_scene_exists(self) -> None:

@@ -25,20 +25,37 @@ Accepted U2 behavior:
   returns one preview signature.
 - `/api/v1/items/{itemId}/draft`, `publish`, `disable`, and `delete` mutate
   through `UnifiedItemAuthoringService` and `UnifiedItemRepository`.
-- Legacy Basic Items payloads and the Consumables, Equipment, and Weapons &
-  Tools mutation routes are compatibility adapters over the unified service.
-- Compatibility adapters preserve hidden specializations while replacing only
-  the subset represented by the legacy request.
-- Unified routes require server preview signatures. Legacy compatibility routes
-  preserve their pre-U2 request shapes until U4 and therefore use unified
-  full-aggregate validation and concurrency, but not uniformly the new
-  signature field.
-- The consolidated Godot Items workspace is implemented in U3. The old editor
-  scripts and route adapters remain compatibility cleanup candidates for U4.
+- U2 temporarily kept legacy Basic Items payloads and the Consumables,
+  Equipment, and Weapons & Tools mutation routes as compatibility adapters over
+  the unified service.
+- Those adapters preserved hidden specializations while replacing only the
+  subset represented by the legacy request.
+- U4 removed the compatibility adapters after the consolidated Godot Items
+  workspace became the normal workflow.
+- Unified routes require server preview signatures for save, publish, disable,
+  and delete.
+
+## U4
+
+U4 is complete when `/api/v1/items` is the only public item-authoring route
+family, every item mutation flows through `UnifiedItemAuthoringService`, every
+item persistence mutation flows through `UnifiedItemRepository`, duplicate
+specialization catalog/schema providers are gone, and the legacy Godot item
+editor scripts are removed.
+
+Accepted U4 behavior:
+
+- `/api/v1/consumables`, `/api/v1/equipment`, and `/api/v1/hand-equipment` are
+  no longer registered.
+- `/api/v1/items` accepts only complete unified request contracts.
+- The Godot shell exposes one Items tab for all item specializations.
+- Old item specialization editors are not referenced by scenes or the host
+  client.
+- The unified item schema-health provider covers consumable, equipment,
+  weapon, combat-bonus, and tool-capability tables.
 
 ## Pending
 
-- U4: retire obsolete specialization routes and tabs.
 - U5: runtime tool resolution across inventory and equipped items.
 
 Runtime tool execution, gathering, crafting, two-handed equipment, and broad
