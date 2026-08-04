@@ -295,10 +295,10 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         )
 
         for token in (
-            "T5D Godot NPC workspace implemented; MMO Project runtime handoff and end-to-end verification remain pending",
+            "T5E MMO Project runtime NPC catalog handoff implemented",
             "The NPCs workspace authors reusable definitions only; placement remains in Tiled",
-            "runtime-catalog, quest-authoring, and multiple-interaction capability",
-            "reference_check_complete = false",
+            "quest-authoring and multiple-interaction capability",
+            "supports_runtime_npc_catalog = true",
         ):
             self.assertIn(token, docs)
 
@@ -317,11 +317,28 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
-        unexpected = [
-            line
-            for line in result.stdout.splitlines()
-            if not line.endswith("tools/MMO-Content-Studio")
-        ]
+        allowed_paths = (
+            "docs/development/CONTENT_AUTHORING_GUIDE.md",
+            "prototype/importer/",
+            "prototype/server/features/npcs/application/NpcRuntimeService.cs",
+            "prototype/server/features/static_content/application/",
+            "prototype/shared/maps/generated/starter_region/",
+            "prototype/shared/maps/npcs/",
+            "prototype/shared/maps/tiled/regions/starter_region.tmj",
+            "prototype/sql/",
+            "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",
+            "prototype/tools/MapPublisher/",
+            "tools/MMO-Content-Studio",
+            "tools/mmoproject.tiled-session",
+        )
+        unexpected = []
+        for line in result.stdout.splitlines():
+            path = line[3:]
+            if not path.startswith(allowed_paths):
+                unexpected.append(line)
         self.assertEqual([], unexpected)
 
 

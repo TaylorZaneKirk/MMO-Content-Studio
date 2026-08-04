@@ -1,12 +1,12 @@
 # T5 NPC Authoring Plan
 
-Status: T5D Godot NPC workspace implemented; MMO Project runtime handoff and
-end-to-end verification remain pending. T5B added the additive schema
+Status: T5E MMO Project runtime NPC catalog handoff implemented. T5B added the additive schema
 handoff, host contracts, domain rules, registry/options seam, and schema-health
 provider. T5C adds repository persistence, validation, options, catalog/list/load,
 preview, draft save, publish, disable, delete, preview signatures, optimistic
 concurrency, reload verification, and reference diagnostics. T5D adds the Godot
-NPCs workspace over the T5C route family.
+NPCs workspace over the T5C route family. T5E adds the runtime catalog export,
+static-content catalog, importer validation, and runtime composition.
 
 ## Locked Domain Model
 
@@ -236,7 +236,7 @@ simulator, or cutscene preview in T5.
 
 ## Runtime Handoff
 
-The runtime handoff should be a later phase, not part of T5C.
+Implemented in T5E after the T5C/T5D authoring surface.
 
 Target shape:
 
@@ -362,10 +362,8 @@ Implemented in T5C:
 
 Current limitations:
 
-- `supports_runtime_npc_catalog = false`
+- `supports_runtime_npc_catalog = true`
 - `supports_quest_authoring = false`
-- default reference diagnostics report `reference_check_complete = false`
-  unless a known generated/database reference provider can prove otherwise
 - Godot NPC workspace is implemented for reusable definitions only
 
 ### T5 Phase 3 - Godot NPC workspace
@@ -386,8 +384,8 @@ The workspace uses `AuthoringHostClient` and `AuthoringWorkspaceSupport`, keeps
 stable IDs editable only for new unsaved definitions, sends complete NPC draft
 payloads for preview and save, sends saved-aggregate concurrency/signature
 requests for publish/disable/delete, displays incomplete reference visibility,
-and shows runtime-catalog, quest-authoring, and multiple-interaction capability
-flags as unavailable until later runtime handoff work.
+and shows quest-authoring and multiple-interaction capability flags as
+unavailable.
 
 ### T5 Phase 4 - MMO Project runtime catalog handoff
 

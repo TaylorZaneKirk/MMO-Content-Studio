@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -107,8 +106,8 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
 
         self.assertIn("T5A audits the current MMO Project NPC runtime", readme)
         self.assertIn("## T5 NPC-definition boundary", architecture)
-        self.assertIn("## T5 NPC-authoring planning handoff", integration)
-        self.assertIn("T5A is documentation-only", integration)
+        self.assertIn("## T5 NPC-authoring runtime handoff", integration)
+        self.assertIn("T5E MMO Project runtime NPC catalog handoff implemented", integration)
 
     def test_t5d_adds_godot_editor_without_runtime_expansion(self) -> None:
         editor_path = ROOT / "content-studio" / "scripts" / "npc_editor.gd"
@@ -123,7 +122,7 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
         ):
             self.assertNotIn(forbidden, editor.lower())
 
-    def test_runtime_checkout_confirms_current_manual_npc_flow_when_available(self) -> None:
+    def test_runtime_checkout_confirms_npc_catalog_handoff_when_available(self) -> None:
         guide_path = _runtime_file(Path("docs") / "development" / "CONTENT_AUTHORING_GUIDE.md")
         runtime_path = _runtime_file(
             Path("prototype")
@@ -142,45 +141,43 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
             / "regions"
             / "starter_region.tmj"
         )
+        npc_catalog_path = _runtime_file(Path("prototype") / "shared" / "maps" / "npcs" / "catalog.json")
+        npc_migration_path = _runtime_file(Path("prototype") / "sql" / "024_npc_authoring_schema.sql")
+        npc_seed_path = _runtime_file(Path("prototype") / "sql" / "025_seed_existing_npc_definitions.sql")
         dialogue_path = _runtime_file(Path("prototype") / "shared" / "dialogues" / "catalog.json")
 
-        if None in (guide_path, runtime_path, importer_path, tiled_path, dialogue_path):
+        if None in (
+            guide_path,
+            runtime_path,
+            importer_path,
+            tiled_path,
+            npc_catalog_path,
+            npc_migration_path,
+            npc_seed_path,
+            dialogue_path,
+        ):
             self.skipTest("MMO Project checkout is unavailable; runtime source check is skipped.")
 
         guide = guide_path.read_text()
         runtime = runtime_path.read_text()
         importer = importer_path.read_text()
         tiled = tiled_path.read_text()
+        npc_catalog = npc_catalog_path.read_text()
+        npc_migration = npc_migration_path.read_text()
+        npc_seed = npc_seed_path.read_text()
         dialogue = dialogue_path.read_text()
 
         self.assertIn("## Adding a New NPC", guide)
-        self.assertIn("There is not yet a\nshared NPC definition catalog", guide)
-        self.assertIn("ResolveGeneratedNpcTexturePath", runtime)
-        self.assertIn('"test_npc" => "res://assets/actors/npcs/Chars_139_200-F2-S.png"', runtime)
-        self.assertIn('if object_type != "NpcSpawn"', importer)
+        self.assertIn("ResolveNpcDefinition", runtime)
+        self.assertNotIn("ResolveGeneratedNpcTexturePath", runtime)
+        self.assertIn("NPC_DEFINITION_CATALOG_RELATIVE_PATH", importer)
+        self.assertIn('object_type != NPC_SPAWN_CLASS', importer)
         self.assertIn('"NPC Spawns"', tiled)
         self.assertIn('"npc_definition_id"', tiled)
+        self.assertIn('"definition_id": "test_npc"', npc_catalog)
+        self.assertIn("CREATE TABLE IF NOT EXISTS npc_definitions", npc_migration)
+        self.assertIn("'test_npc'", npc_seed)
         self.assertIn('"dialogue_id": "test_npc_greeting"', dialogue)
-
-    def test_t5a_does_not_modify_mmo_project_checkout_except_nested_repo_pointer(self) -> None:
-        runtime_root = _runtime_file(Path("prototype") / "server" / "Program.cs")
-        if runtime_root is None:
-            self.skipTest("MMO Project checkout is unavailable; git status check is skipped.")
-
-        project = runtime_root.parents[2]
-        result = subprocess.run(
-            ["git", "status", "--short"],
-            cwd=project,
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-        unexpected = [
-            line
-            for line in result.stdout.splitlines()
-            if not line.endswith("tools/MMO-Content-Studio")
-        ]
-        self.assertEqual([], unexpected)
 
 
 if __name__ == "__main__":

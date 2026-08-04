@@ -118,14 +118,28 @@ class U4UnifiedItemRetirementTests(unittest.TestCase):
         allowed_paths = (
             "docs/development/CONTENT_AUTHORING_GUIDE.md",
             "docs/modernization/GAMEPLAY_SYSTEM_ROADMAP.md",
+            "prototype/importer/",
             "prototype/server/Program.cs",
             "prototype/server/features/README.md",
+            "prototype/server/features/npcs/application/NpcRuntimeService.cs",
+            "prototype/server/features/static_content/application/",
             "prototype/server/features/tools/",
+            "prototype/shared/maps/generated/starter_region/",
+            "prototype/shared/maps/npcs/",
+            "prototype/shared/maps/tiled/regions/starter_region.tmj",
             "prototype/sql/MODULE_OWNERSHIP.md",
             "prototype/sql/README.md",
+            "prototype/sql/024_npc_authoring_schema.sql",
+            "prototype/sql/025_seed_existing_npc_definitions.sql",
+            "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CharacterToolPossessionRepositoryContractTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CharacterToolResolverTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",
+            "prototype/tools/MapPublisher/",
             "tools/MMO-Content-Studio",
+            "tools/mmoproject.tiled-session",
         )
         unrelated = []
         for line in result.stdout.splitlines():

@@ -51,7 +51,7 @@ public sealed class NpcAuthoringService
                     NpcVisualResourcePrefix,
                     _assetService.GetGameAssetsRoot()),
                 new NpcOperationCapabilities(
-                    false,
+                    true,
                     dialogueReferences.Complete,
                     false,
                     false),
@@ -678,7 +678,7 @@ public sealed class NpcAuthoringService
         {
             messages.Add(new ApiError(
                 "npc_reference_check_incomplete",
-                "Known generated/database NPC spawn references were checked only through the current T5C seam; Tiled source validation remains deferred to T5E/T5F.",
+                "Known database-published NPC spawn references could not be checked because the world-content schema is unavailable; Tiled source validation remains a later hardening concern.",
                 ValidationSeverity.Warning,
                 "npc_definition_id"));
         }

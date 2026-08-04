@@ -129,47 +129,38 @@ until a later slice adds explicit authoring support. It does not add random or
 weighted drops, patrols, placement rows, dialogue, shops, quests, arbitrary
 scripts, or runtime hot reload.
 
-## T5 NPC-authoring planning handoff
+## T5 NPC-authoring runtime handoff
 
-T5D Godot NPC workspace implemented; MMO Project runtime handoff and end-to-end
-verification remain pending. T5A audited the current MMO Project NPC runtime and
-locked the future integration boundary; T5B added the additive handoff migration
-`prototype/sql/024_npc_authoring_schema.sql`, host contract shapes,
-normalization rules, registry/options, and schema-health requirements. T5C adds
-Content Studio repository persistence, validator behavior, options,
-catalog/list/load, preview, draft save, publish, disable, delete, preview
-signatures, optimistic concurrency, reload verification, and reference
-diagnostics. T5D adds the Godot NPCs workspace over `/api/v1/npcs`.
+T5E MMO Project runtime NPC catalog handoff implemented. T5A audited the current
+MMO Project NPC runtime and locked the integration boundary; T5B added the
+additive handoff migration `prototype/sql/024_npc_authoring_schema.sql`, host
+contract shapes, normalization rules, registry/options, and schema-health
+requirements. T5C adds Content Studio repository persistence, validator
+behavior, options, catalog/list/load, preview, draft save, publish, disable,
+delete, preview signatures, optimistic concurrency, reload verification, and
+reference diagnostics. T5D adds the Godot NPCs workspace over `/api/v1/npcs`.
+T5E mirrors the migration into MMO Project, seeds `test_npc`, exports
+`prototype/shared/maps/npcs/catalog.json`, validates `NpcSpawn.npc_definition_id`
+against that catalog, and composes runtime NPCs from placement plus reusable
+definition data.
 
-T5A is documentation-only and remains the source audit/domain-lock milestone;
-T5B, T5C, and T5D add Content Studio handoff artifacts, host API behavior, and
-local Godot authoring UI without changing MMO Project runtime code.
+The active handoff is:
 
-The current runtime still loads NPCs from Tiled-generated `npc_spawns` records.
-`NpcRuntimeService` reads placement properties such as `npc_definition_id`,
-`facing`, `movement_behavior`, `interaction_enabled`, `interaction_range_tiles`,
-and `dialogue_id` from generated chunk JSON. The only reusable-definition seam
-today is the `npc_definition_id` value, which is resolved by the hard-coded
-`ResolveGeneratedNpcTexturePath` method.
-
-The planned handoff is:
-
-- Content Studio will own reusable `npc_definitions`.
-- Tiled will continue to own `NpcSpawn` placement, stable object names,
+- Content Studio owns reusable `npc_definitions`.
+- Tiled continues to own `NpcSpawn` placement, stable object names,
   coordinates, initial facing, and the `npc_definition_id` link.
-- A later MMO Project slice should add an `export-npc-catalog` command, importer
-  validation against that catalog, generated/database static-content catalog
-  loading, and runtime composition in `NpcRuntimeService`.
+- `MapPublisher export-npc-catalog` writes the published runtime catalog.
+- Generated and database static-content sources expose `npc_definition_catalog`
+  at the region level.
+- `NpcRuntimeService` no longer requires hard-coded texture mapping.
 - The existing `WorldSnapshotNpcPayload`, `npc_interaction_request`, and
-  `DialogueSessionService` payloads should remain compatible.
+  `DialogueSessionService` payloads remain compatible.
 
-`notes` is authoring-only metadata and should not be exported to the future
-runtime NPC catalog. `default_dialogue_id` remains a stable string reference;
+`notes` is authoring-only metadata and is not exported to the runtime NPC
+catalog. `default_dialogue_id` remains a stable string reference;
 dialogue-reference validation uses the configured file-backed MMO Project
 dialogue catalog when available and otherwise reports syntax-only validation.
-`supports_runtime_npc_catalog = false`, `supports_quest_authoring = false`, and
-reference diagnostics currently report `reference_check_complete = false` unless
-a known generated/database reference provider can prove otherwise.
+`supports_runtime_npc_catalog = true` and `supports_quest_authoring = false`.
 
 T5 does not add shops, banks, trainers, quest state, dialogue graph authoring,
 NPC combat, schedules, portraits, emotes, cutscenes, arbitrary scripts, or

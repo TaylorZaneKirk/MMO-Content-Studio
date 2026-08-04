@@ -1,8 +1,7 @@
 # T5 NPC Authoring Acceptance
 
-Status: acceptance criteria for the T5 implementation sequence. T5D Godot NPC
-workspace implemented; MMO Project runtime handoff and end-to-end verification
-remain pending.
+Status: acceptance criteria for the T5 implementation sequence. T5E MMO Project
+runtime NPC catalog handoff implemented.
 
 ## T5A - Audit And Domain Lock
 
@@ -27,9 +26,9 @@ remain pending.
 - Domain rules validate IDs, publication state, visuals, movement, interaction,
   and dialogue references.
 - Registry/options expose only the supported T5B states, movement modes, and
-  `talk` interaction while dialogue-reference validation remains a later
-  runtime handoff concern.
-- `notes` is authoring-only metadata and is omitted from the future runtime NPC
+  `talk` interaction. Dialogue-reference validation uses the configured
+  file-backed MMO Project dialogue catalog when available.
+- `notes` is authoring-only metadata and is omitted from the runtime NPC
   catalog export.
 - No placement fields appear in the NPC definition contract.
 
@@ -43,12 +42,10 @@ remain pending.
 - Save/publish/disable/delete operate on the saved complete aggregate.
 - Repository writes are transactional and verified by reload after commit.
 - Disabled definitions can be deleted only when no known spawn references exist.
-- Dialogue-reference validation uses the configured file-backed MMO Project
-  dialogue catalog when available, and reports syntax-only validation when the
-  catalog is unavailable.
-- Options report `supports_runtime_npc_catalog = false`,
-  `supports_quest_authoring = false`, and current reference diagnostics may
-  report `reference_check_complete = false`.
+- Dialogue-reference validation uses the configured file-backed MMO Project dialogue catalog
+  when available, and reports syntax-only validation when the catalog is unavailable.
+- Options report `supports_runtime_npc_catalog = true` and
+  `supports_quest_authoring = false`.
 
 ## T5 Phase 3 - Godot NPC Workspace
 
@@ -60,8 +57,8 @@ remain pending.
   placement facing.
 - Form and preview/validation panels are scrollable.
 - Missing/invalid dialogue IDs are visible in validation.
-- Runtime NPC catalog export, quest authoring, multiple interactions, and
-  incomplete reference visibility are displayed as read-only capability states.
+- Quest authoring and multiple interactions are displayed as read-only
+  capability states.
 - Placement coordinates are not editable in Content Studio.
 
 ## T5 Phase 4 - MMO Project Runtime Handoff

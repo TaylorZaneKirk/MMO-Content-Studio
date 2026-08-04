@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import unittest
 from pathlib import Path
 
@@ -184,7 +183,7 @@ class T5CNpcAuthoringApiTests(unittest.TestCase):
         ):
             self.assertIn(token, service_tests)
 
-    def test_docs_mark_t5c_without_claiming_godot_or_runtime_handoff(self) -> None:
+    def test_docs_mark_t5e_without_claiming_deferred_npc_work(self) -> None:
         docs = "\n".join(
             [
                 (ROOT / "README.md").read_text(),
@@ -199,41 +198,43 @@ class T5CNpcAuthoringApiTests(unittest.TestCase):
         )
 
         for token in (
-            "T5D Godot NPC workspace implemented; MMO Project runtime handoff and end-to-end verification remain pending",
-            "reference_check_complete = false",
-            "supports_runtime_npc_catalog = false",
+            "T5E MMO Project runtime NPC catalog handoff implemented",
+            "supports_runtime_npc_catalog = true",
             "supports_quest_authoring = false",
             "The NPCs workspace authors reusable definitions only; placement remains in Tiled",
         ):
             self.assertIn(token, docs)
 
         for forbidden in (
-            "runtime NPC catalog export implemented",
             "Quest authoring implemented",
+            "supports_runtime_npc_catalog = false",
         ):
             self.assertNotIn(forbidden, docs)
 
-    def test_godot_npc_editor_exists_without_mmo_project_changes(self) -> None:
+    def test_runtime_handoff_sources_exist_when_mmo_project_is_available(self) -> None:
         self.assertTrue((ROOT / "content-studio" / "scripts" / "npc_editor.gd").exists())
 
-        runtime_root = _runtime_file(Path("prototype") / "server" / "Program.cs")
-        if runtime_root is None:
-            self.skipTest("MMO Project checkout is unavailable; git status check is skipped.")
-
-        project = runtime_root.parents[2]
-        result = subprocess.run(
-            ["git", "status", "--short"],
-            cwd=project,
-            check=True,
-            text=True,
-            capture_output=True,
-        )
-        unexpected = [
-            line
-            for line in result.stdout.splitlines()
-            if not line.endswith("tools/MMO-Content-Studio")
+        required_paths = [
+            Path("prototype") / "tools" / "MapPublisher" / "NpcCatalogExporter.cs",
+            Path("prototype") / "tools" / "MapPublisher" / "NpcCatalogExportCli.cs",
+            Path("prototype") / "shared" / "maps" / "npcs" / "catalog.json",
+            Path("prototype") / "sql" / "024_npc_authoring_schema.sql",
+            Path("prototype") / "sql" / "025_seed_existing_npc_definitions.sql",
         ]
-        self.assertEqual([], unexpected)
+        resolved_paths = [
+            _runtime_file(relative_path)
+            for relative_path in required_paths
+        ]
+        if any(path is None for path in resolved_paths):
+            self.skipTest("MMO Project checkout is unavailable; runtime handoff source check is skipped.")
+
+        exporter = resolved_paths[0].read_text()
+        catalog = resolved_paths[2].read_text()
+        seed = resolved_paths[4].read_text()
+
+        self.assertIn("NpcCatalogExportService", exporter)
+        self.assertIn('"definition_id": "test_npc"', catalog)
+        self.assertIn("'test_npc'", seed)
 
 
 if __name__ == "__main__":

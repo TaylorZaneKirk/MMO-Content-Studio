@@ -206,16 +206,49 @@ public sealed class NpcRepository : INpcRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public Task<NpcReferenceSummaryRecord> LoadKnownSpawnReferencesAsync(
+    public async Task<NpcReferenceSummaryRecord> LoadKnownSpawnReferencesAsync(
         string npcDefinitionId,
         CancellationToken cancellationToken = default)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(new NpcReferenceSummaryRecord(
+        const string sql = """
+            select c.map_id
+            from world_region_chunks c
+            where exists (
+                select 1
+                from jsonb_array_elements(coalesce(c.chunk_json->'npc_spawns', '[]'::jsonb)) spawn
+                where spawn->>'npc_definition_id' = @npc_definition_id
+                   or spawn->'properties'->>'npc_definition_id' = @npc_definition_id
+            )
+            order by c.map_id;
+            """;
+
+        var sources = new List<string>();
+        try
+        {
+            await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.Add("npc_definition_id", NpgsqlDbType.Text).Value = npcDefinitionId;
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                sources.Add($"database:world_region_chunks:{reader.GetString(0)}");
+            }
+        }
+        catch (PostgresException exception) when (
+            exception.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedColumn)
+        {
+            return new NpcReferenceSummaryRecord(
+                npcDefinitionId,
+                0,
+                [],
+                false);
+        }
+
+        return new NpcReferenceSummaryRecord(
             npcDefinitionId,
-            0,
-            [],
-            false));
+            sources.Count,
+            sources,
+            true);
     }
 
     private static async Task<NpcDefinitionRecord?> LoadAsync(

@@ -39,7 +39,7 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         Assert.Contains(result.Value!.DialogueReferences, reference => reference.Id == "test_npc_greeting");
         Assert.True(result.Value.CanValidateDialogueReferences);
         Assert.True(result.Value.Capabilities.SupportsCompleteDialogueReferenceValidation);
-        Assert.False(result.Value.Capabilities.SupportsRuntimeNpcCatalog);
+        Assert.True(result.Value.Capabilities.SupportsRuntimeNpcCatalog);
         Assert.False(result.Value.Capabilities.SupportsMultipleInteractions);
         Assert.False(result.Value.Capabilities.SupportsQuestAuthoring);
     }

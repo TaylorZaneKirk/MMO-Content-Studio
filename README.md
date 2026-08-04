@@ -69,8 +69,12 @@ spawn names, initial facing, and the `npc_definition_id` link. T5B adds
 `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`,
 compile-time NPC contracts, domain normalization rules, a registry/options seam,
 feature-owned schema-health requirements, and a placeholder NPC catalog section.
-T5D Godot NPC workspace implemented; MMO Project runtime handoff and end-to-end verification remain pending.
-dialogue-reference validation remains a later runtime handoff concern.
+T5D Godot NPC workspace implemented. T5E MMO Project runtime NPC catalog
+handoff implemented via mirrored migrations, `export-npc-catalog`, generated
+and database static-content catalogs, and runtime composition from
+`NpcSpawn.npc_definition_id`.
+Dialogue-reference validation uses the configured file-backed MMO Project
+dialogue catalog when it is available.
 The NPCs workspace authors reusable definitions only; placement remains in Tiled.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
@@ -148,7 +152,7 @@ The default API address is `http://127.0.0.1:5187`.
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
-7. **T5 — Minimal NPC authoring** — T5D Godot NPC workspace implemented
+7. **T5 — Minimal NPC authoring** — T5E runtime NPC catalog handoff implemented
 8. **T6 — Interactable world objects foundation**
 9. **T7 — Gathering resources and processing stations**
 10. **Dialogue workspace**
@@ -182,21 +186,20 @@ boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
 
-T5 planning confirms that current NPCs are still authored as Tiled `NpcSpawn`
-placements whose `npc_definition_id` is resolved by hard-coded runtime mapping.
+T5 planning confirmed that NPCs were authored as Tiled `NpcSpawn` placements
+whose `npc_definition_id` was resolved by hard-coded runtime mapping before
+T5E.
 The locked T5 direction is a reusable NPC definition aggregate with explicit
 visuals, movement defaults, talk/dialogue references, publication state, and no
 Content Studio ownership of map placement. T5B NPC schema and contract
 foundation implemented the additive schema handoff and host-side compile-time
 contracts; T5C NPC repository, validation, and API implemented; T5D Godot NPC
-workspace implemented; MMO Project runtime handoff and end-to-end verification
-remain pending. Notes are
+workspace implemented; T5E MMO Project runtime NPC catalog handoff implemented.
+Notes are
 authoring-only and dialogue-reference validation uses the configured
 file-backed MMO Project dialogue catalog when it is available, otherwise it is
-syntax-only. `supports_runtime_npc_catalog = false`,
-`supports_quest_authoring = false`, and reference diagnostics currently report
-`reference_check_complete = false` unless a known generated/database reference
-provider can prove otherwise. See
+syntax-only. `supports_runtime_npc_catalog = true` and
+`supports_quest_authoring = false`. See
 [`docs/T5_NPC_DOMAIN_AUDIT.md`](docs/T5_NPC_DOMAIN_AUDIT.md),
 [`docs/T5_NPC_AUTHORING_PLAN.md`](docs/T5_NPC_AUTHORING_PLAN.md), and
 [`docs/T5_NPC_ACCEPTANCE.md`](docs/T5_NPC_ACCEPTANCE.md).

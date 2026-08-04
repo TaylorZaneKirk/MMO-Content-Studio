@@ -25,4 +25,4 @@ dependencies or filtering rules.
 The NPC catalog provider never invents fake entries. It returns real NPC
 definition entries when the configured database has the T5 schema, and returns
 an empty implemented section when the host cannot list definitions. MMO Project
-runtime handoff and end-to-end verification remain pending.
+runtime NPC catalog handoff is implemented in T5E.

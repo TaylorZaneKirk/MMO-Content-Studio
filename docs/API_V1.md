@@ -239,7 +239,7 @@ Returns NPC authoring options:
   dialogue catalog can be resolved
 - dialogue-reference validation capability
 - visual asset-root metadata using `res://assets/actors/npcs/`
-- capability flags: `supports_runtime_npc_catalog = false`,
+- capability flags: `supports_runtime_npc_catalog = true`,
   `supports_quest_authoring = false`, `supports_multiple_interactions = false`
 
 ### `GET /api/v1/npcs?search=test`
@@ -272,10 +272,9 @@ diagnostics, and returns a deterministic `preview_signature`.
 the effective payload. If the request body differs from the saved aggregate,
 the preview reports `unsaved_npc_changes`.
 
-Reference diagnostics are deliberately narrow in T5C. Known generated/database
-references block disable/delete, but the default repository seam reports
-`reference_check_complete = false` because Tiled source validation and runtime
-catalog handoff remain T5E/T5F work.
+Reference diagnostics are narrow and use known generated/database references
+when available. Known generated/database references block disable/delete; Tiled
+source validation remains a later hardening concern.
 
 ### `PUT /api/v1/npcs/{npcDefinitionId}/draft`
 
@@ -313,8 +312,8 @@ The T5D Godot **NPCs** workspace consumes these routes through
 `AuthoringHostClient` and `AuthoringHttpTransport`. It sends complete draft
 and preview aggregates for save/preview, sends only `expected_updated_at_utc`
 plus `preview_signature` for publish/disable/delete, clears the apply gate after
-every form edit, and displays runtime-catalog, quest-authoring, multiple-action,
-and reference-completeness limitations until the later runtime handoff.
+every form edit, and displays quest-authoring, multiple-action, and
+reference-completeness capability states.
 
 ## Request correlation
 

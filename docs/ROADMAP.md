@@ -188,15 +188,15 @@ Phased plan:
 
 **Status:** T5A runtime audit and domain lock documented. T5B NPC schema and
 contract foundation implemented. T5C NPC repository, validation, and API
-implemented. T5D Godot NPC workspace implemented; MMO Project runtime handoff
-and end-to-end verification remain pending.
+implemented. T5D Godot NPC workspace implemented. T5E MMO Project runtime NPC
+catalog handoff implemented.
 
 Move reusable NPC identity and presentation data into the database-backed
 authoring boundary while keeping spawn placement in Tiled. The current MMO
-Project path authors `NpcSpawn` objects in Tiled, preserves their properties in
-generated chunk JSON, and resolves `npc_definition_id` through a hard-coded
-`NpcRuntimeService` texture mapping. T5 should replace that manual mapping with
-published reusable NPC definitions and a later runtime catalog handoff.
+Project path authors `NpcSpawn` objects in Tiled, validates their
+`npc_definition_id` against a published runtime NPC catalog, embeds that catalog
+in generated/database static content, and composes runtime NPCs from placement
+plus reusable definitions.
 
 Locked boundaries:
 
@@ -226,15 +226,14 @@ catalog section. T5C adds repository persistence, validator behavior, options,
 catalog/list/load, preview, save draft, publish, disable, delete, preview
 signatures, optimistic concurrency, transactional root writes, reload
 verification, and a narrow reference diagnostic seam. Notes are authoring-only
-metadata and are omitted from the future runtime NPC catalog export.
+metadata and are omitted from the runtime NPC catalog export.
 Dialogue-reference validation uses the configured file-backed MMO Project
 dialogue catalog when available; otherwise it reports syntax-only validation.
-`supports_runtime_npc_catalog = false`, `supports_quest_authoring = false`, and
-reference diagnostics currently report `reference_check_complete = false`
-unless a known generated/database reference provider can prove otherwise. T5D
-adds the Godot NPCs workspace for list/search/create/load/edit/preview/save,
-publish, disable, and delete over `/api/v1/npcs`; it does not add runtime
-catalog export, placement authoring, or quest editing.
+`supports_runtime_npc_catalog = true` and `supports_quest_authoring = false`.
+T5D adds the Godot NPCs workspace for list/search/create/load/edit/preview/save,
+publish, disable, and delete over `/api/v1/npcs`. T5E adds the runtime catalog
+export/static-content/runtime handoff; it does not add placement authoring or
+quest editing.
 
 ## T6 — Interactable World Objects Foundation
 

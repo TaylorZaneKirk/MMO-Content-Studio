@@ -258,14 +258,13 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
         for token in (
             "T5B NPC schema and contract foundation implemented",
             "024_npc_authoring_schema.sql",
-            "MMO Project runtime handoff and end-to-end verification remain pending",
+            "T5E MMO Project runtime NPC catalog handoff implemented",
             "notes is authoring-only",
-            "dialogue-reference validation remains a later runtime handoff concern",
+            "Dialogue-reference validation uses the configured file-backed MMO Project dialogue catalog",
         ):
             self.assertIn(token, docs)
 
         for forbidden in (
-            "runtime NPC catalog export implemented",
             "Quest authoring implemented",
         ):
             self.assertNotIn(forbidden, docs)
@@ -283,11 +282,28 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
             text=True,
             capture_output=True,
         )
-        unexpected = [
-            line
-            for line in result.stdout.splitlines()
-            if not line.endswith("tools/MMO-Content-Studio")
-        ]
+        allowed_paths = (
+            "docs/development/CONTENT_AUTHORING_GUIDE.md",
+            "prototype/importer/",
+            "prototype/server/features/npcs/application/NpcRuntimeService.cs",
+            "prototype/server/features/static_content/application/",
+            "prototype/shared/maps/generated/starter_region/",
+            "prototype/shared/maps/npcs/",
+            "prototype/shared/maps/tiled/regions/starter_region.tmj",
+            "prototype/sql/",
+            "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",
+            "prototype/tools/MapPublisher/",
+            "tools/MMO-Content-Studio",
+            "tools/mmoproject.tiled-session",
+        )
+        unexpected = []
+        for line in result.stdout.splitlines():
+            path = line[3:]
+            if not path.startswith(allowed_paths):
+                unexpected.append(line)
         self.assertEqual([], unexpected)
 
 
