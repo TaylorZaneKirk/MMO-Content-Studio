@@ -85,6 +85,14 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         self.assertIn("operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS]", client)
         self.assertIn("_request_next_startup_operation()", client)
 
+    def test_successful_npc_catalog_load_recovers_schema_enabled_ui(self) -> None:
+        editor = (SCRIPTS / "npc_editor.gd").read_text()
+        catalog_handler = editor.split("func _on_npc_catalog_received", 1)[1].split("func _on_npc_definition_received", 1)[0]
+
+        self.assertIn("_schema_available = true", catalog_handler)
+        self.assertIn("_rebuild_list()", catalog_handler)
+        self.assertIn("_set_form_enabled(not _current_npc.is_empty() or _is_new)", catalog_handler)
+
     def test_editor_uses_shared_client_and_workspace_support(self) -> None:
         editor = (SCRIPTS / "npc_editor.gd").read_text()
 

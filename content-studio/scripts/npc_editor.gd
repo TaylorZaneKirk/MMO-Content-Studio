@@ -362,8 +362,10 @@ func _on_npc_options_received(payload: Dictionary) -> void:
 
 
 func _on_npc_catalog_received(payload: Dictionary) -> void:
+	_schema_available = true
 	_npcs = payload.get("items", []) as Array
 	_rebuild_list()
+	_set_form_enabled(not _current_npc.is_empty() or _is_new)
 	if not _reload_npc_id.is_empty():
 		var npc_id := _reload_npc_id
 		_reload_npc_id = ""
