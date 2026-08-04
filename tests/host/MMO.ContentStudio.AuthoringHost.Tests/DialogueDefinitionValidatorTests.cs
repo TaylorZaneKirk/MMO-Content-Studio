@@ -94,6 +94,35 @@ public sealed class DialogueDefinitionValidatorTests
     }
 
     [Fact]
+    public void DuplicateEntryAndChoiceRuntimeOrdersAreRejected()
+    {
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            EntryPoints =
+            [
+                new DialogueEntryPoint("default", "start", 0, 0, []),
+                new DialogueEntryPoint("fallback", "start", 0, 0, [])
+            ],
+            Nodes =
+            [
+                DialogueTestData.Speaker("start", "Hello", "choice"),
+                new("choice", "player_choice", null, "Choose.", null, true, 100, 0, null,
+                [
+                    new("first", "First.", "end", 0, []),
+                    new("second", "Second.", "end", 0, [])
+                ]),
+                DialogueTestData.End("end")
+            ]
+        };
+
+        var outcome = CreateValidator().Validate("test_npc_greeting", draft, null, true);
+
+        Assert.False(outcome.ValidForPublication);
+        Assert.Contains(outcome.Messages, message => message.Field == "entry_points.entry_order:0");
+        Assert.Contains(outcome.Messages, message => message.Field == "nodes.choice.choices.choice_order:0");
+    }
+
+    [Fact]
     public void CyclesAreAllowedOnlyWhenTheyStillReachEnd()
     {
         var draft = DialogueTestData.ValidDraft() with

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
+using MMO.ContentStudio.AuthoringHost.Persistence;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Xunit;
 
@@ -176,6 +177,26 @@ public sealed class NpcDefinitionValidatorTests : IDisposable
         Assert.Contains(outcome.Messages, message => message.Code == "npc_dialogue_reference_invalid");
     }
 
+    [Theory]
+    [InlineData("Draft")]
+    [InlineData("Disabled")]
+    public async Task PublishUsesAuthoringDialogueStateInsteadOfStaleRuntimeJson(string publicationState)
+    {
+        var validator = CreateValidator(new FakeDialogueRepository([
+            DialogueRecord("test_npc_greeting", publicationState)
+        ]));
+
+        var outcome = await validator.ValidateAsync(
+            "test_npc",
+            ValidDraft(),
+            null,
+            true,
+            TestContext.Current.CancellationToken);
+
+        Assert.False(outcome.ValidForPublication);
+        Assert.Contains(outcome.Messages, message => message.Code == "npc_dialogue_reference_invalid");
+    }
+
     [Fact]
     public async Task DialogueValidationFallsBackToSyntaxOnlyWhenCatalogIsMissing()
     {
@@ -210,7 +231,7 @@ public sealed class NpcDefinitionValidatorTests : IDisposable
         }
     }
 
-    private NpcDefinitionValidator CreateValidator()
+    private NpcDefinitionValidator CreateValidator(IDialogueRepository? dialogueRepository = null)
     {
         var options = Options.Create(new AssetRootsOptions
         {
@@ -221,8 +242,25 @@ public sealed class NpcDefinitionValidatorTests : IDisposable
         });
         return new NpcDefinitionValidator(
             new ItemAssetService(options),
-            new NpcDialogueReferenceProvider(options));
+            new NpcDialogueReferenceProvider(options, dialogueRepository));
     }
+
+    private static DialogueDefinitionRecord DialogueRecord(
+        string dialogueDefinitionId,
+        string publicationState) => new(
+            dialogueDefinitionId,
+            dialogueDefinitionId,
+            publicationState,
+            1,
+            [],
+            [],
+            null,
+            null,
+            DateTimeOffset.UtcNow,
+            DateTimeOffset.UtcNow,
+            0,
+            0,
+            0);
 
     private static NpcDraft ValidDraft() => new(
         "Test NPC",
@@ -257,5 +295,63 @@ public sealed class NpcDefinitionValidatorTests : IDisposable
             (byte)(height >> 24), (byte)(height >> 16), (byte)(height >> 8), (byte)height
         ];
         File.WriteAllBytes(path, header.ToArray());
+    }
+
+    private sealed class FakeDialogueRepository : IDialogueRepository
+    {
+        private readonly IReadOnlyList<DialogueDefinitionRecord> _records;
+
+        public FakeDialogueRepository(IReadOnlyList<DialogueDefinitionRecord> records)
+        {
+            _records = records;
+        }
+
+        public Task<IReadOnlyList<DialogueDefinitionRecord>> ListAsync(
+            string? search,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_records);
+        }
+
+        public Task<DialogueDefinitionRecord?> LoadAsync(
+            string dialogueDefinitionId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DialogueDefinitionRecord?> LoadForUpdateAsync(
+            string dialogueDefinitionId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DialogueDefinitionRecord> InsertDraftAsync(
+            string dialogueDefinitionId,
+            DialogueDraft draft,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DialogueDefinitionRecord> ReplaceDraftAsync(
+            string dialogueDefinitionId,
+            DialogueDraft draft,
+            DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DialogueDefinitionRecord> SetPublicationAsync(
+            string dialogueDefinitionId,
+            string publicationState,
+            DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task DeleteAsync(
+            string dialogueDefinitionId,
+            DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<DialogueReferenceSummaryRecord> LoadNpcReferencesAsync(
+            string dialogueDefinitionId,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

@@ -2,25 +2,46 @@ using System.Text.Json;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
+using MMO.ContentStudio.AuthoringHost.Persistence;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public sealed class NpcDialogueReferenceProvider
 {
     private readonly AssetRootsOptions _options;
+    private readonly IDialogueRepository? _dialogueRepository;
 
     public NpcDialogueReferenceProvider(IOptions<AssetRootsOptions> options)
+        : this(options, null)
     {
-        _options = options.Value;
     }
 
-    public Task<NpcDialogueReferenceSet> LoadAsync(CancellationToken cancellationToken = default)
+    public NpcDialogueReferenceProvider(
+        IOptions<AssetRootsOptions> options,
+        IDialogueRepository? dialogueRepository)
+    {
+        _options = options.Value;
+        _dialogueRepository = dialogueRepository;
+    }
+
+    public async Task<NpcDialogueReferenceSet> LoadAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (_dialogueRepository is not null)
+        {
+            var records = await _dialogueRepository.ListAsync(null, cancellationToken);
+            var options = records
+                .Where(record => record.PublicationState == "Published")
+                .OrderBy(record => record.DialogueDefinitionId, StringComparer.Ordinal)
+                .Select(record => new AuthoringOption(record.DialogueDefinitionId, record.DisplayName))
+                .ToArray();
+            return new NpcDialogueReferenceSet(options, true, "authoring:dialogue_definitions");
+        }
+
         var catalogPath = ResolveDialogueCatalogPath();
         if (catalogPath is null || !File.Exists(catalogPath))
         {
-            return Task.FromResult(new NpcDialogueReferenceSet([], false, catalogPath));
+            return new NpcDialogueReferenceSet([], false, catalogPath);
         }
 
         try
@@ -29,7 +50,7 @@ public sealed class NpcDialogueReferenceProvider
             if (!document.RootElement.TryGetProperty("dialogues", out var dialogues)
                 || dialogues.ValueKind != JsonValueKind.Array)
             {
-                return Task.FromResult(new NpcDialogueReferenceSet([], false, catalogPath));
+                return new NpcDialogueReferenceSet([], false, catalogPath);
             }
 
             var ids = new SortedSet<string>(StringComparer.Ordinal);
@@ -46,15 +67,15 @@ public sealed class NpcDialogueReferenceProvider
             var options = ids
                 .Select(id => new AuthoringOption(id, id))
                 .ToArray();
-            return Task.FromResult(new NpcDialogueReferenceSet(options, true, catalogPath));
+            return new NpcDialogueReferenceSet(options, true, catalogPath);
         }
         catch (JsonException)
         {
-            return Task.FromResult(new NpcDialogueReferenceSet([], false, catalogPath));
+            return new NpcDialogueReferenceSet([], false, catalogPath);
         }
         catch (IOException)
         {
-            return Task.FromResult(new NpcDialogueReferenceSet([], false, catalogPath));
+            return new NpcDialogueReferenceSet([], false, catalogPath);
         }
     }
 

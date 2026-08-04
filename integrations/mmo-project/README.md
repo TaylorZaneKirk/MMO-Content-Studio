@@ -196,7 +196,9 @@ The D2 schema stores authoring-only display metadata, notes, canvas positions,
 editor notes, publication state, and root concurrency timestamps. D4 adds
 `MapPublisher export-dialogue-catalog`, which writes only `Published` dialogue
 definitions back into the runtime catalog shape already consumed by MMO
-Project.
+Project. D5 hardening keeps display metadata, notes, canvas positions, editor
+notes, timestamps, and authoring dismissibility from changing runtime JSON
+output for the current all-dismissible dialogue slice.
 
 The initial handoff must preserve current runtime semantics: prioritized entry
 points, `speaker_text`, `player_choice`, and `end` nodes, node-owned
@@ -207,7 +209,11 @@ scripting, or runtime hot reload.
 
 D2 reference safety reads Content Studio `npc_definitions.default_dialogue_id`.
 Published NPC references block dialogue disable, and any NPC reference blocks
-dialogue delete. Conditions and effects have no authorable registry entries in
-D3, no condition/effect tables are created, and there is no quest, condition, or
-effect authoring. D4 MMO Project runtime catalog handoff is implemented, and
-D5 hardening and playthrough verification remain pending.
+dialogue delete. NPC publish validation prefers the Content Studio authoring
+state for dialogue references; stale runtime JSON is not sufficient to validate
+a Draft, Disabled, or missing dialogue. Conditions and effects have no
+authorable registry entries, no condition/effect tables are created, and there
+is no quest, condition, or effect authoring. D1-D5 non-quest Dialogue Studio
+authoring, graph editing, runtime catalog export, validator/runtime
+equivalence, reference safety, and end-to-end verification are complete. Quest
+predicates/effects remain deferred.

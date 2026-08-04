@@ -81,9 +81,10 @@ class D4DialogueRuntimeHandoffTests(unittest.TestCase):
         self.assertIn("D4 MMO Project runtime catalog handoff implemented", docs)
         self.assertIn("export-dialogue-catalog", docs)
         self.assertIn("only Published definitions", docs)
-        self.assertIn("D5 hardening and playthrough verification remain pending", docs)
+        self.assertIn("D1-D5 non-quest Dialogue Studio authoring", docs)
         self.assertIn("hot reload", docs)
         self.assertNotIn("Quest authoring implemented", docs)
+        self.assertNotIn("D5 hardening and playthrough verification remain pending", docs)
 
 
 if __name__ == "__main__":

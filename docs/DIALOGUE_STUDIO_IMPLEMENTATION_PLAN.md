@@ -1,7 +1,8 @@
 # Dialogue Studio Implementation Plan
 
-Status: D4 MMO Project runtime catalog handoff implemented. D5 hardening and
-playthrough verification remain pending.
+Status: D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
+catalog export, validator/runtime equivalence, reference safety, and end-to-end
+verification are complete. Quest predicates/effects remain deferred.
 
 ## Sequence Lock
 
@@ -14,7 +15,7 @@ D1 dialogue runtime/domain audit           complete
 D2 dialogue schema and host API            complete
 D3 Godot Dialogue Studio graph editor       complete
 D4 MMO Project runtime catalog handoff     complete
-D5 hardening and playthrough verification
+D5 hardening and playthrough verification       complete
 
 MMO Project quest foundations
 Dialogue Studio quest integration
@@ -199,6 +200,8 @@ D4 should not change runtime dialogue session semantics unless the export
 integration reveals a necessary compatibility fix.
 
 ## D5 - Hardening And Playthrough Verification
+
+Status: complete for the non-quest runtime-compatible dialogue slice.
 
 Verification targets:
 

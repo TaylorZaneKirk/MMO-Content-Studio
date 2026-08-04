@@ -27,6 +27,38 @@ public sealed class DialoguePlaythroughServiceTests
     }
 
     [Fact]
+    public void StartUsesPriorityThenEntryOrderAndChoicesUseChoiceOrder()
+    {
+        var service = new DialoguePlaythroughService();
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            EntryPoints =
+            [
+                new DialogueEntryPoint("z_entry", "alternate", 0, 0, []),
+                new DialogueEntryPoint("a_entry", "start", 0, 1, [])
+            ],
+            Nodes =
+            [
+                DialogueTestData.Speaker("alternate", "Alternate.", "choice"),
+                DialogueTestData.Speaker("start", "Welcome.", "choice"),
+                new DialogueNode("choice", "player_choice", null, "What do you say?", null, true, 100, 0, null,
+                [
+                    new DialogueChoice("second", "Second.", "end", 1, []),
+                    new DialogueChoice("first", "First.", "end", 0, [])
+                ]),
+                DialogueTestData.End("end")
+            ]
+        };
+
+        var start = service.Preview(draft, Request(restart: true));
+        var choice = service.Preview(draft, Request(currentNodeId: "alternate"));
+
+        Assert.Equal("alternate", start.CurrentNode!.NodeId);
+        Assert.Equal("first", choice.VisibleChoices[0].ChoiceId);
+        Assert.Equal("second", choice.VisibleChoices[1].ChoiceId);
+    }
+
+    [Fact]
     public void InvalidChoiceStaleNodeAndLoopProtectionReturnWarnings()
     {
         var service = new DialoguePlaythroughService();

@@ -1,9 +1,8 @@
 # Dialogue Studio Domain Model
 
-Status: D3 Godot Dialogue Studio implemented over the D2 host-side dialogue
-schema, contracts, repository, validation, playthrough preview, and API. D4 MMO
-Project runtime handoff remains pending. D5 hardening and playthrough
-verification remain pending.
+Status: D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
+catalog export, validator/runtime equivalence, reference safety, and end-to-end
+verification are complete. Quest predicates/effects remain deferred.
 
 ## Product Boundary
 
@@ -450,15 +449,17 @@ D3 provides no quest, condition, or effect authoring.
 The safest first preview is a pure Content Studio validator/simulator that uses
 the same semantics as current runtime:
 
-- choose the highest-priority unconditional entry point
+- choose the highest-priority unconditional entry point, using entry order and
+  then stable ID for ties
 - show speaker/text
 - continue through `next_node_id`
-- show visible choices
+- show visible choices in `choice_order`
 - select choices by `choice_id`
 - keep end nodes visible until acknowledged
 - detect loops and offer restart
 - show hidden/invalid reasons for unsupported conditions where possible
 
 It must not call production MMO Project session endpoints and must not commit
-effects. A later D4/D5 equivalence test can compare Content Studio preview
-output against `DialogueSessionService` behavior.
+effects. D5 equivalence tests compare Content Studio preview behavior with
+`DialogueSessionService` for continuation, choice ordering, end acknowledgement,
+invalid commands, and close behavior.

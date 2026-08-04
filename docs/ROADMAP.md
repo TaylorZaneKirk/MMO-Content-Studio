@@ -240,8 +240,9 @@ quest editing.
 
 ## D - Dialogue Studio
 
-**Status:** D4 MMO Project runtime catalog handoff implemented. D5 hardening
-and playthrough verification remain pending.
+**Status:** D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
+catalog export, validator/runtime equivalence, reference safety, and end-to-end
+verification are complete. Quest predicates/effects remain deferred.
 
 Move current non-quest dialogue graph authoring into MMO Content Studio as a
 first-class workspace after NPCs and before Environment. Dialogue Studio is not
@@ -285,6 +286,7 @@ Phased plan:
 - D4 adds the MMO Project runtime catalog handoff while preserving the existing
   dialogue protocol. This handoff is implemented.
 - D5 hardens runtime verification, reference safety, and connected playthroughs.
+  This non-quest hardening slice is complete.
 
 D2 adds `integrations/mmo-project/prototype/sql/026_dialogue_authoring_schema.sql`
 with `dialogue_definitions`, `dialogue_entry_points`, `dialogue_nodes`, and

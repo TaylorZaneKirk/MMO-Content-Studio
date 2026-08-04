@@ -329,10 +329,10 @@ definitions to MMO Project runtime JSON through `MapPublisher`.
 
 Returns publication states, node types `speaker_text`, `player_choice`, and
 `end`, ID rules/limits, default entry/start IDs, and capability flags. The
-condition and effect registries are empty. Runtime catalog export, quest
-conditions/effects, localization, portraits, hot reload, and cutscenes all
-report unsupported in D3. The Godot workspace shows those capabilities as
-unsupported and provides no quest, condition, or effect authoring.
+condition and effect registries are empty. Quest conditions/effects,
+localization, portraits, hot reload, and cutscenes all report unsupported. The
+Godot workspace shows those capabilities as unsupported and provides no quest,
+condition, or effect authoring.
 
 ### `GET /api/v1/dialogues?search=greeting`
 

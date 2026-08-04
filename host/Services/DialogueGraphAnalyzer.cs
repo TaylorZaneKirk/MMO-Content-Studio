@@ -182,9 +182,11 @@ public sealed class DialogueGraphAnalyzer
 
     private static void AddDuplicateOrderFields(DialogueDraft draft, ISet<string> duplicateOrders)
     {
-        foreach (var group in draft.EntryPoints.GroupBy(entry => entry.EntryOrder).Where(group => group.Count() > 1))
+        foreach (var group in draft.EntryPoints
+                     .GroupBy(entry => (entry.Priority, entry.EntryOrder))
+                     .Where(group => group.Count() > 1))
         {
-            duplicateOrders.Add($"entry_points.entry_order:{group.Key}");
+            duplicateOrders.Add($"entry_points.entry_order:{group.Key.EntryOrder}");
         }
         foreach (var group in draft.Nodes.GroupBy(node => $"{node.CanvasX:R}:{node.CanvasY:R}").Where(group => group.Count() > 1))
         {

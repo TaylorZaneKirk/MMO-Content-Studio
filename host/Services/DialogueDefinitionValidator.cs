@@ -47,7 +47,7 @@ public sealed class DialogueDefinitionValidator
         {
             messages.Add(new ApiError(
                 "save_will_unpublish_dialogue",
-                "Saving this published dialogue changes its Content Studio lifecycle state to Draft; runtime export remains D4 work.",
+                "Saving this published dialogue changes its Content Studio lifecycle state to Draft; publish again before exporting it to the runtime catalog.",
                 ValidationSeverity.Warning,
                 "publication_state"));
         }
@@ -294,6 +294,17 @@ public sealed class DialogueDefinitionValidator
                 "Multiple entry points are allowed for forward compatibility; with no condition vocabulary, lower-priority entries may be unreachable at runtime.",
                 ValidationSeverity.Warning,
                 "entry_points"));
+        }
+        foreach (var duplicateOrder in analysis.DuplicateOrderFields)
+        {
+            var isAuthoringLayout = duplicateOrder.StartsWith("nodes.canvas_position:", StringComparison.Ordinal);
+            messages.Add(new ApiError(
+                "dialogue_invalid_graph",
+                isAuthoringLayout
+                    ? $"Authoring canvas position is shared by multiple nodes: {duplicateOrder}."
+                    : $"Runtime ordering value is duplicated: {duplicateOrder}.",
+                isAuthoringLayout ? ValidationSeverity.Warning : ValidationSeverity.Error,
+                duplicateOrder));
         }
     }
 

@@ -187,7 +187,7 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "any NPC reference blocks delete",
             "Godot Dialogue Studio",
             "D4 MMO Project runtime catalog handoff implemented",
-            "D5 hardening and playthrough verification remain pending",
+            "D1-D5 non-quest Dialogue Studio authoring",
             "no quest, condition, or effect authoring",
         ):
             self.assertIn(token, docs)
@@ -195,6 +195,7 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
         for forbidden in (
             "D4 complete implemented",
             "D5 complete implemented",
+            "D5 hardening and playthrough verification remain pending",
             "Quest authoring implemented",
             "D4 MMO Project runtime catalog handoff remains pending",
         ):

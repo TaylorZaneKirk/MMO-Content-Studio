@@ -137,7 +137,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, main)
 
-    def test_docs_mark_d4_complete_and_d5_deferred(self) -> None:
+    def test_docs_mark_d4_and_d5_complete_without_quest_scope(self) -> None:
         docs = "\n".join(
             [
                 (ROOT / "README.md").read_text(),
@@ -157,7 +157,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "GraphEdit",
             "NPC cross-navigation",
             "D4 MMO Project runtime catalog handoff implemented",
-            "D5 hardening and playthrough verification remain pending",
+            "D1-D5 non-quest Dialogue Studio authoring",
             "no quest, condition, or effect authoring",
         ):
             self.assertIn(token, docs)
@@ -165,6 +165,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
         for forbidden in (
             "Quest authoring implemented",
             "D4 MMO Project runtime catalog handoff remains pending",
+            "D5 hardening and playthrough verification remain pending",
         ):
             self.assertNotIn(forbidden, docs)
 

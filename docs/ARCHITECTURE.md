@@ -375,11 +375,12 @@ dialogue graphs, or quests.
 
 ## D Dialogue Studio boundary
 
-D2 implements Dialogue Studio's host-side authoring boundary. The later Godot
-workspace belongs in the same Godot shell and .NET authoring host as Items,
-Mobs, and NPCs. It is not a separate application, and the NPC workspace should
-provide navigation to referenced dialogue definitions without embedding the full
-graph editor.
+D1-D5 complete the non-quest Dialogue Studio authoring, graph editing, runtime
+catalog export, validator/runtime equivalence, reference safety, and end-to-end
+verification boundary. The Godot workspace belongs in the same Godot shell and
+.NET authoring host as Items, Mobs, and NPCs. It is not a separate application,
+and the NPC workspace provides navigation to referenced dialogue definitions
+without embedding the full graph editor.
 
 The current MMO Project runtime source of truth is
 `prototype/shared/dialogues/catalog.json`, loaded by

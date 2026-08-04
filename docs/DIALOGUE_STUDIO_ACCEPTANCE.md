@@ -1,9 +1,8 @@
 # Dialogue Studio Acceptance
 
-Status: D4 MMO Project runtime catalog handoff accepted. D5 hardening and
-playthrough verification remain pending.
-
-D5 hardening and playthrough verification remain pending.
+Status: D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
+catalog export, validator/runtime equivalence, reference safety, and end-to-end
+verification are complete. Quest predicates/effects remain deferred.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -89,6 +88,8 @@ Status: complete for the generated runtime catalog handoff.
   locks are exported.
 
 ## D5 - Hardening And Verification
+
+Status: complete for the non-quest runtime-compatible dialogue slice.
 
 - Byte-stable export tests pass.
 - Content Studio graph validation and runtime catalog validation agree on
