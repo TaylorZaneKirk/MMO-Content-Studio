@@ -309,3 +309,34 @@ schema-health manifest, repository-backed catalog/load/options, validation,
 preview signatures, draft save, publish, disable, transaction-scoped child
 replacement, and reload verification. The Godot editor and runtime repository
 integration remain outside this slice.
+
+## T5 NPC-definition boundary
+
+T5 keeps NPC authoring separate from Tiled placement and separate from future
+Dialogue/Quest Studio work:
+
+```text
+npc_definitions
+  └─ default talk/dialogue reference
+
+Tiled NpcSpawn placement
+  └─ npc_definition_id reference
+```
+
+Content Studio should own reusable NPC definitions: stable id, display name,
+runtime actor visual path, source dimensions, anchor/render settings, footprint,
+default movement behavior, interaction range, default `talk` capability,
+optional default `dialogue_id`, publication state, and aggregate concurrency.
+
+Tiled and generated/static-content publication continue to own placement facts:
+stable spawn object name, source coordinates, runtime mount composition, initial
+facing, and the `npc_definition_id` linkage. Placement IDs and coordinates must
+not become Content Studio fields.
+
+The current MMO Project runtime supports NPC click-to-approach and modal
+dialogue through `NpcInteractionService`, `IInteractionSpatialPort`,
+`DialogueDefinitionCatalog`, and `DialogueSessionService`. Initial T5 authoring
+therefore persists only the current `talk`/dialogue capability. Dialogue graphs,
+quests, shops, banking, trainers, service menus, NPC combat, schedules, emotes,
+portraits, cutscenes, arbitrary scripts, and runtime hot reload remain deferred
+until matching runtime consumers exist.

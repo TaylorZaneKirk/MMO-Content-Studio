@@ -128,3 +128,31 @@ runtime catalog now includes health-regeneration fields; T4D exports
 until a later slice adds explicit authoring support. It does not add random or
 weighted drops, patrols, placement rows, dialogue, shops, quests, arbitrary
 scripts, or runtime hot reload.
+
+## T5 NPC-authoring planning handoff
+
+T5A is documentation-only. It audits the current MMO Project NPC runtime and
+locks the future integration boundary without adding a migration, API route,
+Godot workspace, or runtime change.
+
+The current runtime still loads NPCs from Tiled-generated `npc_spawns` records.
+`NpcRuntimeService` reads placement properties such as `npc_definition_id`,
+`facing`, `movement_behavior`, `interaction_enabled`, `interaction_range_tiles`,
+and `dialogue_id` from generated chunk JSON. The only reusable-definition seam
+today is the `npc_definition_id` value, which is resolved by the hard-coded
+`ResolveGeneratedNpcTexturePath` method.
+
+The planned handoff is:
+
+- Content Studio will own reusable `npc_definitions`.
+- Tiled will continue to own `NpcSpawn` placement, stable object names,
+  coordinates, initial facing, and the `npc_definition_id` link.
+- A later MMO Project slice should add an `export-npc-catalog` command, importer
+  validation against that catalog, generated/database static-content catalog
+  loading, and runtime composition in `NpcRuntimeService`.
+- The existing `WorldSnapshotNpcPayload`, `npc_interaction_request`, and
+  `DialogueSessionService` payloads should remain compatible.
+
+T5 does not add shops, banks, trainers, quest state, dialogue graph authoring,
+NPC combat, schedules, portraits, emotes, cutscenes, arbitrary scripts, or
+runtime hot reload.

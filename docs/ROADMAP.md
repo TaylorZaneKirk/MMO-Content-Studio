@@ -186,7 +186,34 @@ Phased plan:
 
 ## T5 — Minimal NPC Authoring
 
-Add reusable NPC identity, visuals, movement profiles, interaction capabilities, service references, and dialogue-reference placeholders before the NPC interaction slice.
+**Status:** T5A runtime audit and domain lock documented; implementation pending.
+
+Move reusable NPC identity and presentation data into the database-backed
+authoring boundary while keeping spawn placement in Tiled. The current MMO
+Project path authors `NpcSpawn` objects in Tiled, preserves their properties in
+generated chunk JSON, and resolves `npc_definition_id` through a hard-coded
+`NpcRuntimeService` texture mapping. T5 should replace that manual mapping with
+published reusable NPC definitions and a later runtime catalog handoff.
+
+Locked boundaries:
+
+- Content Studio owns reusable NPC definitions: stable id, display name,
+  visuals, footprint, default movement behavior, default talk/dialogue
+  interaction, publication state, and aggregate concurrency.
+- Tiled/generated static content owns `NpcSpawn` placement, stable spawn object
+  name, source coordinates, runtime mount composition, initial facing, and the
+  `npc_definition_id` link.
+- The current runtime supports only the `talk` interaction through
+  server-authoritative click-to-approach and `DialogueSessionService`.
+- Dialogue graph authoring, quests, shops, banking, trainers, service menus,
+  NPC combat, factions, schedules, portraits, emotes, cutscenes, arbitrary
+  scripts, and hot reload remain deferred.
+
+References:
+
+- [`T5_NPC_DOMAIN_AUDIT.md`](T5_NPC_DOMAIN_AUDIT.md)
+- [`T5_NPC_AUTHORING_PLAN.md`](T5_NPC_AUTHORING_PLAN.md)
+- [`T5_NPC_ACCEPTANCE.md`](T5_NPC_ACCEPTANCE.md)
 
 ## T6 — Interactable World Objects Foundation
 

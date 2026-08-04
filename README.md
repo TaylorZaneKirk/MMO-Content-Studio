@@ -61,6 +61,13 @@ deterministic export of `Published` mob definitions into the existing runtime
 deferred to a later T4 hardening slice. Spawn placement stays in Tiled/generated
 static content.
 
+T5A audits the current MMO Project NPC runtime, Tiled `NpcSpawn` format,
+dialogue handoff, visual conventions, and current manual authoring guide. It
+locks the next NPC authoring boundary: Content Studio will own reusable NPC
+definitions, while Tiled remains responsible for placement coordinates, stable
+spawn names, initial facing, and the `npc_definition_id` link. NPC schema,
+routes, runtime export, and the Godot NPC workspace are still pending.
+
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
 ## Repository layout
@@ -136,7 +143,7 @@ The default API address is `http://127.0.0.1:5187`.
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
-7. **T5 — Minimal NPC authoring**
+7. **T5 — Minimal NPC authoring** — T5A audit/domain lock documented
 8. **T6 — Interactable world objects foundation**
 9. **T7 — Gathering resources and processing stations**
 10. **Dialogue workspace**
@@ -169,6 +176,15 @@ T4B contributes the local `/api/v1/mobs` host API and transactional persistence
 boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
+
+T5 planning confirms that current NPCs are still authored as Tiled `NpcSpawn`
+placements whose `npc_definition_id` is resolved by hard-coded runtime mapping.
+The locked T5 direction is a reusable NPC definition aggregate with explicit
+visuals, movement defaults, talk/dialogue references, publication state, and no
+Content Studio ownership of map placement. See
+[`docs/T5_NPC_DOMAIN_AUDIT.md`](docs/T5_NPC_DOMAIN_AUDIT.md),
+[`docs/T5_NPC_AUTHORING_PLAN.md`](docs/T5_NPC_AUTHORING_PLAN.md), and
+[`docs/T5_NPC_ACCEPTANCE.md`](docs/T5_NPC_ACCEPTANCE.md).
 
 Unified item-authoring now has one public item route family, one host-side
 complete item aggregate, one mutation authority, and one contextual Godot Items
@@ -203,6 +219,9 @@ server-authoritative runtime execution. See
 - [`docs/T4_ACCEPTANCE.md`](docs/T4_ACCEPTANCE.md)
 - [`docs/T4_MOB_DOMAIN_AUDIT.md`](docs/T4_MOB_DOMAIN_AUDIT.md)
 - [`docs/T4_IMPLEMENTATION_PLAN.md`](docs/T4_IMPLEMENTATION_PLAN.md)
+- [`docs/T5_NPC_ACCEPTANCE.md`](docs/T5_NPC_ACCEPTANCE.md)
+- [`docs/T5_NPC_DOMAIN_AUDIT.md`](docs/T5_NPC_DOMAIN_AUDIT.md)
+- [`docs/T5_NPC_AUTHORING_PLAN.md`](docs/T5_NPC_AUTHORING_PLAN.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md`](docs/UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md)
