@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
 [ext_resource type="Script" path="res://scripts/item_editor.gd" id="3_items"]
 [ext_resource type="Script" path="res://scripts/mob_editor.gd" id="4_mobs"]
+[ext_resource type="Script" path="res://scripts/npc_editor.gd" id="5_npcs"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -105,6 +106,10 @@ script = ExtResource("3_items")
 [node name="Mobs" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2
 script = ExtResource("4_mobs")
+
+[node name="NPCs" type="HBoxContainer" parent="Margin/Root/Tabs"]
+layout_mode = 2
+script = ExtResource("5_npcs")
 
 [node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2

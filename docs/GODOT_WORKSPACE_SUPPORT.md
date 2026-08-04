@@ -11,12 +11,11 @@ content workspace:
 - validation-message rendering
 - publication-operation display names
 
-The U3/U4 Items workspace and the Mobs workspace keep ownership of their forms,
-payloads, preview requests, mutations, status wording, and visual previews while
-delegating the shared lifecycle and feedback behavior to one support instance.
-The legacy Consumables, Equipment, and Weapons & Tools editor scripts were
-removed in U4 after the unified Items workspace became the only normal item
-authoring surface.
+The U3/U4 Items workspace and the Mobs workspace established the current
+pattern: each editor keeps ownership of its form, payloads, preview requests,
+mutations, status wording, and visual preview while delegating the shared
+lifecycle and feedback behavior to one support instance. The T5D NPCs workspace
+follows the same pattern. The legacy Consumables, Equipment, and Weapons & Tools editor scripts were removed in U4 after the unified Items workspace became the only normal item authoring surface.
 
 Every existing editor follows the same sequence:
 
@@ -31,3 +30,9 @@ object instead of declaring their own preview state or feedback renderers. This
 preserves the safety invariant: a mutation can only be submitted when the latest
 valid preview matches both the selected operation and the exact current form
 signature or host-issued preview signature.
+
+The NPCs workspace follows the same rule over `/api/v1/npcs`: list/search,
+create, load, preview, save draft, publish, disable, and delete all flow through
+`AuthoringHostClient`; every meaningful form edit clears the accepted preview;
+and publish/disable/delete use the saved aggregate concurrency token plus the
+server preview signature.

@@ -110,13 +110,18 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
         self.assertIn("## T5 NPC-authoring planning handoff", integration)
         self.assertIn("T5A is documentation-only", integration)
 
-    def test_t5_does_not_add_godot_editor(self) -> None:
-        forbidden_paths = (
-            ROOT / "content-studio" / "scripts" / "npc_editor.gd",
-        )
+    def test_t5d_adds_godot_editor_without_runtime_expansion(self) -> None:
+        editor_path = ROOT / "content-studio" / "scripts" / "npc_editor.gd"
+        self.assertTrue(editor_path.exists())
+        editor = editor_path.read_text()
 
-        for path in forbidden_paths:
-            self.assertFalse(path.exists(), f"T5C must not implement Godot NPC workspace file {path}")
+        for forbidden in (
+            "export-npc-catalog",
+            "dialogue graph editor",
+            "quest_id",
+            "service_script",
+        ):
+            self.assertNotIn(forbidden, editor.lower())
 
     def test_runtime_checkout_confirms_current_manual_npc_flow_when_available(self) -> None:
         guide_path = _runtime_file(Path("docs") / "development" / "CONTENT_AUTHORING_GUIDE.md")

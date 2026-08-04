@@ -188,7 +188,8 @@ Phased plan:
 
 **Status:** T5A runtime audit and domain lock documented. T5B NPC schema and
 contract foundation implemented. T5C NPC repository, validation, and API
-implemented; Godot workspace, runtime handoff, and verification remain pending.
+implemented. T5D Godot NPC workspace implemented; MMO Project runtime handoff
+and end-to-end verification remain pending.
 
 Move reusable NPC identity and presentation data into the database-backed
 authoring boundary while keeping spawn placement in Tiled. The current MMO
@@ -230,8 +231,10 @@ Dialogue-reference validation uses the configured file-backed MMO Project
 dialogue catalog when available; otherwise it reports syntax-only validation.
 `supports_runtime_npc_catalog = false`, `supports_quest_authoring = false`, and
 reference diagnostics currently report `reference_check_complete = false`
-unless a known generated/database reference provider can prove otherwise. No
-Godot NPC workspace is implemented yet.
+unless a known generated/database reference provider can prove otherwise. T5D
+adds the Godot NPCs workspace for list/search/create/load/edit/preview/save,
+publish, disable, and delete over `/api/v1/npcs`; it does not add runtime
+catalog export, placement authoring, or quest editing.
 
 ## T6 — Interactable World Objects Foundation
 

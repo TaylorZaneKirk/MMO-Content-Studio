@@ -258,16 +258,15 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
         for token in (
             "T5B NPC schema and contract foundation implemented",
             "024_npc_authoring_schema.sql",
-            "Godot workspace, runtime handoff, and verification remain pending",
+            "MMO Project runtime handoff and end-to-end verification remain pending",
             "notes is authoring-only",
             "dialogue-reference validation remains a later runtime handoff concern",
         ):
             self.assertIn(token, docs)
 
         for forbidden in (
-            "Godot NPC workspace implemented",
-            "NPC editor implemented",
-            "Godot NPC workspace implemented",
+            "runtime NPC catalog export implemented",
+            "Quest authoring implemented",
         ):
             self.assertNotIn(forbidden, docs)
 

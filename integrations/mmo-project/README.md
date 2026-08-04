@@ -131,19 +131,19 @@ scripts, or runtime hot reload.
 
 ## T5 NPC-authoring planning handoff
 
-T5C NPC repository, validation, and API implemented; Godot workspace, runtime
-handoff, and verification remain pending. T5A audited the current MMO Project
-NPC runtime and locked the future integration boundary; T5B added the additive
-handoff migration `prototype/sql/024_npc_authoring_schema.sql`, host contract
-shapes, normalization rules, registry/options, and schema-health requirements.
-T5C adds Content Studio repository persistence, validator behavior, options,
+T5D Godot NPC workspace implemented; MMO Project runtime handoff and end-to-end
+verification remain pending. T5A audited the current MMO Project NPC runtime and
+locked the future integration boundary; T5B added the additive handoff migration
+`prototype/sql/024_npc_authoring_schema.sql`, host contract shapes,
+normalization rules, registry/options, and schema-health requirements. T5C adds
+Content Studio repository persistence, validator behavior, options,
 catalog/list/load, preview, draft save, publish, disable, delete, preview
 signatures, optimistic concurrency, reload verification, and reference
-diagnostics.
+diagnostics. T5D adds the Godot NPCs workspace over `/api/v1/npcs`.
 
 T5A is documentation-only and remains the source audit/domain-lock milestone;
-T5B and T5C add Content Studio handoff artifacts and host API behavior without
-changing MMO Project runtime code.
+T5B, T5C, and T5D add Content Studio handoff artifacts, host API behavior, and
+local Godot authoring UI without changing MMO Project runtime code.
 
 The current runtime still loads NPCs from Tiled-generated `npc_spawns` records.
 `NpcRuntimeService` reads placement properties such as `npc_definition_id`,
@@ -173,4 +173,5 @@ a known generated/database reference provider can prove otherwise.
 
 T5 does not add shops, banks, trainers, quest state, dialogue graph authoring,
 NPC combat, schedules, portraits, emotes, cutscenes, arbitrary scripts, or
-runtime hot reload. No Godot NPC workspace is implemented yet.
+runtime hot reload. The Godot NPCs workspace is reusable-definition authoring
+only; it does not export a runtime NPC catalog or author Tiled placement.

@@ -223,9 +223,9 @@ edit, and disables mob editing when the mob-authoring schema is unavailable.
 
 ## NPC routes
 
-T5C adds host-side authoring routes for reusable NPC definitions. These routes
-do not export a runtime NPC catalog yet, do not modify Tiled `NpcSpawn`
-placement, and do not add a Godot NPC workspace.
+T5C adds host-side authoring routes for reusable NPC definitions. T5D adds the
+Godot NPCs workspace over those routes. These routes do not export a runtime
+NPC catalog yet and do not modify Tiled `NpcSpawn` placement.
 
 ### `GET /api/v1/npcs/options`
 
@@ -309,7 +309,12 @@ visibility is reported as a warning with `reference_check_complete = false`.
 Deletes a disabled NPC definition after preview/signature and concurrency
 verification. Known generated/database spawn references block delete.
 
-No Godot NPC workspace is implemented yet.
+The T5D Godot **NPCs** workspace consumes these routes through
+`AuthoringHostClient` and `AuthoringHttpTransport`. It sends complete draft
+and preview aggregates for save/preview, sends only `expected_updated_at_utc`
+plus `preview_signature` for publish/disable/delete, clears the apply gate after
+every form edit, and displays runtime-catalog, quest-authoring, multiple-action,
+and reference-completeness limitations until the later runtime handoff.
 
 ## Request correlation
 

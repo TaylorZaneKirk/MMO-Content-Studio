@@ -20,6 +20,12 @@ signal mob_catalog_received(payload: Dictionary)
 signal mob_item_received(payload: Dictionary)
 signal mob_preview_received(payload: Dictionary)
 signal mob_mutation_completed(payload: Dictionary)
+signal npc_options_received(payload: Dictionary)
+signal npc_catalog_received(payload: Dictionary)
+signal npc_definition_received(payload: Dictionary)
+signal npc_preview_received(payload: Dictionary)
+signal npc_mutation_completed(payload: Dictionary)
+signal npc_delete_completed(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const TRANSPORT_SCRIPT := preload("res://scripts/http_json_client.gd")
@@ -46,6 +52,14 @@ const OP_MOB_SAVE_DRAFT := "mob_save_draft"
 const OP_MOB_PUBLISH := "mob_publish"
 const OP_MOB_DISABLE := "mob_disable"
 const OP_MOB_DELETE := "mob_delete"
+const OP_NPC_OPTIONS := "npc_options"
+const OP_NPCS := "npcs"
+const OP_NPC_DEFINITION := "npc_definition"
+const OP_NPC_PREVIEW := "npc_preview"
+const OP_NPC_SAVE_DRAFT := "npc_save_draft"
+const OP_NPC_PUBLISH := "npc_publish"
+const OP_NPC_DISABLE := "npc_disable"
+const OP_NPC_DELETE := "npc_delete"
 
 const CONNECTION_OPERATIONS := [
 	OP_HANDSHAKE,
@@ -59,6 +73,7 @@ const CONNECTION_OPERATIONS := [
 @export var base_url := DEFAULT_BASE_URL
 
 var _transport: AuthoringHttpTransport
+var _startup_operations: Array = []
 
 
 func _ready() -> void:
@@ -193,6 +208,50 @@ func delete_mob(mob_definition_id: String, expected_updated_at_utc: Variant, pre
 	})
 
 
+func load_npc_options() -> void:
+	_request(OP_NPC_OPTIONS, "/api/v1/npcs/options")
+
+
+func load_npcs(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(OP_NPCS, "/api/v1/npcs%s" % suffix)
+
+
+func load_npc(npc_definition_id: String) -> void:
+	_request(OP_NPC_DEFINITION, "/api/v1/npcs/%s" % npc_definition_id.uri_encode())
+
+
+func preview_npc(npc_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_NPC_PREVIEW, "/api/v1/npcs/%s/preview" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+
+func save_npc_draft(npc_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_NPC_SAVE_DRAFT, "/api/v1/npcs/%s/draft" % npc_definition_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+
+func publish_npc(npc_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_NPC_PUBLISH, "/api/v1/npcs/%s/publish" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
+func disable_npc(npc_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_NPC_DISABLE, "/api/v1/npcs/%s/disable" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
+func delete_npc(npc_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_NPC_DELETE, "/api/v1/npcs/%s/delete" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
 func _request(
 	operation: String,
 	path: String,
@@ -232,12 +291,19 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			item_catalog_received.emit(data)
 			items_received.emit(data)
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
-			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
+			_start_workspace_initialization()
 		OP_MOB_OPTIONS:
 			mob_options_received.emit(data)
 			_request(OP_MOBS, "/api/v1/mobs")
 		OP_MOBS:
 			mob_catalog_received.emit(data)
+			_request_next_startup_operation()
+		OP_NPC_OPTIONS:
+			npc_options_received.emit(data)
+			_request(OP_NPCS, "/api/v1/npcs")
+		OP_NPCS:
+			npc_catalog_received.emit(data)
+			_request_next_startup_operation()
 		OP_ITEM:
 			item_definition_received.emit(data)
 			item_received.emit(data)
@@ -253,6 +319,14 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			mob_preview_received.emit(data)
 		OP_MOB_SAVE_DRAFT, OP_MOB_PUBLISH, OP_MOB_DISABLE, OP_MOB_DELETE:
 			mob_mutation_completed.emit(data)
+		OP_NPC_DEFINITION:
+			npc_definition_received.emit(data)
+		OP_NPC_PREVIEW:
+			npc_preview_received.emit(data)
+		OP_NPC_DELETE:
+			npc_delete_completed.emit(data)
+		OP_NPC_SAVE_DRAFT, OP_NPC_PUBLISH, OP_NPC_DISABLE:
+			npc_mutation_completed.emit(data)
 		_:
 			_on_request_failed(operation, "Unexpected request completion.", [])
 
@@ -261,3 +335,21 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
+	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS]:
+		_request_next_startup_operation()
+
+
+func _start_workspace_initialization() -> void:
+	_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS]
+	_request_next_startup_operation()
+
+
+func _request_next_startup_operation() -> void:
+	if _transport.is_busy() or _startup_operations.is_empty():
+		return
+	var operation := str(_startup_operations.pop_front())
+	match operation:
+		OP_MOB_OPTIONS:
+			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
+		OP_NPC_OPTIONS:
+			_request(OP_NPC_OPTIONS, "/api/v1/npcs/options")

@@ -1,11 +1,12 @@
 # T5 NPC Authoring Plan
 
-Status: T5C NPC repository, validation, and API implemented; Godot workspace,
-runtime handoff, and verification remain pending. T5B added the additive schema
+Status: T5D Godot NPC workspace implemented; MMO Project runtime handoff and
+end-to-end verification remain pending. T5B added the additive schema
 handoff, host contracts, domain rules, registry/options seam, and schema-health
 provider. T5C adds repository persistence, validation, options, catalog/list/load,
 preview, draft save, publish, disable, delete, preview signatures, optimistic
-concurrency, reload verification, and reference diagnostics.
+concurrency, reload verification, and reference diagnostics. T5D adds the Godot
+NPCs workspace over the T5C route family.
 
 ## Locked Domain Model
 
@@ -192,20 +193,27 @@ Content Studio host files introduced in T5C:
 - `host/Services/NpcDefinitionValidator.cs`
 - `host/Services/NpcDialogueReferenceProvider.cs`
 
+Godot files introduced in T5D:
+
+- `content-studio/scripts/npc_editor.gd`
+- `content-studio/scripts/npc_editor.gd.uid`
+
 The implementation should follow the existing Mobs and unified Items patterns,
 but must not copy mob combat/drop concerns into NPCs.
 
 ## Godot Workspace Scope
 
-Add a top-level **NPCs** workspace after Mobs or before Environment.
+T5D adds a top-level **NPCs** workspace after Mobs and before Environment.
 
-Recommended layout:
+Implemented layout:
 
 - catalog/search/create
 - identity and publication state
 - visuals and footprint
 - movement
 - interaction and dialogue reference
+- authoring-only notes
+- runtime and placement capability guidance
 - preview and validation/apply panel
 
 One screen is manageable for T5 because the aggregate is small. Use scrollable
@@ -358,17 +366,28 @@ Current limitations:
 - `supports_quest_authoring = false`
 - default reference diagnostics report `reference_check_complete = false`
   unless a known generated/database reference provider can prove otherwise
-- No Godot NPC workspace is implemented yet
+- Godot NPC workspace is implemented for reusable definitions only
 
 ### T5 Phase 3 - Godot NPC workspace
+
+Implemented in T5D:
 
 - catalog
 - identity
 - visuals
 - movement
 - interaction/dialogue reference
+- authoring-only notes
+- runtime/placement capability guidance
 - preview
 - validation/apply lifecycle
+
+The workspace uses `AuthoringHostClient` and `AuthoringWorkspaceSupport`, keeps
+stable IDs editable only for new unsaved definitions, sends complete NPC draft
+payloads for preview and save, sends saved-aggregate concurrency/signature
+requests for publish/disable/delete, displays incomplete reference visibility,
+and shows runtime-catalog, quest-authoring, and multiple-interaction capability
+flags as unavailable until later runtime handoff work.
 
 ### T5 Phase 4 - MMO Project runtime catalog handoff
 
@@ -402,4 +421,4 @@ Current limitations:
 
 ## Open Decisions
 
-None for T5C. The implementation should use the locked narrow model above.
+None for T5D. The implementation uses the locked narrow model above.

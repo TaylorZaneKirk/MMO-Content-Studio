@@ -347,8 +347,9 @@ migration is
 has compile-time NPC contracts, domain normalization rules, static registry
 options, and feature-owned schema-health requirements.
 
-T5C NPC repository, validation, and API implemented; Godot workspace, runtime
-handoff, and verification remain pending. The host now owns repository-backed
+T5C NPC repository, validation, and API implemented. T5D Godot NPC workspace
+implemented; MMO Project runtime handoff and end-to-end verification remain
+pending. The host now owns repository-backed
 options, catalog/list/load, preview, save draft, publish, disable, delete,
 preview signatures, optimistic concurrency, transactional root writes, reload
 verification, and reference diagnostics for known generated/database spawn
@@ -359,4 +360,6 @@ Project dialogue catalog when it can be resolved from `game_client_assets`; when
 that catalog is unavailable, validation is syntax-only and reports that
 limitation. `supports_runtime_npc_catalog = false`,
 `supports_quest_authoring = false`, and incomplete reference diagnostics report
-`reference_check_complete = false`. No Godot NPC workspace is implemented yet.
+`reference_check_complete = false`. The Godot NPCs workspace owns the complete
+NPC aggregate form and preview/apply lifecycle, but does not author placement,
+runtime catalog export, dialogue graphs, or quests.

@@ -1,8 +1,8 @@
 # T5 NPC Authoring Acceptance
 
-Status: acceptance criteria for the T5 implementation sequence. T5C NPC
-repository, validation, and API implemented; Godot workspace, runtime handoff,
-and verification remain pending.
+Status: acceptance criteria for the T5 implementation sequence. T5D Godot NPC
+workspace implemented; MMO Project runtime handoff and end-to-end verification
+remain pending.
 
 ## T5A - Audit And Domain Lock
 
@@ -55,9 +55,13 @@ and verification remain pending.
 - Top-level NPCs workspace lists draft, published, and disabled NPC definitions.
 - Users can create, edit, preview, save draft, publish, disable, and delete NPC
   definitions.
-- The preview resolves the runtime actor sprite path and directional frames.
+- The preview resolves the configured actor sprite path, applies authored scale
+  and anchor offsets, and shows preview-only facing selection without persisting
+  placement facing.
 - Form and preview/validation panels are scrollable.
 - Missing/invalid dialogue IDs are visible in validation.
+- Runtime NPC catalog export, quest authoring, multiple interactions, and
+  incomplete reference visibility are displayed as read-only capability states.
 - Placement coordinates are not editable in Content Studio.
 
 ## T5 Phase 4 - MMO Project Runtime Handoff

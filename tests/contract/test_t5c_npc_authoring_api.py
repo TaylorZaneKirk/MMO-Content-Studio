@@ -199,23 +199,22 @@ class T5CNpcAuthoringApiTests(unittest.TestCase):
         )
 
         for token in (
-            "T5C NPC repository, validation, and API implemented; Godot workspace, runtime handoff, and verification remain pending",
+            "T5D Godot NPC workspace implemented; MMO Project runtime handoff and end-to-end verification remain pending",
             "reference_check_complete = false",
             "supports_runtime_npc_catalog = false",
             "supports_quest_authoring = false",
-            "No Godot NPC workspace is implemented yet",
+            "The NPCs workspace authors reusable definitions only; placement remains in Tiled",
         ):
             self.assertIn(token, docs)
 
         for forbidden in (
-            "Godot NPC workspace implemented",
             "runtime NPC catalog export implemented",
             "Quest authoring implemented",
         ):
             self.assertNotIn(forbidden, docs)
 
-    def test_no_godot_npc_editor_or_mmo_project_changes(self) -> None:
-        self.assertFalse((ROOT / "content-studio" / "scripts" / "npc_editor.gd").exists())
+    def test_godot_npc_editor_exists_without_mmo_project_changes(self) -> None:
+        self.assertTrue((ROOT / "content-studio" / "scripts" / "npc_editor.gd").exists())
 
         runtime_root = _runtime_file(Path("prototype") / "server" / "Program.cs")
         if runtime_root is None:
