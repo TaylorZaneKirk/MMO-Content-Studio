@@ -71,7 +71,7 @@ public sealed class DialogueRepository : IDialogueRepository
                 d.updated_at_utc,
                 count(distinct ep.entry_id)::integer as entry_point_count,
                 count(distinct n.node_id)::integer as node_count,
-                count(c.choice_id)::integer as choice_count
+                (count(distinct (c.node_id, c.choice_id)) filter (where c.choice_id is not null))::integer as choice_count
             from dialogue_definitions d
             left join dialogue_entry_points ep on ep.dialogue_definition_id = d.dialogue_definition_id
             left join dialogue_nodes n on n.dialogue_definition_id = d.dialogue_definition_id
@@ -384,23 +384,25 @@ public sealed class DialogueRepository : IDialogueRepository
             where dialogue_definition_id = @dialogue_definition_id
             order by node_order, node_id;
             """;
-        await using var command = new NpgsqlCommand(sql, connection, transaction);
-        command.Parameters.AddWithValue("dialogue_definition_id", dialogueDefinitionId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var nodes = new List<DialogueNode>();
-        while (await reader.ReadAsync(cancellationToken))
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
         {
-            nodes.Add(new DialogueNode(
-                reader.GetString(0),
-                reader.GetString(1),
-                reader.IsDBNull(2) ? null : reader.GetString(2),
-                reader.IsDBNull(3) ? null : reader.GetString(3),
-                reader.IsDBNull(4) ? null : reader.GetString(4),
-                reader.GetBoolean(5),
-                reader.GetDouble(6),
-                reader.GetDouble(7),
-                reader.IsDBNull(8) ? null : reader.GetString(8),
-                []));
+            command.Parameters.AddWithValue("dialogue_definition_id", dialogueDefinitionId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                nodes.Add(new DialogueNode(
+                    reader.GetString(0),
+                    reader.GetString(1),
+                    reader.IsDBNull(2) ? null : reader.GetString(2),
+                    reader.IsDBNull(3) ? null : reader.GetString(3),
+                    reader.IsDBNull(4) ? null : reader.GetString(4),
+                    reader.GetBoolean(5),
+                    reader.GetDouble(6),
+                    reader.GetDouble(7),
+                    reader.IsDBNull(8) ? null : reader.GetString(8),
+                    []));
+            }
         }
 
         var choices = await LoadChoicesAsync(connection, transaction, dialogueDefinitionId, cancellationToken);
