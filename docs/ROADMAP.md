@@ -380,13 +380,73 @@ followed by Dialogue Studio quest integration and Quest Studio. T6/T7 remain
 planned world-object and gathering/processing slices, but they are not blockers
 for D1-D5.
 
-Design reference:
+Remote and mobile Content Studio support is not a prerequisite for any of those
+features. It is deliberately placed after all currently known authoring and
+operational work. It may move earlier only when MMO Project deployment work,
+remote collaboration, or another concrete dependency needs the same hosted and
+authenticated boundary.
+
+Design references:
 
 - [`INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
+- [`REMOTE_MOBILE_CONTENT_STUDIO_PLAN.md`](REMOTE_MOBILE_CONTENT_STUDIO_PLAN.md)
 
 ## Later Workspaces
 
-- Quest Studio scope evaluation
-- Quest state-graph authoring
-- Contribution bundle export and maintainer publication
-- Validated candidate-snapshot hot reload
+Current order:
+
+1. Quest Studio scope evaluation
+2. Quest state-graph authoring
+3. Contribution bundle export and maintainer publication
+4. Validated candidate-snapshot hot reload
+5. Other higher-value authoring work scheduled later
+6. Remote and Mobile Content Studio
+
+Future features may be inserted before or after this list as priorities become
+clear. Remote and Mobile Content Studio remains last among the currently known
+items; this does not mean it must remain the final feature forever.
+
+## RM — Remote and Mobile Content Studio
+
+**Status:** Planned and deliberately deferred; last among currently known
+roadmap work.
+
+Establish a secure remote-authoring mode and responsive Godot Web/PWA client as
+a lower-risk proof of concepts that MMO Project can later reuse for hosted
+services, browser/mobile exports, authentication, asset delivery, reconnect,
+deployment, and touch-interface behavior.
+
+Locked boundaries:
+
+- Preserve the existing loopback-only local desktop workflow.
+- Add remote access only through an explicitly configured authenticated HTTPS
+  boundary.
+- Keep PostgreSQL, validation, publication, runtime exports, and canonical asset
+  mutations host-owned.
+- Replace client-local absolute-path imports and direct asset-tree reads with
+  network-safe upload and retrieval contracts.
+- Prefer a responsive Godot Web/PWA proof before optional Android-native
+  packaging.
+- Do not treat authoring-host security as a substitute for MMO Project player,
+  realtime, scaling, or anti-cheat requirements.
+
+Planned phases:
+
+- RM0 audits export compatibility, local-only assumptions, and the threat model.
+- RM1 adds a secure remote authoring-host mode while preserving local mode.
+- RM2 adds network-safe asset upload, retrieval, and preview contracts.
+- RM3 adds responsive phone/tablet layouts and touch-capable graph workflows.
+- RM4 delivers and verifies the Godot Web/PWA proof.
+- RM5 optionally packages the same responsive client for native Android.
+
+Exit condition:
+
+> From a supported mobile browser, an authenticated maintainer can remotely
+> load, create, edit, validate, preview, save, and publish representative item,
+> NPC, dialogue, and quest content; upload an asset; recover safely from a
+> connection interruption; and receive a deterministic concurrency conflict if
+> another client changed the same aggregate.
+
+Detailed scope, scheduling triggers, architecture guardrails, non-goals, and
+acceptance criteria are documented in
+[`REMOTE_MOBILE_CONTENT_STUDIO_PLAN.md`](REMOTE_MOBILE_CONTENT_STUDIO_PLAN.md).
