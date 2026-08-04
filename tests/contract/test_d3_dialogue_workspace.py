@@ -45,6 +45,13 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
         self.assertNotIn("HTTPRequest", editor)
         self.assertNotIn("AuthoringHttpTransport", editor)
 
+    def test_graph_rebuild_preserves_graph_edit_internal_children(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").read_text()
+
+        self.assertIn("for child in _graph.get_children():", editor)
+        self.assertIn("if child is not GraphNode:", editor)
+        self.assertIn("continue\n\t\t_graph.remove_child(child)", editor)
+
     def test_inspector_form_labels_do_not_collapse_to_vertical_text(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").read_text()
 

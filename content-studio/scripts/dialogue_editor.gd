@@ -627,6 +627,8 @@ func _delete_selected_node() -> void:
 
 func _rebuild_graph() -> void:
 	for child in _graph.get_children():
+		if child is not GraphNode:
+			continue
 		_graph.remove_child(child)
 		child.queue_free()
 	if _graph.has_method("clear_connections"):
