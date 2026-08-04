@@ -7,6 +7,7 @@ const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_sup
 const NODE_TYPE_SPEAKER_TEXT := "speaker_text"
 const NODE_TYPE_PLAYER_CHOICE := "player_choice"
 const NODE_TYPE_END := "end"
+const FORM_LABEL_WIDTH := 132.0
 
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
 
@@ -138,6 +139,7 @@ func _build_ui() -> void:
 	inspector_panel.add_child(inspector_scroll)
 	var inspector := VBoxContainer.new()
 	inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inspector.custom_minimum_size = Vector2(320, 0)
 	inspector.add_theme_constant_override("separation", 12)
 	inspector_scroll.add_child(inspector)
 	_add_definition_section(inspector)
@@ -1378,6 +1380,7 @@ func _add_heading(parent: Node, text: String, size: int) -> void:
 func _label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
+	label.custom_minimum_size = Vector2(FORM_LABEL_WIDTH, 0)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 
