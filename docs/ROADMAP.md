@@ -238,6 +238,52 @@ Tiled source checks, and Content Studio reference guards across database,
 generated, and Tiled spawn references; it does not add placement authoring or
 quest editing.
 
+## D - Dialogue Studio
+
+**Status:** D1 runtime audit and domain lock documented. D2-D5 planned.
+
+Move current non-quest dialogue graph authoring into MMO Content Studio as a
+first-class workspace after NPCs and before Environment. Dialogue Studio is not
+a separate application, and the NPC workspace should link to referenced
+dialogues without embedding the full graph editor.
+
+Current MMO Project dialogue definitions are file-backed JSON at
+`prototype/shared/dialogues/catalog.json`, loaded during server startup by
+`DialogueDefinitionCatalog`, and executed through `DialogueSessionService`.
+The current runtime model supports dialogue definitions, prioritized entry
+points, `speaker_text`, `player_choice`, and `end` nodes, node-owned
+transitions, server-filtered choices, manual close, end acknowledgement, stale
+command protection, and activity cancellation.
+
+Locked D1-D5 boundaries:
+
+- Content Studio will own reusable dialogue definitions.
+- NPC definitions reference dialogues by stable `default_dialogue_id`; NPC
+  placement remains in Tiled.
+- D1-D5 author only current runtime-compatible dialogue semantics.
+- Initial condition and effect registries expose no production authorable types.
+- Quest predicates, quest effects, objective progress, rewards, content gates,
+  arbitrary scripting, portraits, cutscenes, localization, and hot reload remain
+  deferred.
+
+References:
+
+- [`DIALOGUE_STUDIO_RUNTIME_AUDIT.md`](DIALOGUE_STUDIO_RUNTIME_AUDIT.md)
+- [`DIALOGUE_STUDIO_DOMAIN_MODEL.md`](DIALOGUE_STUDIO_DOMAIN_MODEL.md)
+- [`DIALOGUE_STUDIO_IMPLEMENTATION_PLAN.md`](DIALOGUE_STUDIO_IMPLEMENTATION_PLAN.md)
+- [`DIALOGUE_STUDIO_ACCEPTANCE.md`](DIALOGUE_STUDIO_ACCEPTANCE.md)
+
+Phased plan:
+
+- D1 audits the runtime and locks the non-quest Dialogue Studio model.
+- D2 adds additive schema, contracts, repository, validation, and
+  `/api/v1/dialogues`.
+- D3 adds the Godot Dialogue workspace with graph editing and playthrough
+  preview.
+- D4 adds the MMO Project runtime catalog handoff while preserving the existing
+  dialogue protocol.
+- D5 hardens runtime verification, reference safety, and connected playthroughs.
+
 ## T6 — Interactable World Objects Foundation
 
 **Status:** Planned; design direction documented.
@@ -301,11 +347,13 @@ Exit condition:
 
 ## Ordering Note
 
-T5 establishes reusable noncombat actors and interaction foundations. T6
-establishes non-actor world interactions. T7 adds skill-specific gathering and
-production behavior. Dialogue and Quest Studio then gain both NPC and
-world-object interaction targets; this ordering provides infrastructure they can
-consume and does not reduce their importance.
+T5 establishes reusable noncombat actors and interaction foundations. Dialogue
+Studio now proceeds before T6/T7 because the current MMO Project dialogue
+runtime already exists and can be authored without quest semantics. D1-D5 first
+cover the non-quest dialogue model. MMO Project quest foundations come later,
+followed by Dialogue Studio quest integration and Quest Studio. T6/T7 remain
+planned world-object and gathering/processing slices, but they are not blockers
+for D1-D5.
 
 Design reference:
 
@@ -313,8 +361,6 @@ Design reference:
 
 ## Later Workspaces
 
-- Dialogue graph authoring
-- Dialogue preview and playthrough validation
 - Quest Studio scope evaluation
 - Quest state-graph authoring
 - Contribution bundle export and maintainer publication

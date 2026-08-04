@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: U4 unified item authoring
+## Current state: D1 Dialogue Studio audit
 
 The repository now contains:
 
@@ -50,6 +50,7 @@ The repository now contains:
 - strict publication and disable operations
 - optimistic aggregate concurrency and reload-after-commit verification
 - source and optional runtime contract tests
+- D1 Dialogue Studio runtime audit and domain lock documents
 
 T4 Phase 0 audited the current MMO Project mob/enemy runtime path and locked the
 implementation plan for the Mobs workspace. T4B implements the host-side API for
@@ -78,6 +79,16 @@ disable/delete guards across database, generated, and Tiled spawn references.
 Dialogue-reference validation uses the configured file-backed MMO Project
 dialogue catalog when it is available.
 The NPCs workspace authors reusable definitions only; placement remains in Tiled.
+
+D1 audits MMO Project's implemented dialogue foundation and locks the initial
+Dialogue Studio boundary. Dialogue Studio will be an integrated top-level MMO
+Content Studio workspace, not a separate application and not a full graph editor
+embedded inside the NPC form. D1-D5 author only the current non-quest dialogue
+runtime model: file-backed definitions, entry points, `speaker_text`,
+`player_choice`, and `end` nodes, node-owned transitions, server-filtered
+choices, and empty condition/effect vocabularies. Quest predicates, quest
+effects, objective progress, rewards, content gates, and Quest Studio remain
+deferred until MMO Project quest foundations exist.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -155,10 +166,12 @@ The default API address is `http://127.0.0.1:5187`.
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
-8. **T6 — Interactable world objects foundation**
-9. **T7 — Gathering resources and processing stations**
-10. **Dialogue workspace**
-11. **Quest Studio evaluation**
+8. **D1-D5 — Dialogue Studio** — D1 runtime/domain audit current
+9. **T6 — Interactable world objects foundation**
+10. **T7 — Gathering resources and processing stations**
+11. **MMO Project quest foundations**
+12. **Dialogue Studio quest integration**
+13. **Quest Studio**
 
 The current vertical slices author ordinary items, declarative consumables,
 wearable equipment, and hand-held weapons/tools.
@@ -222,6 +235,14 @@ implemented in MMO Project as a server-authoritative selection seam across
 equipped and inventory items; gathering and processing consumers remain
 deferred.
 
+D1 Dialogue Studio planning locks an integrated top-level Dialogue workspace
+that authors the current non-quest runtime graph before quest foundations are
+introduced. See
+[`docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md`](docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md),
+[`docs/DIALOGUE_STUDIO_DOMAIN_MODEL.md`](docs/DIALOGUE_STUDIO_DOMAIN_MODEL.md),
+[`docs/DIALOGUE_STUDIO_IMPLEMENTATION_PLAN.md`](docs/DIALOGUE_STUDIO_IMPLEMENTATION_PLAN.md),
+and [`docs/DIALOGUE_STUDIO_ACCEPTANCE.md`](docs/DIALOGUE_STUDIO_ACCEPTANCE.md).
+
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering
 resources, and processing stations while preserving Tiled placement and
@@ -246,6 +267,10 @@ server-authoritative runtime execution. See
 - [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md`](docs/UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md)
+- [`docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md`](docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md)
+- [`docs/DIALOGUE_STUDIO_DOMAIN_MODEL.md`](docs/DIALOGUE_STUDIO_DOMAIN_MODEL.md)
+- [`docs/DIALOGUE_STUDIO_IMPLEMENTATION_PLAN.md`](docs/DIALOGUE_STUDIO_IMPLEMENTATION_PLAN.md)
+- [`docs/DIALOGUE_STUDIO_ACCEPTANCE.md`](docs/DIALOGUE_STUDIO_ACCEPTANCE.md)
 - [`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)

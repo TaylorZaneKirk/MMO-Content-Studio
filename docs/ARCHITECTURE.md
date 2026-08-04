@@ -11,7 +11,8 @@
 - Draft content remains unavailable to the active game runtime.
 - Publication requires complete aggregate validation.
 - Existing content can be loaded, edited, disabled, and republished.
-- Tiled remains responsible for map placement. Content Studio defines reusable items, mobs, and NPCs.
+- Tiled remains responsible for map placement. Content Studio defines reusable
+  items, mobs, NPCs, and planned dialogue definitions.
 
 ## Primary components
 
@@ -21,7 +22,7 @@ Responsibilities:
 
 - Catalog navigation and search
 - Guided data-entry forms
-- Inventory, ground-item, paper-doll, mob, and NPC previews
+- Inventory, ground-item, paper-doll, mob, NPC, and dialogue graph/playthrough previews
 - Asset selection and import requests
 - Validation and change-summary presentation
 - Draft, publish, disable, and edit workflows
@@ -363,3 +364,24 @@ limitation. `supports_runtime_npc_catalog = true` and
 `supports_quest_authoring = false`. The Godot NPCs workspace owns the complete
 NPC aggregate form and preview/apply lifecycle, but does not author placement,
 dialogue graphs, or quests.
+
+## D Dialogue Studio boundary
+
+D1 locks Dialogue Studio as a first-class MMO Content Studio workspace. It
+belongs in the same Godot shell and .NET authoring host as Items, Mobs, and
+NPCs. It is not a separate application, and the NPC workspace should provide
+navigation to referenced dialogue definitions without embedding the full graph
+editor.
+
+The current MMO Project runtime source of truth is
+`prototype/shared/dialogues/catalog.json`, loaded by
+`DialogueDefinitionCatalog` and executed through `DialogueSessionService`.
+Dialogue Studio D1-D5 should author that current model: reusable dialogue
+definitions, prioritized entry points, `speaker_text`, `player_choice`, and
+`end` nodes, node-owned transitions, plain speaker/text fields, visible choices,
+manual close, end acknowledgement, and activity cancellation semantics.
+
+D1-D5 intentionally do not author quest predicates, quest effects, objective
+progress, rewards, content gates, arbitrary scripts, portraits, localization,
+cutscenes, or hot reload. Those capabilities require MMO Project quest
+foundations and typed runtime contracts before Dialogue Studio exposes them.

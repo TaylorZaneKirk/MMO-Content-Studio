@@ -83,14 +83,16 @@ class InteractableWorldObjectsDocumentationTests(unittest.TestCase):
         ):
             self.assertIn(token, design)
 
-    def test_roadmap_places_t6_and_t7_after_t5(self) -> None:
+    def test_roadmap_places_dialogue_then_t6_and_t7_after_t5(self) -> None:
         roadmap = (ROOT / "docs" / "ROADMAP.md").read_text()
         t5_index = roadmap.index("## T5")
+        dialogue_index = roadmap.index("## D - Dialogue Studio")
         t6_index = roadmap.index("## T6")
         t7_index = roadmap.index("## T7")
         later_index = roadmap.index("## Later Workspaces")
 
-        self.assertLess(t5_index, t6_index)
+        self.assertLess(t5_index, dialogue_index)
+        self.assertLess(dialogue_index, t6_index)
         self.assertLess(t6_index, t7_index)
         self.assertLess(t7_index, later_index)
         for token in (
@@ -98,8 +100,8 @@ class InteractableWorldObjectsDocumentationTests(unittest.TestCase):
             "Gathering Resources and Processing Stations",
             "without custom executable scripting",
             "without duplicating recipes or hard-coding specific tools",
-            "Dialogue and Quest Studio then gain both NPC and",
-            "world-object interaction targets",
+            "proceeds before T6/T7",
+            "they are not blockers\nfor D1-D5",
             "INTERACTABLE_WORLD_OBJECTS_DESIGN.md",
         ):
             self.assertIn(token, roadmap)
