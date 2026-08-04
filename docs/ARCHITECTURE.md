@@ -348,12 +348,13 @@ has compile-time NPC contracts, domain normalization rules, static registry
 options, and feature-owned schema-health requirements.
 
 T5C NPC repository, validation, and API implemented. T5D Godot NPC workspace
-implemented. T5E MMO Project runtime NPC catalog handoff implemented. The host
+implemented. T5E MMO Project runtime NPC catalog handoff implemented. T5F
+runtime/reference hardening implemented. The host
 now owns repository-backed
 options, catalog/list/load, preview, save draft, publish, disable, delete,
 preview signatures, optimistic concurrency, transactional root writes, reload
-verification, and reference diagnostics for known generated/database spawn
-references. `notes` is authoring-only metadata and is omitted from the
+verification, and reference diagnostics for known database, generated chunk, and
+Tiled source spawn references. `notes` is authoring-only metadata and is omitted from the
 runtime NPC catalog export. `default_dialogue_id` remains a stable string
 reference. Dialogue-reference validation uses the configured file-backed MMO
 Project dialogue catalog when it can be resolved from `game_client_assets`; when

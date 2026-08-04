@@ -1,7 +1,7 @@
 # T5 NPC Authoring Acceptance
 
-Status: acceptance criteria for the T5 implementation sequence. T5E MMO Project
-runtime NPC catalog handoff implemented.
+Status: acceptance criteria for the T5 implementation sequence. T5F runtime
+handoff hardening and reference safety implemented.
 
 ## T5A - Audit And Domain Lock
 
@@ -71,6 +71,11 @@ runtime NPC catalog handoff implemented.
 - Generated/database static-content sources load the NPC definition catalog.
 - `NpcRuntimeService` composes `NpcSpawn` placement with the reusable catalog
   definition and no longer requires hard-coded texture mapping.
+- Static-content startup rejects malformed NPC definitions, duplicate definition
+  IDs, missing catalog references, and `NpcSpawn.npc_definition_id` values that
+  do not resolve to the embedded catalog.
+- MapPublisher export coverage keeps the checked-in NPC catalog byte-stable.
+- Checked-in Tiled source files keep ordinary `NpcSpawn` objects placement-only.
 - Existing `WorldSnapshotNpcPayload` and NPC interaction messages remain
   backward-compatible.
 
@@ -84,7 +89,7 @@ runtime NPC catalog handoff implemented.
 - Dialogue continue, choice, close, session replacement, and manual movement
   cancellation still behave as server-authoritative flows.
 - Disabling or deleting an NPC definition referenced by checked-in spawn data is
-  blocked or produces the locked reference-guard result.
+  blocked through database, generated chunk, or Tiled source reference guards.
 
 ## Non-Goals
 

@@ -280,7 +280,7 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, editor)
 
-    def test_docs_mark_t5d_without_claiming_runtime_handoff(self) -> None:
+    def test_docs_mark_npc_workspace_and_runtime_hardening(self) -> None:
         docs = "\n".join(
             [
                 (ROOT / "README.md").read_text(),
@@ -295,10 +295,11 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         )
 
         for token in (
-            "T5E MMO Project runtime NPC catalog handoff implemented",
+            "T5F runtime/reference hardening implemented",
             "The NPCs workspace authors reusable definitions only; placement remains in Tiled",
             "quest-authoring and multiple-interaction capability",
             "supports_runtime_npc_catalog = true",
+            "database, generated chunk, or Tiled source spawn references block disable",
         ):
             self.assertIn(token, docs)
 
@@ -320,11 +321,14 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         allowed_paths = (
             "docs/development/CONTENT_AUTHORING_GUIDE.md",
             "prototype/importer/",
+            "prototype/server/features/README.md",
             "prototype/server/features/npcs/application/NpcRuntimeService.cs",
             "prototype/server/features/static_content/application/",
             "prototype/shared/maps/generated/starter_region/",
             "prototype/shared/maps/npcs/",
+            "prototype/shared/maps/tiled/mmoproject.tmx",
             "prototype/shared/maps/tiled/regions/starter_region.tmj",
+            "prototype/shared/maps/tiled/regions/starter_region.tmx",
             "prototype/sql/",
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",

@@ -72,7 +72,9 @@ feature-owned schema-health requirements, and a placeholder NPC catalog section.
 T5D Godot NPC workspace implemented. T5E MMO Project runtime NPC catalog
 handoff implemented via mirrored migrations, `export-npc-catalog`, generated
 and database static-content catalogs, and runtime composition from
-`NpcSpawn.npc_definition_id`.
+`NpcSpawn.npc_definition_id`. T5F hardens the handoff with startup validation,
+byte-stable export tests, placement-only Tiled source checks, and Content Studio
+disable/delete guards across database, generated, and Tiled spawn references.
 Dialogue-reference validation uses the configured file-backed MMO Project
 dialogue catalog when it is available.
 The NPCs workspace authors reusable definitions only; placement remains in Tiled.
@@ -152,7 +154,7 @@ The default API address is `http://127.0.0.1:5187`.
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
-7. **T5 — Minimal NPC authoring** — T5E runtime NPC catalog handoff implemented
+7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
 8. **T6 — Interactable world objects foundation**
 9. **T7 — Gathering resources and processing stations**
 10. **Dialogue workspace**
@@ -194,7 +196,8 @@ visuals, movement defaults, talk/dialogue references, publication state, and no
 Content Studio ownership of map placement. T5B NPC schema and contract
 foundation implemented the additive schema handoff and host-side compile-time
 contracts; T5C NPC repository, validation, and API implemented; T5D Godot NPC
-workspace implemented; T5E MMO Project runtime NPC catalog handoff implemented.
+workspace implemented; T5E MMO Project runtime NPC catalog handoff implemented;
+T5F runtime/reference hardening implemented.
 Notes are
 authoring-only and dialogue-reference validation uses the configured
 file-backed MMO Project dialogue catalog when it is available, otherwise it is

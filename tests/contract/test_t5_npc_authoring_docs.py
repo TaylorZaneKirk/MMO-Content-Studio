@@ -107,7 +107,7 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
         self.assertIn("T5A audits the current MMO Project NPC runtime", readme)
         self.assertIn("## T5 NPC-definition boundary", architecture)
         self.assertIn("## T5 NPC-authoring runtime handoff", integration)
-        self.assertIn("T5E MMO Project runtime NPC catalog handoff implemented", integration)
+        self.assertIn("T5F runtime handoff hardening and reference safety implemented", integration)
 
     def test_t5d_adds_godot_editor_without_runtime_expansion(self) -> None:
         editor_path = ROOT / "content-studio" / "scripts" / "npc_editor.gd"

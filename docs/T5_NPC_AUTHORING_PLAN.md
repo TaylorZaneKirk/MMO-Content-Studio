@@ -1,12 +1,15 @@
 # T5 NPC Authoring Plan
 
-Status: T5E MMO Project runtime NPC catalog handoff implemented. T5B added the additive schema
+Status: T5F runtime handoff hardening and reference safety implemented. T5B added the additive schema
 handoff, host contracts, domain rules, registry/options seam, and schema-health
 provider. T5C adds repository persistence, validation, options, catalog/list/load,
 preview, draft save, publish, disable, delete, preview signatures, optimistic
 concurrency, reload verification, and reference diagnostics. T5D adds the Godot
 NPCs workspace over the T5C route family. T5E adds the runtime catalog export,
-static-content catalog, importer validation, and runtime composition.
+static-content catalog, importer validation, and runtime composition. T5F adds
+startup validation, byte-stable export coverage, placement-only Tiled source
+checks, and Content Studio reference guards across database, generated, and
+Tiled spawn references.
 
 ## Locked Domain Model
 
@@ -287,13 +290,14 @@ Publish:
 Disable:
 
 - prevents future export
-- should be blocked or strongly warned when checked-in Tiled/generated content
-  still references the definition and no replacement is supplied
+- is blocked when database, checked-in generated content, or checked-in Tiled
+  source content still references the definition
 
 Delete:
 
 - allowed only for Disabled definitions
-- requires no known spawn references in configured source/generated content
+- requires no known spawn references in configured database, source, or generated
+  content
 - must use saved complete aggregate and concurrency token
 
 Hot reload:
@@ -396,6 +400,10 @@ unavailable.
 - generated/database static-content source catalog loading
 - replace hard-coded texture mapping
 - preserve snapshot payload compatibility
+- reject malformed embedded NPC catalogs and unresolved spawn references at
+  static-content startup
+- keep catalog export byte-stable
+- enforce placement-only checked-in Tiled NPC spawns
 
 ### T5 Phase 5 - Runtime verification and hardening
 
@@ -405,7 +413,8 @@ unavailable.
 - click-to-approach
 - dialogue start/continue/choice/close
 - moving NPC smoke if random wander is enabled
-- spawn reference guards
+- spawn reference guards across database, generated chunks, and Tiled source
+  files
 
 ## Deferred Work
 

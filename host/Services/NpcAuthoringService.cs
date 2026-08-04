@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Xml.Linq;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
 using Npgsql;
@@ -653,8 +654,33 @@ public sealed class NpcAuthoringService
 
     private async Task<NpcReferenceSummaryRecord> LoadReferenceSummaryAsync(
         string npcDefinitionId,
-        CancellationToken cancellationToken) =>
-        await _repository.LoadKnownSpawnReferencesAsync(npcDefinitionId, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var databaseReferences = await _repository.LoadKnownSpawnReferencesAsync(npcDefinitionId, cancellationToken);
+        var knownSources = new SortedSet<string>(databaseReferences.ReferenceSources, StringComparer.Ordinal);
+        var unavailableSources = new SortedSet<string>(StringComparer.Ordinal);
+        if (!databaseReferences.ReferenceCheckComplete)
+        {
+            unavailableSources.Add("unavailable:database:world_region_chunks");
+        }
+
+        var prototypeRoot = TryResolvePrototypeRoot();
+        if (prototypeRoot is null)
+        {
+            unavailableSources.Add("unavailable:workspace:prototype_root");
+        }
+        else
+        {
+            AddGeneratedChunkReferences(prototypeRoot, npcDefinitionId, knownSources, unavailableSources);
+            AddTiledSourceReferences(prototypeRoot, npcDefinitionId, knownSources, unavailableSources);
+        }
+
+        return new NpcReferenceSummaryRecord(
+            npcDefinitionId,
+            knownSources.Count,
+            knownSources.Concat(unavailableSources).ToArray(),
+            unavailableSources.Count == 0);
+    }
 
     private static void AddReferenceDiagnostics(
         ICollection<ApiError> messages,
@@ -678,11 +704,239 @@ public sealed class NpcAuthoringService
         {
             messages.Add(new ApiError(
                 "npc_reference_check_incomplete",
-                "Known database-published NPC spawn references could not be checked because the world-content schema is unavailable; Tiled source validation remains a later hardening concern.",
+                $"Known NPC spawn references could not be checked completely. Unavailable sources: {string.Join(", ", references.ReferenceSources.Where(source => source.StartsWith("unavailable:", StringComparison.Ordinal)).DefaultIfEmpty("unknown"))}.",
                 ValidationSeverity.Warning,
                 "npc_definition_id"));
         }
     }
+
+    private string? TryResolvePrototypeRoot()
+    {
+        var gameAssetsRoot = _assetService.GetGameAssetsRoot();
+        if (string.IsNullOrWhiteSpace(gameAssetsRoot))
+        {
+            return null;
+        }
+
+        var current = new DirectoryInfo(gameAssetsRoot);
+        while (current is not null)
+        {
+            if (Directory.Exists(Path.Combine(current.FullName, "shared")) &&
+                Directory.Exists(Path.Combine(current.FullName, "client", "assets")))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
+    }
+
+    private static void AddGeneratedChunkReferences(
+        string prototypeRoot,
+        string npcDefinitionId,
+        ISet<string> knownSources,
+        ISet<string> unavailableSources)
+    {
+        var generatedRoot = Path.Combine(prototypeRoot, "shared", "maps", "generated");
+        if (!Directory.Exists(generatedRoot))
+        {
+            unavailableSources.Add($"unavailable:generated:{generatedRoot}");
+            return;
+        }
+
+        foreach (var chunkPath in Directory.EnumerateFiles(generatedRoot, "*.json", SearchOption.AllDirectories)
+                     .Where(path => Path.GetFileName(Path.GetDirectoryName(path)) == "chunks"))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(chunkPath));
+                if (!document.RootElement.TryGetProperty("npc_spawns", out var spawns) ||
+                    spawns.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var spawn in spawns.EnumerateArray())
+                {
+                    if (!ReferenceMatches(spawn, npcDefinitionId))
+                    {
+                        continue;
+                    }
+
+                    var spawnId = TryGetString(spawn, "object_name");
+                    knownSources.Add($"generated:{RelativeTo(prototypeRoot, chunkPath)}:{spawnId}");
+                }
+            }
+            catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+            {
+                unavailableSources.Add($"unavailable:generated:{RelativeTo(prototypeRoot, chunkPath)}");
+            }
+        }
+    }
+
+    private static void AddTiledSourceReferences(
+        string prototypeRoot,
+        string npcDefinitionId,
+        ISet<string> knownSources,
+        ISet<string> unavailableSources)
+    {
+        var tiledRoot = Path.Combine(prototypeRoot, "shared", "maps", "tiled");
+        if (!Directory.Exists(tiledRoot))
+        {
+            unavailableSources.Add($"unavailable:tiled:{tiledRoot}");
+            return;
+        }
+
+        foreach (var sourcePath in Directory.EnumerateFiles(tiledRoot, "*.tmj", SearchOption.AllDirectories))
+        {
+            AddTiledJsonReferences(prototypeRoot, sourcePath, npcDefinitionId, knownSources, unavailableSources);
+        }
+
+        foreach (var sourcePath in Directory.EnumerateFiles(tiledRoot, "*.tmx", SearchOption.AllDirectories))
+        {
+            AddTiledXmlReferences(prototypeRoot, sourcePath, npcDefinitionId, knownSources, unavailableSources);
+        }
+    }
+
+    private static void AddTiledJsonReferences(
+        string prototypeRoot,
+        string sourcePath,
+        string npcDefinitionId,
+        ISet<string> knownSources,
+        ISet<string> unavailableSources)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(sourcePath));
+            if (!document.RootElement.TryGetProperty("layers", out var layers) ||
+                layers.ValueKind != JsonValueKind.Array)
+            {
+                return;
+            }
+
+            foreach (var layer in layers.EnumerateArray())
+            {
+                if (!string.Equals(TryGetString(layer, "name"), "NPC Spawns", StringComparison.Ordinal) ||
+                    !layer.TryGetProperty("objects", out var objects) ||
+                    objects.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var npcObject in objects.EnumerateArray())
+                {
+                    var properties = ReadTiledJsonProperties(npcObject);
+                    if (!properties.TryGetValue("npc_definition_id", out var definitionId) ||
+                        !string.Equals(definitionId, npcDefinitionId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    knownSources.Add($"tiled:{RelativeTo(prototypeRoot, sourcePath)}:{TryGetString(npcObject, "name")}");
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or JsonException or UnauthorizedAccessException)
+        {
+            unavailableSources.Add($"unavailable:tiled:{RelativeTo(prototypeRoot, sourcePath)}");
+        }
+    }
+
+    private static void AddTiledXmlReferences(
+        string prototypeRoot,
+        string sourcePath,
+        string npcDefinitionId,
+        ISet<string> knownSources,
+        ISet<string> unavailableSources)
+    {
+        try
+        {
+            var document = XDocument.Load(sourcePath);
+            foreach (var layer in document.Root?.Elements("objectgroup") ?? Enumerable.Empty<XElement>())
+            {
+                if (!string.Equals((string?)layer.Attribute("name"), "NPC Spawns", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                foreach (var npcObject in layer.Elements("object"))
+                {
+                    if (!string.Equals((string?)npcObject.Attribute("type"), "NpcSpawn", StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    var definitionId = npcObject.Element("properties")
+                        ?.Elements("property")
+                        .FirstOrDefault(property => string.Equals((string?)property.Attribute("name"), "npc_definition_id", StringComparison.Ordinal))
+                        ?.Attribute("value")
+                        ?.Value;
+                    if (!string.Equals(definitionId, npcDefinitionId, StringComparison.Ordinal))
+                    {
+                        continue;
+                    }
+
+                    knownSources.Add($"tiled:{RelativeTo(prototypeRoot, sourcePath)}:{(string?)npcObject.Attribute("name")}");
+                }
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or System.Xml.XmlException)
+        {
+            unavailableSources.Add($"unavailable:tiled:{RelativeTo(prototypeRoot, sourcePath)}");
+        }
+    }
+
+    private static Dictionary<string, string> ReadTiledJsonProperties(JsonElement tiledObject)
+    {
+        var properties = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (!tiledObject.TryGetProperty("properties", out var propertiesElement) ||
+            propertiesElement.ValueKind != JsonValueKind.Array)
+        {
+            return properties;
+        }
+
+        foreach (var property in propertiesElement.EnumerateArray())
+        {
+            var name = TryGetString(property, "name");
+            if (string.IsNullOrWhiteSpace(name) ||
+                !property.TryGetProperty("value", out var valueElement))
+            {
+                continue;
+            }
+
+            properties[name] = valueElement.ValueKind == JsonValueKind.String
+                ? valueElement.GetString() ?? string.Empty
+                : valueElement.ToString();
+        }
+
+        return properties;
+    }
+
+    private static bool ReferenceMatches(JsonElement spawn, string npcDefinitionId)
+    {
+        if (string.Equals(TryGetString(spawn, "npc_definition_id"), npcDefinitionId, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return spawn.TryGetProperty("properties", out var properties) &&
+               properties.ValueKind == JsonValueKind.Object &&
+               string.Equals(TryGetString(properties, "npc_definition_id"), npcDefinitionId, StringComparison.Ordinal);
+    }
+
+    private static string TryGetString(JsonElement element, string propertyName)
+    {
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(propertyName, out var property) &&
+               property.ValueKind == JsonValueKind.String
+            ? property.GetString() ?? string.Empty
+            : string.Empty;
+    }
+
+    private static string RelativeTo(string root, string path) =>
+        Path.GetRelativePath(root, path).Replace('\\', '/');
 
     private static NpcReferenceSummary ToReferenceSummary(NpcReferenceSummaryRecord record) =>
         new(record.KnownReferenceCount, record.ReferenceSources, record.ReferenceCheckComplete);

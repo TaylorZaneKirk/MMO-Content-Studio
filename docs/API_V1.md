@@ -224,8 +224,9 @@ edit, and disables mob editing when the mob-authoring schema is unavailable.
 ## NPC routes
 
 T5C adds host-side authoring routes for reusable NPC definitions. T5D adds the
-Godot NPCs workspace over those routes. These routes do not export a runtime
-NPC catalog yet and do not modify Tiled `NpcSpawn` placement.
+Godot NPCs workspace over those routes. T5E/T5F complete the runtime catalog
+handoff and harden reference safety, but the routes still do not modify Tiled
+`NpcSpawn` placement.
 
 ### `GET /api/v1/npcs/options`
 
@@ -272,9 +273,9 @@ diagnostics, and returns a deterministic `preview_signature`.
 the effective payload. If the request body differs from the saved aggregate,
 the preview reports `unsaved_npc_changes`.
 
-Reference diagnostics are narrow and use known generated/database references
-when available. Known generated/database references block disable/delete; Tiled
-source validation remains a later hardening concern.
+Reference diagnostics use known database, generated chunk, and Tiled source
+references when available. Known references block disable/delete; incomplete
+reference visibility is surfaced with `reference_check_complete = false`.
 
 ### `PUT /api/v1/npcs/{npcDefinitionId}/draft`
 
@@ -300,13 +301,14 @@ otherwise validation is syntax-only and reports that limitation.
 ### `POST /api/v1/npcs/{npcDefinitionId}/disable`
 
 Sets `publication_state = Disabled` without replacing the saved draft. Known
-generated/database spawn references block disable. Incomplete reference
+database, generated chunk, or Tiled source spawn references block disable. Incomplete reference
 visibility is reported as a warning with `reference_check_complete = false`.
 
 ### `POST /api/v1/npcs/{npcDefinitionId}/delete`
 
 Deletes a disabled NPC definition after preview/signature and concurrency
-verification. Known generated/database spawn references block delete.
+verification. Known database, generated chunk, or Tiled source spawn references
+block delete.
 
 The T5D Godot **NPCs** workspace consumes these routes through
 `AuthoringHostClient` and `AuthoringHttpTransport`. It sends complete draft

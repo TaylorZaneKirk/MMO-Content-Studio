@@ -195,6 +195,93 @@ public sealed class NpcAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ReferenceSummaryMergesDatabaseGeneratedAndTiledSources()
+    {
+        var repository = new InMemoryNpcRepository();
+        repository.Put(Record(NpcId, "Test NPC", "Published"));
+        repository.ReferenceSummaries[NpcId] = new NpcReferenceSummaryRecord(
+            NpcId,
+            1,
+            ["database:world_region_chunks:starter_region:0_0:npc_test_001"],
+            true);
+        WriteGeneratedNpcReference("starter_region/chunks/chunk_0_0.json", "npc_test_001", NpcId);
+        WriteTiledJsonNpcReference("regions/starter_region.tmj", "npc_test_002", NpcId);
+        WriteTiledXmlNpcReference("regions/starter_region.tmx", "npc_test_003", NpcId);
+        var service = CreateService(repository);
+        var expected = repository.Records[NpcId].UpdatedAtUtc;
+
+        var preview = await service.PreviewAsync(
+            NpcId,
+            ToPreviewRequest(ValidSaveRequest(expected), "disable"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Equal(4, preview.Value!.ReferenceSummary.KnownReferenceCount);
+        Assert.True(preview.Value.ReferenceSummary.ReferenceCheckComplete);
+        Assert.Contains(
+            "database:world_region_chunks:starter_region:0_0:npc_test_001",
+            preview.Value.ReferenceSummary.ReferenceSources);
+        Assert.Contains(
+            "generated:shared/maps/generated/starter_region/chunks/chunk_0_0.json:npc_test_001",
+            preview.Value.ReferenceSummary.ReferenceSources);
+        Assert.Contains(
+            "tiled:shared/maps/tiled/regions/starter_region.tmj:npc_test_002",
+            preview.Value.ReferenceSummary.ReferenceSources);
+        Assert.Contains(
+            "tiled:shared/maps/tiled/regions/starter_region.tmx:npc_test_003",
+            preview.Value.ReferenceSummary.ReferenceSources);
+        Assert.Contains(preview.Value.Messages, message => message.Code == "npc_disable_blocked_by_reference");
+    }
+
+    [Fact]
+    public async Task ReferenceSummaryDeduplicatesSources()
+    {
+        var repository = new InMemoryNpcRepository();
+        repository.Put(Record(NpcId, "Test NPC", "Published"));
+        repository.ReferenceSummaries[NpcId] = new NpcReferenceSummaryRecord(
+            NpcId,
+            2,
+            [
+                "database:world_region_chunks:starter_region:0_0:npc_test_001",
+                "database:world_region_chunks:starter_region:0_0:npc_test_001"
+            ],
+            true);
+        WriteGeneratedNpcReference("starter_region/chunks/chunk_0_0.json", "npc_test_001", NpcId);
+        var service = CreateService(repository);
+        var expected = repository.Records[NpcId].UpdatedAtUtc;
+
+        var preview = await service.PreviewAsync(
+            NpcId,
+            ToPreviewRequest(ValidSaveRequest(expected), "disable"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Equal(2, preview.Value!.ReferenceSummary.KnownReferenceCount);
+        Assert.Equal(preview.Value.ReferenceSummary.ReferenceSources.Distinct(StringComparer.Ordinal).Count(), preview.Value.ReferenceSummary.ReferenceSources.Count);
+    }
+
+    [Fact]
+    public async Task ReferenceSummaryReportsUnavailableFileRoots()
+    {
+        var repository = new InMemoryNpcRepository();
+        repository.Put(Record(NpcId, "Test NPC", "Disabled"));
+        repository.ReferenceSummaries[NpcId] = new NpcReferenceSummaryRecord(NpcId, 0, [], true);
+        var service = CreateService(repository);
+        var expected = repository.Records[NpcId].UpdatedAtUtc;
+
+        var preview = await service.PreviewAsync(
+            NpcId,
+            ToPreviewRequest(ValidSaveRequest(expected), "delete"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.False(preview.Value!.ReferenceSummary.ReferenceCheckComplete);
+        Assert.Contains(preview.Value.ReferenceSummary.ReferenceSources, source => source.StartsWith("unavailable:generated:", StringComparison.Ordinal));
+        Assert.Contains(preview.Value.ReferenceSummary.ReferenceSources, source => source.StartsWith("unavailable:tiled:", StringComparison.Ordinal));
+        Assert.Contains(preview.Value.Messages, message => message.Code == "npc_reference_check_incomplete");
+    }
+
+    [Fact]
     public async Task DeleteRequiresDisabledAndThenRemovesAggregate()
     {
         var repository = new InMemoryNpcRepository();
@@ -367,6 +454,74 @@ public sealed class NpcAuthoringServiceTests : IDisposable
             (byte)(height >> 24), (byte)(height >> 16), (byte)(height >> 8), (byte)height
         ];
         File.WriteAllBytes(path, header.ToArray());
+    }
+
+    private void WriteGeneratedNpcReference(string relativePath, string spawnName, string npcDefinitionId)
+    {
+        var path = Path.Combine(_root, "prototype", "shared", "maps", "generated", relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(
+            path,
+            $$"""
+            {
+              "npc_spawns": [
+                {
+                  "object_name": "{{spawnName}}",
+                  "npc_definition_id": "{{npcDefinitionId}}"
+                }
+              ]
+            }
+            """);
+    }
+
+    private void WriteTiledJsonNpcReference(string relativePath, string spawnName, string npcDefinitionId)
+    {
+        var path = Path.Combine(_root, "prototype", "shared", "maps", "tiled", relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(
+            path,
+            $$"""
+            {
+              "layers": [
+                {
+                  "name": "NPC Spawns",
+                  "objects": [
+                    {
+                      "name": "{{spawnName}}",
+                      "type": "NpcSpawn",
+                      "properties": [
+                        {
+                          "name": "npc_definition_id",
+                          "type": "string",
+                          "value": "{{npcDefinitionId}}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+            """);
+    }
+
+    private void WriteTiledXmlNpcReference(string relativePath, string spawnName, string npcDefinitionId)
+    {
+        var path = Path.Combine(_root, "prototype", "shared", "maps", "tiled", relativePath);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(
+            path,
+            $$"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <map>
+              <objectgroup name="NPC Spawns">
+                <object id="1" name="{{spawnName}}" type="NpcSpawn">
+                  <properties>
+                    <property name="npc_definition_id" type="string" value="{{npcDefinitionId}}" />
+                  </properties>
+                </object>
+              </objectgroup>
+            </map>
+            """);
     }
 
     private sealed class InMemoryNpcRepository : INpcRepository

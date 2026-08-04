@@ -189,7 +189,7 @@ Phased plan:
 **Status:** T5A runtime audit and domain lock documented. T5B NPC schema and
 contract foundation implemented. T5C NPC repository, validation, and API
 implemented. T5D Godot NPC workspace implemented. T5E MMO Project runtime NPC
-catalog handoff implemented.
+catalog handoff implemented. T5F runtime/reference hardening implemented.
 
 Move reusable NPC identity and presentation data into the database-backed
 authoring boundary while keeping spawn placement in Tiled. The current MMO
@@ -231,8 +231,11 @@ Dialogue-reference validation uses the configured file-backed MMO Project
 dialogue catalog when available; otherwise it reports syntax-only validation.
 `supports_runtime_npc_catalog = true` and `supports_quest_authoring = false`.
 T5D adds the Godot NPCs workspace for list/search/create/load/edit/preview/save,
-publish, disable, and delete over `/api/v1/npcs`. T5E adds the runtime catalog
-export/static-content/runtime handoff; it does not add placement authoring or
+publish, disable, and delete over `/api/v1/npcs`. T5E adds the catalog-export,
+static-content, and runtime handoff. T5F adds startup validation for exported NPC
+definitions and spawn references, byte-stable exporter coverage, placement-only
+Tiled source checks, and Content Studio reference guards across database,
+generated, and Tiled spawn references; it does not add placement authoring or
 quest editing.
 
 ## T6 — Interactable World Objects Foundation

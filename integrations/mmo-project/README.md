@@ -131,7 +131,7 @@ scripts, or runtime hot reload.
 
 ## T5 NPC-authoring runtime handoff
 
-T5E MMO Project runtime NPC catalog handoff implemented. T5A audited the current
+T5F runtime handoff hardening and reference safety implemented. T5A audited the current
 MMO Project NPC runtime and locked the integration boundary; T5B added the
 additive handoff migration `prototype/sql/024_npc_authoring_schema.sql`, host
 contract shapes, normalization rules, registry/options, and schema-health
@@ -142,7 +142,9 @@ reference diagnostics. T5D adds the Godot NPCs workspace over `/api/v1/npcs`.
 T5E mirrors the migration into MMO Project, seeds `test_npc`, exports
 `prototype/shared/maps/npcs/catalog.json`, validates `NpcSpawn.npc_definition_id`
 against that catalog, and composes runtime NPCs from placement plus reusable
-definition data.
+definition data. T5F hardens startup validation, byte-stable catalog export,
+placement-only Tiled source checks, and Content Studio disable/delete guards
+across database, generated, and Tiled spawn references.
 
 The active handoff is:
 
@@ -153,6 +155,8 @@ The active handoff is:
 - Generated and database static-content sources expose `npc_definition_catalog`
   at the region level.
 - `NpcRuntimeService` no longer requires hard-coded texture mapping.
+- Content Studio blocks disable/delete when the definition is still referenced by
+  known database, generated chunk, or Tiled source spawn data.
 - The existing `WorldSnapshotNpcPayload`, `npc_interaction_request`, and
   `DialogueSessionService` payloads remain compatible.
 
