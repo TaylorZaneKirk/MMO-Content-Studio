@@ -37,9 +37,8 @@ The D3 Godot Dialogue Studio workspace follows that same boundary over
 feature-owned in Godot, while the host owns validation, graph analysis,
 preview-signatures, persistence, reference checks, and transactions. The
 Dialogue workspace appears after NPCs and before Environment and uses shell
-routing for NPC cross-navigation. D4 MMO Project runtime catalog handoff
-remains pending, so D3 does not export runtime dialogue JSON and provides no
-quest, condition, or effect authoring.
+routing for NPC cross-navigation. D4 MMO Project runtime catalog handoff is
+implemented, while D1-D5 still provide no quest, condition, or effect authoring.
 
 ### .NET Content Authoring Host
 

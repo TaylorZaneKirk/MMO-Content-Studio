@@ -60,7 +60,7 @@ public sealed class DialogueAuthoringRegistry
         MaxPlaythroughSteps);
 
     public DialogueOperationCapabilities LoadCapabilities() => new(
-        false,
+        true,
         false,
         false,
         false,

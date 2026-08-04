@@ -100,7 +100,19 @@ class D2DialogueSchemaContractTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        allowed = {"M tools/MMO-Content-Studio", "M tools/mmoproject.tiled-session"}
+        allowed = {
+            "M tools/MMO-Content-Studio",
+            "M tools/mmoproject.tiled-session",
+            "M docs/development/CONTENT_AUTHORING_GUIDE.md",
+            "M docs/design/DIALOGUE_FOUNDATION_V1.md",
+            "M prototype/importer/README.md",
+            "M prototype/server/features/dialogue/application/DialogueDefinitionCatalog.cs",
+            "M prototype/sql/README.md",
+            "M prototype/tools/MapPublisher/Program.cs",
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs"
+        }
         unexpected = [line for line in result.stdout.splitlines() if line.strip() not in allowed]
         self.assertEqual([], unexpected)
 

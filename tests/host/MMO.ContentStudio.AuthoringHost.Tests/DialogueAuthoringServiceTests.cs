@@ -11,7 +11,7 @@ public sealed class DialogueAuthoringServiceTests
     private const string DialogueId = "test_npc_greeting";
 
     [Fact]
-    public async Task OptionsExposeLockedD2Capabilities()
+    public async Task OptionsExposeLockedD4Capabilities()
     {
         var service = CreateService(new InMemoryDialogueRepository());
 
@@ -21,8 +21,12 @@ public sealed class DialogueAuthoringServiceTests
         Assert.Contains(result.Value!.NodeTypes, option => option.Id == "speaker_text");
         Assert.Empty(result.Value.ConditionTypes);
         Assert.Empty(result.Value.EffectTypes);
-        Assert.False(result.Value.Capabilities.SupportsRuntimeDialogueCatalog);
+        Assert.True(result.Value.Capabilities.SupportsRuntimeDialogueCatalog);
+        Assert.False(result.Value.Capabilities.SupportsConditions);
+        Assert.False(result.Value.Capabilities.SupportsEffects);
         Assert.False(result.Value.Capabilities.SupportsQuestConditions);
+        Assert.False(result.Value.Capabilities.SupportsQuestEffects);
+        Assert.False(result.Value.Capabilities.SupportsHotReload);
     }
 
     [Fact]

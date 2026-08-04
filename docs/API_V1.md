@@ -322,9 +322,8 @@ reference-completeness capability states.
 
 D2 adds host-side authoring routes for reusable dialogue definitions. D3 Godot
 Dialogue Studio implemented the top-level Dialogue workspace after NPCs and
-before Environment over this same route family. These routes still do not
-export to MMO Project runtime JSON yet; D4 MMO Project runtime catalog handoff
-remains pending.
+before Environment over this same route family. D4 exports Published dialogue
+definitions to MMO Project runtime JSON through `MapPublisher`.
 
 ### `GET /api/v1/dialogues/options`
 

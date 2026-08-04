@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: D3 Godot Dialogue Studio
+## Current state: D4 Dialogue Runtime Handoff
 
 The repository now contains:
 
@@ -86,14 +86,14 @@ D2 implements the Content Studio host-side Dialogue authoring boundary over
 `/api/v1/dialogues`. D3 Godot Dialogue Studio implemented the integrated
 Dialogue workspace after NPCs and before Environment with a GraphEdit canvas,
 node inspector, entry-point editing, validation/change previews, playthrough
-preview, and NPC cross-navigation. D1-D5 author only the current non-quest
-dialogue runtime model: definitions, entry points, `speaker_text`,
-`player_choice`, and `end` nodes, node-owned transitions, server-filtered
-choices, and no quest, condition, or effect authoring. D4 MMO Project runtime
-catalog handoff remains pending, and D5 hardening and playthrough verification
-remain pending. Quest predicates, quest effects, objective progress, rewards,
-content gates, runtime export, hot reload, and Quest Studio remain deferred
-until later phases.
+preview, and NPC cross-navigation. D4 implements the deterministic Published
+dialogue export to MMO Project `prototype/shared/dialogues/catalog.json`.
+D1-D5 author only the current non-quest dialogue runtime model: definitions,
+entry points, `speaker_text`, `player_choice`, and `end` nodes, node-owned
+transitions, server-filtered choices, and no quest, condition, or effect
+authoring. D5 hardening and playthrough verification remain pending. Quest
+predicates, quest effects, objective progress, rewards, content gates, hot
+reload, and Quest Studio remain deferred until later phases.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -171,7 +171,7 @@ The default API address is `http://127.0.0.1:5187`.
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
-8. **D1-D5 — Dialogue Studio** — D3 Godot workspace implemented; D4/D5 pending
+8. **D1-D5 — Dialogue Studio** — D4 runtime catalog handoff implemented; D5 pending
 9. **T6 — Interactable world objects foundation**
 10. **T7 — Gathering resources and processing stations**
 11. **MMO Project quest foundations**
@@ -247,7 +247,7 @@ validation, schema-health, and catalog registration. D3 Godot Dialogue Studio
 implemented the Dialogue workspace after NPCs and before Environment using
 GraphEdit for graph editing, complete draft payloads, preview-before-apply
 mutation gates, playthrough preview, and NPC cross-navigation. D4 MMO Project
-runtime catalog handoff remains pending, and D5 hardening and playthrough
+runtime catalog handoff implemented, and D5 hardening and playthrough
 verification remain pending.
 See
 [`docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md`](docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md),

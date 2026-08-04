@@ -331,7 +331,9 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         )
         allowed_paths = (
             "docs/development/CONTENT_AUTHORING_GUIDE.md",
+            "docs/design/DIALOGUE_FOUNDATION_V1.md",
             "prototype/importer/",
+            "prototype/server/features/dialogue/application/DialogueDefinitionCatalog.cs",
             "prototype/server/features/README.md",
             "prototype/server/features/npcs/application/NpcRuntimeService.cs",
             "prototype/server/features/static_content/application/",
@@ -341,8 +343,11 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             "prototype/shared/maps/tiled/regions/starter_region.tmj",
             "prototype/shared/maps/tiled/regions/starter_region.tmx",
             "prototype/sql/",
+            "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/DialogueCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",
             "prototype/tools/MapPublisher/",

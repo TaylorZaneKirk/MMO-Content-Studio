@@ -1,8 +1,7 @@
 # Dialogue Studio Implementation Plan
 
-Status: D3 Godot Dialogue Studio implemented. D4 MMO Project runtime catalog
-handoff remains pending. D5 hardening and playthrough verification remain
-pending.
+Status: D4 MMO Project runtime catalog handoff implemented. D5 hardening and
+playthrough verification remain pending.
 
 ## Sequence Lock
 
@@ -14,7 +13,7 @@ T5 reusable NPC authoring                  complete
 D1 dialogue runtime/domain audit           complete
 D2 dialogue schema and host API            complete
 D3 Godot Dialogue Studio graph editor       complete
-D4 MMO Project runtime catalog handoff
+D4 MMO Project runtime catalog handoff     complete
 D5 hardening and playthrough verification
 
 MMO Project quest foundations
@@ -261,8 +260,7 @@ D3 is complete when:
 - playthrough preview covers current runtime semantics
 - NPC cross-navigation opens a referenced dialogue
 - mutation lifecycle uses `AuthoringWorkspaceSupport`
-- D3 docs mark D4 MMO Project runtime catalog handoff remains pending and D5
-  hardening and playthrough verification remain pending
+- D3 docs mark the Godot Dialogue workspace complete and D4/D5 work queued
 
 D4 is complete when:
 

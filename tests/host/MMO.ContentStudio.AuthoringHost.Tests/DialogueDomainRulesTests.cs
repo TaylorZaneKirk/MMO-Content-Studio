@@ -67,7 +67,7 @@ public sealed class DialogueDomainRulesTests
     }
 
     [Fact]
-    public void RegistryExposesEmptyConditionAndEffectVocabularies()
+    public void RegistryExposesRuntimeCatalogOnlyCapability()
     {
         var registry = new DialogueAuthoringRegistry();
 
@@ -77,6 +77,9 @@ public sealed class DialogueDomainRulesTests
         Assert.False(registry.LoadCapabilities().SupportsEffects);
         Assert.False(registry.LoadCapabilities().SupportsQuestConditions);
         Assert.False(registry.LoadCapabilities().SupportsQuestEffects);
-        Assert.False(registry.LoadCapabilities().SupportsRuntimeDialogueCatalog);
+        Assert.True(registry.LoadCapabilities().SupportsRuntimeDialogueCatalog);
+        Assert.False(registry.LoadCapabilities().SupportsLocalization);
+        Assert.False(registry.LoadCapabilities().SupportsPortraits);
+        Assert.False(registry.LoadCapabilities().SupportsHotReload);
     }
 }

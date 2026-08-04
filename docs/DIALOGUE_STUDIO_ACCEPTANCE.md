@@ -1,7 +1,6 @@
 # Dialogue Studio Acceptance
 
-Status: D3 Godot Dialogue Studio accepted for the Godot workspace boundary.
-D4 MMO Project runtime catalog handoff remains pending. D5 hardening and
+Status: D4 MMO Project runtime catalog handoff accepted. D5 hardening and
 playthrough verification remain pending.
 
 D5 hardening and playthrough verification remain pending.
@@ -75,6 +74,8 @@ Status: complete for the Content Studio Godot workspace.
 - D3 provides no quest, condition, or effect authoring.
 
 ## D4 - MMO Project Runtime Handoff
+
+Status: complete for the generated runtime catalog handoff.
 
 - Existing `test_npc_greeting` is migrated or seeded into Dialogue Studio
   authoring data.

@@ -193,8 +193,8 @@ introduces:
 - `dialogue_choices`
 
 The D2 schema stores authoring-only display metadata, notes, canvas positions,
-editor notes, publication state, and root concurrency timestamps. Runtime export
-remains D4: a deterministic handoff should write only `Published` dialogue
+editor notes, publication state, and root concurrency timestamps. D4 adds
+`MapPublisher export-dialogue-catalog`, which writes only `Published` dialogue
 definitions back into the runtime catalog shape already consumed by MMO
 Project.
 
@@ -209,5 +209,5 @@ D2 reference safety reads Content Studio `npc_definitions.default_dialogue_id`.
 Published NPC references block dialogue disable, and any NPC reference blocks
 dialogue delete. Conditions and effects have no authorable registry entries in
 D3, no condition/effect tables are created, and there is no quest, condition, or
-effect authoring. D4 MMO Project runtime catalog handoff remains pending, and
+effect authoring. D4 MMO Project runtime catalog handoff is implemented, and
 D5 hardening and playthrough verification remain pending.

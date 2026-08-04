@@ -1050,7 +1050,7 @@ func _apply_options() -> void:
 	var limits := _options.get("supported_limits", {}) as Dictionary
 	_set_spin_limits(_schema_version, 1, max(1, int(limits.get("max_schema_version", 100))))
 	var capabilities := _options.get("capabilities", {}) as Dictionary
-	_runtime_status.text = "Available" if bool(capabilities.get("supports_runtime_dialogue_catalog", false)) else "Deferred until D4"
+	_runtime_status.text = "Available" if bool(capabilities.get("supports_runtime_dialogue_catalog", false)) else "Unavailable"
 	_condition_status.text = "Supported" if bool(capabilities.get("supports_conditions", false)) else "Not supported in D3"
 	_effect_status.text = "Supported" if bool(capabilities.get("supports_effects", false)) else "Not supported in D3"
 

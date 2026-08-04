@@ -90,7 +90,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "supports_conditions",
             "supports_effects",
             "Not supported in D3",
-            "Deferred until D4",
+            "Available",
         ):
             self.assertIn(token, editor)
 
@@ -137,7 +137,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, main)
 
-    def test_docs_mark_d3_complete_and_runtime_work_deferred(self) -> None:
+    def test_docs_mark_d4_complete_and_d5_deferred(self) -> None:
         docs = "\n".join(
             [
                 (ROOT / "README.md").read_text(),
@@ -156,7 +156,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "Dialogue workspace after NPCs and before Environment",
             "GraphEdit",
             "NPC cross-navigation",
-            "D4 MMO Project runtime catalog handoff remains pending",
+            "D4 MMO Project runtime catalog handoff implemented",
             "D5 hardening and playthrough verification remain pending",
             "no quest, condition, or effect authoring",
         ):
@@ -164,8 +164,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
 
         for forbidden in (
             "Quest authoring implemented",
-            "Dialogue runtime export implemented",
-            "supports_runtime_dialogue_catalog = true",
+            "D4 MMO Project runtime catalog handoff remains pending",
         ):
             self.assertNotIn(forbidden, docs)
 

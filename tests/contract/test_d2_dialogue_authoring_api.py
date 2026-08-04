@@ -181,12 +181,12 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "D3 Godot Dialogue Studio implemented",
             "026_dialogue_authoring_schema.sql",
             "/api/v1/dialogues",
-            "supports_runtime_dialogue_catalog = false",
+            "supports_runtime_dialogue_catalog = true",
             "empty condition/effect registries",
             "Published NPC references block disable",
             "any NPC reference blocks delete",
             "Godot Dialogue Studio",
-            "D4 MMO Project runtime catalog handoff remains pending",
+            "D4 MMO Project runtime catalog handoff implemented",
             "D5 hardening and playthrough verification remain pending",
             "no quest, condition, or effect authoring",
         ):
@@ -196,8 +196,7 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "D4 complete implemented",
             "D5 complete implemented",
             "Quest authoring implemented",
-            "Dialogue runtime export implemented",
-            "supports_runtime_dialogue_catalog = true",
+            "D4 MMO Project runtime catalog handoff remains pending",
         ):
             self.assertNotIn(forbidden, docs)
 

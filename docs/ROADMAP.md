@@ -240,9 +240,8 @@ quest editing.
 
 ## D - Dialogue Studio
 
-**Status:** D3 Godot Dialogue Studio implemented. D4 MMO Project runtime
-catalog handoff remains pending. D5 hardening and playthrough verification
-remain pending.
+**Status:** D4 MMO Project runtime catalog handoff implemented. D5 hardening
+and playthrough verification remain pending.
 
 Move current non-quest dialogue graph authoring into MMO Content Studio as a
 first-class workspace after NPCs and before Environment. Dialogue Studio is not
@@ -284,7 +283,7 @@ Phased plan:
 - D3 adds the Godot Dialogue workspace with GraphEdit graph editing,
   playthrough preview, validation/change previews, and NPC cross-navigation.
 - D4 adds the MMO Project runtime catalog handoff while preserving the existing
-  dialogue protocol.
+  dialogue protocol. This handoff is implemented.
 - D5 hardens runtime verification, reference safety, and connected playthroughs.
 
 D2 adds `integrations/mmo-project/prototype/sql/026_dialogue_authoring_schema.sql`
@@ -296,7 +295,7 @@ locks the root, checks the expected timestamp, replaces children
 transactionally, reloads inside the transaction, commits, and reloads again.
 Published NPC references through `npc_definitions.default_dialogue_id` block
 disable; any NPC reference blocks delete. Current capabilities report
-`supports_runtime_dialogue_catalog = false`, empty condition/effect registries,
+`supports_runtime_dialogue_catalog = true`, empty condition/effect registries,
 and no quest, localization, portrait, cutscene, or hot-reload support.
 
 D3 Godot Dialogue Studio is implemented over the D2 `/api/v1/dialogues` routes.
@@ -305,8 +304,8 @@ loads complete aggregates, edits `speaker_text`, `player_choice`, and `end`
 nodes on a GraphEdit canvas, keeps condition/effect controls read-only as
 unsupported, previews exact logical changes, gates mutations with
 preview-signatures, runs host playthrough preview, and routes NPC references
-back to the NPCs workspace. D4 MMO Project runtime catalog handoff remains
-pending, so authoring rows are not exported to runtime JSON by D3.
+back to the NPCs workspace. D4 MMO Project runtime catalog handoff now exports
+Published authoring rows to runtime JSON.
 
 ## T6 — Interactable World Objects Foundation
 
