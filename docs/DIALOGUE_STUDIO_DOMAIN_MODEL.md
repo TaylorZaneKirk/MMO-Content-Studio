@@ -1,8 +1,9 @@
 # Dialogue Studio Domain Model
 
-Status: D2 host-side dialogue schema, contracts, repository, validation,
-playthrough preview, and API implemented. Godot Dialogue Studio, MMO Project
-runtime handoff, and hardening remain pending.
+Status: D3 Godot Dialogue Studio implemented over the D2 host-side dialogue
+schema, contracts, repository, validation, playthrough preview, and API. D4 MMO
+Project runtime handoff remains pending. D5 hardening and playthrough
+verification remain pending.
 
 ## Product Boundary
 
@@ -21,7 +22,7 @@ Environment
 later: Quests
 ```
 
-The NPC workspace may later show:
+The NPC workspace shows:
 
 ```text
 Default dialogue: test_npc_greeting
@@ -29,8 +30,8 @@ Default dialogue: test_npc_greeting
 ```
 
 That action should route to the Dialogue workspace and load the definition.
-It should not create a direct script dependency from `npc_editor.gd` to a future
-dialogue editor.
+It uses shell-level routing and does not create a direct script dependency from
+`npc_editor.gd` to `dialogue_editor.gd`.
 
 ## D2 Aggregate
 
@@ -374,6 +375,11 @@ defined in D1.
 
 ## Initial Dialogue Studio UX Requirements
 
+D3 Godot Dialogue Studio implemented the initial UI as a top-level Dialogue
+workspace after NPCs and before Environment. The workspace uses GraphEdit and
+GraphNode for graph editing, keeps condition and effect authoring read-only as
+unsupported, and routes NPC reference summaries back to the NPCs workspace.
+
 Top-level workspace:
 
 ```text
@@ -436,6 +442,8 @@ Only relevant fields should be visible for each node type:
 
 Conditions and effects should be visible as empty/read-only "not supported by
 current runtime" sections until runtime types are implemented.
+
+D3 provides no quest, condition, or effect authoring.
 
 ## Playthrough Preview
 

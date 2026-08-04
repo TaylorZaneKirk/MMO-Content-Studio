@@ -24,7 +24,7 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: D2 Dialogue Studio host API
+## Current state: D3 Godot Dialogue Studio
 
 The repository now contains:
 
@@ -51,6 +51,7 @@ The repository now contains:
 - optimistic aggregate concurrency and reload-after-commit verification
 - source and optional runtime contract tests
 - D2 Dialogue Studio schema, contracts, repository, validation, playthrough preview, and host API
+- D3 Godot Dialogue Studio implemented as a top-level Dialogue workspace after NPCs and before Environment
 
 T4 Phase 0 audited the current MMO Project mob/enemy runtime path and locked the
 implementation plan for the Mobs workspace. T4B implements the host-side API for
@@ -82,14 +83,17 @@ The NPCs workspace authors reusable definitions only; placement remains in Tiled
 
 D2 implements the Content Studio host-side Dialogue authoring boundary over
 `integrations/mmo-project/prototype/sql/026_dialogue_authoring_schema.sql` and
-`/api/v1/dialogues`. Dialogue Studio remains an integrated top-level MMO
-Content Studio workspace planned for D3, not a separate application and not a
-full graph editor embedded inside the NPC form. D1-D5 author only the current
-non-quest dialogue runtime model: definitions, entry points, `speaker_text`,
+`/api/v1/dialogues`. D3 Godot Dialogue Studio implemented the integrated
+Dialogue workspace after NPCs and before Environment with a GraphEdit canvas,
+node inspector, entry-point editing, validation/change previews, playthrough
+preview, and NPC cross-navigation. D1-D5 author only the current non-quest
+dialogue runtime model: definitions, entry points, `speaker_text`,
 `player_choice`, and `end` nodes, node-owned transitions, server-filtered
-choices, and empty condition/effect vocabularies. Quest predicates, quest
-effects, objective progress, rewards, content gates, runtime export, hot reload,
-and Quest Studio remain deferred until later phases.
+choices, and no quest, condition, or effect authoring. D4 MMO Project runtime
+catalog handoff remains pending, and D5 hardening and playthrough verification
+remain pending. Quest predicates, quest effects, objective progress, rewards,
+content gates, runtime export, hot reload, and Quest Studio remain deferred
+until later phases.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -167,7 +171,7 @@ The default API address is `http://127.0.0.1:5187`.
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
-8. **D1-D5 — Dialogue Studio** — D2 host schema/API implemented; D3-D5 pending
+8. **D1-D5 — Dialogue Studio** — D3 Godot workspace implemented; D4/D5 pending
 9. **T6 — Interactable world objects foundation**
 10. **T7 — Gathering resources and processing stations**
 11. **MMO Project quest foundations**
@@ -239,8 +243,12 @@ deferred.
 D2 Dialogue Studio host work adds additive authoring schema, complete graph
 contracts, repository-backed `/api/v1/dialogues`, draft/publish/disable/delete
 preview signatures, optimistic concurrency, pure playthrough preview, graph
-validation, schema-health, and catalog registration. The Godot Dialogue
-workspace, MMO Project runtime catalog handoff, and hardening remain pending.
+validation, schema-health, and catalog registration. D3 Godot Dialogue Studio
+implemented the Dialogue workspace after NPCs and before Environment using
+GraphEdit for graph editing, complete draft payloads, preview-before-apply
+mutation gates, playthrough preview, and NPC cross-navigation. D4 MMO Project
+runtime catalog handoff remains pending, and D5 hardening and playthrough
+verification remain pending.
 See
 [`docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md`](docs/DIALOGUE_STUDIO_RUNTIME_AUDIT.md),
 [`docs/DIALOGUE_STUDIO_DOMAIN_MODEL.md`](docs/DIALOGUE_STUDIO_DOMAIN_MODEL.md),

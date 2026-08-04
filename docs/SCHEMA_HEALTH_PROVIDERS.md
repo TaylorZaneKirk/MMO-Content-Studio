@@ -60,4 +60,6 @@ D2 Dialogue schema/API implemented the Dialogue manifest in
 `integrations/mmo-project/prototype/sql/026_dialogue_authoring_schema.sql`,
 including stable ID constraints, supported node types, finite layout
 coordinates, root timestamp columns, and child-table triggers that advance the
-root concurrency token.
+root concurrency token. D3 Godot Dialogue Studio consumes that health surface
+for the Dialogue workspace; D4 MMO Project runtime catalog handoff remains
+pending.

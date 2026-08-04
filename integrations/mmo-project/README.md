@@ -174,7 +174,11 @@ only; it does not export a runtime NPC catalog or author Tiled placement.
 ## D Dialogue Studio runtime handoff plan
 
 D2 adds the Content Studio host-side dialogue authoring schema/API without
-modifying the MMO Project runtime repository.
+modifying the MMO Project runtime repository. D3 Godot Dialogue Studio
+implemented the Content Studio Dialogue workspace after NPCs and before
+Environment, including GraphEdit graph editing, host playthrough preview, and
+NPC cross-navigation, still without modifying the MMO Project runtime
+repository.
 
 Current MMO Project dialogue definitions live in
 `prototype/shared/dialogues/catalog.json`, are loaded by
@@ -204,4 +208,6 @@ scripting, or runtime hot reload.
 D2 reference safety reads Content Studio `npc_definitions.default_dialogue_id`.
 Published NPC references block dialogue disable, and any NPC reference blocks
 dialogue delete. Conditions and effects have no authorable registry entries in
-D2, and no condition/effect tables are created.
+D3, no condition/effect tables are created, and there is no quest, condition, or
+effect authoring. D4 MMO Project runtime catalog handoff remains pending, and
+D5 hardening and playthrough verification remain pending.

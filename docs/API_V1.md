@@ -320,9 +320,11 @@ reference-completeness capability states.
 
 ## Dialogue routes
 
-D2 adds host-side authoring routes for reusable dialogue definitions. These
-routes do not add the Godot Dialogue workspace and do not export to MMO Project
-runtime JSON yet.
+D2 adds host-side authoring routes for reusable dialogue definitions. D3 Godot
+Dialogue Studio implemented the top-level Dialogue workspace after NPCs and
+before Environment over this same route family. These routes still do not
+export to MMO Project runtime JSON yet; D4 MMO Project runtime catalog handoff
+remains pending.
 
 ### `GET /api/v1/dialogues/options`
 
@@ -330,7 +332,8 @@ Returns publication states, node types `speaker_text`, `player_choice`, and
 `end`, ID rules/limits, default entry/start IDs, and capability flags. The
 condition and effect registries are empty. Runtime catalog export, quest
 conditions/effects, localization, portraits, hot reload, and cutscenes all
-report unsupported in D2.
+report unsupported in D3. The Godot workspace shows those capabilities as
+unsupported and provides no quest, condition, or effect authoring.
 
 ### `GET /api/v1/dialogues?search=greeting`
 
@@ -396,6 +399,13 @@ NPC definitions that reference the dialogue through
 Deletes a disabled dialogue definition after preview/signature and concurrency
 verification. Any known NPC definition reference blocks delete, including Draft
 and Disabled NPC references.
+
+The D3 Godot **Dialogue** workspace consumes these routes through
+`AuthoringHostClient` and `AuthoringHttpTransport`. It sends complete draft and
+preview aggregates for save/preview, sends only `expected_updated_at_utc` plus
+`preview_signature` for publish/disable/delete, clears the apply gate after
+every form edit, uses GraphEdit for current node types, runs playthrough preview
+through the host, and supports NPC cross-navigation through shell-level routing.
 
 ## Request correlation
 

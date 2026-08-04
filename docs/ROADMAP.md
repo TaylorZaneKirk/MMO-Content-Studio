@@ -240,13 +240,14 @@ quest editing.
 
 ## D - Dialogue Studio
 
-**Status:** D2 dialogue schema, repository, validation, playthrough preview,
-and API implemented. D3-D5 planned.
+**Status:** D3 Godot Dialogue Studio implemented. D4 MMO Project runtime
+catalog handoff remains pending. D5 hardening and playthrough verification
+remain pending.
 
 Move current non-quest dialogue graph authoring into MMO Content Studio as a
 first-class workspace after NPCs and before Environment. Dialogue Studio is not
-a separate application, and the NPC workspace should link to referenced
-dialogues without embedding the full graph editor.
+a separate application, and the NPC workspace links to referenced dialogues
+without embedding the full graph editor.
 
 Current MMO Project dialogue definitions are file-backed JSON at
 `prototype/shared/dialogues/catalog.json`, loaded during server startup by
@@ -266,6 +267,7 @@ Locked D1-D5 boundaries:
 - Quest predicates, quest effects, objective progress, rewards, content gates,
   arbitrary scripting, portraits, cutscenes, localization, and hot reload remain
   deferred.
+- D3 provides no quest, condition, or effect authoring.
 
 References:
 
@@ -279,8 +281,8 @@ Phased plan:
 - D1 audits the runtime and locks the non-quest Dialogue Studio model.
 - D2 adds additive schema, contracts, repository, validation, playthrough
   preview, schema-health/catalog registration, and `/api/v1/dialogues`.
-- D3 adds the Godot Dialogue workspace with graph editing and playthrough
-  preview.
+- D3 adds the Godot Dialogue workspace with GraphEdit graph editing,
+  playthrough preview, validation/change previews, and NPC cross-navigation.
 - D4 adds the MMO Project runtime catalog handoff while preserving the existing
   dialogue protocol.
 - D5 hardens runtime verification, reference safety, and connected playthroughs.
@@ -296,6 +298,15 @@ Published NPC references through `npc_definitions.default_dialogue_id` block
 disable; any NPC reference blocks delete. Current capabilities report
 `supports_runtime_dialogue_catalog = false`, empty condition/effect registries,
 and no quest, localization, portrait, cutscene, or hot-reload support.
+
+D3 Godot Dialogue Studio is implemented over the D2 `/api/v1/dialogues` routes.
+The Dialogue workspace after NPCs and before Environment lists definitions,
+loads complete aggregates, edits `speaker_text`, `player_choice`, and `end`
+nodes on a GraphEdit canvas, keeps condition/effect controls read-only as
+unsupported, previews exact logical changes, gates mutations with
+preview-signatures, runs host playthrough preview, and routes NPC references
+back to the NPCs workspace. D4 MMO Project runtime catalog handoff remains
+pending, so authoring rows are not exported to runtime JSON by D3.
 
 ## T6 — Interactable World Objects Foundation
 

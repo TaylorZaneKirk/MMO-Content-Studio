@@ -1,6 +1,8 @@
 # Dialogue Studio Implementation Plan
 
-Status: D2 host-side schema/API implemented. D3-D5 remain planned.
+Status: D3 Godot Dialogue Studio implemented. D4 MMO Project runtime catalog
+handoff remains pending. D5 hardening and playthrough verification remain
+pending.
 
 ## Sequence Lock
 
@@ -11,7 +13,7 @@ T5 reusable NPC authoring                  complete
 
 D1 dialogue runtime/domain audit           complete
 D2 dialogue schema and host API            complete
-D3 Godot Dialogue Studio graph editor
+D3 Godot Dialogue Studio graph editor       complete
 D4 MMO Project runtime catalog handoff
 D5 hardening and playthrough verification
 
@@ -118,12 +120,13 @@ with repository, preview, playthrough, schema-health, and catalog registration.
 
 ## D3 - Godot Dialogue Studio
 
-Add a top-level **Dialogue** workspace after NPCs and before Environment.
+Implemented a top-level **Dialogue** workspace after NPCs and before
+Environment.
 
 Godot files:
 
 - `content-studio/scripts/dialogue_editor.gd`
-- `content-studio/scripts/dialogue_graph_canvas.gd` if split from the editor
+- graph canvas remains inside `content-studio/scripts/dialogue_editor.gd`
 - scene registration in `content-studio/scenes/Main.tscn`
 - `AuthoringHostClient` dialogue route methods and signals
 
@@ -146,7 +149,7 @@ Graph canvas:
 - start-node marker based on entry points
 - end-node marker
 - invalid-edge indicators
-- automatic layout command
+- automatic layout command deferred unless the graph grows enough to justify it
 
 Preview/apply lifecycle:
 
@@ -163,6 +166,7 @@ Cross-workspace navigation:
 - `NPC -> Open Dialogue` loads `default_dialogue_id`
 - Dialogue references panel lists NPC definitions that reference the dialogue
 - no direct dependency from `npc_editor.gd` to `dialogue_editor.gd`
+- no quest, condition, or effect authoring in D3
 
 ## D4 - MMO Project Runtime Catalog Handoff
 
@@ -257,6 +261,8 @@ D3 is complete when:
 - playthrough preview covers current runtime semantics
 - NPC cross-navigation opens a referenced dialogue
 - mutation lifecycle uses `AuthoringWorkspaceSupport`
+- D3 docs mark D4 MMO Project runtime catalog handoff remains pending and D5
+  hardening and playthrough verification remain pending
 
 D4 is complete when:
 

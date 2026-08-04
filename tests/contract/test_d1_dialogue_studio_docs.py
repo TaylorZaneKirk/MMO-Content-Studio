@@ -130,7 +130,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
 
         self.assertIn("## D Dialogue Studio boundary", architecture)
         self.assertIn("dialogue graph/playthrough previews", architecture)
-        self.assertIn("D3 Dialogue Studio should use the same support boundary", workspace)
+        self.assertIn("D3 Dialogue Studio uses the same support boundary", workspace)
         self.assertIn("## D Dialogue Studio runtime handoff plan", integration)
 
     def test_initial_schema_excludes_quest_semantics(self) -> None:
@@ -163,16 +163,17 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn("Effect tables should be deferred", domain)
         self.assertIn("D1 registers no condition or effect types.", domain)
 
-    def test_d1_does_not_add_godot_dialogue_editor(self) -> None:
-        absent_paths = (
-            ROOT / "content-studio" / "scripts" / "dialogue_editor.gd",
-        )
-        for path in absent_paths:
-            self.assertFalse(path.exists(), f"{path} should wait until D2/D3")
-
+    def test_godot_dialogue_editor_keeps_d1_runtime_boundary(self) -> None:
         main_scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
-        self.assertNotIn('[node name="Dialogue"', main_scene)
-        self.assertNotIn("dialogue_editor.gd", main_scene)
+        editor = (ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").read_text()
+
+        self.assertIn('[node name="Dialogue"', main_scene)
+        self.assertIn("dialogue_editor.gd", main_scene)
+        self.assertIn('const NODE_TYPE_SPEAKER_TEXT := "speaker_text"', editor)
+        self.assertIn('const NODE_TYPE_PLAYER_CHOICE := "player_choice"', editor)
+        self.assertIn('const NODE_TYPE_END := "end"', editor)
+        self.assertIn("Quest and condition authoring are deferred", editor)
+        self.assertNotIn("/api/v1/quests", editor)
 
     def test_runtime_checkout_confirms_current_dialogue_when_available(self) -> None:
         catalog_path = _runtime_file(Path("prototype") / "shared" / "dialogues" / "catalog.json")

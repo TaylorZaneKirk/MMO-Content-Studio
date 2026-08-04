@@ -10,6 +10,9 @@ extends Control
 @onready var asset_roots_list: VBoxContainer = %AssetRootsList
 @onready var catalog_list: VBoxContainer = %CatalogList
 @onready var authoring_host_client: AuthoringHostClient = %AuthoringHostClient
+@onready var tabs: TabContainer = %Tabs
+@onready var npc_editor = %NPCs
+@onready var dialogue_editor = %Dialogue
 
 
 func _ready() -> void:
@@ -17,6 +20,8 @@ func _ready() -> void:
 	authoring_host_client.handshake_received.connect(_on_handshake_received)
 	authoring_host_client.health_received.connect(_on_health_received)
 	authoring_host_client.catalog_received.connect(_on_catalog_received)
+	npc_editor.workspace_open_requested.connect(_on_workspace_open_requested)
+	dialogue_editor.workspace_open_requested.connect(_on_workspace_open_requested)
 	retry_button.pressed.connect(authoring_host_client.retry)
 	authoring_host_client.connect_and_load()
 
@@ -101,3 +106,19 @@ func _clear_children(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
+
+
+func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> void:
+	match workspace_id:
+		"dialogue":
+			_open_tab(dialogue_editor)
+			dialogue_editor.open_resource(resource_id)
+		"npcs":
+			_open_tab(npc_editor)
+			npc_editor.open_resource(resource_id)
+
+
+func _open_tab(control: Control) -> void:
+	var index := tabs.get_tab_idx_from_control(control)
+	if index >= 0:
+		tabs.current_tab = index

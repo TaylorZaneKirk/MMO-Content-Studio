@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name NpcEditor
 
+signal workspace_open_requested(workspace_id: String, resource_id: String)
+
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const GAME_ASSET_PREFIX := "res://assets/"
 
@@ -99,6 +101,7 @@ var _interaction_range: SpinBox
 var _default_interaction: OptionButton
 var _dialogue_id: LineEdit
 var _dialogue_options: OptionButton
+var _open_dialogue_button: Button
 var _dialogue_capability: Label
 var _dialogue_guidance: Label
 var _notes: TextEdit
@@ -253,6 +256,12 @@ func _add_dialogue_section(parent: VBoxContainer) -> void:
 	_dialogue_id = _line_field(grid, "Default dialogue ID", "test_npc_greeting")
 	_dialogue_options = _option_field(grid, "Known dialogue IDs")
 	_dialogue_options.item_selected.connect(_on_dialogue_option_selected.unbind(1))
+	grid.add_child(_label("Workspace"))
+	_open_dialogue_button = Button.new()
+	_open_dialogue_button.text = "Open Dialogue"
+	_open_dialogue_button.disabled = true
+	_open_dialogue_button.pressed.connect(_on_open_dialogue_pressed)
+	grid.add_child(_open_dialogue_button)
 	_dialogue_capability = _value_label(grid, "Complete reference validation", "Unknown")
 	_dialogue_guidance = _wrapped_label("This field links to the current MMO Project dialogue definition. Dialogue and quest authoring remain separate future work.")
 	parent.add_child(_dialogue_guidance)
@@ -495,6 +504,10 @@ func _load_npc_id(npc_definition_id: String) -> void:
 		_client.load_npc(npc_definition_id)
 
 
+func open_resource(npc_definition_id: String) -> void:
+	_load_npc_id(npc_definition_id)
+
+
 func _load_npc(payload: Dictionary) -> void:
 	_is_loading = true
 	_current_npc = payload
@@ -662,6 +675,7 @@ func _on_form_changed(_value: Variant = null) -> void:
 		return
 	_clear_preview()
 	_update_visual_preview()
+	_update_dialogue_workspace_button()
 
 
 func _on_visual_path_changed(_value: String) -> void:
@@ -697,6 +711,12 @@ func _on_dialogue_option_selected() -> void:
 	_on_form_changed()
 
 
+func _on_open_dialogue_pressed() -> void:
+	var dialogue_id := _dialogue_id.text.strip_edges()
+	if not dialogue_id.is_empty():
+		workspace_open_requested.emit("dialogue", dialogue_id)
+
+
 func _update_movement_controls() -> void:
 	var movement := _selected_metadata(_movement_behavior)
 	var can_wander := _form_editable and movement == "random_wander"
@@ -714,6 +734,13 @@ func _update_interaction_controls() -> void:
 	if not _interaction_enabled.button_pressed:
 		_dialogue_id.text = ""
 		_select_option(_dialogue_options, "")
+	_update_dialogue_workspace_button()
+
+
+func _update_dialogue_workspace_button() -> void:
+	if _open_dialogue_button == null:
+		return
+	_open_dialogue_button.disabled = _dialogue_id.text.strip_edges().is_empty()
 
 
 func _update_visual_preview() -> void:

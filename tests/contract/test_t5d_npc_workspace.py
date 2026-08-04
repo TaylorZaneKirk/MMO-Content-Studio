@@ -25,13 +25,13 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             '[node name="Items" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             '[node name="Mobs" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             '[node name="NPCs" type="HBoxContainer" parent="Margin/Root/Tabs"]',
+            '[node name="Dialogue" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             '[node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             'script = ExtResource("5_npcs")',
         ):
             self.assertIn(token, scene)
 
         for forbidden in (
-            '[node name="Dialogue"',
             '[node name="Quests"',
             '[node name="Services"',
             '[node name="Shops"',
@@ -78,11 +78,11 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         connection_operations = client.split("const CONNECTION_OPERATIONS := [", 1)[1].split("]", 1)[0]
 
         self.assertNotIn("OP_NPC_OPTIONS", connection_operations)
-        self.assertIn("_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS]", client)
+        self.assertIn("_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS]", client)
         self.assertIn("OP_NPC_OPTIONS:", client)
         self.assertIn("npc_options_received.emit(data)", client)
         self.assertIn("npc_catalog_received.emit(data)", client)
-        self.assertIn("operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS]", client)
+        self.assertIn("operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES]", client)
         self.assertIn("_request_next_startup_operation()", client)
 
     def test_successful_npc_catalog_load_recovers_schema_enabled_ui(self) -> None:

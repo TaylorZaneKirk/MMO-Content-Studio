@@ -32,6 +32,15 @@ owns feature-specific request methods and signals. Editors own their forms and
 payloads, while `AuthoringWorkspaceSupport` owns preview/apply lifecycle state
 and feedback rendering.
 
+The D3 Godot Dialogue Studio workspace follows that same boundary over
+`/api/v1/dialogues`: GraphEdit and the node/playthrough inspectors are
+feature-owned in Godot, while the host owns validation, graph analysis,
+preview-signatures, persistence, reference checks, and transactions. The
+Dialogue workspace appears after NPCs and before Environment and uses shell
+routing for NPC cross-navigation. D4 MMO Project runtime catalog handoff
+remains pending, so D3 does not export runtime dialogue JSON and provides no
+quest, condition, or effect authoring.
+
 ### .NET Content Authoring Host
 
 Responsibilities:

@@ -30,5 +30,6 @@ runtime NPC catalog handoff is implemented in T5E.
 The Dialogue catalog provider follows the same rule. It is backed by
 `DialogueAuthoringService.ListAsync`, reports real Dialogue definition entries
 when the configured database has the D2 schema, and returns an empty implemented
-section when listing is unavailable. It does not fabricate runtime graph entries
-and does not claim the D4 runtime export handoff.
+section when listing is unavailable. D3 Godot Dialogue Studio reads those
+entries for its top-level Dialogue workspace. It does not fabricate runtime
+graph entries and does not claim the D4 runtime export handoff.

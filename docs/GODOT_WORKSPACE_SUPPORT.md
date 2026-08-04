@@ -15,7 +15,9 @@ The U3/U4 Items workspace and the Mobs workspace established the current
 pattern: each editor keeps ownership of its form, payloads, preview requests,
 mutations, status wording, and visual preview while delegating the shared
 lifecycle and feedback behavior to one support instance. The T5D NPCs workspace
-follows the same pattern. The legacy Consumables, Equipment, and Weapons & Tools editor scripts were removed in U4 after the unified Items workspace became the only normal item authoring surface.
+follows the same pattern. D3 Godot Dialogue Studio implemented the same pattern
+for the Dialogue workspace after NPCs and before Environment.
+The legacy Consumables, Equipment, and Weapons & Tools editor scripts were removed in U4 after the unified Items workspace became the only normal item authoring surface.
 
 Every existing editor follows the same sequence:
 
@@ -37,10 +39,13 @@ create, load, preview, save draft, publish, disable, and delete all flow through
 and publish/disable/delete use the saved aggregate concurrency token plus the
 server preview signature.
 
-D3 Dialogue Studio should use the same support boundary for validation,
-preview-before-apply, exact logical changes, and mutation enablement. Its graph
-canvas, node inspector, and playthrough preview should remain feature-owned,
-while `AuthoringWorkspaceSupport` owns the shared lifecycle mechanics. The NPC
-workspace may offer shell-level navigation to a referenced dialogue, but it
-should not take a direct script dependency on a future `dialogue_editor.gd` or
-embed the full graph editor inside the NPC form.
+D3 Dialogue Studio uses the same support boundary for validation,
+preview-before-apply, exact logical changes, and mutation enablement. Its
+GraphEdit canvas, node inspector, entry-point editor, and playthrough preview
+remain feature-owned, while `AuthoringWorkspaceSupport` owns the shared
+lifecycle mechanics. The NPC workspace offers shell-level navigation to a
+referenced dialogue, and the Dialogue workspace routes NPC reference summaries
+back to NPCs without either editor directly instantiating the other. D4 MMO
+Project runtime catalog handoff remains pending, D5 hardening and playthrough
+verification remain pending, and D3 provides no quest, condition, or effect
+authoring.

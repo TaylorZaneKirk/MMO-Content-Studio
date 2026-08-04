@@ -1,7 +1,10 @@
 # Dialogue Studio Acceptance
 
-Status: D2 accepted for the host-side schema/API boundary. D3-D5 remain
-pending.
+Status: D3 Godot Dialogue Studio accepted for the Godot workspace boundary.
+D4 MMO Project runtime catalog handoff remains pending. D5 hardening and
+playthrough verification remain pending.
+
+D5 hardening and playthrough verification remain pending.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -24,7 +27,7 @@ D1 is complete when:
   workspace.
 - Quest semantics are explicitly deferred.
 - Source-contract tests preserve the historical D1 boundary and now guard that
-  the Godot Dialogue editor remains deferred until D3.
+  the Godot Dialogue editor stays within current runtime-compatible semantics.
 - MMO Project remains read-only.
 
 ## D2 - Schema, Contracts, Repository, Validation, And API
@@ -51,6 +54,8 @@ Status: complete for host-side authoring.
 
 ## D3 - Godot Dialogue Studio
 
+Status: complete for the Content Studio Godot workspace.
+
 - A top-level **Dialogue** workspace appears after NPCs and before Environment.
 - Dialogue is not a separate application.
 - The NPC workspace can route to a referenced dialogue without embedding the
@@ -65,6 +70,9 @@ Status: complete for host-side authoring.
   effects.
 - Validation and exact logical changes remain visible and scrollable.
 - Preview/apply lifecycle uses `AuthoringWorkspaceSupport`.
+- Dialogue references can route back to NPC definitions through shell-level
+  NPC cross-navigation.
+- D3 provides no quest, condition, or effect authoring.
 
 ## D4 - MMO Project Runtime Handoff
 

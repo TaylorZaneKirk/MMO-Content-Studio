@@ -26,6 +26,13 @@ signal npc_definition_received(payload: Dictionary)
 signal npc_preview_received(payload: Dictionary)
 signal npc_mutation_completed(payload: Dictionary)
 signal npc_delete_completed(payload: Dictionary)
+signal dialogue_options_received(payload: Dictionary)
+signal dialogue_catalog_received(payload: Dictionary)
+signal dialogue_definition_received(payload: Dictionary)
+signal dialogue_preview_received(payload: Dictionary)
+signal dialogue_playthrough_received(payload: Dictionary)
+signal dialogue_mutation_completed(payload: Dictionary)
+signal dialogue_delete_completed(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const TRANSPORT_SCRIPT := preload("res://scripts/http_json_client.gd")
@@ -60,6 +67,15 @@ const OP_NPC_SAVE_DRAFT := "npc_save_draft"
 const OP_NPC_PUBLISH := "npc_publish"
 const OP_NPC_DISABLE := "npc_disable"
 const OP_NPC_DELETE := "npc_delete"
+const OP_DIALOGUE_OPTIONS := "dialogue_options"
+const OP_DIALOGUES := "dialogues"
+const OP_DIALOGUE_DEFINITION := "dialogue_definition"
+const OP_DIALOGUE_PREVIEW := "dialogue_preview"
+const OP_DIALOGUE_PLAYTHROUGH := "dialogue_playthrough"
+const OP_DIALOGUE_SAVE_DRAFT := "dialogue_save_draft"
+const OP_DIALOGUE_PUBLISH := "dialogue_publish"
+const OP_DIALOGUE_DISABLE := "dialogue_disable"
+const OP_DIALOGUE_DELETE := "dialogue_delete"
 
 const CONNECTION_OPERATIONS := [
 	OP_HANDSHAKE,
@@ -252,6 +268,54 @@ func delete_npc(npc_definition_id: String, expected_updated_at_utc: Variant, pre
 	})
 
 
+func load_dialogue_options() -> void:
+	_request(OP_DIALOGUE_OPTIONS, "/api/v1/dialogues/options")
+
+
+func load_dialogues(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(OP_DIALOGUES, "/api/v1/dialogues%s" % suffix)
+
+
+func load_dialogue(dialogue_definition_id: String) -> void:
+	_request(OP_DIALOGUE_DEFINITION, "/api/v1/dialogues/%s" % dialogue_definition_id.uri_encode())
+
+
+func preview_dialogue(dialogue_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_DIALOGUE_PREVIEW, "/api/v1/dialogues/%s/preview" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+
+func preview_dialogue_playthrough(dialogue_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_DIALOGUE_PLAYTHROUGH, "/api/v1/dialogues/%s/playthrough" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+
+func save_dialogue_draft(dialogue_definition_id: String, payload: Dictionary) -> void:
+	_request(OP_DIALOGUE_SAVE_DRAFT, "/api/v1/dialogues/%s/draft" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+
+func publish_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_DIALOGUE_PUBLISH, "/api/v1/dialogues/%s/publish" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
+func disable_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_DIALOGUE_DISABLE, "/api/v1/dialogues/%s/disable" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
+func delete_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_DIALOGUE_DELETE, "/api/v1/dialogues/%s/delete" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+
 func _request(
 	operation: String,
 	path: String,
@@ -304,6 +368,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		OP_NPCS:
 			npc_catalog_received.emit(data)
 			_request_next_startup_operation()
+		OP_DIALOGUE_OPTIONS:
+			dialogue_options_received.emit(data)
+			_request(OP_DIALOGUES, "/api/v1/dialogues")
+		OP_DIALOGUES:
+			dialogue_catalog_received.emit(data)
+			_request_next_startup_operation()
 		OP_ITEM:
 			item_definition_received.emit(data)
 			item_received.emit(data)
@@ -327,6 +397,16 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			npc_delete_completed.emit(data)
 		OP_NPC_SAVE_DRAFT, OP_NPC_PUBLISH, OP_NPC_DISABLE:
 			npc_mutation_completed.emit(data)
+		OP_DIALOGUE_DEFINITION:
+			dialogue_definition_received.emit(data)
+		OP_DIALOGUE_PREVIEW:
+			dialogue_preview_received.emit(data)
+		OP_DIALOGUE_PLAYTHROUGH:
+			dialogue_playthrough_received.emit(data)
+		OP_DIALOGUE_DELETE:
+			dialogue_delete_completed.emit(data)
+		OP_DIALOGUE_SAVE_DRAFT, OP_DIALOGUE_PUBLISH, OP_DIALOGUE_DISABLE:
+			dialogue_mutation_completed.emit(data)
 		_:
 			_on_request_failed(operation, "Unexpected request completion.", [])
 
@@ -335,12 +415,12 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
-	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS]:
+	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES]:
 		_request_next_startup_operation()
 
 
 func _start_workspace_initialization() -> void:
-	_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS]
+	_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS]
 	_request_next_startup_operation()
 
 
@@ -353,3 +433,5 @@ func _request_next_startup_operation() -> void:
 			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
 		OP_NPC_OPTIONS:
 			_request(OP_NPC_OPTIONS, "/api/v1/npcs/options")
+		OP_DIALOGUE_OPTIONS:
+			_request(OP_DIALOGUE_OPTIONS, "/api/v1/dialogues/options")

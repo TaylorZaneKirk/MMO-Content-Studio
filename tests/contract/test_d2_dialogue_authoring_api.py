@@ -129,12 +129,27 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
         self.assertIn("DialogueAuthoringService", catalog)
         self.assertIn("dialogues.ListAsync", catalog)
 
-    def test_no_godot_dialogue_workspace_or_quest_routes_yet(self) -> None:
-        self.assertFalse((ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").exists())
+    def test_godot_dialogue_workspace_uses_d2_routes_without_quest_routes(self) -> None:
+        self.assertTrue((ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").exists())
         main_scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
+        editor = (ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").read_text()
         host_text = "\n".join(path.read_text() for path in (HOST).rglob("*.cs"))
 
-        self.assertNotIn("dialogue_editor.gd", main_scene)
+        self.assertIn("dialogue_editor.gd", main_scene)
+        self.assertIn('[node name="Dialogue"', main_scene)
+        for route in (
+            "/api/v1/dialogues/options",
+            "/api/v1/dialogues%s",
+            "/api/v1/dialogues/%s",
+            "/api/v1/dialogues/%s/preview",
+            "/api/v1/dialogues/%s/playthrough",
+            "/api/v1/dialogues/%s/draft",
+            "/api/v1/dialogues/%s/publish",
+            "/api/v1/dialogues/%s/disable",
+            "/api/v1/dialogues/%s/delete",
+        ):
+            self.assertIn(route, (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text())
+        self.assertNotIn("/api/v1/quests", editor)
         self.assertNotIn("/api/v1/quests", host_text)
         for token in (
             "quest_stage",
@@ -163,7 +178,7 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
         )
 
         for token in (
-            "D2 host schema/API implemented; D3-D5 pending",
+            "D3 Godot Dialogue Studio implemented",
             "026_dialogue_authoring_schema.sql",
             "/api/v1/dialogues",
             "supports_runtime_dialogue_catalog = false",
@@ -171,12 +186,13 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "Published NPC references block disable",
             "any NPC reference blocks delete",
             "Godot Dialogue Studio",
-            "runtime handoff, and hardening remain pending",
+            "D4 MMO Project runtime catalog handoff remains pending",
+            "D5 hardening and playthrough verification remain pending",
+            "no quest, condition, or effect authoring",
         ):
             self.assertIn(token, docs)
 
         for forbidden in (
-            "D3 complete implemented",
             "D4 complete implemented",
             "D5 complete implemented",
             "Quest authoring implemented",
