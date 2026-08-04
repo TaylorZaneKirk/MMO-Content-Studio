@@ -78,7 +78,8 @@ class SchemaHealthProviderTests(unittest.TestCase):
             "HandEquipment/HandEquipmentSchemaRequirements.cs": (
                 "item_tool_capabilities",
                 "item_tool_capabilities_power_tier_check",
-                "item_tool_capabilities_hand_slot_guard",
+                'AbsentTrigger("item_tool_capabilities", "item_tool_capabilities_hand_slot_guard")',
+                'AbsentTrigger("item_definitions", "item_definitions_tool_capability_slot_guard")',
             ),
             "Mobs/MobSchemaRequirements.cs": (
                 "mob_definitions",
@@ -95,7 +96,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
     def test_shared_requirement_model_has_stable_deduplication_key(self) -> None:
         model = (HOST / "Health" / "AuthoringSchemaRequirement.cs").read_text()
         self.assertIn("public string Key", model)
-        for factory in ("Table", "Column", "Constraint", "Trigger"):
+        for factory in ("Table", "Column", "Constraint", "Trigger", "AbsentTrigger"):
             self.assertIn(f"AuthoringSchemaRequirement {factory}", model)
 
     def test_program_registers_inspector_not_feature_schema_details(self) -> None:

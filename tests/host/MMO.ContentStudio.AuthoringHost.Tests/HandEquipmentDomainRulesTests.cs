@@ -109,6 +109,19 @@ public sealed class HandEquipmentDomainRulesTests
     }
 
     [Fact]
+    public void ClassifyTreatsToolCapabilitiesAsItemLevelSpecialization()
+    {
+        var tools = new[]
+        {
+            new HandEquipmentToolCapabilityDefinition("mining", "Mining", 0, 1, null, null)
+        };
+
+        Assert.Equal(
+            "Tool",
+            HandEquipmentDomainRules.Classify(false, null, null, tools));
+    }
+
+    [Fact]
     public void ActiveRuntimeWeaponRequiresRightHandProfile()
     {
         var profile = new EquipmentCombatProfileDefinition("test_profile", "melee", "slash", 1, 1, 4);

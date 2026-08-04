@@ -141,7 +141,8 @@ The Godot **Weapons & Tools** workspace consumes these routes through
 
 Returns supported hand slots, wearable slots for declassification, skills,
 combat bonus fields, attack families/styles, tool capability IDs, and weapon
-animation refs.
+animation refs. Tool capabilities are item-level metadata and do not require
+equipability or a hand slot.
 
 Current runtime-supported weapon publication values are:
 
@@ -172,6 +173,11 @@ Loads one aggregate containing:
 - `combat_bonuses`
 - ordered `tool_capabilities`
 - aggregate `updated_at_utc` concurrency token
+
+When `equippable` is false, draft saves clear slot, requirements, modifiers,
+combat bonuses, and weapon profile metadata but still accept and persist ordered
+`tool_capabilities`. Submitting an empty capability collection explicitly
+removes tool rows.
 
 The workspace preserves displayed tool-capability row order in the outgoing
 array. The server remains authoritative for duplicate, unknown, stale, or

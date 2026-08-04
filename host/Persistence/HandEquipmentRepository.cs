@@ -154,7 +154,7 @@ public sealed class HandEquipmentRepository
 
         if (!draft.Equippable)
         {
-            await DeleteAllEquipmentMetadataAsync(connection, transaction, itemId, cancellationToken);
+            await DeleteEquipmentMetadataAsync(connection, transaction, itemId, cancellationToken);
         }
         else
         {
@@ -165,14 +165,13 @@ public sealed class HandEquipmentRepository
             if (EquipmentItemRepository.IsHandSlot(draft.EquipmentSlotId))
             {
                 await ReplaceWeaponProfileAsync(connection, transaction, itemId, draft.WeaponProfile, cancellationToken);
-                await ReplaceToolCapabilitiesAsync(connection, transaction, itemId, draft.ToolCapabilities, cancellationToken);
             }
             else
             {
                 await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
-                await ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities", itemId, cancellationToken);
             }
         }
+        await ReplaceToolCapabilitiesAsync(connection, transaction, itemId, draft.ToolCapabilities, cancellationToken);
 
         var saved = await LoadAggregateAsync(connection, transaction, itemId, false, cancellationToken)
             ?? throw new InvalidOperationException("Saved hand-equipment item could not be reloaded inside its transaction.");
@@ -228,7 +227,8 @@ public sealed class HandEquipmentRepository
             throw new EquipmentPublishedDeleteException(itemId);
         }
 
-        await DeleteAllEquipmentMetadataAsync(connection, transaction, itemId, cancellationToken);
+        await DeleteEquipmentMetadataAsync(connection, transaction, itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities", itemId, cancellationToken);
 
         const string sql = "delete from item_definitions where item_id = @item_id;";
         await using (var command = new NpgsqlCommand(sql, connection, transaction))
@@ -239,14 +239,13 @@ public sealed class HandEquipmentRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
-    public static bool HasHandMetadata(HandEquipmentItemRecord record) =>
+    public static bool HasEquipmentMetadata(HandEquipmentItemRecord record) =>
         record.EquipmentSlotId is not null
         || record.RequiredStrength != 1
         || record.HasCombatProfile
         || record.HasCombatBonuses
         || record.HasSkillRequirements
-        || record.HasSkillModifiers
-        || record.HasToolCapabilities;
+        || record.HasSkillModifiers;
 
     private static async Task<HandEquipmentItemRecord?> LoadAggregateAsync(
         NpgsqlConnection connection,
@@ -667,7 +666,7 @@ public sealed class HandEquipmentRepository
         }
     }
 
-    private static async Task DeleteAllEquipmentMetadataAsync(
+    private static async Task DeleteEquipmentMetadataAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string itemId,
@@ -677,7 +676,6 @@ public sealed class HandEquipmentRepository
         await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
-        await ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities", itemId, cancellationToken);
     }
 
     private static async Task ExecuteDeleteAsync(

@@ -58,7 +58,7 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
             self.assertIn("UNIFIED_ITEM_AUTHORING_PLAN.md", document)
 
         self.assertIn("planned unified item", architecture.lower())
-        self.assertIn("Status:** Planned; audit and consolidation plan complete.", roadmap)
+        self.assertIn("Status:** U1 tool-capability independence and metadata safety implemented", roadmap)
         self.assertIn("The current tabs and routes are still\nseparate", readme)
 
 

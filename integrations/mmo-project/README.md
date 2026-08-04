@@ -60,7 +60,14 @@ MMO Project runtime checkout for development verification:
 - one row per item/capability ID
 - deterministic `capability_order`
 - optional declarative animation/effect resource IDs
-- a hand-slot guard requiring the owning item to be `right_hand` or `left_hand`
+- no durability, charges, ammo, item-instance state, or executable behavior
+
+`prototype/sql/023_item_tool_capability_independence.sql` removes the obsolete
+hand-slot guard triggers/functions from the T3B schema. Tool capabilities now
+belong to the base item definition and may be authored for inventory tools,
+wearable equipment, or hand equipment. Removing equipability clears equipment
+and weapon metadata but preserves tool rows unless the submitted capability
+collection is explicitly empty.
 
 Tool capabilities are declarative metadata. The migration does not introduce
 durability, ammo, charges, item-instance state, or executable behavior. A later

@@ -146,9 +146,9 @@ The current vertical slices author ordinary items, declarative consumables,
 wearable equipment, and hand-held weapons/tools.
 Equipment synchronizes the base item, slot, requirements, modifiers, combat
 bonuses, optional weapon profile, and tool capabilities in one transaction.
-Turning **Equippable** off deliberately clears every dependent equipment and
-combat/tool row, which provides a safe correction path for legacy
-misclassifications such as Chunk of Iron.
+Turning **Equippable** off deliberately clears dependent equipment, combat, and
+weapon rows while preserving item-level tool capabilities. Tool capabilities
+work from inventory or equipment; equipability is optional.
 
 The T3B Godot workspace was recovered selectively from prior attempts and
 reconciled with the hardened `AuthoringHttpTransport`,
@@ -176,6 +176,8 @@ separate; the plan is a future consolidation path that preserves existing T1-T3B
 behavior while decoupling tool capabilities from equipability. See
 [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).
+U1 tool-capability independence and metadata safety is implemented; the unified
+aggregate, unified API, and consolidated Godot workspace remain pending.
 
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering

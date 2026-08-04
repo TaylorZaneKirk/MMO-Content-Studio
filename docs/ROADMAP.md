@@ -147,7 +147,7 @@ reference guards remain deferred.
 
 ## U - Unified Item Authoring
 
-**Status:** Planned; audit and consolidation plan complete.
+**Status:** U1 tool-capability independence and metadata safety implemented; unified aggregate, unified API, and consolidated Godot workspace remain pending.
 
 Collapse Basic Items, Consumables, Equipment, and Weapons and Tools into one
 public item aggregate and one contextual Godot Items workspace.

@@ -70,6 +70,7 @@ public sealed class HandEquipmentSchemaRequirements : IAuthoringSchemaRequiremen
         AuthoringSchemaRequirement.Constraint("item_tool_capabilities_action_animation_id_nonempty"),
         AuthoringSchemaRequirement.Constraint("item_tool_capabilities_effect_resource_id_nonempty"),
         AuthoringSchemaRequirement.Constraint("item_tool_capabilities_item_order_key"),
-        AuthoringSchemaRequirement.Trigger("item_tool_capabilities", "item_tool_capabilities_hand_slot_guard")
+        AuthoringSchemaRequirement.AbsentTrigger("item_tool_capabilities", "item_tool_capabilities_hand_slot_guard"),
+        AuthoringSchemaRequirement.AbsentTrigger("item_definitions", "item_definitions_tool_capability_slot_guard")
     ];
 }

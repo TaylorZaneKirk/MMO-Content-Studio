@@ -78,13 +78,14 @@ class T3BSourceContractTests(unittest.TestCase):
             "ReplaceWeaponProfileAsync",
             "ReplaceCombatBonusesAsync",
             "ReplaceToolCapabilitiesAsync",
-            "DeleteAllEquipmentMetadataAsync",
+            "DeleteEquipmentMetadataAsync",
             'ExecuteDeleteAsync(connection, transaction, "item_combat_profiles"',
             'ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities"',
             "LoadAggregateAsync(connection, transaction",
             "CommitAsync",
         ):
             self.assertIn(token, repository)
+        self.assertIn("await ReplaceToolCapabilitiesAsync(connection, transaction, itemId, draft.ToolCapabilities, cancellationToken);", repository)
 
     def test_validation_matches_runtime_weapon_and_tool_rules(self) -> None:
         validator = (
@@ -259,7 +260,7 @@ class T3BSourceContractTests(unittest.TestCase):
         editor = (ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").read_text()
         for token in (
             '"weapon_profile": _weapon_profile_payload() if equippable and hand_slot else null',
-            '"tool_capabilities": _collect_tool_capabilities() if equippable and hand_slot else []',
+            '"tool_capabilities": _collect_tool_capabilities()',
             "_weapon_enabled",
             "_add_tool_row",
             "_collect_tool_capabilities",
@@ -307,9 +308,9 @@ class T3BSourceContractTests(unittest.TestCase):
             "right_hand supports current active weapon publication",
             "Not equippable: preview will clear slot",
             "Wearable slot selected: preview will remove hand-only weapon profile",
-            "_is_hand_slot",
+            "Tool capabilities work from inventory or equipment. Equipability is optional.",
             "_weapon_profile_payload() if equippable and hand_slot else null",
-            "_collect_tool_capabilities() if equippable and hand_slot else []",
+            '"tool_capabilities": _collect_tool_capabilities()',
             'if not _value:\n\t\t_select_option(_operation, "save_draft")',
         ):
             self.assertIn(token, editor)

@@ -26,6 +26,14 @@ public sealed class SchemaHealthInspector
                     connection,
                     RequireTableName(requirement),
                     requirement.ObjectName,
+                    true,
+                    cancellationToken),
+            AuthoringSchemaRequirementKind.AbsentTrigger =>
+                CheckTriggerAsync(
+                    connection,
+                    RequireTableName(requirement),
+                    requirement.ObjectName,
+                    false,
                     cancellationToken),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(requirement),
@@ -133,6 +141,7 @@ public sealed class SchemaHealthInspector
         NpgsqlConnection connection,
         string tableName,
         string triggerName,
+        bool shouldExist,
         CancellationToken cancellationToken)
     {
         const string sql = """
@@ -150,14 +159,27 @@ public sealed class SchemaHealthInspector
         command.Parameters.AddWithValue("trigger_name", triggerName);
         var exists = (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
 
-        return exists
+        if (shouldExist)
+        {
+            return exists
+                ? new HealthCheck(
+                    $"trigger:{triggerName}",
+                    HealthState.Healthy,
+                    $"Required trigger '{triggerName}' exists on '{tableName}'.")
+                : new HealthCheck(
+                    $"trigger:{triggerName}",
+                    HealthState.Unhealthy,
+                    $"Required trigger '{triggerName}' is missing from '{tableName}'.");
+        }
+
+        return !exists
             ? new HealthCheck(
-                $"trigger:{triggerName}",
+                $"absent-trigger:{triggerName}",
                 HealthState.Healthy,
-                $"Required trigger '{triggerName}' exists on '{tableName}'.")
+                $"Obsolete trigger '{triggerName}' is absent from '{tableName}'.")
             : new HealthCheck(
-                $"trigger:{triggerName}",
+                $"absent-trigger:{triggerName}",
                 HealthState.Unhealthy,
-                $"Required trigger '{triggerName}' is missing from '{tableName}'.");
+                $"Obsolete trigger '{triggerName}' still exists on '{tableName}'; apply migration 023_item_tool_capability_independence.sql so tool capabilities are not restricted to hand equipment.");
     }
 }

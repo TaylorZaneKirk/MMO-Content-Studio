@@ -5,7 +5,8 @@ public enum AuthoringSchemaRequirementKind
     Table,
     Column,
     Constraint,
-    Trigger
+    Trigger,
+    AbsentTrigger
 }
 
 public sealed record AuthoringSchemaRequirement(
@@ -26,6 +27,9 @@ public sealed record AuthoringSchemaRequirement(
 
     public static AuthoringSchemaRequirement Trigger(string tableName, string triggerName) =>
         new(AuthoringSchemaRequirementKind.Trigger, triggerName, tableName);
+
+    public static AuthoringSchemaRequirement AbsentTrigger(string tableName, string triggerName) =>
+        new(AuthoringSchemaRequirementKind.AbsentTrigger, triggerName, tableName);
 }
 
 public interface IAuthoringSchemaRequirementProvider

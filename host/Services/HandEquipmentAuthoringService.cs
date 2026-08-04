@@ -542,6 +542,7 @@ public sealed class HandEquipmentAuthoringService
         EquipmentCombatBonusDefinition? bonuses,
         IReadOnlyList<HandEquipmentToolCapabilityDraft>? capabilities)
     {
+        var normalizedCapabilities = HandEquipmentDomainRules.NormalizeToolCapabilities(capabilities);
         if (!equippable)
         {
             return new NormalizedHandEquipmentDraft(
@@ -554,7 +555,7 @@ public sealed class HandEquipmentAuthoringService
                 [],
                 null,
                 EquipmentCombatBonusDefinition.Zero,
-                []);
+                normalizedCapabilities);
         }
 
         return new NormalizedHandEquipmentDraft(
@@ -585,7 +586,7 @@ public sealed class HandEquipmentAuthoringService
                     weaponProfile.MaximumRangeTiles,
                     weaponProfile.AttackSpeedUnits),
             bonuses ?? EquipmentCombatBonusDefinition.Zero,
-            HandEquipmentDomainRules.NormalizeToolCapabilities(capabilities));
+            normalizedCapabilities);
     }
 
     private static NormalizedHandEquipmentDraft FromRecord(HandEquipmentItemRecord record) =>

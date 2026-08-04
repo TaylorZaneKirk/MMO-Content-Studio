@@ -57,7 +57,7 @@ public sealed partial class HandEquipmentItemValidator
         }
         else
         {
-            ValidateNotEquippable(draft, existing, messages);
+            await ValidateNotEquippableAsync(draft, existing, messages, forPublication, cancellationToken);
         }
 
         if (existing.RuntimeEnabled && !forPublication)
@@ -102,14 +102,14 @@ public sealed partial class HandEquipmentItemValidator
         }
 
         var isHandSlot = EquipmentItemRepository.IsHandSlot(draft.EquipmentSlotId);
-        if (!isHandSlot && (draft.WeaponProfile is not null || draft.ToolCapabilities.Count > 0))
+        if (!isHandSlot && draft.WeaponProfile is not null)
         {
             messages.Add(new ApiError(
                 "non_hand_specialization",
-                "Only right_hand and left_hand equipment may carry weapon profiles or tool capabilities.",
+                "Only right_hand and left_hand equipment may carry weapon profiles.",
                 ValidationSeverity.Error,
                 "equipment_slot_id",
-                "Changing a hand item to a wearable slot clears weapon and tool specialization rows."));
+                "Changing a hand item to a wearable slot clears weapon profile rows."));
         }
 
         if (draft.RequiredStrength is < 1 or > HandEquipmentDomainRules.MaximumMagnitude)
@@ -139,31 +139,42 @@ public sealed partial class HandEquipmentItemValidator
         }
     }
 
-    private static void ValidateNotEquippable(
+    private async Task ValidateNotEquippableAsync(
         NormalizedHandEquipmentDraft draft,
         HandEquipmentItemRecord existing,
-        ICollection<ApiError> messages)
+        ICollection<ApiError> messages,
+        bool forPublication,
+        CancellationToken cancellationToken)
     {
         if (draft.EquipmentSlotId is not null
             || draft.RequiredStrength != 1
             || draft.Requirements.Count != 0
             || draft.SkillModifiers.Count != 0
             || draft.WeaponProfile is not null
-            || !draft.CombatBonuses.IsZero
-            || draft.ToolCapabilities.Count != 0)
+            || !draft.CombatBonuses.IsZero)
         {
             messages.Add(new ApiError(
                 "non_equippable_metadata_not_empty",
-                "Not-equippable items cannot retain a slot, requirements, modifiers, combat bonuses, weapon profile, or tool capabilities.",
+                "Not-equippable items cannot retain a slot, requirements, modifiers, combat bonuses, or weapon profile.",
                 ValidationSeverity.Error,
                 "equippable"));
         }
 
-        if (HandEquipmentRepository.HasHandMetadata(existing))
+        var knownCapabilities = (await _repository.LoadGatheringCapabilitiesAsync(cancellationToken))
+            .Select(skill => skill.SkillId)
+            .ToHashSet(StringComparer.Ordinal);
+        ValidateToolCapabilities(draft, knownCapabilities, messages);
+
+        if (forPublication)
+        {
+            ValidatePublication(draft, messages);
+        }
+
+        if (HandEquipmentRepository.HasEquipmentMetadata(existing))
         {
             messages.Add(new ApiError(
                 "hand_equipment_metadata_will_be_removed",
-                "Applying this draft will remove the equipment slot, strength gate, requirements, modifiers, combat profile, combat bonuses, and tool capabilities.",
+                "Applying this draft will remove the equipment slot, strength gate, requirements, modifiers, combat profile, and combat bonuses.",
                 ValidationSeverity.Warning,
                 "equippable"));
         }
@@ -422,11 +433,14 @@ public sealed partial class HandEquipmentItemValidator
     {
         if (!EquipmentItemRepository.IsHandSlot(draft.EquipmentSlotId))
         {
-            messages.Add(new ApiError(
-                "not_hand_equipment",
-                "Weapons and Tools can only publish right_hand or left_hand equipment.",
-                ValidationSeverity.Error,
-                "equipment_slot_id"));
+            if (draft.ToolCapabilities.Count == 0)
+            {
+                messages.Add(new ApiError(
+                    "not_weapon_or_tool",
+                    "Weapons and Tools can only publish hand equipment or items with tool capabilities.",
+                    ValidationSeverity.Error,
+                    "tool_capabilities"));
+            }
         }
         if (draft.EquipmentSlotId == HandEquipmentAuthoringRegistry.ActiveWeaponSlotId
             && draft.WeaponProfile is null)

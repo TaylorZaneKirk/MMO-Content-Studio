@@ -791,7 +791,7 @@ func _payload() -> Dictionary:
 		"skill_modifiers": _collect_modifiers() if equippable else [],
 		"weapon_profile": _weapon_profile_payload() if equippable and hand_slot else null,
 		"combat_bonuses": _collect_bonuses() if equippable else _zero_bonuses(),
-		"tool_capabilities": _collect_tool_capabilities() if equippable and hand_slot else [],
+		"tool_capabilities": _collect_tool_capabilities(),
 		"expected_updated_at_utc": _current_item.get("updated_at_utc", null),
 	}
 
@@ -882,9 +882,9 @@ func _update_editability() -> void:
 	_weapon_min_range.editable = weapon_enabled
 	_weapon_max_range.editable = weapon_enabled
 	_weapon_speed_units.editable = weapon_enabled
-	_add_tool_button.disabled = not hand_slot
+	_add_tool_button.disabled = not enabled
 	for child in _tool_rows.get_children():
-		_set_tool_row_enabled(child, hand_slot)
+		_set_tool_row_enabled(child, enabled)
 	_update_guidance()
 
 
@@ -934,7 +934,7 @@ func _status_for_item(payload: Dictionary) -> String:
 
 
 func _belongs_in_hand_equipment_catalog(payload: Dictionary) -> bool:
-	return bool(payload.get("equippable", false)) and (
+	return (
 		_is_hand_slot(str(payload.get("equipment_slot_id", "")))
 		or payload.get("weapon_profile", null) is Dictionary
 		or bool(payload.get("has_weapon_profile", false))
@@ -945,11 +945,11 @@ func _belongs_in_hand_equipment_catalog(payload: Dictionary) -> bool:
 
 func _update_guidance() -> void:
 	if not _equippable.button_pressed:
-		_weapon_note.text = "Not equippable: preview will clear slot, requirements, modifiers, weapon profile, combat bonuses, and tool capabilities."
+		_weapon_note.text = "Not equippable: preview will clear slot, requirements, modifiers, weapon profile, and combat bonuses. Tool capabilities work from inventory or equipment. Equipability is optional."
 		return
 	var slot_id := _selected_metadata(_slot)
 	if not _is_hand_slot(slot_id):
-		_weapon_note.text = "Wearable slot selected: preview will remove hand-only weapon profile and tool capability rows."
+		_weapon_note.text = "Wearable slot selected: preview will remove hand-only weapon profile rows. Tool capabilities work from inventory or equipment. Equipability is optional."
 	elif slot_id == "left_hand":
 		_weapon_note.text = "left_hand tools can be drafted. Current runtime blocks left_hand weapon profile publication."
 	else:

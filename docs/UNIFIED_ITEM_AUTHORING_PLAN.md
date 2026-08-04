@@ -366,6 +366,9 @@ Runtime tests during U5:
 
 ### U1 - Domain And Schema Correction
 
+Status: implemented through compatibility routes. The unified aggregate, unified
+API, and consolidated Godot workspace remain pending.
+
 - Add a compatibility-safe migration that removes the two tool-hand-slot guard
   triggers and retires their functions.
 - Update Content Studio schema-health requirements for tool capabilities.

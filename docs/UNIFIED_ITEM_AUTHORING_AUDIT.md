@@ -146,6 +146,10 @@ capabilities, `ValidateNotEquippable` rejects them, and
 both equippable and assigned to a hand slot. This is the strongest current
 disagreement with the target model.
 
+U1 correction: this risk is addressed by splitting equipment-metadata cleanup
+from tool-capability replacement, preserving tool rows when equipability is
+removed, and dropping the obsolete hand-slot-only schema guards.
+
 ## Current Routes
 
 Current item routes are separate public aggregate routes:
