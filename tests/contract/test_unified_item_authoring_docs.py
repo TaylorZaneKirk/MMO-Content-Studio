@@ -58,8 +58,8 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
             self.assertIn("UNIFIED_ITEM_AUTHORING_PLAN.md", document)
 
         self.assertIn("planned unified item", architecture.lower())
-        self.assertIn("Status:** U1 tool-capability independence and metadata safety implemented", roadmap)
-        self.assertIn("The current tabs and routes are still\nseparate", readme)
+        self.assertIn("Status:** U2 unified host aggregate and compatibility adapters implemented", roadmap)
+        self.assertIn("current Godot tabs remain separate until U3", readme)
 
 
 if __name__ == "__main__":

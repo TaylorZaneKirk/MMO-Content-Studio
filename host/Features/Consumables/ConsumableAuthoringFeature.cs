@@ -54,31 +54,31 @@ public static class ConsumableAuthoringFeature
             HttpContext context,
             string itemId,
             ConsumablePreviewRequest request,
-            ConsumableItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.PreviewAsync(itemId, request, cancellationToken)));
+                await service.PreviewConsumableAsync(itemId, request, cancellationToken)));
 
         consumables.MapPut("/{itemId}/draft", async (
             HttpContext context,
             string itemId,
             SaveConsumableDraftRequest request,
-            ConsumableItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.SaveDraftAsync(itemId, request, cancellationToken)));
+                await service.SaveConsumableDraftAsync(itemId, request, cancellationToken)));
 
         consumables.MapPost("/{itemId}/publish", async (
             HttpContext context,
             string itemId,
             PublicationMutationRequest request,
-            ConsumableItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.PublishAsync(
+                await service.PublishConsumableAsync(
                     itemId,
                     request.ExpectedUpdatedAtUtc,
                     cancellationToken)));
@@ -87,11 +87,11 @@ public static class ConsumableAuthoringFeature
             HttpContext context,
             string itemId,
             PublicationMutationRequest request,
-            ConsumableItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.DisableAsync(
+                await service.DisableConsumableAsync(
                     itemId,
                     request.ExpectedUpdatedAtUtc,
                     cancellationToken)));
@@ -100,7 +100,7 @@ public static class ConsumableAuthoringFeature
             HttpContext context,
             string itemId,
             DeleteMutationRequest request,
-            ConsumableItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,

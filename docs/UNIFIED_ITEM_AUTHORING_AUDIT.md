@@ -169,6 +169,14 @@ The split means a publish, disable, delete, or draft save can validate only the
 subset visible to that tab. That is now insufficient for a composable item
 aggregate.
 
+U2 correction: host-side mutations now flow through
+`UnifiedItemAuthoringService` and `UnifiedItemRepository`. The unified
+`/api/v1/items` routes accept complete item drafts, while old Basic Items
+payloads and the `/api/v1/consumables`, `/api/v1/equipment`, and
+`/api/v1/hand-equipment` mutation routes are compatibility adapters that load
+the full aggregate, replace only the represented subset, and preserve hidden
+specializations. The Godot tabs are still separate until U3.
+
 ## Current Godot Tabs
 
 Files:

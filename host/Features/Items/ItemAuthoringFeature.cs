@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Health;
@@ -13,6 +14,9 @@ public static class ItemAuthoringFeature
     {
         services.AddSingleton<ItemAssetService>();
         services.AddSingleton<ItemAssetAuthoringService>();
+        services.AddSingleton<UnifiedItemRepository>();
+        services.AddSingleton<UnifiedItemValidator>();
+        services.AddSingleton<UnifiedItemAuthoringService>();
         services.AddSingleton<BasicItemRepository>();
         services.AddSingleton<BasicItemValidator>();
         services.AddSingleton<BasicItemAuthoringService>();
@@ -40,10 +44,18 @@ public static class ItemAuthoringFeature
                 context,
                 await service.ImportAsync(request, cancellationToken)));
 
+        items.MapGet("/options", async (
+            HttpContext context,
+            UnifiedItemAuthoringService service,
+            CancellationToken cancellationToken) =>
+            AuthoringHttpResults.FromOperation(
+                context,
+                await service.LoadOptionsAsync(cancellationToken)));
+
         items.MapGet(string.Empty, async (
             HttpContext context,
             string? search,
-            BasicItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
@@ -52,7 +64,7 @@ public static class ItemAuthoringFeature
         items.MapGet("/{itemId}", async (
             HttpContext context,
             string itemId,
-            BasicItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
@@ -61,54 +73,78 @@ public static class ItemAuthoringFeature
         items.MapPost("/{itemId}/preview", async (
             HttpContext context,
             string itemId,
-            BasicItemPreviewRequest request,
-            BasicItemAuthoringService service,
+            JsonElement request,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
-            AuthoringHttpResults.FromOperation(
+        {
+            if (IsUnifiedItemRequest(request))
+            {
+                return AuthoringHttpResults.FromOperation(
+                    context,
+                    await service.PreviewAsync(
+                        itemId,
+                        DeserializeRequest<PreviewItemRequest>(request),
+                        cancellationToken));
+            }
+
+            return AuthoringHttpResults.FromOperation(
                 context,
-                await service.PreviewAsync(itemId, request, cancellationToken)));
+                await service.PreviewBasicAsync(
+                    itemId,
+                    DeserializeRequest<BasicItemPreviewRequest>(request),
+                    cancellationToken));
+        });
 
         items.MapPut("/{itemId}/draft", async (
             HttpContext context,
             string itemId,
-            SaveBasicItemDraftRequest request,
-            BasicItemAuthoringService service,
+            JsonElement request,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
-            AuthoringHttpResults.FromOperation(
+        {
+            if (IsUnifiedItemRequest(request))
+            {
+                return AuthoringHttpResults.FromOperation(
+                    context,
+                    await service.SaveDraftAsync(
+                        itemId,
+                        DeserializeRequest<SaveItemDraftRequest>(request),
+                        cancellationToken));
+            }
+
+            return AuthoringHttpResults.FromOperation(
                 context,
-                await service.SaveDraftAsync(itemId, request, cancellationToken)));
+                await service.SaveBasicDraftAsync(
+                    itemId,
+                    DeserializeRequest<SaveBasicItemDraftRequest>(request),
+                    cancellationToken));
+        });
 
         items.MapPost("/{itemId}/publish", async (
             HttpContext context,
             string itemId,
-            PublicationMutationRequest request,
-            BasicItemAuthoringService service,
+            HandEquipmentPublicationRequest request,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.PublishAsync(
-                    itemId,
-                    request.ExpectedUpdatedAtUtc,
-                    cancellationToken)));
+                await service.PublishAsync(itemId, request, cancellationToken)));
 
         items.MapPost("/{itemId}/disable", async (
             HttpContext context,
             string itemId,
-            PublicationMutationRequest request,
-            BasicItemAuthoringService service,
+            HandEquipmentPublicationRequest request,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.DisableAsync(
-                    itemId,
-                    request.ExpectedUpdatedAtUtc,
-                    cancellationToken)));
+                await service.DisableAsync(itemId, request, cancellationToken)));
 
         items.MapPost("/{itemId}/delete", async (
             HttpContext context,
             string itemId,
             DeleteMutationRequest request,
-            BasicItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
@@ -116,4 +152,15 @@ public static class ItemAuthoringFeature
 
         return endpoints;
     }
+
+    private static bool IsUnifiedItemRequest(JsonElement request) =>
+        request.ValueKind == JsonValueKind.Object
+        && (request.TryGetProperty("consumable_behavior", out _)
+            || request.TryGetProperty("equipment", out _)
+            || request.TryGetProperty("tool_capabilities", out _)
+            || request.TryGetProperty("preview_signature", out _));
+
+    private static TRequest DeserializeRequest<TRequest>(JsonElement request) =>
+        request.Deserialize<TRequest>(JsonSerializerOptions.Web)
+        ?? throw new JsonException($"Unable to read {typeof(TRequest).Name}.");
 }

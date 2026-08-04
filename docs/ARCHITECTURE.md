@@ -255,21 +255,23 @@ item_definitions
   └─ item_tool_capabilities (independent item capabilities)
 ```
 
-This future boundary treats consumable behavior, equipability, weapon profile,
-combat bonuses, and tool capabilities as contextual item specializations rather
-than separate top-level item domains. Tool capabilities are independent of
-equipability; removing equipability clears equipment and weapon metadata but
-must preserve tool capability rows. Weapon profiles remain contextual to
-runtime-supported weapon-capable slots, initially `right_hand`.
+The host-side U2 boundary treats consumable behavior, equipability, weapon
+profile, combat bonuses, and tool capabilities as contextual item
+specializations rather than separate top-level item domains. Tool capabilities
+are independent of equipability; removing equipability clears equipment and
+weapon metadata but must preserve tool capability rows. Weapon profiles remain
+contextual to runtime-supported weapon-capable slots, initially `right_hand`.
 
 The current separate routes and Godot tabs remain compatibility surfaces until
-the unified item aggregate and workspace are implemented. During that migration,
-legacy routes should adapt through the unified service so a partial workspace
-cannot silently overwrite child rows owned by another specialization.
+the unified Godot Items workspace is implemented. During that migration, legacy
+Basic payloads and specialization mutation routes adapt through the unified
+service so a partial workspace cannot silently overwrite child rows owned by
+another specialization.
 
 Detailed evidence and the phased migration plan live in
 [`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md) and
-[`UNIFIED_ITEM_AUTHORING_PLAN.md`](UNIFIED_ITEM_AUTHORING_PLAN.md).
+[`UNIFIED_ITEM_AUTHORING_PLAN.md`](UNIFIED_ITEM_AUTHORING_PLAN.md), and
+[`UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md`](UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md).
 
 ## T4 mob-definition boundary
 

@@ -366,8 +366,7 @@ Runtime tests during U5:
 
 ### U1 - Domain And Schema Correction
 
-Status: implemented through compatibility routes. The unified aggregate, unified
-API, and consolidated Godot workspace remain pending.
+Status: implemented.
 
 - Add a compatibility-safe migration that removes the two tool-hand-slot guard
   triggers and retires their functions.
@@ -383,6 +382,9 @@ Exit condition:
 > current compatibility routes.
 
 ### U2 - Unified Item Host Aggregate
+
+Status: implemented in the host. The unified Godot workspace, route retirement,
+and runtime tool resolution remain pending.
 
 - Add unified item contracts and options.
 - Add a unified repository orchestration layer that locks `item_definitions`,

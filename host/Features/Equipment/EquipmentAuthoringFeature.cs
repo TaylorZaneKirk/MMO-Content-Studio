@@ -54,31 +54,31 @@ public static class EquipmentAuthoringFeature
             HttpContext context,
             string itemId,
             EquipmentPreviewRequest request,
-            EquipmentItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.PreviewAsync(itemId, request, cancellationToken)));
+                await service.PreviewEquipmentAsync(itemId, request, cancellationToken)));
 
         equipment.MapPut("/{itemId}/draft", async (
             HttpContext context,
             string itemId,
             SaveEquipmentDraftRequest request,
-            EquipmentItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.SaveDraftAsync(itemId, request, cancellationToken)));
+                await service.SaveEquipmentDraftAsync(itemId, request, cancellationToken)));
 
         equipment.MapPost("/{itemId}/publish", async (
             HttpContext context,
             string itemId,
             PublicationMutationRequest request,
-            EquipmentItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.PublishAsync(
+                await service.PublishEquipmentAsync(
                     itemId,
                     request.ExpectedUpdatedAtUtc,
                     cancellationToken)));
@@ -87,11 +87,11 @@ public static class EquipmentAuthoringFeature
             HttpContext context,
             string itemId,
             PublicationMutationRequest request,
-            EquipmentItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.DisableAsync(
+                await service.DisableEquipmentAsync(
                     itemId,
                     request.ExpectedUpdatedAtUtc,
                     cancellationToken)));
@@ -100,7 +100,7 @@ public static class EquipmentAuthoringFeature
             HttpContext context,
             string itemId,
             DeleteMutationRequest request,
-            EquipmentItemAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,

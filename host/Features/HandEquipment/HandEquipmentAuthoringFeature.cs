@@ -55,27 +55,27 @@ public static class HandEquipmentAuthoringFeature
             HttpContext context,
             string itemId,
             HandEquipmentPreviewRequest request,
-            HandEquipmentAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.PreviewAsync(itemId, request, cancellationToken)));
+                await service.PreviewHandEquipmentAsync(itemId, request, cancellationToken)));
 
         handEquipment.MapPut("/{itemId}/draft", async (
             HttpContext context,
             string itemId,
             SaveHandEquipmentDraftRequest request,
-            HandEquipmentAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
-                await service.SaveDraftAsync(itemId, request, cancellationToken)));
+                await service.SaveHandEquipmentDraftAsync(itemId, request, cancellationToken)));
 
         handEquipment.MapPost("/{itemId}/publish", async (
             HttpContext context,
             string itemId,
             HandEquipmentPublicationRequest request,
-            HandEquipmentAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
@@ -85,7 +85,7 @@ public static class HandEquipmentAuthoringFeature
             HttpContext context,
             string itemId,
             HandEquipmentPublicationRequest request,
-            HandEquipmentAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,
@@ -95,7 +95,7 @@ public static class HandEquipmentAuthoringFeature
             HttpContext context,
             string itemId,
             DeleteMutationRequest request,
-            HandEquipmentAuthoringService service,
+            UnifiedItemAuthoringService service,
             CancellationToken cancellationToken) =>
             AuthoringHttpResults.FromOperation(
                 context,

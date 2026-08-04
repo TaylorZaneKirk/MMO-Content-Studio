@@ -71,7 +71,63 @@ The host verifies the PNG signature, limits file size, sanitizes the target
 name, prevents directory traversal, and refuses to overwrite a different file.
 An identical existing file is returned as a successful no-op.
 
-## Basic-item routes
+## Unified item routes
+
+U2 makes the Items host boundary authoritative for complete item aggregates.
+The current Godot specialization tabs remain separate until U3, but host
+mutations now flow through one unified service and repository.
+
+### `GET /api/v1/items/options`
+
+Returns unified item-authoring options for equipment slots, weapon-capable
+slots, skills, combat bonus fields, attack families/styles, tool capability
+IDs, consumable action/effect/requirement types, published item references, and
+shared limits.
+
+### `GET /api/v1/items?search=ore`
+
+Lists item definitions with derived classification labels such as `Basic`,
+`Consumable`, `Equipment`, `Weapon`, `Tool`, and combinations such as
+`Consumable + Tool` or `Weapon + Tool`.
+
+### `GET /api/v1/items/{itemId}`
+
+Loads the complete aggregate: identity, icon, publication state, optional
+`consumable_behavior`, optional `equipment`, optional equipment
+`weapon_profile`, independent `tool_capabilities`, and one `updated_at_utc`
+concurrency token.
+
+### `POST /api/v1/items/{itemId}/preview`
+
+Validates the complete normalized draft for `save_draft`, `publish`, `disable`,
+or `delete`, returns exact logical changes, and returns one
+`preview_signature`. During U2, this route also accepts the legacy Basic Items
+preview payload and adapts it through the unified service.
+
+### `PUT /api/v1/items/{itemId}/draft`
+
+Applies the same complete normalized draft that was previewed. The repository
+locks the root `item_definitions` row, replaces each submitted specialization
+collection, advances the root timestamp, reloads inside the transaction,
+commits, then reloads and verifies the aggregate. During U2, legacy Basic
+Items draft payloads replace only the base identity/icon subset and preserve
+hidden consumable, equipment, weapon, and tool metadata.
+
+### `POST /api/v1/items/{itemId}/publish`
+
+Publishes the complete saved aggregate after strict validation of every visible
+and hidden specialization.
+
+### `POST /api/v1/items/{itemId}/disable`
+
+Disables the complete saved aggregate after live-reference checks.
+
+### `POST /api/v1/items/{itemId}/delete`
+
+Deletes a disabled item aggregate after preview/signature and concurrency
+verification.
+
+## Legacy basic-item compatibility
 
 ### `GET /api/v1/items?search=ore`
 
@@ -103,8 +159,9 @@ enables the apply action.
 
 ### `PUT /api/v1/items/{itemId}/draft`
 
-Creates or updates one non-equippable item as `runtime_enabled = false`.
-The operation locks the current row, executes in one transaction, commits, then
+Creates or updates the Basic Items subset as `runtime_enabled = false`.
+The operation locks the current row, preserves hidden specializations through
+the unified compatibility adapter, executes in one transaction, commits, then
 reloads and verifies the persisted aggregate.
 
 ### `POST /api/v1/items/{itemId}/publish`

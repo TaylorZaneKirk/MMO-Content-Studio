@@ -149,6 +149,7 @@ bonuses, optional weapon profile, and tool capabilities in one transaction.
 Turning **Equippable** off deliberately clears dependent equipment, combat, and
 weapon rows while preserving item-level tool capabilities. Tool capabilities
 work from inventory or equipment; equipability is optional.
+U1 tool-capability independence and metadata safety is implemented.
 
 The T3B Godot workspace was recovered selectively from prior attempts and
 reconciled with the hardened `AuthoringHttpTransport`,
@@ -169,15 +170,16 @@ boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
 
-Unified item-authoring planning now documents how Basic Items, Consumables,
-Equipment, and Weapons & Tools should collapse into one contextual Items
-workspace and one complete item aggregate. The current tabs and routes are still
-separate; the plan is a future consolidation path that preserves existing T1-T3B
-behavior while decoupling tool capabilities from equipability. See
+Unified item-authoring now has a host-side complete item aggregate and unified
+mutation authority. The current Godot tabs remain separate until U3, and the
+legacy Basic payloads and specialization routes are compatibility adapters
+while callers migrate.
+See
 [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).
-U1 tool-capability independence and metadata safety is implemented; the unified
-aggregate, unified API, and consolidated Godot workspace remain pending.
+U2 unified host aggregate and compatibility adapters are implemented; the
+unified Godot workspace, route retirement, and runtime tool resolution remain
+pending.
 
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering
@@ -199,6 +201,7 @@ server-authoritative runtime execution. See
 - [`docs/T4_IMPLEMENTATION_PLAN.md`](docs/T4_IMPLEMENTATION_PLAN.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 - [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md)
+- [`docs/UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md`](docs/UNIFIED_ITEM_AUTHORING_ACCEPTANCE.md)
 - [`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
