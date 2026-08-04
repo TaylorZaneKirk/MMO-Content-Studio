@@ -412,7 +412,7 @@ items; this does not mean it must remain the final feature forever.
 roadmap work.
 
 Establish a secure remote-authoring mode and responsive Godot Web/PWA client as
-a lower-risk proof of concepts that MMO Project can later reuse for hosted
+a lower-risk proof of concept that MMO Project can later reuse for hosted
 services, browser/mobile exports, authentication, asset delivery, reconnect,
 deployment, and touch-interface behavior.
 
