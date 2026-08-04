@@ -45,8 +45,9 @@ Project migration automatically.
 
 Returns the top-level content catalog. Items is implemented as one unified
 authoring section, Mobs is implemented when the configured database has the
-mob-authoring schema, and NPCs are implemented when the configured database has
-the T5 NPC authoring schema.
+mob-authoring schema, NPCs are implemented when the configured database has the
+T5 NPC authoring schema, and Dialogue is implemented when the configured
+database has the D2 dialogue authoring schema.
 
 ## Item asset routes
 
@@ -316,6 +317,85 @@ and preview aggregates for save/preview, sends only `expected_updated_at_utc`
 plus `preview_signature` for publish/disable/delete, clears the apply gate after
 every form edit, and displays quest-authoring, multiple-action, and
 reference-completeness capability states.
+
+## Dialogue routes
+
+D2 adds host-side authoring routes for reusable dialogue definitions. These
+routes do not add the Godot Dialogue workspace and do not export to MMO Project
+runtime JSON yet.
+
+### `GET /api/v1/dialogues/options`
+
+Returns publication states, node types `speaker_text`, `player_choice`, and
+`end`, ID rules/limits, default entry/start IDs, and capability flags. The
+condition and effect registries are empty. Runtime catalog export, quest
+conditions/effects, localization, portraits, hot reload, and cutscenes all
+report unsupported in D2.
+
+### `GET /api/v1/dialogues?search=greeting`
+
+Searches dialogue definition ID and display name. Results are ordered by display
+name and stable ID and include publication state, schema version, entry-point
+count, node count, choice count, and `updated_at_utc`.
+
+### `GET /api/v1/dialogues/{dialogueDefinitionId}`
+
+Loads one complete aggregate: root metadata, publication state, schema version,
+ordered entry points, ordered nodes, ordered choices, authoring-only metadata,
+and root concurrency timestamps.
+
+Runtime-relevant fields are definition ID, entry points, node IDs, node types,
+speaker, text, `next_node_id`, dismissible, ordered choice IDs/text/targets.
+Display name, metadata description, notes, canvas coordinates, editor notes,
+publication state, and timestamps are authoring-only.
+
+### `POST /api/v1/dialogues/{dialogueDefinitionId}/preview`
+
+Validates a complete normalized draft for `save_draft`, `publish`, `disable`,
+or `delete`, returns graph analysis, exact logical changes, NPC reference
+diagnostics, and a deterministic `preview_signature`. Save Draft previews the
+submitted graph. Publish, Disable, and Delete operate on the saved graph and
+report `dialogue_unsaved_changes` when the submitted body differs from what is
+already persisted.
+
+### `POST /api/v1/dialogues/{dialogueDefinitionId}/playthrough`
+
+Runs a noncommitting playthrough preview over the submitted draft or saved
+definition. It can start/restart from an entry point, continue from
+`speaker_text`, show ordered choices for `player_choice`, select a choice,
+acknowledge `end`, detect stale node or choice IDs, and report loop-protection
+warnings. It executes no effects because D2 has no effect vocabulary.
+
+### `PUT /api/v1/dialogues/{dialogueDefinitionId}/draft`
+
+Creates a new Draft or replaces an existing saved aggregate. The request must
+include the same complete graph that was previewed plus `preview_signature`.
+Existing definitions also require `expected_updated_at_utc`.
+
+Saving locks the root row, verifies the expected timestamp, writes root
+metadata, replaces entry points/nodes/choices transactionally, advances the root
+timestamp for child-only edits, reloads inside the transaction, commits, reloads
+again, and verifies semantic equality.
+
+### `POST /api/v1/dialogues/{dialogueDefinitionId}/publish`
+
+Publishes the already saved aggregate after strict validation against current
+runtime semantics. Publication requires at least one entry point, resolving
+entry and transition targets, supported node types, empty condition/effect data,
+valid node-specific fields, a reachable end path, and all published nodes
+reachable from entry points.
+
+### `POST /api/v1/dialogues/{dialogueDefinitionId}/disable`
+
+Sets `publication_state = Disabled` without replacing the saved graph. Published
+NPC definitions that reference the dialogue through
+`npc_definitions.default_dialogue_id` block disable.
+
+### `POST /api/v1/dialogues/{dialogueDefinitionId}/delete`
+
+Deletes a disabled dialogue definition after preview/signature and concurrency
+verification. Any known NPC definition reference blocks delete, including Draft
+and Disabled NPC references.
 
 ## Request correlation
 

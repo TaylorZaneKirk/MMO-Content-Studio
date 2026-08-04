@@ -135,7 +135,8 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
 
     def test_initial_schema_excludes_quest_semantics(self) -> None:
         domain = (ROOT / "docs" / "DIALOGUE_STUDIO_DOMAIN_MODEL.md").read_text()
-        proposed_tables = domain.split("## Proposed Tables", 1)[1].split("## Identity Rules", 1)[0]
+        table_heading = "## Implemented Tables" if "## Implemented Tables" in domain else "## Proposed Tables"
+        proposed_tables = domain.split(table_heading, 1)[1].split("## Identity Rules", 1)[0]
         deferred = domain.split("The initial aggregate explicitly excludes:", 1)[1].split(
             "It also excludes", 1
         )[0]
@@ -162,13 +163,8 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn("Effect tables should be deferred", domain)
         self.assertIn("D1 registers no condition or effect types.", domain)
 
-    def test_d1_does_not_add_production_dialogue_authoring_code(self) -> None:
+    def test_d1_does_not_add_godot_dialogue_editor(self) -> None:
         absent_paths = (
-            ROOT / "host" / "Contracts" / "DialogueContracts.cs",
-            ROOT / "host" / "Features" / "Dialogue" / "DialogueAuthoringFeature.cs",
-            ROOT / "host" / "Persistence" / "DialogueRepository.cs",
-            ROOT / "host" / "Services" / "DialogueAuthoringService.cs",
-            ROOT / "host" / "Services" / "DialogueAuthoringRegistry.cs",
             ROOT / "content-studio" / "scripts" / "dialogue_editor.gd",
         )
         for path in absent_paths:

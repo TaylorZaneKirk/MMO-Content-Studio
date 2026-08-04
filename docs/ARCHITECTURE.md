@@ -367,19 +367,30 @@ dialogue graphs, or quests.
 
 ## D Dialogue Studio boundary
 
-D1 locks Dialogue Studio as a first-class MMO Content Studio workspace. It
-belongs in the same Godot shell and .NET authoring host as Items, Mobs, and
-NPCs. It is not a separate application, and the NPC workspace should provide
-navigation to referenced dialogue definitions without embedding the full graph
-editor.
+D2 implements Dialogue Studio's host-side authoring boundary. The later Godot
+workspace belongs in the same Godot shell and .NET authoring host as Items,
+Mobs, and NPCs. It is not a separate application, and the NPC workspace should
+provide navigation to referenced dialogue definitions without embedding the full
+graph editor.
 
 The current MMO Project runtime source of truth is
 `prototype/shared/dialogues/catalog.json`, loaded by
 `DialogueDefinitionCatalog` and executed through `DialogueSessionService`.
-Dialogue Studio D1-D5 should author that current model: reusable dialogue
-definitions, prioritized entry points, `speaker_text`, `player_choice`, and
-`end` nodes, node-owned transitions, plain speaker/text fields, visible choices,
-manual close, end acknowledgement, and activity cancellation semantics.
+D2 authors that current model through `dialogue_definitions`,
+`dialogue_entry_points`, `dialogue_nodes`, and `dialogue_choices`: reusable
+dialogue definitions, prioritized entry points, `speaker_text`,
+`player_choice`, and `end` nodes, node-owned transitions, plain speaker/text
+fields, visible choices, manual close, end acknowledgement, and activity
+cancellation semantics.
+
+The D2 repository performs complete aggregate replacement transactionally.
+Target-node consistency is service validation rather than a database target FK,
+which allows incomplete Draft graphs to persist while publish validation stays
+strict. Child-table mutations advance the root `updated_at_utc`, and mutations
+require both optimistic concurrency and preview signatures. The pure
+playthrough-preview service emulates current session flow without executing
+effects. NPC reference guards read `npc_definitions.default_dialogue_id`:
+Published NPC references block disable, and any NPC reference blocks delete.
 
 D1-D5 intentionally do not author quest predicates, quest effects, objective
 progress, rewards, content gates, arbitrary scripts, portraits, localization,

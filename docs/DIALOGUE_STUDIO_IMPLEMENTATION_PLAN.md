@@ -1,7 +1,6 @@
 # Dialogue Studio Implementation Plan
 
-Status: D1 implementation-ready plan. D1 adds documentation and source
-contracts only.
+Status: D2 host-side schema/API implemented. D3-D5 remain planned.
 
 ## Sequence Lock
 
@@ -10,8 +9,8 @@ The revised sequence is:
 ```text
 T5 reusable NPC authoring                  complete
 
-D1 dialogue runtime/domain audit           current
-D2 dialogue schema and host API
+D1 dialogue runtime/domain audit           complete
+D2 dialogue schema and host API            complete
 D3 Godot Dialogue Studio graph editor
 D4 MMO Project runtime catalog handoff
 D5 hardening and playthrough verification
@@ -47,20 +46,20 @@ D1 restrictions:
 
 ## D2 - Schema, Contracts, Repository, Validation, And API
 
-Add a feature-owned Dialogue module in Content Studio.
+Implemented as a feature-owned Dialogue module in Content Studio.
 
 Host files:
 
 - `host/Contracts/DialogueContracts.cs`
-- `host/Features/Dialogue/DialogueAuthoringFeature.cs`
-- `host/Features/Dialogue/DialogueSchemaRequirements.cs`
-- `host/Features/Dialogue/DialogueCatalogSectionProvider.cs`
+- `host/Features/Dialogues/DialogueAuthoringFeature.cs`
+- `host/Features/Dialogues/DialogueSchemaRequirements.cs`
+- `host/Features/Dialogues/DialogueCatalogSectionProvider.cs`
 - `host/Persistence/DialogueRepository.cs`
 - `host/Services/DialogueAuthoringService.cs`
 - `host/Services/DialogueDefinitionValidator.cs`
 - `host/Services/DialogueAuthoringRegistry.cs`
-- `host/Services/DialogueReferenceProvider.cs`
-- `host/Services/DialogueGraphSimulator.cs`
+- `host/Services/DialogueGraphAnalyzer.cs`
+- `host/Services/DialoguePlaythroughService.cs`
 
 Schema:
 
@@ -68,7 +67,8 @@ Schema:
 - `dialogue_entry_points`
 - `dialogue_nodes`
 - `dialogue_choices`
-- optional condition seam tables with no registered types
+- no condition/effect tables; contracts expose empty condition arrays and
+  registries report zero types
 
 Routes:
 
@@ -91,8 +91,8 @@ Contract rules:
   unsupported node types, and impossible references
 - publish requires runtime-compatible graph validation
 - publish/disable/delete operate on the saved aggregate
-- reference guards block disabling/deleting dialogues referenced by published
-  NPC definitions
+- reference guards block disabling dialogues referenced by Published NPC
+  definitions and block deleting dialogues referenced by any NPC definition
 
 Validation:
 
@@ -108,16 +108,13 @@ Options should expose:
 
 - publication states
 - supported node types
-- supported speaker kinds
 - current condition registry: empty
 - current effect registry: empty
-- known NPC dialogue references and reverse references
 - capability flags such as `supports_quest_conditions = false` and
-  `supports_authored_effects = false`
+  `supports_effects = false`
 
-Combine D2 schema/repository/API into one slice unless the diff becomes too
-large. The current Content Studio pattern makes the route family most useful
-once repository and preview exist together.
+D2 combines schema/repository/API in one slice so the route family is useful
+with repository, preview, playthrough, schema-health, and catalog registration.
 
 ## D3 - Godot Dialogue Studio
 

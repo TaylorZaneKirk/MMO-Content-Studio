@@ -1,4 +1,5 @@
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
+using MMO.ContentStudio.AuthoringHost.Features.Dialogues;
 using MMO.ContentStudio.AuthoringHost.Features.Items;
 using MMO.ContentStudio.AuthoringHost.Features.Mobs;
 using MMO.ContentStudio.AuthoringHost.Features.Npcs;
@@ -12,6 +13,7 @@ public static class AuthoringFeatureExtensions
         services.AddItemAuthoring();
         services.AddMobAuthoring();
         services.AddNpcAuthoring();
+        services.AddDialogueAuthoring();
         return services;
     }
 
@@ -21,6 +23,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapItemAuthoring();
         endpoints.MapMobAuthoring();
         endpoints.MapNpcAuthoring();
+        endpoints.MapDialogueAuthoring();
         return endpoints;
     }
 }

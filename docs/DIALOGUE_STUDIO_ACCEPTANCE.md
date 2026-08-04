@@ -1,6 +1,7 @@
 # Dialogue Studio Acceptance
 
-Status: D1 acceptance criteria and D2-D5 implementation acceptance outline.
+Status: D2 accepted for the host-side schema/API boundary. D3-D5 remain
+pending.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -22,11 +23,13 @@ D1 is complete when:
   integration docs name Dialogue Studio as an integrated Content Studio
   workspace.
 - Quest semantics are explicitly deferred.
-- Source-contract tests verify that no production dialogue schema, routes,
-  services, repository, or Godot editor were added in D1.
+- Source-contract tests preserve the historical D1 boundary and now guard that
+  the Godot Dialogue editor remains deferred until D3.
 - MMO Project remains read-only.
 
 ## D2 - Schema, Contracts, Repository, Validation, And API
+
+Status: complete for host-side authoring.
 
 - Additive dialogue authoring schema exists.
 - Feature-owned schema-health provider reports required dialogue tables and
@@ -41,8 +44,8 @@ D1 is complete when:
 - Mutations require root concurrency and server preview signatures.
 - Repository writes replace child collections transactionally and advance the
   root timestamp for child-only edits.
-- Reference guards block disable/delete when published NPC definitions reference
-  a dialogue.
+- Reference guards block disable when Published NPC definitions reference a
+  dialogue and block delete when any NPC definition references it.
 - Initial condition and effect registries expose no authorable runtime types.
 - No quest fields are accepted.
 

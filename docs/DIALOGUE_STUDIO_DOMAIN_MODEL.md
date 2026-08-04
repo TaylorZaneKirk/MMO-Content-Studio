@@ -1,7 +1,8 @@
 # Dialogue Studio Domain Model
 
-Status: D1 domain lock for future D2-D5 implementation. No production schema,
-API, or Godot editor is implemented in D1.
+Status: D2 host-side dialogue schema, contracts, repository, validation,
+playthrough preview, and API implemented. Godot Dialogue Studio, MMO Project
+runtime handoff, and hardening remain pending.
 
 ## Product Boundary
 
@@ -31,9 +32,9 @@ That action should route to the Dialogue workspace and load the definition.
 It should not create a direct script dependency from `npc_editor.gd` to a future
 dialogue editor.
 
-## Initial Aggregate
+## D2 Aggregate
 
-The D2 aggregate should author the complete current runtime dialogue definition
+The D2 aggregate authors the complete current runtime dialogue definition
 without quest semantics:
 
 ```text
@@ -114,26 +115,25 @@ dialogue_nodes
 dialogue_choices
 ```
 
-Recommended condition storage seam:
+Deferred condition storage seam:
 
 ```text
 dialogue_entry_point_conditions
 dialogue_choice_conditions
 ```
 
-Those condition tables may exist in D2 only as a typed registry-backed seam.
-They must have no enabled authorable condition types until MMO Project
-implements a runtime evaluator beyond "empty list is eligible." Draft and
-publish validation should reject unsupported condition rows.
+D2 does not create condition tables because MMO Project has no typed runtime
+condition contract beyond "empty list is eligible." Contracts expose empty
+condition arrays and validation rejects nonempty arrays.
 
 Effect tables should be deferred until MMO Project has an implemented effect
 contract. The current runtime has no effect fields, no execution timing, and no
 transaction boundary for effects, so adding effect persistence in D2 would be
 premature.
 
-## Proposed Tables
+## Implemented Tables
 
-Initial D2 schema:
+Migration `026_dialogue_authoring_schema.sql` implements:
 
 ```sql
 CREATE TABLE dialogue_definitions (
@@ -160,9 +160,7 @@ CREATE TABLE dialogue_nodes (
     dialogue_definition_id TEXT NOT NULL REFERENCES dialogue_definitions(dialogue_definition_id) ON DELETE CASCADE,
     node_id TEXT NOT NULL,
     node_type TEXT NOT NULL,
-    speaker_kind TEXT NULL,
-    speaker_display_name TEXT NULL,
-    speaker_actor_id TEXT NULL,
+    speaker TEXT NULL,
     text TEXT NULL,
     next_node_id TEXT NULL,
     dismissible BOOLEAN NOT NULL DEFAULT TRUE,
@@ -187,37 +185,12 @@ CREATE TABLE dialogue_choices (
 );
 ```
 
-If D2 includes condition seam tables, they should be:
-
-```sql
-CREATE TABLE dialogue_entry_point_conditions (
-    dialogue_definition_id TEXT NOT NULL,
-    entry_id TEXT NOT NULL,
-    condition_order INTEGER NOT NULL,
-    condition_type TEXT NOT NULL,
-    condition_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-    PRIMARY KEY (dialogue_definition_id, entry_id, condition_order),
-    FOREIGN KEY (dialogue_definition_id, entry_id)
-        REFERENCES dialogue_entry_points(dialogue_definition_id, entry_id)
-        ON DELETE CASCADE
-);
-
-CREATE TABLE dialogue_choice_conditions (
-    dialogue_definition_id TEXT NOT NULL,
-    node_id TEXT NOT NULL,
-    choice_id TEXT NOT NULL,
-    condition_order INTEGER NOT NULL,
-    condition_type TEXT NOT NULL,
-    condition_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
-    PRIMARY KEY (dialogue_definition_id, node_id, choice_id, condition_order),
-    FOREIGN KEY (dialogue_definition_id, node_id, choice_id)
-        REFERENCES dialogue_choices(dialogue_definition_id, node_id, choice_id)
-        ON DELETE CASCADE
-);
-```
-
-These are not generic scripting payloads. They are typed registry payloads with
-no initially registered runtime condition types.
+The migration adds named constraints for stable IDs, publication states, schema
+version, supported node types, finite canvas positions, text/order bounds, and
+child ownership. It deliberately leaves entry/transition/choice target
+resolution to graph validation instead of PostgreSQL target FKs so incomplete
+Draft work can be saved. Trigger `touch_dialogue_definition_updated_at()`
+advances root `updated_at_utc` after entry-point, node, or choice changes.
 
 ## Identity Rules
 
@@ -250,17 +223,17 @@ Publication stability:
 
 ## Validation Rules
 
-Draft save should preserve incomplete work but still reject malformed aggregate
+Draft save preserves incomplete work but still rejects malformed aggregate
 shape:
 
 - invalid definition, node, entry, or choice IDs
 - duplicate entry, node, or per-node choice IDs
 - unsupported node types
 - malformed enum values
-- impossible graph references in committed rows
+- malformed transition fields
 - unsupported condition or effect types
 
-Publish validation should require runtime-compatible completeness:
+Publish validation requires runtime-compatible completeness:
 
 - at least one unconditional entry point
 - all entry points target existing nodes
@@ -274,7 +247,7 @@ Publish validation should require runtime-compatible completeness:
 - no effect collections until a runtime effect contract exists
 - no quest fields
 
-Warnings should include:
+Draft warnings and publish diagnostics include:
 
 - unreachable nodes
 - cycles
@@ -309,12 +282,12 @@ Publish:
 Disable:
 
 - removes the dialogue from future exports
-- must be blocked when a published NPC definition references it
+- is blocked when a Published NPC definition references it
 
 Delete:
 
 - allowed only for Disabled definitions
-- blocked by known references from NPC definitions
+- blocked by any known NPC definition reference
 - future references from quests, world objects, tutorials, or server-script
   triggers should plug into the same reference provider seam
 
@@ -332,7 +305,7 @@ Concurrency:
 
 ## Cross-Reference Model
 
-Current D1 reference source:
+Current D2 reference source:
 
 - NPC definitions through `default_dialogue_id`
 
@@ -344,9 +317,10 @@ Future sources:
 - mob/boss encounter triggers
 - server-script/system triggers
 
-D2 should introduce an internal `DialogueReferenceProvider` seam that returns
-references by source type without adding those future source types to the
-dialogue aggregate.
+D2 reads `npc_definitions.default_dialogue_id` through the Dialogue repository
+and returns `known_reference_count`, `reference_sources`, and
+`reference_check_complete`. Reference sources use strings such as
+`npc:test_npc:Published`.
 
 ## Runtime Export Shape
 

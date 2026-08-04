@@ -173,16 +173,26 @@ only; it does not export a runtime NPC catalog or author Tiled placement.
 
 ## D Dialogue Studio runtime handoff plan
 
-D1 is documentation and source-contract work only. It does not modify the MMO
-Project runtime repository.
+D2 adds the Content Studio host-side dialogue authoring schema/API without
+modifying the MMO Project runtime repository.
 
 Current MMO Project dialogue definitions live in
 `prototype/shared/dialogues/catalog.json`, are loaded by
 `DialogueDefinitionCatalog`, and are executed through `DialogueSessionService`.
-D2/D3 should add database-backed reusable dialogue authoring inside MMO Content
-Studio. D4 should add a deterministic export handoff that writes only
-`Published` dialogue definitions back into the runtime catalog shape already
-consumed by MMO Project.
+D2 adds database-backed reusable dialogue authoring inside MMO Content Studio
+through `prototype/sql/026_dialogue_authoring_schema.sql`. The migration
+introduces:
+
+- `dialogue_definitions`
+- `dialogue_entry_points`
+- `dialogue_nodes`
+- `dialogue_choices`
+
+The D2 schema stores authoring-only display metadata, notes, canvas positions,
+editor notes, publication state, and root concurrency timestamps. Runtime export
+remains D4: a deterministic handoff should write only `Published` dialogue
+definitions back into the runtime catalog shape already consumed by MMO
+Project.
 
 The initial handoff must preserve current runtime semantics: prioritized entry
 points, `speaker_text`, `player_choice`, and `end` nodes, node-owned
@@ -190,3 +200,8 @@ transitions, server-filtered choices, end acknowledgement, close/cancellation
 behavior, and the existing dialogue protocol payloads. D1-D5 do not add quest
 predicates, quest effects, objective progress, rewards, content gates, arbitrary
 scripting, or runtime hot reload.
+
+D2 reference safety reads Content Studio `npc_definitions.default_dialogue_id`.
+Published NPC references block dialogue disable, and any NPC reference blocks
+dialogue delete. Conditions and effects have no authorable registry entries in
+D2, and no condition/effect tables are created.

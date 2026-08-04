@@ -52,3 +52,12 @@ including the root `updated_at_utc` concurrency token and the constraints for
 visuals, initial `1x1` footprint support, movement, interaction, and dialogue
 reference consistency. T5C implements the repository/API boundary; T5D adds the
 Godot workspace; T5E adds the MMO Project runtime NPC catalog handoff.
+
+D2 Dialogue schema/API implemented the Dialogue manifest in
+`host/Features/Dialogues/DialogueSchemaRequirements.cs`. It checks
+`dialogue_definitions`, `dialogue_entry_points`, `dialogue_nodes`, and
+`dialogue_choices` from
+`integrations/mmo-project/prototype/sql/026_dialogue_authoring_schema.sql`,
+including stable ID constraints, supported node types, finite layout
+coordinates, root timestamp columns, and child-table triggers that advance the
+root concurrency token.

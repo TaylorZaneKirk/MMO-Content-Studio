@@ -240,7 +240,8 @@ quest editing.
 
 ## D - Dialogue Studio
 
-**Status:** D1 runtime audit and domain lock documented. D2-D5 planned.
+**Status:** D2 dialogue schema, repository, validation, playthrough preview,
+and API implemented. D3-D5 planned.
 
 Move current non-quest dialogue graph authoring into MMO Content Studio as a
 first-class workspace after NPCs and before Environment. Dialogue Studio is not
@@ -257,7 +258,7 @@ command protection, and activity cancellation.
 
 Locked D1-D5 boundaries:
 
-- Content Studio will own reusable dialogue definitions.
+- Content Studio owns reusable dialogue definitions in the D2 host schema.
 - NPC definitions reference dialogues by stable `default_dialogue_id`; NPC
   placement remains in Tiled.
 - D1-D5 author only current runtime-compatible dialogue semantics.
@@ -276,13 +277,25 @@ References:
 Phased plan:
 
 - D1 audits the runtime and locks the non-quest Dialogue Studio model.
-- D2 adds additive schema, contracts, repository, validation, and
-  `/api/v1/dialogues`.
+- D2 adds additive schema, contracts, repository, validation, playthrough
+  preview, schema-health/catalog registration, and `/api/v1/dialogues`.
 - D3 adds the Godot Dialogue workspace with graph editing and playthrough
   preview.
 - D4 adds the MMO Project runtime catalog handoff while preserving the existing
   dialogue protocol.
 - D5 hardens runtime verification, reference safety, and connected playthroughs.
+
+D2 adds `integrations/mmo-project/prototype/sql/026_dialogue_authoring_schema.sql`
+with `dialogue_definitions`, `dialogue_entry_points`, `dialogue_nodes`, and
+`dialogue_choices`. Target-node resolution is validated by the service rather
+than PostgreSQL target FKs so Draft graphs can preserve incomplete work.
+Child-table triggers advance the root `updated_at_utc`; the repository still
+locks the root, checks the expected timestamp, replaces children
+transactionally, reloads inside the transaction, commits, and reloads again.
+Published NPC references through `npc_definitions.default_dialogue_id` block
+disable; any NPC reference blocks delete. Current capabilities report
+`supports_runtime_dialogue_catalog = false`, empty condition/effect registries,
+and no quest, localization, portrait, cutscene, or hot-reload support.
 
 ## T6 — Interactable World Objects Foundation
 
