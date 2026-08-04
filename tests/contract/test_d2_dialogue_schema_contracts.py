@@ -107,11 +107,13 @@ class D2DialogueSchemaContractTests(unittest.TestCase):
             "M docs/design/DIALOGUE_FOUNDATION_V1.md",
             "M prototype/importer/README.md",
             "M prototype/server/features/dialogue/application/DialogueDefinitionCatalog.cs",
+            "M prototype/sql/027_seed_existing_dialogue_definitions.sql",
             "M prototype/sql/README.md",
             "M prototype/tools/MapPublisher/Program.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
-            "M prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs"
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
+            "m tools/MMO-Content-Studio"
         }
         unexpected = [line for line in result.stdout.splitlines() if line.strip() not in allowed]
         self.assertEqual([], unexpected)

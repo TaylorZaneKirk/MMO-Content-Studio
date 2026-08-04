@@ -143,6 +143,7 @@ class U4UnifiedItemRetirementTests(unittest.TestCase):
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CharacterToolPossessionRepositoryContractTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CharacterToolResolverTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSeedMigrationTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",

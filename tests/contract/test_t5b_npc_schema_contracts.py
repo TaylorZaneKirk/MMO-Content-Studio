@@ -300,6 +300,7 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSeedMigrationTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",

@@ -37,6 +37,30 @@ class D4DialogueRuntimeHandoffTests(unittest.TestCase):
         self.assertIn("'player_choice'", seed)
         self.assertIn("'end'", seed)
 
+    def test_seed_preserves_existing_dialogue_aggregate_on_rerun(self) -> None:
+        seed = (
+            ROOT
+            / "integrations"
+            / "mmo-project"
+            / "prototype"
+            / "sql"
+            / "027_seed_existing_dialogue_definitions.sql"
+        ).read_text()
+        collapsed = " ".join(seed.split())
+
+        self.assertIn(
+            "IF NOT EXISTS ( SELECT 1 FROM dialogue_definitions "
+            "WHERE dialogue_definition_id = 'test_npc_greeting' ) THEN",
+            collapsed,
+        )
+        self.assertIn("END IF;", seed)
+        self.assertNotIn("ON CONFLICT", seed)
+        self.assertNotIn("DO UPDATE", seed)
+        self.assertNotIn("DELETE FROM dialogue_choices", seed)
+        self.assertNotIn("DELETE FROM dialogue_entry_points", seed)
+        self.assertNotIn("DELETE FROM dialogue_nodes", seed)
+        self.assertNotIn("updated_at_utc = NOW()", seed)
+
     def test_runtime_catalog_capability_is_enabled_without_adjacent_features(self) -> None:
         registry = (ROOT / "host" / "Services" / "DialogueAuthoringRegistry.cs").read_text()
 
