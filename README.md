@@ -24,14 +24,14 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
-## Current state: T4 Godot mob workspace
+## Current state: U3 unified item workspace
 
 The repository now contains:
 
 - a Godot 4 desktop Content Studio shell
 - a loopback-only .NET 10 authoring host
 - environment, schema, and asset-root health checks
-- searchable Basic Items, Consumables, Equipment, and Weapons & Tools workspaces
+- a searchable unified Items workspace backed by complete `/api/v1/items` aggregates
 - canonical item-PNG selection and import
 - declarative consumable profiles, ordered requirements, and ordered effects
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
@@ -61,7 +61,7 @@ deterministic export of `Published` mob definitions into the existing runtime
 deferred to a later T4 hardening slice. Spawn placement stays in Tiled/generated
 static content.
 
-T0 through T4C still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
+T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
 ## Repository layout
 
@@ -170,16 +170,17 @@ boundary. T4C contributes the Godot Mobs workspace. T4D mirrors the schema into
 MMO Project and adds the runtime export handoff while keeping generated-spawn
 reference guards deferred.
 
-Unified item-authoring now has a host-side complete item aggregate and unified
-mutation authority. The current Godot tabs remain separate until U3, and the
-legacy Basic payloads and specialization routes are compatibility adapters
-while callers migrate.
+Unified item-authoring now has a host-side complete item aggregate, unified
+mutation authority, and one contextual Godot Items workspace. U2 delivered the
+host aggregate and compatibility adapters; U3 makes that aggregate the normal
+Godot workflow. Legacy Basic payloads and specialization routes remain
+compatibility adapters until U4, but the normal authoring workflow no longer
+exposes separate Consumables, Equipment, or Weapons and Tools tabs.
 See
 [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).
-U2 unified host aggregate and compatibility adapters are implemented; the
-unified Godot workspace, route retirement, and runtime tool resolution remain
-pending.
+U3 unified Godot Items workspace implemented; obsolete route/tab retirement and
+runtime tool resolution remain pending.
 
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering

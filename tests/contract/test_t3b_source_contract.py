@@ -195,12 +195,13 @@ class T3BSourceContractTests(unittest.TestCase):
             for forbidden in ("durability", "ammo", "charges", "item_instance"):
                 self.assertNotIn(forbidden, migration.lower())
 
-    def test_godot_navigation_exposes_dedicated_weapons_and_tools_workspace(self) -> None:
+    def test_godot_navigation_retires_dedicated_weapons_and_tools_workspace_in_u3(self) -> None:
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
-        self.assertIn('path="res://scripts/hand_equipment_editor.gd"', scene)
-        self.assertIn('[node name="Weapons & Tools" type="HBoxContainer"', scene)
-        self.assertIn('script = ExtResource("5_hand_equipment")', scene)
-        self.assertIn('[node name="Equipment" type="HBoxContainer"', scene)
+        self.assertTrue((ROOT / "content-studio" / "scripts" / "hand_equipment_editor.gd").exists())
+        self.assertIn('path="res://scripts/item_editor.gd"', scene)
+        self.assertNotIn('[node name="Weapons & Tools" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
+        self.assertNotIn('script = ExtResource("5_hand_equipment")', scene)
+        self.assertNotIn('[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
     def test_godot_client_supports_hand_equipment_api_via_transport(self) -> None:
         client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()

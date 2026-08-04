@@ -105,14 +105,18 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
         self.assertIn("SaveHandEquipmentDraftAsync", hand)
         self.assertNotIn("await service.SaveDraftAsync(itemId, request, cancellationToken)", consumables + equipment + hand)
 
-    def test_godot_tabs_remain_unconsolidated_for_u2(self) -> None:
+    def test_godot_workspace_is_consolidated_after_u3(self) -> None:
         scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
         main = (ROOT / "content-studio" / "scripts" / "main.gd").read_text()
-        for token in ("Items", "Consumables", "Equipment", "Weapons & Tools", "Mobs"):
+        editor = (ROOT / "content-studio" / "scripts" / "item_editor.gd").read_text()
+        for token in ("Items", "Mobs", "Environment"):
             self.assertIn(token, scene + main)
-        self.assertNotIn("UnifiedItemEditor", main)
+        self.assertIn("UnifiedItemEditor", editor)
+        self.assertNotIn('[node name="Consumables" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
+        self.assertNotIn('[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
+        self.assertNotIn('[node name="Weapons & Tools" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
-    def test_docs_record_u2_without_claiming_u3_or_runtime_tool_resolution(self) -> None:
+    def test_docs_record_u2_and_u3_without_claiming_u4_or_runtime_tool_resolution(self) -> None:
         readme = (ROOT / "README.md").read_text()
         roadmap = (ROOT / "docs" / "ROADMAP.md").read_text()
         api = (ROOT / "docs" / "API_V1.md").read_text()
@@ -121,8 +125,9 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
 
         for document in (readme, roadmap, api, architecture, acceptance):
             self.assertIn("U2", document)
-        self.assertIn("unified Godot workspace, route retirement, and runtime tool resolution remain pending", roadmap)
-        self.assertIn("current Godot specialization tabs remain separate until U3", api)
+        self.assertIn("U3 unified Godot Items workspace implemented", roadmap)
+        self.assertIn("obsolete route/tab retirement and runtime tool resolution remain pending", roadmap)
+        self.assertIn("U3 consolidates the Godot item workflow", api)
         self.assertIn("unified routes require server-issued", api)
         self.assertIn("uniformly require the new signature field", api)
         self.assertIn("Legacy Basic Items payloads and the Consumables, Equipment, and Weapons &", acceptance)

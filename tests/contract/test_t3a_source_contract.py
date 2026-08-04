@@ -180,7 +180,7 @@ class T3ASourceContractTests(unittest.TestCase):
         self.assertIn("prototype-equipment-authoring-v1", settings)
         self.assertIn("prototype-equipment-authoring-v1", options)
 
-    def test_catalog_and_scene_expose_equipment_workspace(self) -> None:
+    def test_catalog_exposes_equipment_and_legacy_scene_tab_is_retired_by_u3(self) -> None:
         catalog = (
             ROOT
             / "host"
@@ -188,12 +188,12 @@ class T3ASourceContractTests(unittest.TestCase):
             / "Equipment"
             / "EquipmentCatalogSectionProvider.cs"
         ).read_text()
-        scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
         self.assertIn('ContentType => "equipment"', catalog)
         self.assertIn("item.Equippable", catalog)
-        self.assertIn('path="res://scripts/equipment_editor.gd"', scene)
-        self.assertIn('[node name="Equipment" type="HBoxContainer"', scene)
-        self.assertIn('text = "T4 Mob Authoring"', scene)
+        self.assertTrue((ROOT / "content-studio" / "scripts" / "equipment_editor.gd").exists())
+        scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
+        self.assertIn('path="res://scripts/item_editor.gd"', scene)
+        self.assertNotIn('[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
     def test_godot_equipment_functions_are_not_duplicated(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "equipment_editor.gd").read_text()

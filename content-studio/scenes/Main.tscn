@@ -1,11 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
-[ext_resource type="Script" path="res://scripts/consumable_editor.gd" id="3_consumables"]
-[ext_resource type="Script" path="res://scripts/equipment_editor.gd" id="4_equipment"]
-[ext_resource type="Script" path="res://scripts/hand_equipment_editor.gd" id="5_hand_equipment"]
-[ext_resource type="Script" path="res://scripts/mob_editor.gd" id="6_mobs"]
+[ext_resource type="Script" path="res://scripts/item_editor.gd" id="3_items"]
+[ext_resource type="Script" path="res://scripts/mob_editor.gd" id="4_mobs"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -67,7 +65,7 @@ text = "MMO Content Studio"
 [node name="Subtitle" type="Label" parent="Margin/Root/Header/TitleBlock"]
 layout_mode = 2
 modulate = Color(0.7, 0.73, 0.79, 1)
-text = "T4 Mob Authoring"
+text = "U3 Unified Item Authoring"
 
 [node name="ConnectionBlock" type="VBoxContainer" parent="Margin/Root/Header"]
 layout_mode = 2
@@ -102,210 +100,11 @@ size_flags_vertical = 3
 [node name="Items" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2
 theme_override_constants/separation = 14
-
-[node name="CatalogPanel" type="PanelContainer" parent="Margin/Root/Tabs/Items"]
-custom_minimum_size = Vector2(310, 0)
-layout_mode = 2
-theme_override_styles/panel = SubResource("StylePanel")
-
-[node name="Content" type="VBoxContainer" parent="Margin/Root/Tabs/Items/CatalogPanel"]
-layout_mode = 2
-theme_override_constants/separation = 10
-
-[node name="Heading" type="Label" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Items"
-
-[node name="ItemSearch" type="LineEdit" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-placeholder_text = "Search item ID or name"
-
-[node name="NewItemButton" type="Button" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "+ New Basic Item"
-
-[node name="Scroll" type="ScrollContainer" parent="Margin/Root/Tabs/Items/CatalogPanel/Content"]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="ItemList" type="VBoxContainer" parent="Margin/Root/Tabs/Items/CatalogPanel/Content/Scroll"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 6
-
-[node name="EditorPanel" type="PanelContainer" parent="Margin/Root/Tabs/Items"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_styles/panel = SubResource("StylePanel")
-
-[node name="EditorScroll" type="ScrollContainer" parent="Margin/Root/Tabs/Items/EditorPanel"]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-
-[node name="Content" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 12
-
-[node name="Heading" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 20
-text = "Basic Item Definition"
-
-[node name="Form" type="GridContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-layout_mode = 2
-columns = 2
-
-[node name="ItemIdLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-text = "Stable item ID"
-
-[node name="ItemIdEdit" type="LineEdit" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-placeholder_text = "iron_ore"
-
-[node name="DisplayNameLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-text = "Display name"
-
-[node name="DisplayNameEdit" type="LineEdit" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="IconLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-text = "Inventory / ground icon"
-
-[node name="IconControls" type="HBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="IconOption" type="OptionButton" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form/IconControls"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="ImportAssetButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form/IconControls"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Import PNG…"
-
-[node name="PublicationLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-text = "Publication state"
-
-[node name="PublicationValue" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "No item selected"
-
-[node name="KindLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-text = "Authoring kind"
-
-[node name="AuthoringKindValue" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Unknown"
-
-[node name="UpdatedLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-layout_mode = 2
-text = "Last updated"
-
-[node name="UpdatedValue" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/Form"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Unknown"
-
-[node name="PreviewRow" type="HBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-layout_mode = 2
-theme_override_constants/separation = 16
-
-[node name="IconPreview" type="TextureRect" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(128, 128)
-layout_mode = 2
-expand_mode = 1
-stretch_mode = 5
-
-[node name="Operation" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/separation = 8
-
-[node name="TargetLabel" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
-layout_mode = 2
-text = "Target operation"
-
-[node name="TargetOperation" type="OptionButton" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="PreviewButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "Validate and Preview Changes"
-
-[node name="DeleteButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
-unique_name_in_owner = true
-layout_mode = 2
-disabled = true
-text = "Delete"
-
-[node name="ApplyButton" type="Button" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
-unique_name_in_owner = true
-layout_mode = 2
-disabled = true
-text = "Apply Previewed Operation"
-
-[node name="OperationStatus" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content/PreviewRow/Operation"]
-unique_name_in_owner = true
-layout_mode = 2
-modulate = Color(0.7, 0.73, 0.79, 1)
-text = "Select an item or create a new one."
-autowrap_mode = 2
-
-[node name="ChangesHeading" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "Exact logical changes"
-
-[node name="ChangesList" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ValidationHeading" type="Label" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-layout_mode = 2
-theme_override_font_sizes/font_size = 16
-text = "Validation"
-
-[node name="ValidationList" type="VBoxContainer" parent="Margin/Root/Tabs/Items/EditorPanel/EditorScroll/Content"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="Consumables" type="HBoxContainer" parent="Margin/Root/Tabs"]
-layout_mode = 2
-script = ExtResource("3_consumables")
-
-[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]
-layout_mode = 2
-script = ExtResource("4_equipment")
-
-[node name="Weapons & Tools" type="HBoxContainer" parent="Margin/Root/Tabs"]
-layout_mode = 2
-script = ExtResource("5_hand_equipment")
+script = ExtResource("3_items")
 
 [node name="Mobs" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2
-script = ExtResource("6_mobs")
+script = ExtResource("4_mobs")
 
 [node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2

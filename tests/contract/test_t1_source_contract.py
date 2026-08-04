@@ -64,7 +64,7 @@ class T1SourceContractTests(unittest.TestCase):
         repository = (ROOT / "host" / "Persistence" / "BasicItemRepository.cs").read_text()
         service = (ROOT / "host" / "Services" / "BasicItemAuthoringService.cs").read_text()
         client = (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text()
-        main = (ROOT / "content-studio" / "scripts" / "main.gd").read_text()
+        editor = (ROOT / "content-studio" / "scripts" / "item_editor.gd").read_text()
         publication = (ROOT / "host" / "Contracts" / "PublicationContracts.cs").read_text()
 
         self.assertIn("DeleteMutationRequest", publication)
@@ -73,20 +73,19 @@ class T1SourceContractTests(unittest.TestCase):
         self.assertIn("delete from item_definitions", repository)
         self.assertIn("delete_requires_disabled_item", service)
         self.assertIn("item_delete_blocked_by_references", service)
-        self.assertIn('target_operation.add_item("Delete")', main)
-        self.assertIn('target_operation.set_item_metadata(3, "delete")', main)
-        self.assertIn("@onready var delete_button: Button = %DeleteButton", main)
-        self.assertIn("delete_button.pressed.connect(_preview_delete)", main)
-        self.assertIn("func _preview_delete", main)
+        self.assertIn('["Delete", "delete"]', editor)
+        self.assertIn('_delete_button.text = "Delete"', editor)
+        self.assertIn("_delete_button.pressed.connect(_preview_delete)", editor)
+        self.assertIn("func _preview_delete", editor)
         self.assertIn("func delete_item", client)
         self.assertIn('"/api/v1/items/%s/delete"', client)
         self.assertIn("OP_ITEM_DELETE", client)
 
     def test_godot_requires_preview_before_apply(self) -> None:
-        main = (ROOT / "content-studio" / "scripts" / "main.gd").read_text()
-        self.assertIn("_workspace_support.can_apply", main)
-        self.assertIn("_workspace_support.accept_preview", main)
-        self.assertIn("Preview the operation again", main)
+        editor = (ROOT / "content-studio" / "scripts" / "item_editor.gd").read_text()
+        self.assertIn("_workspace_support.can_apply", editor)
+        self.assertIn("_workspace_support.accept_preview", editor)
+        self.assertIn("Preview the operation again", editor)
 
     def test_godot_has_no_database_driver_or_sql(self) -> None:
         godot_sources = "\n".join(

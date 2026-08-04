@@ -57,9 +57,9 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
             self.assertIn("UNIFIED_ITEM_AUTHORING_AUDIT.md", document)
             self.assertIn("UNIFIED_ITEM_AUTHORING_PLAN.md", document)
 
-        self.assertIn("planned unified item", architecture.lower())
-        self.assertIn("Status:** U2 unified host aggregate and compatibility adapters implemented", roadmap)
-        self.assertIn("current Godot tabs remain separate until U3", readme)
+        self.assertIn("unified item-authoring boundary", architecture.lower())
+        self.assertIn("Status:** U3 unified Godot Items workspace implemented", roadmap)
+        self.assertIn("one contextual Godot Items workspace", readme)
 
 
 if __name__ == "__main__":

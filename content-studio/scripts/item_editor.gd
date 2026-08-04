@@ -1,0 +1,1327 @@
+extends HBoxContainer
+class_name UnifiedItemEditor
+
+const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
+const PAPER_DOLL_PREVIEW_SCRIPT := preload("res://scripts/paper_doll_preview.gd")
+
+const COMBAT_UNIT_MILLISECONDS := 600
+const DEFAULT_BONUS_FIELDS := [
+	{"id": "attack_thrust", "display_name": "Attack Thrust"},
+	{"id": "attack_slash", "display_name": "Attack Slash"},
+	{"id": "attack_crush", "display_name": "Attack Crush"},
+	{"id": "attack_ranged", "display_name": "Attack Ranged"},
+	{"id": "attack_magic", "display_name": "Attack Magic"},
+	{"id": "strength_melee", "display_name": "Strength Melee"},
+	{"id": "strength_ranged", "display_name": "Strength Ranged"},
+	{"id": "strength_magic", "display_name": "Strength Magic"},
+	{"id": "defence_thrust", "display_name": "Defence Thrust"},
+	{"id": "defence_slash", "display_name": "Defence Slash"},
+	{"id": "defence_crush", "display_name": "Defence Crush"},
+	{"id": "defence_ranged", "display_name": "Defence Ranged"},
+	{"id": "defence_magic", "display_name": "Defence Magic"},
+]
+const DEFAULT_EQUIPMENT_SLOTS := [
+	{"id": "head", "display_name": "Head"},
+	{"id": "body", "display_name": "Body"},
+	{"id": "legs", "display_name": "Legs"},
+	{"id": "boots", "display_name": "Boots"},
+	{"id": "gloves", "display_name": "Gloves"},
+	{"id": "cape", "display_name": "Cape"},
+	{"id": "right_hand", "display_name": "Right Hand"},
+	{"id": "left_hand", "display_name": "Left Hand"},
+]
+const DEFAULT_WEAPON_CAPABLE_SLOTS := [{"id": "right_hand", "display_name": "Right Hand"}]
+
+var _client: AuthoringHostClient
+var _workspace_support
+var _paper_doll_preview
+var _items: Array = []
+var _assets: Array = []
+var _asset_by_path: Dictionary = {}
+var _options: Dictionary = {}
+var _current_item: Dictionary = {}
+var _is_loading := false
+var _reload_item_id := ""
+var _game_client_assets_root := ""
+
+var _search: LineEdit
+var _list: VBoxContainer
+var _item_id: LineEdit
+var _display_name: LineEdit
+var _icon: OptionButton
+var _icon_preview: TextureRect
+var _publication: Label
+var _classification: Label
+var _kind: Label
+var _updated: Label
+var _consumable_enabled: CheckBox
+var _use_action: OptionButton
+var _consume_quantity: SpinBox
+var _result_item_id: LineEdit
+var _success_message: LineEdit
+var _usable_in_combat: CheckBox
+var _cooldown_ms: SpinBox
+var _animation_id: LineEdit
+var _sound_path: LineEdit
+var _consumable_requirements: VBoxContainer
+var _consumable_effects: VBoxContainer
+var _equipable: CheckBox
+var _equipment_slot: OptionButton
+var _required_strength: SpinBox
+var _equip_note: Label
+var _appearance_section: VBoxContainer
+var _requirements_section: VBoxContainer
+var _combat_bonus_section: VBoxContainer
+var _weapon_section: VBoxContainer
+var _tool_section: VBoxContainer
+var _requirements: VBoxContainer
+var _modifiers: VBoxContainer
+var _bonus_controls: Dictionary = {}
+var _weapon_enabled: CheckBox
+var _weapon_profile_id: LineEdit
+var _weapon_attack_type: OptionButton
+var _weapon_accuracy_style: OptionButton
+var _weapon_min_range: SpinBox
+var _weapon_max_range: SpinBox
+var _weapon_speed_units: SpinBox
+var _weapon_timing: Label
+var _tool_rows: VBoxContainer
+var _operation: OptionButton
+var _preview_button: Button
+var _delete_button: Button
+var _apply_button: Button
+var _status: Label
+var _changes: VBoxContainer
+var _validation: VBoxContainer
+var _file_dialog: FileDialog
+var _paper_doll_stage: Control
+var _paper_doll_status: Label
+var _preview_direction: OptionButton
+var _preview_frame: SpinBox
+
+
+func _ready() -> void:
+	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
+	_paper_doll_preview = PAPER_DOLL_PREVIEW_SCRIPT.new()
+	_client = %AuthoringHostClient
+	_build_ui()
+	_connect_client()
+	_set_form_enabled(false)
+
+
+func _connect_client() -> void:
+	_client.health_received.connect(_on_health_received)
+	_client.item_assets_received.connect(_on_assets_received)
+	_client.item_asset_imported.connect(_on_asset_imported)
+	_client.item_options_received.connect(_on_options_received)
+	_client.item_catalog_received.connect(_on_catalog_received)
+	_client.item_definition_received.connect(_on_definition_received)
+	_client.item_preview_received.connect(_on_preview_received)
+	_client.item_mutation_completed.connect(_on_mutation_completed)
+	_client.item_delete_completed.connect(_on_delete_completed)
+	_client.request_failed.connect(_on_request_failed)
+
+
+func _build_ui() -> void:
+	add_theme_constant_override("separation", 14)
+
+	var catalog_panel := _panel()
+	catalog_panel.custom_minimum_size = Vector2(310, 0)
+	add_child(catalog_panel)
+	var catalog := VBoxContainer.new()
+	catalog.add_theme_constant_override("separation", 10)
+	catalog_panel.add_child(catalog)
+	catalog.add_child(_heading("Items", 20))
+	_search = LineEdit.new()
+	_search.placeholder_text = "Search item ID, name, or classification"
+	_search.text_changed.connect(_on_search_changed.unbind(1))
+	catalog.add_child(_search)
+	var new_button := Button.new()
+	new_button.text = "+ New Item"
+	new_button.pressed.connect(_start_new)
+	catalog.add_child(new_button)
+	var refresh := Button.new()
+	refresh.text = "Refresh"
+	refresh.pressed.connect(_refresh_catalog)
+	catalog.add_child(refresh)
+	var catalog_scroll := ScrollContainer.new()
+	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	catalog.add_child(catalog_scroll)
+	_list = VBoxContainer.new()
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_list.add_theme_constant_override("separation", 6)
+	catalog_scroll.add_child(_list)
+
+	var editor_panel := _panel()
+	editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	add_child(editor_panel)
+	var editor_scroll := ScrollContainer.new()
+	editor_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	editor_panel.add_child(editor_scroll)
+	var editor := VBoxContainer.new()
+	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	editor.add_theme_constant_override("separation", 12)
+	editor_scroll.add_child(editor)
+	editor.add_child(_heading("Complete Item Definition", 20))
+
+	var identity_grid := _section_grid(editor, "Identity and Inventory")
+	_item_id = _add_line_field(identity_grid, "Stable item ID", "iron_ore")
+	_display_name = _add_line_field(identity_grid, "Display name", "Iron Ore")
+	identity_grid.add_child(_field_label("Inventory / ground icon"))
+	var icon_row := HBoxContainer.new()
+	icon_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	identity_grid.add_child(icon_row)
+	_icon = OptionButton.new()
+	_icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_icon.item_selected.connect(_on_form_changed.unbind(1))
+	icon_row.add_child(_icon)
+	var import_button := Button.new()
+	import_button.text = "Import PNG..."
+	import_button.pressed.connect(_open_import)
+	icon_row.add_child(import_button)
+	_publication = _add_value_field(identity_grid, "Publication state", "No item selected")
+	_classification = _add_value_field(identity_grid, "Classification", "Unknown")
+	_kind = _add_value_field(identity_grid, "Authoring kind", "Unknown")
+	_updated = _add_value_field(identity_grid, "Last updated", "Unknown")
+
+	var consumable_grid := _section_grid(editor, "Consumable Behavior")
+	consumable_grid.add_child(_field_label("Consumable"))
+	_consumable_enabled = CheckBox.new()
+	_consumable_enabled.text = "Enable consumable behavior"
+	_consumable_enabled.toggled.connect(_on_consumable_toggled)
+	consumable_grid.add_child(_consumable_enabled)
+	_use_action = _add_option_field(consumable_grid, "Use action")
+	_consume_quantity = _add_spin_field(consumable_grid, "Quantity consumed", 1, 999, 1)
+	_result_item_id = _add_line_field(consumable_grid, "Result item ID", "Optional item ID")
+	_success_message = _add_line_field(consumable_grid, "Success message", "Optional message")
+	consumable_grid.add_child(_field_label("Usable in combat"))
+	_usable_in_combat = CheckBox.new()
+	_usable_in_combat.button_pressed = true
+	_usable_in_combat.toggled.connect(_on_form_changed.unbind(1))
+	consumable_grid.add_child(_usable_in_combat)
+	_cooldown_ms = _add_spin_field(consumable_grid, "Cooldown ms", 0, 86400000, 100)
+	_animation_id = _add_line_field(consumable_grid, "Use animation ID", "Optional semantic ID")
+	_sound_path = _add_line_field(consumable_grid, "Sound resource path", "Optional res://assets/... path")
+	editor.add_child(_row_header("Consumable Requirements", "+ Requirement", _add_consumable_requirement_row))
+	_consumable_requirements = _rows()
+	editor.add_child(_consumable_requirements)
+	editor.add_child(_row_header("Consumable Effects", "+ Effect", _add_consumable_effect_row))
+	_consumable_effects = _rows()
+	editor.add_child(_consumable_effects)
+
+	var equip_grid := _section_grid(editor, "Equipability")
+	equip_grid.add_child(_field_label("Equipable"))
+	_equipable = CheckBox.new()
+	_equipable.text = "Item can be equipped"
+	_equipable.toggled.connect(_on_equipable_toggled)
+	equip_grid.add_child(_equipable)
+	_equipment_slot = _add_option_field(equip_grid, "Equipment slot")
+	_equipment_slot.item_selected.connect(_on_slot_changed.unbind(1))
+	_required_strength = _add_spin_field(equip_grid, "Required strength", 1, 1000000, 1)
+	_equip_note = Label.new()
+	_equip_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_equip_note.modulate = Color(0.7, 0.73, 0.79, 1)
+	_equip_note.text = "Disabling equipability removes equipment requirements, modifiers, combat bonuses, and weapon profile. Tool capabilities and consumable behavior remain."
+	editor.add_child(_equip_note)
+
+	_appearance_section = VBoxContainer.new()
+	_appearance_section.add_theme_constant_override("separation", 8)
+	editor.add_child(_appearance_section)
+	_appearance_section.add_child(_heading("Equipped Appearance", 16))
+	var doll_row := HBoxContainer.new()
+	doll_row.add_theme_constant_override("separation", 16)
+	_appearance_section.add_child(doll_row)
+	var doll_panel := PanelContainer.new()
+	var doll_style := StyleBoxFlat.new()
+	doll_style.bg_color = Color(0.045, 0.052, 0.066, 1)
+	doll_style.border_color = Color(0.19, 0.22, 0.28, 1)
+	doll_style.set_border_width_all(1)
+	doll_style.set_corner_radius_all(6)
+	doll_panel.add_theme_stylebox_override("panel", doll_style)
+	doll_panel.custom_minimum_size = PAPER_DOLL_PREVIEW_SCRIPT.STAGE_SIZE
+	doll_row.add_child(doll_panel)
+	_paper_doll_stage = Control.new()
+	_paper_doll_stage.clip_contents = true
+	_paper_doll_stage.custom_minimum_size = PAPER_DOLL_PREVIEW_SCRIPT.STAGE_SIZE
+	doll_panel.add_child(_paper_doll_stage)
+	var doll_controls := VBoxContainer.new()
+	doll_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	doll_controls.add_theme_constant_override("separation", 8)
+	doll_row.add_child(doll_controls)
+	var direction_row := HBoxContainer.new()
+	direction_row.add_child(_field_label("Direction"))
+	_preview_direction = OptionButton.new()
+	for direction in ["N", "S", "E", "W"]:
+		_preview_direction.add_item(direction)
+		_preview_direction.set_item_metadata(_preview_direction.item_count - 1, direction)
+	_preview_direction.item_selected.connect(_on_visual_preview_changed.unbind(1))
+	direction_row.add_child(_preview_direction)
+	doll_controls.add_child(direction_row)
+	var frame_row := HBoxContainer.new()
+	frame_row.add_child(_field_label("Frame"))
+	_preview_frame = SpinBox.new()
+	_preview_frame.min_value = 1
+	_preview_frame.max_value = 4
+	_preview_frame.step = 1
+	_preview_frame.value = 3
+	_preview_frame.value_changed.connect(_on_visual_preview_changed.unbind(1))
+	frame_row.add_child(_preview_frame)
+	doll_controls.add_child(frame_row)
+	_paper_doll_status = Label.new()
+	_paper_doll_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_paper_doll_status.modulate = Color(0.7, 0.73, 0.79, 1)
+	doll_controls.add_child(_paper_doll_status)
+	_paper_doll_preview.bind(_paper_doll_stage, _paper_doll_status)
+
+	_requirements_section = VBoxContainer.new()
+	_requirements_section.add_theme_constant_override("separation", 8)
+	editor.add_child(_requirements_section)
+	_requirements_section.add_child(_row_header("Requirements and Skill Modifiers", "+ Requirement", _add_requirement_row))
+	_requirements = _rows()
+	_requirements_section.add_child(_requirements)
+	_requirements_section.add_child(_row_header("Skill Modifiers", "+ Modifier", _add_modifier_row))
+	_modifiers = _rows()
+	_requirements_section.add_child(_modifiers)
+
+	_combat_bonus_section = VBoxContainer.new()
+	_combat_bonus_section.add_theme_constant_override("separation", 8)
+	editor.add_child(_combat_bonus_section)
+	_combat_bonus_section.add_child(_heading("Combat Bonuses", 16))
+	var bonus_grid := GridContainer.new()
+	bonus_grid.columns = 4
+	bonus_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_combat_bonus_section.add_child(bonus_grid)
+	_rebuild_bonus_grid(bonus_grid)
+
+	_weapon_section = VBoxContainer.new()
+	_weapon_section.add_theme_constant_override("separation", 8)
+	editor.add_child(_weapon_section)
+	_weapon_section.add_child(_heading("Weapon Profile", 16))
+	_weapon_enabled = CheckBox.new()
+	_weapon_enabled.text = "Weapon profile enabled"
+	_weapon_enabled.toggled.connect(_on_weapon_enabled_toggled)
+	_weapon_section.add_child(_weapon_enabled)
+	var weapon_grid := GridContainer.new()
+	weapon_grid.columns = 2
+	weapon_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_weapon_section.add_child(weapon_grid)
+	_weapon_profile_id = _add_line_field(weapon_grid, "Profile ID", "iron_sword_melee")
+	_weapon_attack_type = _add_option_field(weapon_grid, "Attack type")
+	_weapon_accuracy_style = _add_option_field(weapon_grid, "Accuracy style")
+	_weapon_min_range = _add_spin_field(weapon_grid, "Minimum range tiles", 0, 32, 1)
+	_weapon_max_range = _add_spin_field(weapon_grid, "Maximum range tiles", 0, 32, 1)
+	_weapon_speed_units = _add_spin_field(weapon_grid, "Attack speed units", 1, 60, 1)
+	_weapon_timing = _add_value_field(weapon_grid, "Attack interval", "4 attack units x 600 ms = 2400 ms")
+
+	_tool_section = VBoxContainer.new()
+	_tool_section.add_theme_constant_override("separation", 8)
+	editor.add_child(_tool_section)
+	var tool_note := Label.new()
+	tool_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tool_note.modulate = Color(0.7, 0.73, 0.79, 1)
+	tool_note.text = "Tool capabilities work from inventory or equipment. Equipability is optional."
+	_tool_section.add_child(_row_header("Tool Capabilities", "+ Capability", _add_tool_row))
+	_tool_section.add_child(tool_note)
+	_tool_rows = _rows()
+	_tool_section.add_child(_tool_rows)
+
+	var preview_panel := _panel()
+	preview_panel.custom_minimum_size = Vector2(330, 0)
+	add_child(preview_panel)
+	var preview_scroll := ScrollContainer.new()
+	preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview_panel.add_child(preview_scroll)
+	var preview := VBoxContainer.new()
+	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	preview.add_theme_constant_override("separation", 10)
+	preview_scroll.add_child(preview)
+	preview.add_child(_heading("Preview", 20))
+	_icon_preview = TextureRect.new()
+	_icon_preview.custom_minimum_size = Vector2(160, 160)
+	_icon_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_icon_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	preview.add_child(_icon_preview)
+	preview.add_child(_heading("Operation", 16))
+	_operation = OptionButton.new()
+	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
+		_operation.add_item(option[0])
+		_operation.set_item_metadata(_operation.item_count - 1, option[1])
+	_operation.item_selected.connect(_on_operation_changed.unbind(1))
+	preview.add_child(_operation)
+	_preview_button = Button.new()
+	_preview_button.text = "Validate and Preview Changes"
+	_preview_button.pressed.connect(_preview)
+	preview.add_child(_preview_button)
+	_delete_button = Button.new()
+	_delete_button.text = "Delete"
+	_delete_button.disabled = true
+	_delete_button.pressed.connect(_preview_delete)
+	preview.add_child(_delete_button)
+	_apply_button = Button.new()
+	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.disabled = true
+	_apply_button.pressed.connect(_apply)
+	preview.add_child(_apply_button)
+	_status = Label.new()
+	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_status.modulate = Color(0.7, 0.73, 0.79, 1)
+	_status.text = "Select an item or create a new one."
+	preview.add_child(_status)
+	preview.add_child(_heading("Exact Logical Changes", 16))
+	_changes = VBoxContainer.new()
+	preview.add_child(_changes)
+	preview.add_child(_heading("Validation", 16))
+	_validation = VBoxContainer.new()
+	preview.add_child(_validation)
+
+	_file_dialog = FileDialog.new()
+	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+	_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	_file_dialog.filters = PackedStringArray(["*.png ; PNG images"])
+	_file_dialog.file_selected.connect(_import_selected)
+	add_child(_file_dialog)
+
+	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id]:
+		edit.text_changed.connect(_on_form_changed.unbind(1))
+	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range]:
+		spin.value_changed.connect(_on_form_changed.unbind(1))
+	_weapon_speed_units.value_changed.connect(_on_weapon_speed_changed.unbind(1))
+	_update_contextual_sections()
+	_update_weapon_timing()
+
+
+func _on_health_received(payload: Dictionary) -> void:
+	_game_client_assets_root = ""
+	for variant in payload.get("asset_roots", []) as Array:
+		if variant is Dictionary and str((variant as Dictionary).get("id", "")) == "game_client_assets":
+			_game_client_assets_root = str((variant as Dictionary).get("path", ""))
+			break
+	_paper_doll_preview.game_client_assets_root = _game_client_assets_root
+	_paper_doll_preview.clear_cache()
+	_update_paper_doll_preview()
+
+
+func _on_assets_received(payload: Dictionary) -> void:
+	_assets = payload.get("assets", []) as Array
+	_rebuild_asset_options(_selected_metadata(_icon))
+
+
+func _on_asset_imported(payload: Dictionary) -> void:
+	var asset := payload.get("asset", {}) as Dictionary
+	var resource_path := str(asset.get("resource_path", ""))
+	if not resource_path.is_empty() and not _asset_by_path.has(resource_path):
+		_assets.append(asset)
+	_rebuild_asset_options(resource_path)
+	_status.text = str(payload.get("message", "Item asset imported."))
+	_clear_preview()
+
+
+func _on_options_received(payload: Dictionary) -> void:
+	_options = payload
+	_fill_option(_equipment_slot, _option_array("equipment_slots", DEFAULT_EQUIPMENT_SLOTS))
+	_fill_option(_use_action, _option_array("use_actions", [{"id": "use", "display_name": "Use"}]))
+	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}]))
+	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
+	_rebuild_bonus_grid(_bonus_controls.get("_grid", null))
+	_update_weapon_timing()
+
+
+func _on_catalog_received(payload: Dictionary) -> void:
+	_items = payload.get("items", []) as Array
+	_rebuild_list()
+	if not _reload_item_id.is_empty():
+		var item_id := _reload_item_id
+		_reload_item_id = ""
+		_client.load_item_definition(item_id)
+
+
+func _on_definition_received(payload: Dictionary) -> void:
+	_is_loading = true
+	_current_item = payload.duplicate(true)
+	_item_id.text = str(payload.get("item_id", ""))
+	_item_id.editable = false
+	_display_name.text = str(payload.get("display_name", ""))
+	_select_option(_icon, str(payload.get("icon_texture_path", "")))
+	_publication.text = str(payload.get("publication_state", "Unknown"))
+	_classification.text = str(payload.get("classification_label", "Unknown"))
+	_kind.text = str(payload.get("authoring_kind", "Unknown"))
+	_updated.text = str(payload.get("updated_at_utc", "Unknown"))
+	_apply_consumable(payload.get("consumable_behavior", null))
+	_apply_equipment(payload.get("equipment", null))
+	_clear_rows(_tool_rows)
+	for variant in payload.get("tool_capabilities", []) as Array:
+		if variant is Dictionary:
+			_add_tool_row(variant as Dictionary)
+	_update_operation_default()
+	_set_form_enabled(true)
+	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
+	_update_paper_doll_preview()
+	_is_loading = false
+	_update_contextual_sections()
+	_clear_preview()
+	_status.text = "Loaded %s." % _item_id.text
+
+
+func _on_preview_received(payload: Dictionary) -> void:
+	var operation := str(payload.get("target_operation", "save_draft"))
+	var applicable := bool(payload.get("valid_for_publication", false)) if operation == "publish" else bool(payload.get("valid_for_draft", false))
+	_workspace_support.accept_preview(
+		operation,
+		str(payload.get("preview_signature", "")),
+		applicable,
+		_apply_button,
+		"Apply %s" % _workspace_support.operation_name(operation)
+	)
+	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
+	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
+	_update_icon_preview(str(payload.get("asset_preview_file_path", "")))
+	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
+
+
+func _on_mutation_completed(payload: Dictionary) -> void:
+	var operation := str(payload.get("operation", "operation"))
+	var item := payload.get("item", {}) as Dictionary
+	var item_id := str(item.get("item_id", _item_id.text))
+	_reload_item_id = item_id
+	_clear_preview()
+	_status.text = "%s completed. Reloading complete aggregate..." % _workspace_support.operation_name(operation)
+	_client.search_item_catalog(_search.text)
+
+
+func _on_delete_completed(payload: Dictionary) -> void:
+	var deleted_id := str(payload.get("deleted_id", _item_id.text))
+	_start_new()
+	_status.text = "Deleted %s." % deleted_id
+	_client.search_item_catalog(_search.text)
+
+
+func _on_request_failed(operation: String, message: String, errors: Array) -> void:
+	if not operation.begins_with("item") and operation != "item_asset_import":
+		return
+	_status.text = "%s failed: %s" % [operation, message]
+	_workspace_support.render_validation(_validation, errors)
+	_apply_button.disabled = true
+
+
+func _rebuild_list() -> void:
+	_clear_rows(_list)
+	var query := _search.text.strip_edges().to_lower()
+	for variant in _items:
+		if variant is not Dictionary:
+			continue
+		var item := variant as Dictionary
+		var haystack := "%s %s %s" % [
+			item.get("item_id", ""),
+			item.get("display_name", ""),
+			item.get("classification_label", item.get("authoring_kind", "")),
+		]
+		if not query.is_empty() and not haystack.to_lower().contains(query):
+			continue
+		var button := Button.new()
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.text = "%s\n%s | %s | %s" % [
+			str(item.get("display_name", "Unnamed item")),
+			str(item.get("item_id", "")),
+			str(item.get("publication_state", "Unknown")),
+			str(item.get("classification_label", item.get("authoring_kind", "Unknown"))),
+		]
+		button.tooltip_text = str(item.get("updated_at_utc", ""))
+		button.pressed.connect(_client.load_item_definition.bind(str(item.get("item_id", ""))))
+		_list.add_child(button)
+
+
+func _start_new() -> void:
+	_is_loading = true
+	_current_item = {}
+	_item_id.text = ""
+	_item_id.editable = true
+	_display_name.text = ""
+	_select_option(_icon, "")
+	_publication.text = "Unsaved"
+	_classification.text = "Basic"
+	_kind.text = "Unified"
+	_updated.text = "Not saved"
+	_apply_consumable(null)
+	_apply_equipment(null)
+	_clear_rows(_tool_rows)
+	_select_option(_operation, "save_draft")
+	_set_form_enabled(true)
+	_update_icon_preview("")
+	_update_paper_doll_preview()
+	_is_loading = false
+	_update_contextual_sections()
+	_clear_preview()
+	_item_id.grab_focus()
+	_status.text = "Creating a new complete item aggregate."
+
+
+func _apply_consumable(value: Variant) -> void:
+	var enabled := value is Dictionary
+	var consumable := value as Dictionary if enabled else {}
+	_consumable_enabled.button_pressed = enabled
+	_select_option(_use_action, str(consumable.get("use_action", "use")))
+	_consume_quantity.value = float(consumable.get("consume_quantity", 1))
+	_result_item_id.text = _nullable_string(consumable.get("result_item_id", ""))
+	_success_message.text = _nullable_string(consumable.get("success_message", ""))
+	_usable_in_combat.button_pressed = bool(consumable.get("usable_in_combat", true))
+	_cooldown_ms.value = float(consumable.get("cooldown_ms", 0))
+	_animation_id.text = _nullable_string(consumable.get("use_animation_id", ""))
+	_sound_path.text = _nullable_string(consumable.get("use_sound_resource_path", ""))
+	_clear_rows(_consumable_requirements)
+	for variant in consumable.get("requirements", []) as Array:
+		if variant is Dictionary:
+			_add_consumable_requirement_row(variant as Dictionary)
+	_clear_rows(_consumable_effects)
+	for variant in consumable.get("effects", []) as Array:
+		if variant is Dictionary:
+			_add_consumable_effect_row(variant as Dictionary)
+
+
+func _apply_equipment(value: Variant) -> void:
+	var enabled := value is Dictionary
+	var equipment := value as Dictionary if enabled else {}
+	_equipable.button_pressed = enabled
+	_select_option(_equipment_slot, str(equipment.get("equipment_slot_id", "right_hand")))
+	_required_strength.value = float(equipment.get("required_strength", 1))
+	_clear_rows(_requirements)
+	for variant in equipment.get("requirements", []) as Array:
+		if variant is Dictionary:
+			_add_requirement_row(variant as Dictionary)
+	_clear_rows(_modifiers)
+	for variant in equipment.get("skill_modifiers", []) as Array:
+		if variant is Dictionary:
+			_add_modifier_row(variant as Dictionary)
+	var bonuses := equipment.get("combat_bonuses", {}) as Dictionary
+	_apply_bonus_values(bonuses)
+	_apply_weapon_profile(equipment.get("weapon_profile", null))
+
+
+func _payload() -> Dictionary:
+	return {
+		"display_name": _display_name.text,
+		"icon_texture_path": _selected_metadata(_icon),
+		"consumable_behavior": _consumable_payload() if _consumable_enabled.button_pressed else null,
+		"equipment": _equipment_payload() if _equipable.button_pressed else null,
+		"tool_capabilities": _collect_tool_capabilities(),
+		"expected_updated_at_utc": _current_item.get("updated_at_utc", null),
+		"preview_signature": null,
+	}
+
+
+func _preview() -> void:
+	var item_id := _item_id.text.strip_edges()
+	if item_id.is_empty():
+		_status.text = "Enter a stable item ID before previewing."
+		return
+	var payload := _payload()
+	payload.erase("preview_signature")
+	payload["target_operation"] = _selected_metadata(_operation)
+	_client.preview_item_operation(item_id, payload)
+	_status.text = "Calculating validation and exact logical changes..."
+
+
+func _preview_delete() -> void:
+	if _current_item.is_empty():
+		_status.text = "Select a saved disabled item before deleting."
+		return
+	_select_option(_operation, "delete")
+	_preview()
+
+
+func _apply() -> void:
+	var operation := _selected_metadata(_operation)
+	var preview_signature: String = _workspace_support.preview_signature
+	if not _workspace_support.can_apply(operation, preview_signature):
+		_status.text = "The form changed. Preview the operation again before applying it."
+		_apply_button.disabled = true
+		return
+	var item_id := _item_id.text.strip_edges()
+	var expected: Variant = _current_item.get("updated_at_utc", null)
+	match operation:
+		"publish":
+			_client.publish_item(item_id, expected, preview_signature)
+		"disable":
+			_client.disable_item(item_id, expected, preview_signature)
+		"delete":
+			_client.delete_item(item_id, expected, preview_signature)
+		_:
+			var payload := _payload()
+			payload["preview_signature"] = preview_signature
+			_client.save_complete_item_draft(item_id, payload)
+	_apply_button.disabled = true
+	_status.text = "Applying unified item operation..."
+
+
+func _consumable_payload() -> Dictionary:
+	return {
+		"use_action": _selected_metadata(_use_action),
+		"consume_quantity": int(_consume_quantity.value),
+		"result_item_id": _optional_payload(_result_item_id.text),
+		"success_message": _optional_payload(_success_message.text),
+		"usable_in_combat": _usable_in_combat.button_pressed,
+		"cooldown_ms": int(_cooldown_ms.value),
+		"use_animation_id": _optional_payload(_animation_id.text),
+		"use_sound_resource_path": _optional_payload(_sound_path.text),
+		"requirements": _collect_consumable_requirements(),
+		"effects": _collect_consumable_effects(),
+	}
+
+
+func _equipment_payload() -> Dictionary:
+	return {
+		"equipment_slot_id": _selected_metadata(_equipment_slot),
+		"required_strength": int(_required_strength.value),
+		"requirements": _collect_requirements(),
+		"skill_modifiers": _collect_modifiers(),
+		"combat_bonuses": _collect_bonuses(),
+		"weapon_profile": _weapon_profile_payload(),
+	}
+
+
+func _weapon_profile_payload() -> Variant:
+	if not _weapon_enabled.button_pressed or not _is_weapon_capable_slot(_selected_metadata(_equipment_slot)):
+		return null
+	return {
+		"profile_id": _weapon_profile_id.text.strip_edges(),
+		"attack_type": _selected_metadata(_weapon_attack_type),
+		"accuracy_style": _selected_metadata(_weapon_accuracy_style),
+		"minimum_range_tiles": int(_weapon_min_range.value),
+		"maximum_range_tiles": int(_weapon_max_range.value),
+		"attack_speed_units": int(_weapon_speed_units.value),
+	}
+
+
+func _add_consumable_requirement_row(initial: Dictionary = {}) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var type := OptionButton.new()
+	_fill_option(type, _option_array("requirement_types", [{"id": "skill_minimum", "display_name": "Skill Minimum"}]))
+	_select_option(type, str(initial.get("requirement_type", "skill_minimum")))
+	row.add_child(type)
+	var target := OptionButton.new()
+	target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_option(target, _option_array("skills", []))
+	_select_option(target, str(initial.get("target_id", "")))
+	row.add_child(target)
+	var minimum := _row_spin(1, 1000000, float(initial.get("minimum_value", 1)))
+	row.add_child(minimum)
+	var remove := _remove_button(row)
+	row.add_child(remove)
+	row.set_meta("type", type)
+	row.set_meta("target", target)
+	row.set_meta("value", minimum)
+	_connect_row_controls(row)
+	_consumable_requirements.add_child(row)
+	_clear_preview()
+
+
+func _add_consumable_effect_row(initial: Dictionary = {}) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var type := OptionButton.new()
+	_fill_option(type, _option_array("effect_types", [{"id": "restore_resource", "display_name": "Restore Resource"}]))
+	_select_option(type, str(initial.get("effect_type", "restore_resource")))
+	row.add_child(type)
+	var target := OptionButton.new()
+	target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_option(target, _option_array("resource_targets", [{"id": "health", "display_name": "Health"}]))
+	_select_option(target, str(initial.get("target_id", "health")))
+	row.add_child(target)
+	var minimum := _row_spin(1, 1000000, float(initial.get("minimum_amount", 1)))
+	row.add_child(minimum)
+	var maximum := _row_spin(1, 1000000, float(initial.get("maximum_amount", initial.get("minimum_amount", 1))))
+	row.add_child(maximum)
+	var remove := _remove_button(row)
+	row.add_child(remove)
+	row.set_meta("type", type)
+	row.set_meta("target", target)
+	row.set_meta("minimum", minimum)
+	row.set_meta("maximum", maximum)
+	_connect_row_controls(row)
+	_consumable_effects.add_child(row)
+	_clear_preview()
+
+
+func _add_requirement_row(initial: Dictionary = {}) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var skill := OptionButton.new()
+	skill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_option(skill, _option_array("skills", []))
+	_select_option(skill, str(initial.get("skill_id", "")))
+	row.add_child(skill)
+	var value := _row_spin(1, 1000000, float(initial.get("required_value", 1)))
+	row.add_child(value)
+	var remove := _remove_button(row)
+	row.add_child(remove)
+	row.set_meta("skill", skill)
+	row.set_meta("value", value)
+	_connect_row_controls(row)
+	_requirements.add_child(row)
+	_clear_preview()
+
+
+func _add_modifier_row(initial: Dictionary = {}) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var skill := OptionButton.new()
+	skill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_option(skill, _option_array("skills", []))
+	_select_option(skill, str(initial.get("skill_id", "")))
+	row.add_child(skill)
+	var value := _row_spin(-1000000, 1000000, float(initial.get("modifier_value", 0)))
+	row.add_child(value)
+	var remove := _remove_button(row)
+	row.add_child(remove)
+	row.set_meta("skill", skill)
+	row.set_meta("value", value)
+	_connect_row_controls(row)
+	_modifiers.add_child(row)
+	_clear_preview()
+
+
+func _add_tool_row(initial: Dictionary = {}) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 6)
+	var capability := OptionButton.new()
+	capability.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_option(capability, _option_array("tool_capabilities", []))
+	_select_option(capability, str(initial.get("capability_id", "")))
+	row.add_child(capability)
+	var maximum_power := int(_options.get("maximum_tool_power_tier", 1000))
+	var power := _row_spin(1, maximum_power, float(initial.get("power_tier", 1)))
+	row.add_child(power)
+	var action := LineEdit.new()
+	action.placeholder_text = "action animation ID"
+	action.text = _nullable_string(initial.get("action_animation_id", ""))
+	action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(action)
+	var effect := LineEdit.new()
+	effect.placeholder_text = "effect resource ID"
+	effect.text = _nullable_string(initial.get("effect_resource_id", ""))
+	effect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(effect)
+	var up := Button.new()
+	up.text = "Up"
+	up.pressed.connect(_move_row.bind(row, _tool_rows, -1))
+	row.add_child(up)
+	var down := Button.new()
+	down.text = "Down"
+	down.pressed.connect(_move_row.bind(row, _tool_rows, 1))
+	row.add_child(down)
+	var remove := _remove_button(row)
+	row.add_child(remove)
+	row.set_meta("capability", capability)
+	row.set_meta("power", power)
+	row.set_meta("action", action)
+	row.set_meta("effect", effect)
+	_connect_row_controls(row)
+	_tool_rows.add_child(row)
+	_clear_preview()
+
+
+func _collect_consumable_requirements() -> Array:
+	var values: Array = []
+	for row in _consumable_requirements.get_children():
+		if row.has_meta("type"):
+			values.append({
+				"requirement_index": values.size(),
+				"requirement_type": _selected_metadata(row.get_meta("type") as OptionButton),
+				"target_id": _selected_metadata(row.get_meta("target") as OptionButton),
+				"minimum_value": int((row.get_meta("value") as SpinBox).value),
+			})
+	return values
+
+
+func _collect_consumable_effects() -> Array:
+	var values: Array = []
+	for row in _consumable_effects.get_children():
+		if row.has_meta("type"):
+			values.append({
+				"effect_index": values.size(),
+				"effect_type": _selected_metadata(row.get_meta("type") as OptionButton),
+				"target_id": _selected_metadata(row.get_meta("target") as OptionButton),
+				"minimum_amount": int((row.get_meta("minimum") as SpinBox).value),
+				"maximum_amount": int((row.get_meta("maximum") as SpinBox).value),
+			})
+	return values
+
+
+func _collect_requirements() -> Array:
+	var values: Array = []
+	for row in _requirements.get_children():
+		if row.has_meta("skill"):
+			values.append({
+				"skill_id": _selected_metadata(row.get_meta("skill") as OptionButton),
+				"required_value": int((row.get_meta("value") as SpinBox).value),
+			})
+	return values
+
+
+func _collect_modifiers() -> Array:
+	var values: Array = []
+	for row in _modifiers.get_children():
+		if row.has_meta("skill"):
+			values.append({
+				"skill_id": _selected_metadata(row.get_meta("skill") as OptionButton),
+				"modifier_value": int((row.get_meta("value") as SpinBox).value),
+			})
+	return values
+
+
+func _collect_bonuses() -> Dictionary:
+	var values: Dictionary = {}
+	for id in _bonus_controls:
+		if id == "_grid":
+			continue
+		values[id] = int((_bonus_controls[id] as SpinBox).value)
+	return values
+
+
+func _collect_tool_capabilities() -> Array:
+	var values: Array = []
+	for row in _tool_rows.get_children():
+		if row.has_meta("capability"):
+			values.append({
+				"capability_id": _selected_metadata(row.get_meta("capability") as OptionButton),
+				"power_tier": int((row.get_meta("power") as SpinBox).value),
+				"action_animation_id": _optional_payload((row.get_meta("action") as LineEdit).text),
+				"effect_resource_id": _optional_payload((row.get_meta("effect") as LineEdit).text),
+			})
+	return values
+
+
+func _apply_bonus_values(values: Dictionary) -> void:
+	for id in _bonus_controls:
+		if id != "_grid":
+			(_bonus_controls[id] as SpinBox).value = float(values.get(id, 0))
+
+
+func _apply_weapon_profile(profile_variant: Variant) -> void:
+	var has_profile := profile_variant is Dictionary
+	var profile := profile_variant as Dictionary if has_profile else {}
+	_weapon_enabled.button_pressed = has_profile
+	_weapon_profile_id.text = str(profile.get("profile_id", ""))
+	_select_option(_weapon_attack_type, str(profile.get("attack_type", "melee")))
+	_select_option(_weapon_accuracy_style, str(profile.get("accuracy_style", "slash")))
+	_weapon_min_range.value = float(profile.get("minimum_range_tiles", 1))
+	_weapon_max_range.value = float(profile.get("maximum_range_tiles", 1))
+	_weapon_speed_units.value = float(profile.get("attack_speed_units", 4))
+	_update_weapon_timing()
+
+
+func _on_search_changed() -> void:
+	_rebuild_list()
+
+
+func _refresh_catalog() -> void:
+	_client.search_item_catalog(_search.text)
+
+
+func _on_consumable_toggled(_value: bool) -> void:
+	if _is_loading:
+		return
+	if _value and _consumable_effects.get_child_count() == 0:
+		_add_consumable_effect_row({"effect_type": "restore_resource", "target_id": "health", "minimum_amount": 1, "maximum_amount": 1})
+	_update_contextual_sections()
+	_on_form_changed()
+
+
+func _on_equipable_toggled(_value: bool) -> void:
+	if _is_loading:
+		return
+	if not _value:
+		_weapon_enabled.button_pressed = false
+	_update_contextual_sections()
+	_on_form_changed()
+
+
+func _on_slot_changed() -> void:
+	if _is_loading:
+		return
+	if not _is_weapon_capable_slot(_selected_metadata(_equipment_slot)):
+		_weapon_enabled.button_pressed = false
+	_update_contextual_sections()
+	_on_form_changed()
+
+
+func _on_weapon_enabled_toggled(_value: bool) -> void:
+	_update_contextual_sections()
+	if not _is_loading:
+		_on_form_changed()
+
+
+func _on_weapon_speed_changed() -> void:
+	_update_weapon_timing()
+	_on_form_changed()
+
+
+func _on_operation_changed() -> void:
+	_clear_preview()
+
+
+func _on_visual_preview_changed() -> void:
+	_update_paper_doll_preview()
+
+
+func _on_form_changed() -> void:
+	if _is_loading:
+		return
+	_clear_preview()
+	_update_icon_preview()
+	_update_paper_doll_preview()
+
+
+func _update_contextual_sections() -> void:
+	var equipment_enabled := _equipable.button_pressed
+	var weapon_capable := equipment_enabled and _is_weapon_capable_slot(_selected_metadata(_equipment_slot))
+	_appearance_section.visible = equipment_enabled
+	_requirements_section.visible = equipment_enabled
+	_combat_bonus_section.visible = equipment_enabled
+	_weapon_section.visible = weapon_capable
+	_tool_section.visible = true
+	_set_consumable_controls_enabled(_consumable_enabled.button_pressed)
+	_set_equipment_controls_enabled(equipment_enabled)
+	_set_weapon_controls_enabled(weapon_capable and _weapon_enabled.button_pressed)
+
+
+func _set_form_enabled(enabled: bool) -> void:
+	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id]:
+		edit.editable = enabled and (edit != _item_id or _current_item.is_empty())
+	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _operation]:
+		option.disabled = not enabled
+	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units]:
+		spin.editable = enabled
+	for toggle in [_consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
+		toggle.disabled = not enabled
+	_preview_button.disabled = not enabled
+	_delete_button.disabled = not enabled or _current_item.is_empty()
+	if not enabled:
+		_apply_button.disabled = true
+	_update_contextual_sections()
+
+
+func _set_consumable_controls_enabled(enabled: bool) -> void:
+	_use_action.disabled = not enabled
+	for control in [_result_item_id, _success_message, _animation_id, _sound_path]:
+		control.editable = enabled
+	for spin in [_consume_quantity, _cooldown_ms]:
+		spin.editable = enabled
+	_usable_in_combat.disabled = not enabled
+	for row in _consumable_requirements.get_children() + _consumable_effects.get_children():
+		_set_row_enabled(row, enabled)
+
+
+func _set_equipment_controls_enabled(enabled: bool) -> void:
+	_equipment_slot.disabled = not enabled
+	_required_strength.editable = enabled
+	for row in _requirements.get_children() + _modifiers.get_children():
+		_set_row_enabled(row, enabled)
+	for id in _bonus_controls:
+		if id != "_grid":
+			(_bonus_controls[id] as SpinBox).editable = enabled
+
+
+func _set_weapon_controls_enabled(enabled: bool) -> void:
+	_weapon_profile_id.editable = enabled
+	_weapon_attack_type.disabled = not enabled
+	_weapon_accuracy_style.disabled = not enabled
+	_weapon_min_range.editable = enabled
+	_weapon_max_range.editable = enabled
+	_weapon_speed_units.editable = enabled
+
+
+func _set_row_enabled(row: Node, enabled: bool) -> void:
+	for child in row.get_children():
+		if child is OptionButton:
+			(child as OptionButton).disabled = not enabled
+		elif child is SpinBox:
+			(child as SpinBox).editable = enabled
+		elif child is LineEdit:
+			(child as LineEdit).editable = enabled
+		elif child is Button:
+			(child as Button).disabled = not enabled
+
+
+func _update_operation_default() -> void:
+	var state := str(_current_item.get("publication_state", "Unsaved"))
+	_select_option(_operation, "disable" if state == "Published" else "save_draft")
+
+
+func _update_weapon_timing() -> void:
+	var units := int(_weapon_speed_units.value) if _weapon_speed_units != null else 4
+	var milliseconds := int(_options.get("combat_unit_milliseconds", COMBAT_UNIT_MILLISECONDS))
+	_weapon_timing.text = "%d attack units x %d ms = %d ms" % [units, milliseconds, units * milliseconds]
+
+
+func _rebuild_asset_options(selected_path: String = "") -> void:
+	var previous := selected_path if not selected_path.is_empty() else _selected_metadata(_icon)
+	_asset_by_path.clear()
+	_icon.clear()
+	_icon.add_item("Select an item icon...")
+	_icon.set_item_metadata(0, "")
+	for variant in _assets:
+		if variant is Dictionary:
+			var asset := variant as Dictionary
+			var path := str(asset.get("resource_path", ""))
+			_asset_by_path[path] = asset
+			_icon.add_item(str(asset.get("display_name", path)))
+			_icon.set_item_metadata(_icon.item_count - 1, path)
+	_select_option(_icon, previous)
+	_update_icon_preview()
+
+
+func _update_icon_preview(explicit_file_path: String = "") -> void:
+	_icon_preview.texture = null
+	var file_path := explicit_file_path
+	if file_path.is_empty():
+		var asset := _asset_by_path.get(_selected_metadata(_icon), {}) as Dictionary
+		file_path = str(asset.get("file_path", ""))
+	if file_path.is_empty() or not FileAccess.file_exists(file_path):
+		return
+	var image := Image.load_from_file(file_path)
+	if image == null or image.is_empty():
+		return
+	_icon_preview.texture = ImageTexture.create_from_image(image)
+
+
+func _update_paper_doll_preview() -> void:
+	var direction := _selected_metadata(_preview_direction)
+	_paper_doll_preview.update(
+		_equipable.button_pressed,
+		_selected_metadata(_equipment_slot) if _equipable.button_pressed else "",
+		_paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges()),
+		direction if not direction.is_empty() else "N",
+		int(_preview_frame.value),
+		["head", "cape", "body", "legs", "boots", "gloves", "right_hand", "left_hand"]
+	)
+
+
+func _open_import() -> void:
+	_file_dialog.popup_centered_ratio(0.75)
+
+
+func _import_selected(path: String) -> void:
+	_client.import_item_asset(path, path.get_file())
+	_status.text = "Importing PNG into the canonical item asset directory..."
+
+
+func _panel() -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.086, 0.098, 0.122, 1)
+	style.border_color = Color(0.19, 0.22, 0.28, 1)
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(8)
+	style.content_margin_left = 16
+	style.content_margin_top = 14
+	style.content_margin_right = 16
+	style.content_margin_bottom = 14
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
+
+
+func _heading(value: String, size: int) -> Label:
+	var label := Label.new()
+	label.text = value
+	label.add_theme_font_size_override("font_size", size)
+	return label
+
+
+func _field_label(value: String) -> Label:
+	var label := Label.new()
+	label.text = value
+	return label
+
+
+func _section_grid(parent: Node, title: String) -> GridContainer:
+	parent.add_child(_heading(title, 16))
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(grid)
+	return grid
+
+
+func _row_header(title: String, button_text: String, callable: Callable) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	var label := _heading(title, 16)
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(label)
+	var button := Button.new()
+	button.text = button_text
+	button.pressed.connect(callable)
+	row.add_child(button)
+	return row
+
+
+func _rows() -> VBoxContainer:
+	var rows := VBoxContainer.new()
+	rows.add_theme_constant_override("separation", 6)
+	rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	return rows
+
+
+func _add_line_field(grid: GridContainer, label_text: String, placeholder: String) -> LineEdit:
+	grid.add_child(_field_label(label_text))
+	var edit := LineEdit.new()
+	edit.placeholder_text = placeholder
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(edit)
+	return edit
+
+
+func _add_value_field(grid: GridContainer, label_text: String, value: String) -> Label:
+	grid.add_child(_field_label(label_text))
+	var label := Label.new()
+	label.text = value
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(label)
+	return label
+
+
+func _add_option_field(grid: GridContainer, label_text: String) -> OptionButton:
+	grid.add_child(_field_label(label_text))
+	var option := OptionButton.new()
+	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	option.item_selected.connect(_on_form_changed.unbind(1))
+	grid.add_child(option)
+	return option
+
+
+func _add_spin_field(grid: GridContainer, label_text: String, minimum: float, maximum: float, step: float) -> SpinBox:
+	grid.add_child(_field_label(label_text))
+	var spin := SpinBox.new()
+	spin.min_value = minimum
+	spin.max_value = maximum
+	spin.step = step
+	spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_child(spin)
+	return spin
+
+
+func _row_spin(minimum: float, maximum: float, value: float) -> SpinBox:
+	var spin := SpinBox.new()
+	spin.min_value = minimum
+	spin.max_value = maximum
+	spin.value = value
+	spin.custom_minimum_size = Vector2(110, 0)
+	return spin
+
+
+func _remove_button(row: Control) -> Button:
+	var remove := Button.new()
+	remove.text = "Remove"
+	remove.pressed.connect(_remove_row.bind(row))
+	return remove
+
+
+func _connect_row_controls(row: Node) -> void:
+	for child in row.get_children():
+		if child is OptionButton:
+			(child as OptionButton).item_selected.connect(_on_form_changed.unbind(1))
+		elif child is SpinBox:
+			(child as SpinBox).value_changed.connect(_on_form_changed.unbind(1))
+		elif child is LineEdit:
+			(child as LineEdit).text_changed.connect(_on_form_changed.unbind(1))
+
+
+func _remove_row(row: Control) -> void:
+	var parent := row.get_parent()
+	if parent != null:
+		parent.remove_child(row)
+	row.queue_free()
+	_clear_preview()
+
+
+func _move_row(row: Control, container: Node, delta: int) -> void:
+	var index := row.get_index()
+	var target := clampi(index + delta, 0, container.get_child_count() - 1)
+	if target == index:
+		return
+	container.move_child(row, target)
+	_clear_preview()
+
+
+func _rebuild_bonus_grid(grid_variant: Variant) -> void:
+	var grid := grid_variant as GridContainer
+	if grid == null and _bonus_controls.has("_grid"):
+		grid = _bonus_controls["_grid"] as GridContainer
+	if grid == null:
+		return
+	_clear_rows(grid)
+	_bonus_controls.clear()
+	_bonus_controls["_grid"] = grid
+	for variant in _option_array("combat_bonus_fields", DEFAULT_BONUS_FIELDS):
+		if variant is not Dictionary:
+			continue
+		var option := variant as Dictionary
+		var id := str(option.get("id", ""))
+		grid.add_child(_field_label(str(option.get("display_name", id))))
+		var spin := SpinBox.new()
+		spin.min_value = -1000000
+		spin.max_value = 1000000
+		spin.value_changed.connect(_on_form_changed.unbind(1))
+		grid.add_child(spin)
+		_bonus_controls[id] = spin
+
+
+func _fill_option(control: OptionButton, values: Array) -> void:
+	var selected := _selected_metadata(control)
+	control.clear()
+	for variant in values:
+		if variant is Dictionary:
+			var option := variant as Dictionary
+			control.add_item(str(option.get("display_name", option.get("id", "Option"))))
+			control.set_item_metadata(control.item_count - 1, str(option.get("id", "")))
+	if control.item_count > 0:
+		_select_option(control, selected)
+
+
+func _select_option(control: OptionButton, id: String) -> void:
+	for index in range(control.item_count):
+		if str(control.get_item_metadata(index)) == id:
+			control.select(index)
+			return
+	if control.item_count > 0:
+		control.select(0)
+
+
+func _selected_metadata(control: OptionButton) -> String:
+	return "" if control.selected < 0 else str(control.get_item_metadata(control.selected))
+
+
+func _option_array(key: String, fallback: Array) -> Array:
+	var values: Variant = _options.get(key, [])
+	if values is Array and not (values as Array).is_empty():
+		return values as Array
+	return fallback
+
+
+func _is_weapon_capable_slot(slot_id: String) -> bool:
+	for variant in _option_array("weapon_capable_slots", DEFAULT_WEAPON_CAPABLE_SLOTS):
+		if variant is Dictionary and str((variant as Dictionary).get("id", "")) == slot_id:
+			return true
+	return false
+
+
+func _nullable_string(value: Variant) -> String:
+	return "" if value == null else str(value)
+
+
+func _optional_payload(value: String) -> Variant:
+	var trimmed := value.strip_edges()
+	return null if trimmed.is_empty() else trimmed
+
+
+func _clear_preview() -> void:
+	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+
+
+func _clear_rows(container: Node) -> void:
+	for child in container.get_children():
+		container.remove_child(child)
+		child.queue_free()

@@ -30,15 +30,14 @@ Accepted U2 behavior:
 - Compatibility adapters preserve hidden specializations while replacing only
   the subset represented by the legacy request.
 - Unified routes require server preview signatures. Legacy compatibility routes
-  preserve their pre-U2 request shapes until U3/U4 and therefore use unified
+  preserve their pre-U2 request shapes until U4 and therefore use unified
   full-aggregate validation and concurrency, but not uniformly the new
   signature field.
-- The old Godot tabs remain present for U2. The consolidated Godot Items
-  workspace is U3.
+- The consolidated Godot Items workspace is implemented in U3. The old editor
+  scripts and route adapters remain compatibility cleanup candidates for U4.
 
 ## Pending
 
-- U3: unified Godot Items workspace.
 - U4: retire obsolete specialization routes and tabs.
 - U5: runtime tool resolution across inventory and equipped items.
 

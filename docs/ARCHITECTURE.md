@@ -229,19 +229,18 @@ replaces child collections, clears stale hand specialization rows when
 equipability or slot changes, reloads inside the transaction, commits, and then
 reloads again to verify the persisted aggregate.
 
-The Godot implementation keeps T3B in a dedicated **Weapons & Tools** workspace
-instead of extending the wearable Equipment editor. Both Equipment and Weapons &
-Tools use the shared `PaperDollPreview` helper for player-layer asset
-resolution, legacy filename normalization, N/S/E/W frame fallback, and current
-layer ordering. This keeps the directional preview behavior aligned while
-allowing each workspace to own its distinct form rules.
+The T3B Godot implementation originally kept hand equipment in a dedicated
+**Weapons & Tools** workspace. U3 replaces the visible item-specialization tabs
+with one contextual **Items** workspace backed by the complete `/api/v1/items`
+aggregate. The legacy `consumable_editor.gd`, `equipment_editor.gd`, and
+`hand_equipment_editor.gd` files remain in source as U4 cleanup candidates, but
+normal navigation no longer instantiates them.
 
-## Planned unified item-authoring boundary
+## Unified item-authoring boundary
 
 The T1-T3B slices intentionally shipped as separate vertical workspaces, but
-they all mutate one runtime root: `item_definitions`. The planned unified item
-authoring boundary will expose one public `ItemDefinition` aggregate while
-keeping specialization internals modular:
+they all mutate one runtime root: `item_definitions`. U2 exposes one public
+`ItemDefinition` aggregate while keeping specialization internals modular:
 
 ```text
 item_definitions
@@ -262,11 +261,10 @@ are independent of equipability; removing equipability clears equipment and
 weapon metadata but must preserve tool capability rows. Weapon profiles remain
 contextual to runtime-supported weapon-capable slots, initially `right_hand`.
 
-The current separate routes and Godot tabs remain compatibility surfaces until
-the unified Godot Items workspace is implemented. During that migration, legacy
-Basic payloads and specialization mutation routes adapt through the unified
-service so a partial workspace cannot silently overwrite child rows owned by
-another specialization.
+U3 makes that aggregate the active Godot item workflow. Legacy Basic payloads
+and specialization mutation routes remain compatibility surfaces until U4 and
+adapt through the unified service so a partial caller cannot silently overwrite
+child rows owned by another specialization.
 
 Detailed evidence and the phased migration plan live in
 [`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md) and

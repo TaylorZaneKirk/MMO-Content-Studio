@@ -18,7 +18,7 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
 
         self.assertIn('path="res://scripts/mob_editor.gd"', scene)
         self.assertIn('[node name="Mobs" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
-        self.assertIn('script = ExtResource("6_mobs")', scene)
+        self.assertIn('script = ExtResource("4_mobs")', scene)
         self.assertIn('[node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
     def test_client_supports_mob_api_via_transport(self) -> None:
@@ -311,7 +311,7 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
         ):
             self.assertIn(token, editor)
 
-        self.assertIn('text = "T4 Mob Authoring"', scene)
+        self.assertIn('text = "U3 Unified Item Authoring"', scene)
 
     def test_preview_feedback_scrolls_without_hiding_operation_controls(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()

@@ -102,8 +102,9 @@ class U1ToolCapabilityIndependenceTests(unittest.TestCase):
         for document in (readme, roadmap, api, integration, runtime_readme, runtime_ownership):
             self.assertIn("tool capabilities", document.lower())
         self.assertIn("U1 tool-capability independence and metadata safety is implemented", readme)
-        self.assertIn("U2 unified host aggregate and compatibility adapters implemented", roadmap)
-        self.assertIn("unified Godot workspace, route retirement, and runtime tool resolution remain pending", roadmap)
+        self.assertIn("U2 adds the unified item host aggregate and compatibility adapters", roadmap)
+        self.assertIn("U3 unified Godot Items workspace implemented", roadmap)
+        self.assertIn("obsolete route/tab retirement and runtime tool resolution remain pending", roadmap)
         self.assertIn("do not require\nequipability or a hand slot", api)
         self.assertIn("023_item_tool_capability_independence.sql", integration)
         self.assertIn("023_item_tool_capability_independence.sql", runtime_readme)

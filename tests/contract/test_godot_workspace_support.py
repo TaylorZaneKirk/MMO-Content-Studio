@@ -32,7 +32,7 @@ class GodotWorkspaceSupportTests(unittest.TestCase):
             self.assertIn(token, support)
 
     def test_existing_editors_delegate_shared_behavior(self) -> None:
-        editors = ("main.gd", "consumable_editor.gd", "equipment_editor.gd", "hand_equipment_editor.gd", "mob_editor.gd")
+        editors = ("item_editor.gd", "consumable_editor.gd", "equipment_editor.gd", "hand_equipment_editor.gd", "mob_editor.gd")
         for file_name in editors:
             editor = (SCRIPTS / file_name).read_text()
             self.assertIn(
@@ -49,7 +49,7 @@ class GodotWorkspaceSupportTests(unittest.TestCase):
             self.assertIn("_workspace_support.operation_name", editor, file_name)
 
     def test_editors_do_not_redeclare_shared_preview_state_or_renderers(self) -> None:
-        editors = ("main.gd", "consumable_editor.gd", "equipment_editor.gd", "hand_equipment_editor.gd", "mob_editor.gd")
+        editors = ("item_editor.gd", "consumable_editor.gd", "equipment_editor.gd", "hand_equipment_editor.gd", "mob_editor.gd")
         for file_name in editors:
             editor = (SCRIPTS / file_name).read_text()
             for forbidden in (
@@ -99,7 +99,8 @@ class GodotWorkspaceSupportTests(unittest.TestCase):
 
     def test_migration_sequence_is_documented(self) -> None:
         documentation = (ROOT / "docs" / "GODOT_WORKSPACE_SUPPORT.md").read_text()
-        self.assertIn("Items, Consumables, Equipment, Weapons & Tools, and Mobs", documentation)
+        self.assertIn("The U3 Items workspace and the Mobs workspace", documentation)
+        self.assertIn("legacy Consumables, Equipment, and Weapons & Tools editor scripts", documentation)
         self.assertIn("existing editor", documentation)
         self.assertIn("New workspaces", documentation)
 

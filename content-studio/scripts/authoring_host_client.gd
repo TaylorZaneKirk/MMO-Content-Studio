@@ -7,10 +7,14 @@ signal health_received(payload: Dictionary)
 signal catalog_received(payload: Dictionary)
 signal item_assets_received(payload: Dictionary)
 signal item_asset_imported(payload: Dictionary)
+signal item_options_received(payload: Dictionary)
+signal item_catalog_received(payload: Dictionary)
+signal item_definition_received(payload: Dictionary)
 signal items_received(payload: Dictionary)
 signal item_received(payload: Dictionary)
 signal item_preview_received(payload: Dictionary)
 signal item_mutation_completed(payload: Dictionary)
+signal item_delete_completed(payload: Dictionary)
 signal consumable_options_received(payload: Dictionary)
 signal consumables_received(payload: Dictionary)
 signal consumable_received(payload: Dictionary)
@@ -41,6 +45,7 @@ const OP_HEALTH := "health"
 const OP_CATALOG := "catalog"
 const OP_ITEM_ASSETS := "item_assets"
 const OP_ITEM_ASSET_IMPORT := "item_asset_import"
+const OP_ITEM_OPTIONS := "item_options"
 const OP_ITEMS := "items"
 const OP_ITEM := "item"
 const OP_ITEM_PREVIEW := "item_preview"
@@ -86,11 +91,8 @@ const CONNECTION_OPERATIONS := [
 	OP_HEALTH,
 	OP_CATALOG,
 	OP_ITEM_ASSETS,
+	OP_ITEM_OPTIONS,
 	OP_ITEMS,
-	OP_CONSUMABLE_OPTIONS,
-	OP_CONSUMABLES,
-	OP_EQUIPMENT_OPTIONS,
-	OP_EQUIPMENT,
 ]
 
 @export var base_url := DEFAULT_BASE_URL
@@ -127,6 +129,14 @@ func import_item_asset(source_file_path: String, target_file_name: String = "") 
 
 
 func load_items(search: String = "") -> void:
+	search_item_catalog(search)
+
+
+func load_item_options() -> void:
+	_request(OP_ITEM_OPTIONS, "/api/v1/items/options")
+
+
+func search_item_catalog(search: String = "") -> void:
 	var suffix := ""
 	if not search.strip_edges().is_empty():
 		suffix = "?search=%s" % search.strip_edges().uri_encode()
@@ -134,27 +144,48 @@ func load_items(search: String = "") -> void:
 
 
 func load_item(item_id: String) -> void:
+	load_item_definition(item_id)
+
+
+func load_item_definition(item_id: String) -> void:
 	_request(OP_ITEM, "/api/v1/items/%s" % item_id.uri_encode())
 
 
 func preview_item(item_id: String, payload: Dictionary) -> void:
+	preview_item_operation(item_id, payload)
+
+
+func preview_item_operation(item_id: String, payload: Dictionary) -> void:
 	_request(OP_ITEM_PREVIEW, "/api/v1/items/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
 
 func save_item_draft(item_id: String, payload: Dictionary) -> void:
+	save_complete_item_draft(item_id, payload)
+
+
+func save_complete_item_draft(item_id: String, payload: Dictionary) -> void:
 	_request(OP_ITEM_SAVE_DRAFT, "/api/v1/items/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
 
 
-func publish_item(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_ITEM_PUBLISH, "/api/v1/items/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
+func publish_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
+	_request(OP_ITEM_PUBLISH, "/api/v1/items/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
 
 
-func disable_item(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_ITEM_DISABLE, "/api/v1/items/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
+func disable_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
+	_request(OP_ITEM_DISABLE, "/api/v1/items/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
 
 
-func delete_item(item_id: String, expected_updated_at_utc: Variant) -> void:
-	_request(OP_ITEM_DELETE, "/api/v1/items/%s/delete" % item_id.uri_encode(), HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc})
+func delete_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
+	_request(OP_ITEM_DELETE, "/api/v1/items/%s/delete" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
 
 
 func load_consumables(search: String = "") -> void:
@@ -336,12 +367,17 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			_request(OP_ITEM_ASSETS, "/api/v1/assets/items")
 		OP_ITEM_ASSETS:
 			item_assets_received.emit(data)
-			_request(OP_ITEMS, "/api/v1/items")
+			_request(OP_ITEM_OPTIONS, "/api/v1/items/options")
 		OP_ITEM_ASSET_IMPORT:
 			item_asset_imported.emit(data)
+		OP_ITEM_OPTIONS:
+			item_options_received.emit(data)
+			_request(OP_ITEMS, "/api/v1/items")
 		OP_ITEMS:
+			item_catalog_received.emit(data)
 			items_received.emit(data)
-			_request(OP_CONSUMABLE_OPTIONS, "/api/v1/consumables/options")
+			connection_state_changed.emit("connected", "Connected to the local authoring host.")
+			_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
 		OP_CONSUMABLE_OPTIONS:
 			consumable_options_received.emit(data)
 			_request(OP_CONSUMABLES, "/api/v1/consumables")
@@ -367,10 +403,13 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		OP_MOBS:
 			mob_catalog_received.emit(data)
 		OP_ITEM:
+			item_definition_received.emit(data)
 			item_received.emit(data)
 		OP_ITEM_PREVIEW:
 			item_preview_received.emit(data)
-		OP_ITEM_SAVE_DRAFT, OP_ITEM_PUBLISH, OP_ITEM_DISABLE, OP_ITEM_DELETE:
+		OP_ITEM_DELETE:
+			item_delete_completed.emit(data)
+		OP_ITEM_SAVE_DRAFT, OP_ITEM_PUBLISH, OP_ITEM_DISABLE:
 			item_mutation_completed.emit(data)
 		OP_CONSUMABLE:
 			consumable_received.emit(data)

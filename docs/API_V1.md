@@ -74,12 +74,13 @@ An identical existing file is returned as a successful no-op.
 ## Unified item routes
 
 U2 makes the Items host boundary authoritative for complete item aggregates.
-The current Godot specialization tabs remain separate until U3, but host
-mutations now flow through one unified service and repository.
+U3 consolidates the Godot item workflow into one contextual Items workspace
+that loads, previews, saves, publishes, disables, and deletes through this
+route family only.
 
 Temporary U2 compatibility rule: unified routes require server-issued
 `preview_signature` values before mutation. Legacy compatibility routes preserve
-their pre-U2 request shapes until U3/U4 and therefore use unified
+their pre-U2 request shapes until U4 and therefore use unified
 full-aggregate validation and `expected_updated_at_utc` concurrency, but do not
 uniformly require the new signature field.
 

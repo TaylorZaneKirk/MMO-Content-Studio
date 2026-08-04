@@ -383,8 +383,8 @@ Exit condition:
 
 ### U2 - Unified Item Host Aggregate
 
-Status: implemented in the host. The unified Godot workspace, route retirement,
-and runtime tool resolution remain pending.
+Status: implemented in the host. The unified Godot workspace is now implemented
+in U3; route retirement and runtime tool resolution remain pending.
 
 - Add unified item contracts and options.
 - Add a unified repository orchestration layer that locks `item_definitions`,
@@ -397,7 +397,7 @@ and runtime tool resolution remain pending.
 - Convert old Consumables, Equipment, and HandEquipment routes into adapters
   over the unified service.
 - Preserve existing response shapes for old routes.
-- Temporary rule before U3/U4: unified routes require server preview
+- Temporary rule before U4: unified routes require server preview
   signatures, while legacy compatibility routes keep their pre-U2 request
   shapes and use unified full-aggregate validation/concurrency without
   uniformly requiring the new signature field.
@@ -409,10 +409,12 @@ Exit condition:
 
 ### U3 - Unified Godot Items Workspace
 
+Status: implemented.
+
 - Replace the current top-level item specialization tabs with one contextual
   Items workspace.
-- Keep old tabs hidden or visibly deprecated behind a temporary developer flag
-  if needed for comparison.
+- Keep old editor scripts as compatibility cleanup candidates until U4, without
+  normal navigation entries.
 - Reuse dynamic-row helpers where practical.
 - Reuse paper-doll preview only in the equipable visual section.
 - Use one operation panel with scrollable validation and exact changes.

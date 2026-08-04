@@ -11,10 +11,12 @@ content workspace:
 - validation-message rendering
 - publication-operation display names
 
-Items, Consumables, Equipment, Weapons & Tools, and Mobs now keep ownership of their
-forms, payloads, preview requests, mutations, status wording, and visual
-previews while delegating the shared lifecycle and feedback behavior to one
-support instance.
+The U3 Items workspace and the Mobs workspace keep ownership of their forms,
+payloads, preview requests, mutations, status wording, and visual previews while
+delegating the shared lifecycle and feedback behavior to one support instance.
+The legacy Consumables, Equipment, and Weapons & Tools editor scripts still use
+the same support helper, but they are no longer instantiated from normal
+navigation and are retained only until U4 cleanup.
 
 Every existing editor follows the same sequence:
 
