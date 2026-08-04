@@ -38,8 +38,9 @@ class FeatureCatalogProviderTests(unittest.TestCase):
             "Npcs": (
                 "NpcCatalogSectionProvider.cs",
                 "npcs",
-                "NPCs",
-                "false",
+                "NpcAuthoringService",
+                "npc.NpcDefinitionId",
+                "true",
             ),
         }
         for feature, (file_name, *tokens) in expectations.items():

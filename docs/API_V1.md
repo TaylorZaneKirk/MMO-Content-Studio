@@ -45,7 +45,8 @@ Project migration automatically.
 
 Returns the top-level content catalog. Items is implemented as one unified
 authoring section, Mobs is implemented when the configured database has the
-mob-authoring schema, and NPCs remain a planned workspace.
+mob-authoring schema, and NPCs are implemented when the configured database has
+the T5 NPC authoring schema.
 
 ## Item asset routes
 
@@ -219,6 +220,96 @@ The T4C Godot **Mobs** workspace consumes these routes through
 preview aggregates for save/preview, sends only `expected_updated_at_utc` plus
 `preview_signature` for publish/disable, clears the apply gate after every form
 edit, and disables mob editing when the mob-authoring schema is unavailable.
+
+## NPC routes
+
+T5C adds host-side authoring routes for reusable NPC definitions. These routes
+do not export a runtime NPC catalog yet, do not modify Tiled `NpcSpawn`
+placement, and do not add a Godot NPC workspace.
+
+### `GET /api/v1/npcs/options`
+
+Returns NPC authoring options:
+
+- publication states: `Draft`, `Published`, `Disabled`
+- movement behaviors: `static`, `random_wander`
+- interaction types: `talk`
+- numeric defaults and limits
+- known dialogue references when the configured file-backed MMO Project
+  dialogue catalog can be resolved
+- dialogue-reference validation capability
+- visual asset-root metadata using `res://assets/actors/npcs/`
+- capability flags: `supports_runtime_npc_catalog = false`,
+  `supports_quest_authoring = false`, `supports_multiple_interactions = false`
+
+### `GET /api/v1/npcs?search=test`
+
+Searches NPC definition ID and display name. Results are ordered by display name
+and stable ID, and include publication state, visual path, movement behavior,
+interaction enabled state, default dialogue ID, editable status, and
+`updated_at_utc`.
+
+### `GET /api/v1/npcs/{npcDefinitionId}`
+
+Loads one complete NPC aggregate:
+
+- identity and `publication_state`
+- visual texture path, source dimensions, anchor offsets, and render scale
+- initial runtime-compatible `1x1` footprint
+- default movement behavior, wander radius, tick interval, and idle chance
+- `talk` interaction enablement, range, and optional default dialogue ID
+- authoring-only notes
+- created/updated timestamps
+- local sprite preview file path when the asset resolves
+
+### `POST /api/v1/npcs/{npcDefinitionId}/preview`
+
+Validates `save_draft`, `publish`, `disable`, or `delete`, normalizes the
+complete draft payload, calculates exact logical changes, returns reference
+diagnostics, and returns a deterministic `preview_signature`.
+
+`publish`, `disable`, and `delete` previews use the currently saved aggregate as
+the effective payload. If the request body differs from the saved aggregate,
+the preview reports `unsaved_npc_changes`.
+
+Reference diagnostics are deliberately narrow in T5C. Known generated/database
+references block disable/delete, but the default repository seam reports
+`reference_check_complete = false` because Tiled source validation and runtime
+catalog handoff remain T5E/T5F work.
+
+### `PUT /api/v1/npcs/{npcDefinitionId}/draft`
+
+Creates a new draft when the ID does not exist, or updates an existing
+aggregate. The request must include the same complete draft that was previewed
+plus `preview_signature`. Existing definitions also require
+`expected_updated_at_utc`.
+
+Saving writes only the `npc_definitions` root row, advances `updated_at_utc`,
+reloads inside the transaction, commits, reloads after commit, and verifies the
+saved aggregate.
+
+### `POST /api/v1/npcs/{npcDefinitionId}/publish`
+
+Publishes the already saved aggregate after strict validation. The request body
+contains only `expected_updated_at_utc` and `preview_signature`; it does not
+carry unsaved form data. Publication requires a valid visual PNG, matching
+source dimensions when readable, current `1x1` footprint support, valid
+movement, `talk` interaction, and a dialogue reference. Dialogue references are
+checked against the file-backed MMO Project dialogue catalog when available;
+otherwise validation is syntax-only and reports that limitation.
+
+### `POST /api/v1/npcs/{npcDefinitionId}/disable`
+
+Sets `publication_state = Disabled` without replacing the saved draft. Known
+generated/database spawn references block disable. Incomplete reference
+visibility is reported as a warning with `reference_check_complete = false`.
+
+### `POST /api/v1/npcs/{npcDefinitionId}/delete`
+
+Deletes a disabled NPC definition after preview/signature and concurrency
+verification. Known generated/database spawn references block delete.
+
+No Godot NPC workspace is implemented yet.
 
 ## Request correlation
 

@@ -20,6 +20,7 @@ public static class AuthoringFeatureExtensions
     {
         endpoints.MapItemAuthoring();
         endpoints.MapMobAuthoring();
+        endpoints.MapNpcAuthoring();
         return endpoints;
     }
 }

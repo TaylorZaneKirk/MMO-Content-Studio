@@ -341,13 +341,22 @@ quests, shops, banking, trainers, service menus, NPC combat, schedules, emotes,
 portraits, cutscenes, arbitrary scripts, and runtime hot reload remain deferred
 until matching runtime consumers exist.
 
-T5B implements only the schema/contract foundation for this boundary. The
-handoff migration is
+T5B implements the schema/contract foundation for this boundary. The handoff
+migration is
 `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`; the host
 has compile-time NPC contracts, domain normalization rules, static registry
-options, feature-owned schema-health requirements, and a catalog section that
-keeps NPCs marked unimplemented until the repository/API and Godot workspace
-arrive. `notes` is authoring-only metadata and is omitted from the future
+options, and feature-owned schema-health requirements.
+
+T5C NPC repository, validation, and API implemented; Godot workspace, runtime
+handoff, and verification remain pending. The host now owns repository-backed
+options, catalog/list/load, preview, save draft, publish, disable, delete,
+preview signatures, optimistic concurrency, transactional root writes, reload
+verification, and reference diagnostics for known generated/database spawn
+references. `notes` is authoring-only metadata and is omitted from the future
 runtime NPC catalog export. `default_dialogue_id` remains a stable string
-reference; dialogue-reference validation remains a later runtime handoff
-concern because current dialogue definitions are file-backed in MMO Project.
+reference. Dialogue-reference validation uses the configured file-backed MMO
+Project dialogue catalog when it can be resolved from `game_client_assets`; when
+that catalog is unavailable, validation is syntax-only and reports that
+limitation. `supports_runtime_npc_catalog = false`,
+`supports_quest_authoring = false`, and incomplete reference diagnostics report
+`reference_check_complete = false`. No Godot NPC workspace is implemented yet.

@@ -12,16 +12,17 @@ The central `ContentCatalogService` only:
 - returns the combined versioned catalog response
 
 Items now projects one unified item catalog section. Mobs provides its own
-section. T5B NPC schema and contract foundation implemented
-`host/Features/Npcs/NpcCatalogSectionProvider.cs`, which registers the `NPCs`
-section as unavailable without fake entries until NPC repository/API support
-exists.
+section. T5C NPC repository, validation, and API implemented
+`host/Features/Npcs/NpcCatalogSectionProvider.cs` as a repository-backed
+section over `NpcAuthoringService.ListAsync`.
 
 A new workspace therefore does not modify `ContentCatalogService`. It adds its
 own provider and registers it from the feature module. This keeps catalog growth
 additive and prevents the central service from gaining feature-specific service
 dependencies or filtering rules.
 
-The NPC catalog provider is intentionally only a shell-level placeholder today:
-repository/API, Godot workspace, runtime handoff, and verification remain
-pending.
+The NPC catalog provider never invents fake entries. It returns real NPC
+definition entries when the configured database has the T5 schema, and returns
+an empty implemented section when the host cannot list definitions. Godot
+workspace, runtime handoff, and verification remain pending. No Godot NPC
+workspace is implemented yet.

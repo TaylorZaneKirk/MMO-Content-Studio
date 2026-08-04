@@ -123,6 +123,7 @@ public sealed record NpcPreviewResponse(
     [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages,
     [property: JsonPropertyName("changes")] IReadOnlyList<AuthoringChange> Changes,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
+    [property: JsonPropertyName("reference_summary")] NpcReferenceSummary ReferenceSummary,
     [property: JsonPropertyName("preview_signature")] string PreviewSignature);
 
 public sealed record NpcMutationResponse(
@@ -143,7 +144,19 @@ public sealed record NpcOptionsResponse(
     [property: JsonPropertyName("can_validate_dialogue_references")] bool CanValidateDialogueReferences,
     [property: JsonPropertyName("supported_limits")] NpcSupportedLimits SupportedLimits,
     [property: JsonPropertyName("visual_assets")] NpcVisualAssetOptions VisualAssets,
+    [property: JsonPropertyName("capabilities")] NpcOperationCapabilities Capabilities,
     [property: JsonPropertyName("defaults")] NpcAuthoringDefaults Defaults);
+
+public sealed record NpcOperationCapabilities(
+    [property: JsonPropertyName("supports_runtime_npc_catalog")] bool SupportsRuntimeNpcCatalog,
+    [property: JsonPropertyName("supports_complete_dialogue_reference_validation")] bool SupportsCompleteDialogueReferenceValidation,
+    [property: JsonPropertyName("supports_multiple_interactions")] bool SupportsMultipleInteractions,
+    [property: JsonPropertyName("supports_quest_authoring")] bool SupportsQuestAuthoring);
+
+public sealed record NpcReferenceSummary(
+    [property: JsonPropertyName("known_reference_count")] int KnownReferenceCount,
+    [property: JsonPropertyName("reference_sources")] IReadOnlyList<string> ReferenceSources,
+    [property: JsonPropertyName("reference_check_complete")] bool ReferenceCheckComplete);
 
 public sealed record NpcSupportedLimits(
     [property: JsonPropertyName("minimum_tick_interval_ms")] int MinimumTickIntervalMs,

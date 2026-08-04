@@ -50,5 +50,5 @@ T5B NPC schema and contract foundation implemented the NPC manifest in
 `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`,
 including the root `updated_at_utc` concurrency token and the constraints for
 visuals, initial `1x1` footprint support, movement, interaction, and dialogue
-reference consistency. Repository/API, Godot workspace, runtime handoff, and
-verification remain pending.
+reference consistency. T5C implements the repository/API boundary; Godot
+workspace, runtime handoff, and verification remain pending.

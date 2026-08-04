@@ -110,15 +110,13 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
         self.assertIn("## T5 NPC-authoring planning handoff", integration)
         self.assertIn("T5A is documentation-only", integration)
 
-    def test_t5a_does_not_add_production_npc_schema_routes_or_godot_editor(self) -> None:
+    def test_t5_does_not_add_godot_editor(self) -> None:
         forbidden_paths = (
-            ROOT / "host" / "Persistence" / "NpcRepository.cs",
-            ROOT / "host" / "Services" / "NpcAuthoringService.cs",
             ROOT / "content-studio" / "scripts" / "npc_editor.gd",
         )
 
         for path in forbidden_paths:
-            self.assertFalse(path.exists(), f"T5A must not implement production file {path}")
+            self.assertFalse(path.exists(), f"T5C must not implement Godot NPC workspace file {path}")
 
     def test_runtime_checkout_confirms_current_manual_npc_flow_when_available(self) -> None:
         guide_path = _runtime_file(Path("docs") / "development" / "CONTENT_AUTHORING_GUIDE.md")

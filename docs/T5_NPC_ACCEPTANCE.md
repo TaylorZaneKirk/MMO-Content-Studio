@@ -1,7 +1,8 @@
 # T5 NPC Authoring Acceptance
 
-Status: acceptance criteria for the T5 implementation sequence. T5B NPC schema
-and contract foundation implemented; repository/API, Godot workspace, runtime handoff, and verification remain pending.
+Status: acceptance criteria for the T5 implementation sequence. T5C NPC
+repository, validation, and API implemented; Godot workspace, runtime handoff,
+and verification remain pending.
 
 ## T5A - Audit And Domain Lock
 
@@ -42,6 +43,12 @@ and contract foundation implemented; repository/API, Godot workspace, runtime ha
 - Save/publish/disable/delete operate on the saved complete aggregate.
 - Repository writes are transactional and verified by reload after commit.
 - Disabled definitions can be deleted only when no known spawn references exist.
+- Dialogue-reference validation uses the configured file-backed MMO Project
+  dialogue catalog when available, and reports syntax-only validation when the
+  catalog is unavailable.
+- Options report `supports_runtime_npc_catalog = false`,
+  `supports_quest_authoring = false`, and current reference diagnostics may
+  report `reference_check_complete = false`.
 
 ## T5 Phase 3 - Godot NPC Workspace
 

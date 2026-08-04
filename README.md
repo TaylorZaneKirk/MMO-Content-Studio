@@ -69,8 +69,9 @@ spawn names, initial facing, and the `npc_definition_id` link. T5B adds
 `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`,
 compile-time NPC contracts, domain normalization rules, a registry/options seam,
 feature-owned schema-health requirements, and a placeholder NPC catalog section.
-NPC repository/API, runtime export, and the Godot NPC workspace are still
-pending.
+T5C NPC repository, validation, and API implemented; Godot workspace, runtime handoff, and verification remain pending.
+dialogue-reference validation remains a later runtime handoff concern.
+No Godot NPC workspace is implemented yet.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -147,7 +148,7 @@ The default API address is `http://127.0.0.1:5187`.
 4. **T3A — Wearable equipment** — implemented; runtime verification pending
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
-7. **T5 — Minimal NPC authoring** — T5B schema/contracts implemented
+7. **T5 — Minimal NPC authoring** — T5C host API implemented
 8. **T6 — Interactable world objects foundation**
 9. **T7 — Gathering resources and processing stations**
 10. **Dialogue workspace**
@@ -187,9 +188,14 @@ The locked T5 direction is a reusable NPC definition aggregate with explicit
 visuals, movement defaults, talk/dialogue references, publication state, and no
 Content Studio ownership of map placement. T5B NPC schema and contract
 foundation implemented the additive schema handoff and host-side compile-time
-contracts only; repository/API, Godot workspace, runtime handoff, and
-verification remain pending. Notes are authoring-only and dialogue-reference
-validation remains a later runtime handoff concern. See
+contracts; T5C NPC repository, validation, and API implemented; Godot
+workspace, runtime handoff, and verification remain pending. Notes are
+authoring-only and dialogue-reference validation uses the configured
+file-backed MMO Project dialogue catalog when it is available, otherwise it is
+syntax-only. `supports_runtime_npc_catalog = false`,
+`supports_quest_authoring = false`, and reference diagnostics currently report
+`reference_check_complete = false` unless a known generated/database reference
+provider can prove otherwise. See
 [`docs/T5_NPC_DOMAIN_AUDIT.md`](docs/T5_NPC_DOMAIN_AUDIT.md),
 [`docs/T5_NPC_AUTHORING_PLAN.md`](docs/T5_NPC_AUTHORING_PLAN.md), and
 [`docs/T5_NPC_ACCEPTANCE.md`](docs/T5_NPC_ACCEPTANCE.md).

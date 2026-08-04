@@ -9,6 +9,7 @@ public sealed class NpcAuthoringRegistry
     public const int InitialFootprintWidthTiles = 1;
     public const int InitialFootprintHeightTiles = 1;
     public const int MaxWanderRadiusTiles = 32;
+    public const int MaxNotesLength = 4000;
     public const double DefaultIdleChance = 0.15;
     public const double DefaultVisualRenderScale = 0.25;
     public const string DefaultMovementBehavior = "static";

@@ -131,17 +131,19 @@ scripts, or runtime hot reload.
 
 ## T5 NPC-authoring planning handoff
 
-T5B NPC schema and contract foundation implemented. T5A audited the current MMO
-Project NPC runtime and locked the future integration boundary; T5B adds the
-additive handoff migration
-`prototype/sql/024_npc_authoring_schema.sql`, host contract shapes,
-normalization rules, registry/options, schema-health requirements, and a
-placeholder NPC catalog section. NPC repository/API, Godot workspace, runtime
-handoff, and verification remain pending.
+T5C NPC repository, validation, and API implemented; Godot workspace, runtime
+handoff, and verification remain pending. T5A audited the current MMO Project
+NPC runtime and locked the future integration boundary; T5B added the additive
+handoff migration `prototype/sql/024_npc_authoring_schema.sql`, host contract
+shapes, normalization rules, registry/options, and schema-health requirements.
+T5C adds Content Studio repository persistence, validator behavior, options,
+catalog/list/load, preview, draft save, publish, disable, delete, preview
+signatures, optimistic concurrency, reload verification, and reference
+diagnostics.
 
 T5A is documentation-only and remains the source audit/domain-lock milestone;
-T5B adds the schema/contract handoff artifacts without changing MMO Project
-runtime code.
+T5B and T5C add Content Studio handoff artifacts and host API behavior without
+changing MMO Project runtime code.
 
 The current runtime still loads NPCs from Tiled-generated `npc_spawns` records.
 `NpcRuntimeService` reads placement properties such as `npc_definition_id`,
@@ -163,9 +165,12 @@ The planned handoff is:
 
 `notes` is authoring-only metadata and should not be exported to the future
 runtime NPC catalog. `default_dialogue_id` remains a stable string reference;
-dialogue-reference validation remains a later runtime handoff concern because
-the current runtime dialogue catalog is file-backed in MMO Project.
+dialogue-reference validation uses the configured file-backed MMO Project
+dialogue catalog when available and otherwise reports syntax-only validation.
+`supports_runtime_npc_catalog = false`, `supports_quest_authoring = false`, and
+reference diagnostics currently report `reference_check_complete = false` unless
+a known generated/database reference provider can prove otherwise.
 
 T5 does not add shops, banks, trainers, quest state, dialogue graph authoring,
 NPC combat, schedules, portraits, emotes, cutscenes, arbitrary scripts, or
-runtime hot reload.
+runtime hot reload. No Godot NPC workspace is implemented yet.

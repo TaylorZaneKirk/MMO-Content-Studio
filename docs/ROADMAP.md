@@ -187,8 +187,8 @@ Phased plan:
 ## T5 — Minimal NPC Authoring
 
 **Status:** T5A runtime audit and domain lock documented. T5B NPC schema and
-contract foundation implemented; repository/API, Godot workspace, runtime
-handoff, and verification remain pending.
+contract foundation implemented. T5C NPC repository, validation, and API
+implemented; Godot workspace, runtime handoff, and verification remain pending.
 
 Move reusable NPC identity and presentation data into the database-backed
 authoring boundary while keeping spawn placement in Tiled. The current MMO
@@ -221,11 +221,17 @@ T5B added the additive handoff migration
 `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`,
 compile-time host contracts, feature-owned schema-health requirements, NPC
 domain normalization rules, a registry/options seam, and a feature-owned NPC
-catalog section that reports the workspace as not yet implemented. Notes are
-authoring-only metadata and are omitted from the future runtime NPC catalog
-export. Dialogue-reference validation remains a later runtime handoff concern.
-Repository/API, Godot workspace, runtime handoff, and verification remain
-pending.
+catalog section. T5C adds repository persistence, validator behavior, options,
+catalog/list/load, preview, save draft, publish, disable, delete, preview
+signatures, optimistic concurrency, transactional root writes, reload
+verification, and a narrow reference diagnostic seam. Notes are authoring-only
+metadata and are omitted from the future runtime NPC catalog export.
+Dialogue-reference validation uses the configured file-backed MMO Project
+dialogue catalog when available; otherwise it reports syntax-only validation.
+`supports_runtime_npc_catalog = false`, `supports_quest_authoring = false`, and
+reference diagnostics currently report `reference_check_complete = false`
+unless a known generated/database reference provider can prove otherwise. No
+Godot NPC workspace is implemented yet.
 
 ## T6 — Interactable World Objects Foundation
 

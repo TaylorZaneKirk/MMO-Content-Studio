@@ -1,9 +1,11 @@
 # T5 NPC Authoring Plan
 
-Status: T5B NPC schema and contract foundation implemented. The additive
-schema handoff, host contracts, domain rules, registry/options seam,
-schema-health provider, and placeholder catalog section exist; repository/API,
-Godot workspace, runtime handoff, and verification remain pending.
+Status: T5C NPC repository, validation, and API implemented; Godot workspace,
+runtime handoff, and verification remain pending. T5B added the additive schema
+handoff, host contracts, domain rules, registry/options seam, and schema-health
+provider. T5C adds repository persistence, validation, options, catalog/list/load,
+preview, draft save, publish, disable, delete, preview signatures, optimistic
+concurrency, reload verification, and reference diagnostics.
 
 ## Locked Domain Model
 
@@ -63,9 +65,9 @@ The aggregate deliberately excludes:
 
 ## Proposed Schema
 
-T5B adds the additive MMO Project handoff migration at
+T5B added the additive MMO Project handoff migration at
 `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`.
-Repository persistence remains a T5 Phase 2 task.
+T5C implements Content Studio repository persistence against that one root table.
 
 Proposed tables:
 
@@ -123,14 +125,14 @@ Content Studio
 repository/API round trips, but it is omitted from the future runtime NPC
 catalog export.
 
-Dialogue-reference validation remains a later runtime handoff concern. T5B
-stores the stable `default_dialogue_id` string and exposes registry/options
-hooks, but current MMO Project dialogue definitions are file-backed and are not
-validated by a Content Studio database foreign key.
+Dialogue-reference validation uses the configured file-backed MMO Project
+dialogue catalog when it can be resolved from `game_client_assets`; otherwise
+validation is syntax-only and reports that limitation. There is still no
+dialogue database table.
 
 ## API Routes
 
-T5 Phase 2 should add a feature-owned `/api/v1/npcs` route family:
+T5C adds a feature-owned `/api/v1/npcs` route family:
 
 - `GET /api/v1/npcs/options`
 - `GET /api/v1/npcs`
@@ -183,11 +185,12 @@ Content Studio host files introduced in T5B:
 - `host/Services/NpcDomainRules.cs`
 - tests under `tests/host/MMO.ContentStudio.AuthoringHost.Tests/`
 
-Expected later host files:
+Content Studio host files introduced in T5C:
 
 - `host/Persistence/NpcRepository.cs`
 - `host/Services/NpcAuthoringService.cs`
 - `host/Services/NpcDefinitionValidator.cs`
+- `host/Services/NpcDialogueReferenceProvider.cs`
 
 The implementation should follow the existing Mobs and unified Items patterns,
 but must not copy mob combat/drop concerns into NPCs.
@@ -225,7 +228,7 @@ simulator, or cutscene preview in T5.
 
 ## Runtime Handoff
 
-The runtime handoff should be a later phase, not part of T5B.
+The runtime handoff should be a later phase, not part of T5C.
 
 Target shape:
 
@@ -334,15 +337,28 @@ Manual verification:
 
 ### T5 Phase 2 - NPC repository and mutation API
 
+Implemented in T5C:
+
+- options
 - list/load
 - preview
 - save draft
 - publish
 - disable
 - delete
-- concurrency
+- preview signatures
+- optimistic concurrency
 - reload verification
 - transaction tests
+- reference diagnostics
+
+Current limitations:
+
+- `supports_runtime_npc_catalog = false`
+- `supports_quest_authoring = false`
+- default reference diagnostics report `reference_check_complete = false`
+  unless a known generated/database reference provider can prove otherwise
+- No Godot NPC workspace is implemented yet
 
 ### T5 Phase 3 - Godot NPC workspace
 
@@ -386,4 +402,4 @@ Manual verification:
 
 ## Open Decisions
 
-None for T5B. The implementation should use the locked narrow model above.
+None for T5C. The implementation should use the locked narrow model above.

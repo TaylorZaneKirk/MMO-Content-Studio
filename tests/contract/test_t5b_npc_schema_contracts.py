@@ -172,7 +172,8 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
             "Facing",
             "MountId",
             "Patrol",
-            "Quest",
+            "QuestId",
+            "QuestDefinition",
             "ServiceScript",
             "Combat",
             "Faction",
@@ -211,7 +212,7 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
         ):
             self.assertIn(token, registry)
 
-    def test_schema_provider_and_catalog_section_are_feature_owned_without_routes(self) -> None:
+    def test_schema_provider_and_catalog_section_are_feature_owned(self) -> None:
         feature = (HOST / "Features" / "Npcs" / "NpcAuthoringFeature.cs").read_text()
         schema = (HOST / "Features" / "Npcs" / "NpcSchemaRequirements.cs").read_text()
         catalog = (HOST / "Features" / "Npcs" / "NpcCatalogSectionProvider.cs").read_text()
@@ -230,18 +231,13 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
         self.assertIn('AuthoringSchemaRequirement.Constraint("npc_definitions_dialogue_reference_check")', schema)
         self.assertIn('ContentType => "npcs"', catalog)
         self.assertIn('"NPCs"', catalog)
-        self.assertIn("false", catalog)
+        self.assertIn("NpcAuthoringService", catalog)
         self.assertIn("services.AddNpcAuthoring();", aggregator)
 
         for forbidden in (
-            "MapNpcAuthoring",
-            'MapGroup($"{AuthoringApi.RoutePrefix}/npcs")',
-            '"/api/v1/npcs"',
-            "NpcRepository",
-            "NpcAuthoringService",
-            "MapGet",
-            "MapPost",
-            "MapPut",
+            "content-studio/scripts/npc_editor.gd",
+            "Quest",
+            "ServiceScript",
         ):
             self.assertNotIn(forbidden, feature)
 
@@ -262,7 +258,7 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
         for token in (
             "T5B NPC schema and contract foundation implemented",
             "024_npc_authoring_schema.sql",
-            "repository/API, Godot workspace, runtime handoff, and verification remain pending",
+            "Godot workspace, runtime handoff, and verification remain pending",
             "notes is authoring-only",
             "dialogue-reference validation remains a later runtime handoff concern",
         ):
@@ -271,7 +267,7 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
         for forbidden in (
             "Godot NPC workspace implemented",
             "NPC editor implemented",
-            "/api/v1/npcs routes are available",
+            "Godot NPC workspace implemented",
         ):
             self.assertNotIn(forbidden, docs)
 
