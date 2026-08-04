@@ -54,9 +54,26 @@ Accepted U4 behavior:
 - The unified item schema-health provider covers consumable, equipment,
   weapon, combat-bonus, and tool-capability tables.
 
-## Pending
+## U5
 
-- U5: runtime tool resolution across inventory and equipped items.
+U5 is complete when MMO Project exposes a server-authoritative runtime resolver
+that can answer a stable tool capability request from active equipped and
+inventory possessions without mutating inventory, equipment, or world-object
+state.
+
+Accepted U5 behavior:
+
+- Only `runtime_enabled = true` item definitions qualify.
+- Tool capability rows qualify from inventory-only items or equipped items.
+- Ranking uses highest `power_tier`, equal-power equipped preference,
+  `right_hand`, `left_hand`, configured equipment-slot order, inventory slot
+  index, and stable `item_id`.
+- The result identifies the possessed item location, matching capability row,
+  `power_tier`, and optional animation/effect references.
+- Revalidation is available for later activities before authoritative commit.
+- No client-supplied tool choice is trusted as authoritative.
+
+## Pending
 
 Runtime tool execution, gathering, crafting, two-handed equipment, and broad
 item schema redesign remain deferred.

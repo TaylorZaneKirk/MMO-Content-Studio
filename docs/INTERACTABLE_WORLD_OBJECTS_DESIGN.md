@@ -236,7 +236,8 @@ Potential reusable concerns include:
 - available/depleted visuals
 - competition model
 
-These objects should connect to the existing T3B tool-capability system.
+These objects should connect to the existing T3B tool-capability system through
+MMO Project's U5 server-authoritative tool resolver.
 
 ```text
 required tool capability: mining
@@ -244,7 +245,9 @@ minimum capability tier or effectiveness: 2
 ```
 
 The runtime should not require one hard-coded pickaxe item when a typed
-capability can express the requirement.
+capability can express the requirement. Later gathering execution should ask
+the resolver for the required capability and revalidate the selected possession
+before applying resource, XP, depletion, durability, or inventory effects.
 
 ### Processing Stations
 
@@ -344,7 +347,8 @@ Important runtime concerns remain unresolved until a dedicated runtime audit:
 ### T3B Tools
 
 Resource and challenge objects may require typed tool capabilities instead of
-specific hard-coded item IDs.
+specific hard-coded item IDs. U5 provides the runtime selection seam over
+equipped and inventory items, but it does not execute object actions by itself.
 
 ### Skills And Discipline/Mastery
 

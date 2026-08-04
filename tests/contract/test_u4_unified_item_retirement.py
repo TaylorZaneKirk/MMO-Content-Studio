@@ -96,13 +96,15 @@ class U4UnifiedItemRetirementTests(unittest.TestCase):
         ):
             self.assertIn(token, schema)
 
-    def test_u5_runtime_tool_resolution_remains_pending(self) -> None:
+    def test_u5_runtime_tool_resolution_is_status_only_in_content_studio(self) -> None:
         contracts = (HOST / "Contracts" / "ItemContracts.cs").read_text()
         service = (HOST / "Services" / "UnifiedItemAuthoringService.cs").read_text()
+        validator = (HOST / "Services" / "UnifiedItemValidator.cs").read_text()
         self.assertIn('supports_runtime_tool_resolution', contracts)
-        self.assertIn("false));", service)
+        self.assertIn("true));", service)
+        self.assertIn("runtime_tool_execution_deferred", validator)
 
-    def test_mmo_project_checkout_is_not_modified_by_u4(self) -> None:
+    def test_mmo_project_checkout_changes_are_limited_to_u5_tool_resolution(self) -> None:
         parent = ROOT.parents[1]
         if not (parent / ".git").exists():
             self.skipTest("MMO Project checkout is unavailable.")
@@ -113,10 +115,23 @@ class U4UnifiedItemRetirementTests(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-        unrelated = [
-            line for line in result.stdout.splitlines()
-            if not line.strip().endswith("tools/MMO-Content-Studio")
-        ]
+        allowed_paths = (
+            "docs/development/CONTENT_AUTHORING_GUIDE.md",
+            "docs/modernization/GAMEPLAY_SYSTEM_ROADMAP.md",
+            "prototype/server/Program.cs",
+            "prototype/server/features/README.md",
+            "prototype/server/features/tools/",
+            "prototype/sql/MODULE_OWNERSHIP.md",
+            "prototype/sql/README.md",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/CharacterToolPossessionRepositoryContractTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/CharacterToolResolverTests.cs",
+            "tools/MMO-Content-Studio",
+        )
+        unrelated = []
+        for line in result.stdout.splitlines():
+            path = line[3:]
+            if not path.startswith(allowed_paths):
+                unrelated.append(line)
         self.assertEqual([], unrelated)
 
 

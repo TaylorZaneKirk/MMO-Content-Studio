@@ -77,8 +77,8 @@ public sealed class UnifiedItemValidator
         if (draft.ToolCapabilities.Count > 0)
         {
             messages.Add(new ApiError(
-                "runtime_tool_resolution_pending",
-                "Tool capabilities are item metadata only until the future server-authoritative tool-resolution slice consumes them.",
+                "runtime_tool_execution_deferred",
+                "MMO Project can resolve possessed tool capabilities, but gathering, processing, durability, and charges remain deferred.",
                 ValidationSeverity.Info,
                 "tool_capabilities"));
         }

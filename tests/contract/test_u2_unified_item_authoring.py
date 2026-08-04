@@ -113,7 +113,7 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
         self.assertNotIn('[node name="Equipment" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
         self.assertNotIn('[node name="Weapons & Tools" type="HBoxContainer" parent="Margin/Root/Tabs"]', scene)
 
-    def test_docs_record_u2_u3_and_u4_without_claiming_runtime_tool_resolution(self) -> None:
+    def test_docs_record_u2_u3_u4_and_u5_without_claiming_tool_execution(self) -> None:
         readme = (ROOT / "README.md").read_text()
         roadmap = (ROOT / "docs" / "ROADMAP.md").read_text()
         api = (ROOT / "docs" / "API_V1.md").read_text()
@@ -124,11 +124,13 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
         for document in (readme, roadmap, api, architecture, acceptance):
             self.assertIn("U2", document)
         self.assertIn("U3 replaced specialization tabs with one contextual Items workspace", roadmap)
-        self.assertIn("U4 obsolete route/tab retirement implemented; runtime tool resolution remains pending", roadmap)
+        self.assertIn("U5 runtime tool resolution implemented in MMO Project", roadmap)
+        self.assertIn("gathering and processing consumers remain deferred", roadmap)
         self.assertIn("U3 consolidated the Godot item workflow", api)
         self.assertIn("/api/v1/items` is now the only public item-authoring route family", api_inline)
         self.assertIn("Unified routes require server preview signatures", acceptance)
         self.assertIn("U4 removed the compatibility adapters", acceptance)
+        self.assertIn("Runtime tool execution, gathering, crafting", acceptance)
 
 
 if __name__ == "__main__":

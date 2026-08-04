@@ -57,7 +57,7 @@ public sealed class UnifiedItemAuthoringService
                     publishedItems,
                     ItemAuthoringRegistry.CombatUnitMilliseconds,
                     UnifiedItemDomainRules.MaximumPowerTier,
-                    false));
+                    true));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {

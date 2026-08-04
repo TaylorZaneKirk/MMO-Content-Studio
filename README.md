@@ -180,8 +180,10 @@ editor scripts. `/api/v1/items` is the only public item-authoring route family.
 See
 [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).
-U4 unified route/tab retirement is implemented; U5 runtime tool resolution
-remains pending.
+U4 unified route/tab retirement is implemented. U5 runtime tool resolution is
+implemented in MMO Project as a server-authoritative selection seam across
+equipped and inventory items; gathering and processing consumers remain
+deferred.
 
 Future planned work includes reusable interactable world-object authoring for
 typed-capability objects such as levers, searchable containers, gathering

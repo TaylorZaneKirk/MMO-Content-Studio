@@ -48,7 +48,7 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
         ):
             self.assertIn(required, plan)
 
-    def test_project_docs_link_plan_without_claiming_implementation(self):
+    def test_project_docs_link_plan_without_claiming_tool_execution(self):
         readme = (ROOT / "README.md").read_text()
         roadmap = (ROOT / "docs" / "ROADMAP.md").read_text()
         architecture = (ROOT / "docs" / "ARCHITECTURE.md").read_text()
@@ -58,7 +58,8 @@ class UnifiedItemAuthoringDocsTests(unittest.TestCase):
             self.assertIn("UNIFIED_ITEM_AUTHORING_PLAN.md", document)
 
         self.assertIn("unified item-authoring boundary", architecture.lower())
-        self.assertIn("Status:** U4 obsolete route/tab retirement implemented", roadmap)
+        self.assertIn("Status:** U5 runtime tool resolution implemented in MMO Project", roadmap)
+        self.assertIn("gathering and processing consumers remain deferred", roadmap)
         self.assertIn("one contextual Godot Items", readme)
 
 

@@ -147,7 +147,7 @@ reference guards remain deferred.
 
 ## U - Unified Item Authoring
 
-**Status:** U4 obsolete route/tab retirement implemented; runtime tool resolution remains pending.
+**Status:** U5 runtime tool resolution implemented in MMO Project; gathering and processing consumers remain deferred.
 
 Collapse Basic Items, Consumables, Equipment, and Weapons and Tools into one
 public item aggregate and one contextual Godot Items workspace.
@@ -180,7 +180,9 @@ Phased plan:
 - U2 added the unified item host aggregate and temporary compatibility adapters.
 - U3 replaced specialization tabs with one contextual Items workspace.
 - U4 retired obsolete routes, adapters, duplicate providers, and legacy editor scripts.
-- U5 adds runtime tool resolution across equipped and inventory items.
+- U5 added MMO Project runtime tool resolution across equipped and inventory
+  items. It selects only; gathering, processing, durability, charges, resource
+  depletion, and world-object execution remain deferred.
 
 ## T5 — Minimal NPC Authoring
 

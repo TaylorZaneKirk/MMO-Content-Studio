@@ -288,7 +288,8 @@ Selection:
 2. Filter to matching `capability_id`.
 3. Rank by higher `power_tier`.
 4. For equal `power_tier`, prefer equipped items.
-5. For equipped ties, use equipment slot sort order then slot id.
+5. For equipped ties, use explicit slot priority: `right_hand`, `left_hand`,
+   then configured equipment slot order.
 6. For inventory ties, use inventory slot index.
 7. Final tie-breaker: stable `item_id`.
 
@@ -354,13 +355,15 @@ Godot tests during implementation:
 - apply is disabled when the form changes after preview
 - validation and change lists scroll and remain reachable
 
-Runtime tests during U5:
+Runtime tests completed during U5:
 
 - non-equipable tool in inventory resolves by capability
 - equipped and inventory tools both resolve
 - higher `power_tier` wins
 - equal-power equipped item wins over inventory item
 - deterministic tie-breaks are stable
+- revalidation fails after removal or publication loss and succeeds when the
+  same item/capability remains valid in inventory
 
 ## Phased Implementation
 
@@ -442,6 +445,8 @@ Exit condition:
 
 ### U5 - Runtime Tool-Resolution Integration
 
+Status: implemented in MMO Project. Runtime consumers remain deferred.
+
 - Add an MMO Project runtime tool-capability repository/read model.
 - Add a server-authoritative tool resolver over equipment and inventory.
 - Apply deterministic ranking.
@@ -449,6 +454,8 @@ Exit condition:
   interactable objects, traps, and similar activities.
 - Do not implement full gathering/crafting gameplay in this phase unless a later
   slice explicitly requests it.
+- Require future activity commits to revalidate the selected item/capability
+  before applying authoritative effects.
 
 Exit condition:
 

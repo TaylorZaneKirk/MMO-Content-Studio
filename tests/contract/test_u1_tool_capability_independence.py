@@ -103,7 +103,7 @@ class U1ToolCapabilityIndependenceTests(unittest.TestCase):
         self.assertIn("U1 tool-capability independence and metadata safety is implemented", readme)
         self.assertIn("U2 added the unified item host aggregate and temporary compatibility adapters", roadmap)
         self.assertIn("U3 replaced specialization tabs with one contextual Items workspace", roadmap)
-        self.assertIn("U4 obsolete route/tab retirement implemented; runtime tool resolution remains pending", roadmap)
+        self.assertIn("U5 runtime tool resolution implemented in MMO Project", roadmap)
         self.assertIn("do not require equipability or a hand slot", api_inline)
         self.assertIn("023_item_tool_capability_independence.sql", integration)
         self.assertIn("023_item_tool_capability_independence.sql", runtime_readme)
