@@ -1,6 +1,7 @@
 # T5 NPC Authoring Acceptance
 
-Status: acceptance criteria for the T5 implementation sequence.
+Status: acceptance criteria for the T5 implementation sequence. T5B NPC schema
+and contract foundation implemented; repository/API, Godot workspace, runtime handoff, and verification remain pending.
 
 ## T5A - Audit And Domain Lock
 
@@ -16,12 +17,19 @@ Status: acceptance criteria for the T5 implementation sequence.
 
 ## T5 Phase 1 - Schema And Contracts
 
-- Additive migration artifact introduces `npc_definitions`.
+- Additive migration artifact
+  `integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`
+  introduces `npc_definitions`.
 - Contracts expose the complete NPC aggregate, options, preview, validation,
   mutation, and catalog response shapes.
 - Schema-health provider checks the NPC authoring table and required columns.
 - Domain rules validate IDs, publication state, visuals, movement, interaction,
   and dialogue references.
+- Registry/options expose only the supported T5B states, movement modes, and
+  `talk` interaction while dialogue-reference validation remains a later
+  runtime handoff concern.
+- `notes` is authoring-only metadata and is omitted from the future runtime NPC
+  catalog export.
 - No placement fields appear in the NPC definition contract.
 
 ## T5 Phase 2 - Repository And API

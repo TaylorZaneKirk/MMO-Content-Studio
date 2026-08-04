@@ -1,6 +1,7 @@
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Features.Items;
 using MMO.ContentStudio.AuthoringHost.Features.Mobs;
+using MMO.ContentStudio.AuthoringHost.Features.Npcs;
 
 namespace MMO.ContentStudio.AuthoringHost.Features;
 
@@ -10,8 +11,7 @@ public static class AuthoringFeatureExtensions
     {
         services.AddItemAuthoring();
         services.AddMobAuthoring();
-        services.AddSingleton<IAuthoringCatalogSectionProvider>(
-            new PlannedCatalogSectionProvider("npcs", "NPCs", 500));
+        services.AddNpcAuthoring();
         return services;
     }
 

@@ -340,3 +340,14 @@ therefore persists only the current `talk`/dialogue capability. Dialogue graphs,
 quests, shops, banking, trainers, service menus, NPC combat, schedules, emotes,
 portraits, cutscenes, arbitrary scripts, and runtime hot reload remain deferred
 until matching runtime consumers exist.
+
+T5B implements only the schema/contract foundation for this boundary. The
+handoff migration is
+`integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`; the host
+has compile-time NPC contracts, domain normalization rules, static registry
+options, feature-owned schema-health requirements, and a catalog section that
+keeps NPCs marked unimplemented until the repository/API and Godot workspace
+arrive. `notes` is authoring-only metadata and is omitted from the future
+runtime NPC catalog export. `default_dialogue_id` remains a stable string
+reference; dialogue-reference validation remains a later runtime handoff
+concern because current dialogue definitions are file-backed in MMO Project.

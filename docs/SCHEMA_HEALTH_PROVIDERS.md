@@ -12,6 +12,7 @@ host/
   Features/
     Items/ItemSchemaRequirements.cs
     Mobs/MobSchemaRequirements.cs
+    Npcs/NpcSchemaRequirements.cs
 ```
 
 A requirement describes one PostgreSQL object:
@@ -42,3 +43,12 @@ equipment, weapon, combat-bonus, and tool-capability tables. The aggregator
 removes duplicates while preserving first-registration order, allowing each
 workspace to describe its own requirements without coordinating a global
 hardcoded list.
+
+T5B NPC schema and contract foundation implemented the NPC manifest in
+`host/Features/Npcs/NpcSchemaRequirements.cs`. It checks the additive
+`npc_definitions` table from
+`integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`,
+including the root `updated_at_utc` concurrency token and the constraints for
+visuals, initial `1x1` footprint support, movement, interaction, and dialogue
+reference consistency. Repository/API, Godot workspace, runtime handoff, and
+verification remain pending.

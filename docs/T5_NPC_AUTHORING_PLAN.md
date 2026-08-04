@@ -1,7 +1,9 @@
 # T5 NPC Authoring Plan
 
-Status: T5A locked implementation plan. This document describes future work and
-does not claim the NPC editor/API/schema is implemented yet.
+Status: T5B NPC schema and contract foundation implemented. The additive
+schema handoff, host contracts, domain rules, registry/options seam,
+schema-health provider, and placeholder catalog section exist; repository/API,
+Godot workspace, runtime handoff, and verification remain pending.
 
 ## Locked Domain Model
 
@@ -49,8 +51,8 @@ Locked definition ID format:
 - `default_interaction`: initially `talk`
 - `default_dialogue_id`
 - `notes`
-- `created_at`
-- `updated_at`
+- `created_at_utc`
+- `updated_at_utc`
 
 The aggregate deliberately excludes:
 
@@ -61,8 +63,9 @@ The aggregate deliberately excludes:
 
 ## Proposed Schema
 
-T5 Phase 1 should add an additive MMO Project handoff migration and matching
-Content Studio repository support.
+T5B adds the additive MMO Project handoff migration at
+`integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`.
+Repository persistence remains a T5 Phase 2 task.
 
 Proposed tables:
 
@@ -88,8 +91,8 @@ CREATE TABLE npc_definitions (
     default_interaction TEXT NOT NULL,
     default_dialogue_id TEXT NULL,
     notes TEXT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
 
@@ -115,9 +118,19 @@ Validation constraints:
 - `default_interaction = 'talk'`
 - `default_dialogue_id` required when `interaction_enabled = true`
 
+The rule is simple: notes is authoring-only metadata. It should be preserved by
+Content Studio
+repository/API round trips, but it is omitted from the future runtime NPC
+catalog export.
+
+Dialogue-reference validation remains a later runtime handoff concern. T5B
+stores the stable `default_dialogue_id` string and exposes registry/options
+hooks, but current MMO Project dialogue definitions are file-backed and are not
+validated by a Content Studio database foreign key.
+
 ## API Routes
 
-Add a feature-owned `/api/v1/npcs` route family:
+T5 Phase 2 should add a feature-owned `/api/v1/npcs` route family:
 
 - `GET /api/v1/npcs/options`
 - `GET /api/v1/npcs`
@@ -160,17 +173,21 @@ Publish validation:
 
 ## Feature Layout
 
-Expected Content Studio host files:
+Content Studio host files introduced in T5B:
 
 - `host/Contracts/NpcContracts.cs`
 - `host/Features/Npcs/NpcAuthoringFeature.cs`
 - `host/Features/Npcs/NpcSchemaRequirements.cs`
 - `host/Features/Npcs/NpcCatalogSectionProvider.cs`
+- `host/Services/NpcAuthoringRegistry.cs`
+- `host/Services/NpcDomainRules.cs`
+- tests under `tests/host/MMO.ContentStudio.AuthoringHost.Tests/`
+
+Expected later host files:
+
 - `host/Persistence/NpcRepository.cs`
 - `host/Services/NpcAuthoringService.cs`
 - `host/Services/NpcDefinitionValidator.cs`
-- `host/Domain/NpcDomainRules.cs`
-- tests under `tests/host/MMO.ContentStudio.AuthoringHost.Tests/`
 
 The implementation should follow the existing Mobs and unified Items patterns,
 but must not copy mob combat/drop concerns into NPCs.
@@ -208,7 +225,7 @@ simulator, or cutscene preview in T5.
 
 ## Runtime Handoff
 
-The runtime handoff should be a later phase, not part of T5A.
+The runtime handoff should be a later phase, not part of T5B.
 
 Target shape:
 
@@ -369,4 +386,4 @@ Manual verification:
 
 ## Open Decisions
 
-None for T5A. The implementation should use the locked narrow model above.
+None for T5B. The implementation should use the locked narrow model above.

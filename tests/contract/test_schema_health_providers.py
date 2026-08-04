@@ -47,6 +47,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
         expectations = {
             "Items/ItemAuthoringFeature.cs": "ItemSchemaRequirements",
             "Mobs/MobAuthoringFeature.cs": "MobSchemaRequirements",
+            "Npcs/NpcAuthoringFeature.cs": "NpcSchemaRequirements",
         }
         for relative_path, provider in expectations.items():
             feature = (HOST / "Features" / relative_path).read_text()
@@ -77,6 +78,14 @@ class SchemaHealthProviderTests(unittest.TestCase):
                 "mob_combat_profiles",
                 "mob_definitions_proactive_targeting_check",
             ),
+            "Npcs/NpcSchemaRequirements.cs": (
+                "npc_definitions",
+                "npc_definition_id",
+                "default_dialogue_id",
+                "updated_at_utc",
+                "npc_definitions_initial_footprint_check",
+                "npc_definitions_dialogue_reference_check",
+            ),
         }
         for relative_path, tokens in expectations.items():
             manifest = (HOST / "Features" / relative_path).read_text()
@@ -98,6 +107,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
         self.assertNotIn("EquipmentSchemaRequirements", program)
         self.assertNotIn("HandEquipmentSchemaRequirements", program)
         self.assertNotIn("MobSchemaRequirements", program)
+        self.assertNotIn("NpcSchemaRequirements", program)
 
 
 if __name__ == "__main__":

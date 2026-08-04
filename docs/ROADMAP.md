@@ -186,7 +186,9 @@ Phased plan:
 
 ## T5 — Minimal NPC Authoring
 
-**Status:** T5A runtime audit and domain lock documented; implementation pending.
+**Status:** T5A runtime audit and domain lock documented. T5B NPC schema and
+contract foundation implemented; repository/API, Godot workspace, runtime
+handoff, and verification remain pending.
 
 Move reusable NPC identity and presentation data into the database-backed
 authoring boundary while keeping spawn placement in Tiled. The current MMO
@@ -214,6 +216,16 @@ References:
 - [`T5_NPC_DOMAIN_AUDIT.md`](T5_NPC_DOMAIN_AUDIT.md)
 - [`T5_NPC_AUTHORING_PLAN.md`](T5_NPC_AUTHORING_PLAN.md)
 - [`T5_NPC_ACCEPTANCE.md`](T5_NPC_ACCEPTANCE.md)
+
+T5B added the additive handoff migration
+`integrations/mmo-project/prototype/sql/024_npc_authoring_schema.sql`,
+compile-time host contracts, feature-owned schema-health requirements, NPC
+domain normalization rules, a registry/options seam, and a feature-owned NPC
+catalog section that reports the workspace as not yet implemented. Notes are
+authoring-only metadata and are omitted from the future runtime NPC catalog
+export. Dialogue-reference validation remains a later runtime handoff concern.
+Repository/API, Godot workspace, runtime handoff, and verification remain
+pending.
 
 ## T6 — Interactable World Objects Foundation
 

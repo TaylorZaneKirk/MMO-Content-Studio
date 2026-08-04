@@ -35,6 +35,12 @@ class FeatureCatalogProviderTests(unittest.TestCase):
                 "mob.MobDefinitionId",
                 "true",
             ),
+            "Npcs": (
+                "NpcCatalogSectionProvider.cs",
+                "npcs",
+                "NPCs",
+                "false",
+            ),
         }
         for feature, (file_name, *tokens) in expectations.items():
             source = (FEATURES / feature / file_name).read_text()
@@ -45,6 +51,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
         expectations = (
             ("Items", "ItemAuthoringFeature.cs", "ItemCatalogSectionProvider"),
             ("Mobs", "MobAuthoringFeature.cs", "MobCatalogSectionProvider"),
+            ("Npcs", "NpcAuthoringFeature.cs", "NpcCatalogSectionProvider"),
         )
         for feature, file_name, provider in expectations:
             source = (FEATURES / feature / file_name).read_text()
@@ -73,9 +80,10 @@ class FeatureCatalogProviderTests(unittest.TestCase):
 
     def test_only_unimplemented_future_sections_are_planned_in_aggregator(self) -> None:
         aggregator = (FEATURES / "AuthoringFeatureExtensions.cs").read_text()
-        self.assertIn('new PlannedCatalogSectionProvider("npcs", "NPCs", 500)', aggregator)
+        self.assertNotIn('new PlannedCatalogSectionProvider("npcs", "NPCs", 500)', aggregator)
         self.assertNotIn('new PlannedCatalogSectionProvider("mobs", "Mobs", 400)', aggregator)
         self.assertIn("services.AddMobAuthoring();", aggregator)
+        self.assertIn("services.AddNpcAuthoring();", aggregator)
 
 
 if __name__ == "__main__":

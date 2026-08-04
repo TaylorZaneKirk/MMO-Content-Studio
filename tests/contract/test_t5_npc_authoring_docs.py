@@ -112,13 +112,9 @@ class T5NpcAuthoringDocumentationTests(unittest.TestCase):
 
     def test_t5a_does_not_add_production_npc_schema_routes_or_godot_editor(self) -> None:
         forbidden_paths = (
-            ROOT / "host" / "Contracts" / "NpcContracts.cs",
-            ROOT / "host" / "Features" / "Npcs" / "NpcAuthoringFeature.cs",
-            ROOT / "host" / "Features" / "Npcs" / "NpcSchemaRequirements.cs",
             ROOT / "host" / "Persistence" / "NpcRepository.cs",
             ROOT / "host" / "Services" / "NpcAuthoringService.cs",
             ROOT / "content-studio" / "scripts" / "npc_editor.gd",
-            ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "024_npc_authoring_schema.sql",
         )
 
         for path in forbidden_paths:

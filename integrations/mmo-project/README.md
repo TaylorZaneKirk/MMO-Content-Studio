@@ -131,9 +131,17 @@ scripts, or runtime hot reload.
 
 ## T5 NPC-authoring planning handoff
 
-T5A is documentation-only. It audits the current MMO Project NPC runtime and
-locks the future integration boundary without adding a migration, API route,
-Godot workspace, or runtime change.
+T5B NPC schema and contract foundation implemented. T5A audited the current MMO
+Project NPC runtime and locked the future integration boundary; T5B adds the
+additive handoff migration
+`prototype/sql/024_npc_authoring_schema.sql`, host contract shapes,
+normalization rules, registry/options, schema-health requirements, and a
+placeholder NPC catalog section. NPC repository/API, Godot workspace, runtime
+handoff, and verification remain pending.
+
+T5A is documentation-only and remains the source audit/domain-lock milestone;
+T5B adds the schema/contract handoff artifacts without changing MMO Project
+runtime code.
 
 The current runtime still loads NPCs from Tiled-generated `npc_spawns` records.
 `NpcRuntimeService` reads placement properties such as `npc_definition_id`,
@@ -152,6 +160,11 @@ The planned handoff is:
   loading, and runtime composition in `NpcRuntimeService`.
 - The existing `WorldSnapshotNpcPayload`, `npc_interaction_request`, and
   `DialogueSessionService` payloads should remain compatible.
+
+`notes` is authoring-only metadata and should not be exported to the future
+runtime NPC catalog. `default_dialogue_id` remains a stable string reference;
+dialogue-reference validation remains a later runtime handoff concern because
+the current runtime dialogue catalog is file-backed in MMO Project.
 
 T5 does not add shops, banks, trainers, quest state, dialogue graph authoring,
 NPC combat, schedules, portraits, emotes, cutscenes, arbitrary scripts, or
