@@ -14,12 +14,12 @@ public sealed class UnifiedItemValidator
     private static readonly IReadOnlySet<string> RequirementTypes =
         new HashSet<string>(["skill_minimum"], StringComparer.Ordinal);
 
-    private readonly UnifiedItemRepository _repository;
+    private readonly IUnifiedItemRepository _repository;
     private readonly HandEquipmentAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
 
     public UnifiedItemValidator(
-        UnifiedItemRepository repository,
+        IUnifiedItemRepository repository,
         HandEquipmentAuthoringRegistry registry,
         ItemAssetService assetService)
     {

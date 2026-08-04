@@ -5,7 +5,60 @@ using NpgsqlTypes;
 
 namespace MMO.ContentStudio.AuthoringHost.Persistence;
 
-public sealed class UnifiedItemRepository
+public interface IUnifiedItemRepository
+{
+    Task<IReadOnlyList<UnifiedItemRecord>> ListAsync(
+        string? search,
+        CancellationToken cancellationToken = default);
+
+    Task<UnifiedItemRecord?> LoadAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<EquipmentSlotRecord>> LoadSlotsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<EquipmentSkillRecord>> LoadSkillsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<EquipmentSkillRecord>> LoadGatheringCapabilitiesAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AuthoringOption>> LoadPublishedItemOptionsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasLiveReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasPublishedConsumableResultReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
+    Task<ReferencedItemRecord?> LoadReferencedItemAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
+    Task<UnifiedItemRecord> SaveDraftAsync(
+        string itemId,
+        NormalizedItemDraft draft,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        bool expectNew,
+        CancellationToken cancellationToken = default);
+
+    Task<UnifiedItemRecord> SetPublicationAsync(
+        string itemId,
+        bool runtimeEnabled,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(
+        string itemId,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class UnifiedItemRepository : IUnifiedItemRepository
 {
     private readonly AuthoringDatabaseConnectionFactory _connectionFactory;
 

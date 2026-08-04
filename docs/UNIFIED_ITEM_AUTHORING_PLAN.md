@@ -397,6 +397,10 @@ and runtime tool resolution remain pending.
 - Convert old Consumables, Equipment, and HandEquipment routes into adapters
   over the unified service.
 - Preserve existing response shapes for old routes.
+- Temporary rule before U3/U4: unified routes require server preview
+  signatures, while legacy compatibility routes keep their pre-U2 request
+  shapes and use unified full-aggregate validation/concurrency without
+  uniformly requiring the new signature field.
 
 Exit condition:
 

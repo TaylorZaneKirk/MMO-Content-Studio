@@ -77,6 +77,12 @@ U2 makes the Items host boundary authoritative for complete item aggregates.
 The current Godot specialization tabs remain separate until U3, but host
 mutations now flow through one unified service and repository.
 
+Temporary U2 compatibility rule: unified routes require server-issued
+`preview_signature` values before mutation. Legacy compatibility routes preserve
+their pre-U2 request shapes until U3/U4 and therefore use unified
+full-aggregate validation and `expected_updated_at_utc` concurrency, but do not
+uniformly require the new signature field.
+
 ### `GET /api/v1/items/options`
 
 Returns unified item-authoring options for equipment slots, weapon-capable

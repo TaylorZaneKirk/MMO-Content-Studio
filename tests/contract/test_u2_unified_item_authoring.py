@@ -123,6 +123,8 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
             self.assertIn("U2", document)
         self.assertIn("unified Godot workspace, route retirement, and runtime tool resolution remain pending", roadmap)
         self.assertIn("current Godot specialization tabs remain separate until U3", api)
+        self.assertIn("unified routes require server-issued", api)
+        self.assertIn("uniformly require the new signature field", api)
         self.assertIn("Legacy Basic Items payloads and the Consumables, Equipment, and Weapons &", acceptance)
 
 

@@ -14,7 +14,7 @@ public static class ItemAuthoringFeature
     {
         services.AddSingleton<ItemAssetService>();
         services.AddSingleton<ItemAssetAuthoringService>();
-        services.AddSingleton<UnifiedItemRepository>();
+        services.AddSingleton<IUnifiedItemRepository, UnifiedItemRepository>();
         services.AddSingleton<UnifiedItemValidator>();
         services.AddSingleton<UnifiedItemAuthoringService>();
         services.AddSingleton<BasicItemRepository>();

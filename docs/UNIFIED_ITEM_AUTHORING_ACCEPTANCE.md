@@ -29,6 +29,10 @@ Accepted U2 behavior:
   Tools mutation routes are compatibility adapters over the unified service.
 - Compatibility adapters preserve hidden specializations while replacing only
   the subset represented by the legacy request.
+- Unified routes require server preview signatures. Legacy compatibility routes
+  preserve their pre-U2 request shapes until U3/U4 and therefore use unified
+  full-aggregate validation and concurrency, but not uniformly the new
+  signature field.
 - The old Godot tabs remain present for U2. The consolidated Godot Items
   workspace is U3.
 

@@ -9,14 +9,14 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public sealed class UnifiedItemAuthoringService
 {
-    private readonly UnifiedItemRepository _repository;
+    private readonly IUnifiedItemRepository _repository;
     private readonly UnifiedItemValidator _validator;
     private readonly HandEquipmentAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
     private readonly ILogger<UnifiedItemAuthoringService> _logger;
 
     public UnifiedItemAuthoringService(
-        UnifiedItemRepository repository,
+        IUnifiedItemRepository repository,
         UnifiedItemValidator validator,
         HandEquipmentAuthoringRegistry registry,
         ItemAssetService assetService,
@@ -1060,12 +1060,15 @@ public sealed class UnifiedItemAuthoringService
     }
 
     private static bool EquivalentDraft(UnifiedItemRecord record, NormalizedItemDraft draft) =>
-        UnifiedItemDomainRules.FromRecord(record) == draft;
+        EquivalentDrafts(UnifiedItemDomainRules.FromRecord(record), draft);
 
     private static bool Equivalent(UnifiedItemRecord left, UnifiedItemRecord right) =>
         left.ItemId == right.ItemId
-        && UnifiedItemDomainRules.FromRecord(left) == UnifiedItemDomainRules.FromRecord(right)
+        && EquivalentDrafts(UnifiedItemDomainRules.FromRecord(left), UnifiedItemDomainRules.FromRecord(right))
         && left.RuntimeEnabled == right.RuntimeEnabled;
+
+    private static bool EquivalentDrafts(NormalizedItemDraft left, NormalizedItemDraft right) =>
+        string.Equals(Serialize(left), Serialize(right), StringComparison.Ordinal);
 
     private static string ComputePreviewSignature(
         string itemId,
