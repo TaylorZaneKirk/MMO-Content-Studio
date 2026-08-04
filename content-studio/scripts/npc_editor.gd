@@ -271,11 +271,16 @@ func _add_notes_section(parent: VBoxContainer) -> void:
 
 func _add_runtime_guidance_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "Runtime and Placement Guidance", 18)
-	var grid := _grid(parent)
-	_runtime_catalog_status = _value_label(grid, "Runtime NPC catalog export", "Not yet implemented")
-	_quest_status = _value_label(grid, "Quest authoring", "Not supported")
-	_multiple_interactions_status = _value_label(grid, "Multiple interactions", "Not supported")
-	_placement_guidance = _wrapped_label("Placement is authored in Tiled using npc_definition_id. Spawn coordinates, home coordinates, map IDs, and placement facing are not Content Studio fields.")
+	var status_grid := GridContainer.new()
+	status_grid.columns = 2
+	status_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	status_grid.add_theme_constant_override("h_separation", 12)
+	status_grid.add_theme_constant_override("v_separation", 8)
+	parent.add_child(status_grid)
+	_runtime_catalog_status = _guidance_status_tile(status_grid, "Runtime catalog", "Pending")
+	_quest_status = _guidance_status_tile(status_grid, "Quest authoring", "Deferred")
+	_multiple_interactions_status = _guidance_status_tile(status_grid, "Interactions", "Deferred")
+	_placement_guidance = _wrapped_label("Tiled owns placement: npc_definition_id, spawn coordinates, home coordinates, map IDs, and facing.")
 	parent.add_child(_placement_guidance)
 
 
@@ -912,6 +917,28 @@ func _value_label(grid: GridContainer, label_text: String, value: String) -> Lab
 	var label := _wrapped_label(value)
 	grid.add_child(label)
 	return label
+
+
+func _guidance_status_tile(parent: GridContainer, label_text: String, value: String) -> Label:
+	var tile := VBoxContainer.new()
+	tile.custom_minimum_size = Vector2(160, 0)
+	tile.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tile.add_theme_constant_override("separation", 2)
+	var label := Label.new()
+	label.text = label_text
+	label.add_theme_font_size_override("font_size", 13)
+	label.modulate = Color(0.72, 0.75, 0.82, 1)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	tile.add_child(label)
+	var status := Label.new()
+	status.text = value
+	status.autowrap_mode = TextServer.AUTOWRAP_OFF
+	status.clip_text = true
+	status.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tile.add_child(status)
+	parent.add_child(tile)
+	return status
 
 
 func _register_control(control: Control) -> void:

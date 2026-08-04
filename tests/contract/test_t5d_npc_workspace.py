@@ -253,9 +253,12 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             "supports_runtime_npc_catalog",
             "supports_quest_authoring",
             "supports_multiple_interactions",
-            "Not yet implemented",
-            "Not supported",
-            "Placement is authored in Tiled using npc_definition_id.",
+            "_guidance_status_tile(status_grid, \"Runtime catalog\", \"Pending\")",
+            "_guidance_status_tile(status_grid, \"Quest authoring\", \"Deferred\")",
+            "_guidance_status_tile(status_grid, \"Interactions\", \"Deferred\")",
+            "TextServer.AUTOWRAP_OFF",
+            "TextServer.OVERRUN_TRIM_ELLIPSIS",
+            "Tiled owns placement: npc_definition_id",
         ):
             self.assertIn(token, editor)
 
