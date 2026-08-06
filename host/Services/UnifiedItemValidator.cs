@@ -17,15 +17,18 @@ public sealed class UnifiedItemValidator
     private readonly IUnifiedItemRepository _repository;
     private readonly ItemAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
+    private readonly ActorAppearanceCatalogService _actorAppearanceCatalogService;
 
     public UnifiedItemValidator(
         IUnifiedItemRepository repository,
         ItemAuthoringRegistry registry,
-        ItemAssetService assetService)
+        ItemAssetService assetService,
+        ActorAppearanceCatalogService actorAppearanceCatalogService)
     {
         _repository = repository;
         _registry = registry;
         _assetService = assetService;
+        _actorAppearanceCatalogService = actorAppearanceCatalogService;
     }
 
     public async Task<UnifiedItemValidationOutcome> ValidateAsync(
@@ -163,6 +166,7 @@ public sealed class UnifiedItemValidator
         ValidateEquipmentModifiers(equipment.SkillModifiers, knownSkills, messages);
         ValidateBonuses(equipment.CombatBonuses, messages);
         ValidateWeaponProfile(equipment, forPublication, messages);
+        ValidateEquippedVisual(equipment.EquippedVisual, forPublication, messages);
     }
 
     private async Task ValidateToolCapabilitiesAsync(
@@ -557,6 +561,179 @@ public sealed class UnifiedItemValidator
                 $"Attack speed must be stored as 1-{UnifiedItemDomainRules.MaximumAttackSpeedUnits} combat units.",
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.attack_speed_units"));
+        }
+    }
+
+    private void ValidateEquippedVisual(
+        NormalizedItemEquippedVisual? equippedVisual,
+        bool forPublication,
+        ICollection<ApiError> messages)
+    {
+        if (equippedVisual is null)
+        {
+            return;
+        }
+
+        var catalog = _actorAppearanceCatalogService.LoadRigCatalog();
+        if (!catalog.Available)
+        {
+            messages.Add(new ApiError(
+                "actor_rig_catalog_unavailable",
+                catalog.Message ?? "The canonical actor rig catalog is unavailable.",
+                forPublication ? ValidationSeverity.Error : ValidationSeverity.Warning,
+                "equipment.equipped_visual.rig_id"));
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(equippedVisual.AssetKey)
+            || equippedVisual.AssetKey.Length > 100
+            || !UnifiedItemDomainRules.StableIdRegex().IsMatch(equippedVisual.AssetKey))
+        {
+            messages.Add(new ApiError(
+                "invalid_equipped_visual_asset_key",
+                "Equipped visual asset_key must use the stable lowercase underscore format.",
+                ValidationSeverity.Error,
+                "equipment.equipped_visual.asset_key"));
+        }
+
+        if (string.IsNullOrWhiteSpace(equippedVisual.BindingType)
+            || (equippedVisual.BindingType != "rig_layer" && equippedVisual.BindingType != "socket"))
+        {
+            messages.Add(new ApiError(
+                "invalid_equipped_visual_binding_type",
+                "Equipped visual binding_type must be rig_layer or socket.",
+                ValidationSeverity.Error,
+                "equipment.equipped_visual.binding_type"));
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(equippedVisual.SecondarySocketId))
+        {
+            messages.Add(new ApiError(
+                "secondary_socket_not_supported",
+                "secondary_socket_id is reserved for later two-handed support and must remain empty in V1.",
+                ValidationSeverity.Error,
+                "equipment.equipped_visual.secondary_socket_id"));
+        }
+
+        var rig = catalog.Rigs.FirstOrDefault(value => string.Equals(value.RigId, equippedVisual.RigId, StringComparison.Ordinal));
+        if (rig is null)
+        {
+            messages.Add(new ApiError(
+                "unknown_equipped_visual_rig",
+                $"Equipped visual rig_id '{equippedVisual.RigId}' is not present in the canonical actor rig catalog.",
+                ValidationSeverity.Error,
+                "equipment.equipped_visual.rig_id"));
+            return;
+        }
+
+        var knownLayers = rig.Layers.Select(value => value.LayerId).ToHashSet(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(equippedVisual.RenderLayerId)
+            || !knownLayers.Contains(equippedVisual.RenderLayerId))
+        {
+            messages.Add(new ApiError(
+                "unknown_equipped_visual_render_layer",
+                $"Equipped visual render_layer_id '{equippedVisual.RenderLayerId}' is not defined by rig '{rig.RigId}'.",
+                ValidationSeverity.Error,
+                "equipment.equipped_visual.render_layer_id"));
+        }
+
+        if (equippedVisual.BindingType == "rig_layer")
+        {
+            if (!string.IsNullOrWhiteSpace(equippedVisual.SocketId))
+            {
+                messages.Add(new ApiError(
+                    "rig_layer_socket_not_allowed",
+                    "rig_layer equipped visuals must not define socket_id.",
+                    ValidationSeverity.Error,
+                    "equipment.equipped_visual.socket_id"));
+            }
+            if (equippedVisual.GripAnchors.Count > 0)
+            {
+                messages.Add(new ApiError(
+                    "rig_layer_grip_anchors_not_allowed",
+                    "rig_layer equipped visuals must not define grip anchors.",
+                    ValidationSeverity.Error,
+                    "equipment.equipped_visual.grip_anchors"));
+            }
+            return;
+        }
+
+        var knownSockets = rig.Sockets.Select(value => value.SocketId).ToHashSet(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(equippedVisual.SocketId)
+            || !knownSockets.Contains(equippedVisual.SocketId))
+        {
+            messages.Add(new ApiError(
+                "unknown_equipped_visual_socket",
+                $"Equipped visual socket_id '{equippedVisual.SocketId}' is not defined by rig '{rig.RigId}'.",
+                ValidationSeverity.Error,
+                "equipment.equipped_visual.socket_id"));
+        }
+
+        ValidateGripAnchors(equippedVisual.GripAnchors, forPublication, messages);
+    }
+
+    private static void ValidateGripAnchors(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> gripAnchors,
+        bool forPublication,
+        ICollection<ApiError> messages)
+    {
+        var expectedDirections = new HashSet<string>(["N", "E", "S", "W"], StringComparer.Ordinal);
+        var expectedFrames = new HashSet<string>(["1", "2", "3", "4"], StringComparer.Ordinal);
+
+        foreach (var direction in gripAnchors.Keys)
+        {
+            if (!expectedDirections.Contains(direction))
+            {
+                messages.Add(new ApiError(
+                    "invalid_grip_anchor_direction",
+                    $"Grip anchor direction '{direction}' is not supported.",
+                    ValidationSeverity.Error,
+                    $"equipment.equipped_visual.grip_anchors.{direction}"));
+                continue;
+            }
+
+            foreach (var frame in gripAnchors[direction].Keys)
+            {
+                if (!expectedFrames.Contains(frame))
+                {
+                    messages.Add(new ApiError(
+                        "invalid_grip_anchor_frame",
+                        $"Grip anchor frame '{frame}' is not supported.",
+                        ValidationSeverity.Error,
+                        $"equipment.equipped_visual.grip_anchors.{direction}.{frame}"));
+                }
+            }
+        }
+
+        if (!forPublication)
+        {
+            return;
+        }
+
+        foreach (var direction in expectedDirections)
+        {
+            if (!gripAnchors.TryGetValue(direction, out var frames))
+            {
+                messages.Add(new ApiError(
+                    "missing_grip_anchor_direction",
+                    $"Socket-bound equipped visuals must define all four directions; '{direction}' is missing.",
+                    ValidationSeverity.Error,
+                    $"equipment.equipped_visual.grip_anchors.{direction}"));
+                continue;
+            }
+
+            foreach (var frame in expectedFrames)
+            {
+                if (!frames.ContainsKey(frame))
+                {
+                    messages.Add(new ApiError(
+                        "missing_grip_anchor_frame",
+                        $"Socket-bound equipped visuals must define frame {frame} for direction {direction}.",
+                        ValidationSeverity.Error,
+                        $"equipment.equipped_visual.grip_anchors.{direction}.{frame}"));
+                }
+            }
         }
     }
 

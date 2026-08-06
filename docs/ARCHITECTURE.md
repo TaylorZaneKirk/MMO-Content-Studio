@@ -260,14 +260,19 @@ item_definitions
   ├─ item_skill_modifiers
   ├─ item_combat_bonuses
   ├─ item_combat_profiles (optional weapon_profile)
+  ├─ item_equipped_visuals
+  │    └─ item_equipped_visual_pose_anchors
   └─ item_tool_capabilities (independent item capabilities)
 ```
 
 The host-side U2 boundary treats consumable behavior, equipability, weapon
-profile, combat bonuses, and tool capabilities as contextual item
+profile, equipped-visual metadata, combat bonuses, and tool capabilities as contextual item
 specializations rather than separate top-level item domains. Tool capabilities
 are independent of equipability; removing equipability clears equipment and
-weapon metadata but must preserve tool capability rows. Weapon profiles remain
+weapon metadata, including equipped-visual rows, but must preserve tool
+capability rows. Equipped-visual authoring now uses the canonical MMO Project
+actor-rig catalog for layer depth, sockets, and attachment math while keeping
+`/api/v1/items` as the only public item surface. Weapon profiles remain
 contextual to runtime-supported weapon-capable slots, initially `right_hand`.
 
 U3 made that aggregate the active Godot item workflow. U4 made the same

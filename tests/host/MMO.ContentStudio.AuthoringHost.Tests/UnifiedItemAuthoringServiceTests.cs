@@ -14,21 +14,87 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     private const string ItemId = "battle_pick";
     private const string IconPath = "res://assets/items/battle_pick.png";
 
+    private readonly string _clientRoot;
     private readonly string _assetRoot;
 
     public UnifiedItemAuthoringServiceTests()
     {
-        _assetRoot = Path.Combine(Path.GetTempPath(), $"content-studio-tests-{Guid.NewGuid():N}");
+        _clientRoot = Path.Combine(Path.GetTempPath(), $"content-studio-tests-{Guid.NewGuid():N}", "client");
+        _assetRoot = Path.Combine(_clientRoot, "assets");
         Directory.CreateDirectory(Path.Combine(_assetRoot, "items"));
+        Directory.CreateDirectory(Path.Combine(_clientRoot, "actors", "appearance", "data", "rigs"));
         File.WriteAllBytes(Path.Combine(_assetRoot, "items", "battle_pick.png"), [0]);
         File.WriteAllBytes(Path.Combine(_assetRoot, "items", "renamed_pick.png"), [0]);
+        File.WriteAllText(
+            Path.Combine(_clientRoot, "actors", "appearance", "data", "rigs", "catalog_v1.json"),
+            """
+            {
+              "schema_version": 1,
+              "rigs": [
+                {
+                  "rig_id": "humanoid_v1",
+                  "schema_version": 1,
+                  "layers": {
+                    "head": {
+                      "binding_type": "rig_layer",
+                      "default_render_plane": "body",
+                      "z_index_by_direction": { "N": 30, "E": 30, "S": 30, "W": 30 }
+                    },
+                    "body": {
+                      "binding_type": "rig_layer",
+                      "default_render_plane": "body",
+                      "z_index_by_direction": { "N": 20, "E": 20, "S": 20, "W": 20 }
+                    },
+                    "legs": {
+                      "binding_type": "rig_layer",
+                      "default_render_plane": "body",
+                      "z_index_by_direction": { "N": 20, "E": 20, "S": 20, "W": 20 }
+                    },
+                    "right_hand": {
+                      "binding_type": "rig_layer",
+                      "default_render_plane": "body",
+                      "z_index_by_direction": { "N": 30, "E": 30, "S": 30, "W": 0 }
+                    }
+                  },
+                  "sockets": {
+                    "right_hand_primary": {
+                      "N": {
+                        "1": { "x": 80, "y": 80 },
+                        "2": { "x": 80, "y": 80 },
+                        "3": { "x": 80, "y": 80 },
+                        "4": { "x": 80, "y": 80 }
+                      },
+                      "E": {
+                        "1": { "x": 84, "y": 78 },
+                        "2": { "x": 84, "y": 78 },
+                        "3": { "x": 84, "y": 78 },
+                        "4": { "x": 84, "y": 78 }
+                      },
+                      "S": {
+                        "1": { "x": 82, "y": 86 },
+                        "2": { "x": 82, "y": 86 },
+                        "3": { "x": 82, "y": 86 },
+                        "4": { "x": 82, "y": 86 }
+                      },
+                      "W": {
+                        "1": { "x": 76, "y": 78 },
+                        "2": { "x": 76, "y": 78 },
+                        "3": { "x": 76, "y": 78 },
+                        "4": { "x": 76, "y": 78 }
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+            """);
     }
 
     public void Dispose()
     {
-        if (Directory.Exists(_assetRoot))
+        if (Directory.Exists(_clientRoot))
         {
-            Directory.Delete(_assetRoot, true);
+            Directory.Delete(_clientRoot, true);
         }
     }
 
@@ -266,6 +332,149 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task PreviewSignatureChangesWhenEquippedVisualChanges()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+        var request = UnifiedSaveRequest(null);
+
+        var firstPreview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+        var secondPreview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(
+                request with
+                {
+                    Equipment = EquipmentDraft() with
+                    {
+                        EquippedVisual = EquippedVisualDraft() with
+                        {
+                            GripAnchors = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>
+                            {
+                                ["N"] = new Dictionary<string, SourcePixelPointDefinition>
+                                {
+                                    ["1"] = new(32, 18)
+                                }
+                            }
+                        }
+                    }
+                },
+                "save_draft"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(firstPreview);
+        AssertSucceeded(secondPreview);
+        Assert.NotEqual(firstPreview.Value!.PreviewSignature, secondPreview.Value!.PreviewSignature);
+    }
+
+    [Fact]
+    public async Task DisablingEquipabilityClearsEquippedVisual()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+
+        var result = await SaveDraftWithPreviewAsync(
+            service,
+            ItemId,
+            ToSaveRequest(repository.Records[ItemId], repository.Records[ItemId].UpdatedAtUtc) with
+            {
+                Equipment = null
+            });
+
+        AssertSucceeded(result);
+        Assert.Null(repository.Records[ItemId].EquippedVisual);
+    }
+
+    [Fact]
+    public async Task LoadOptionsReadsActorRigCatalogFromCanonicalClientRoot()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+
+        var result = await service.LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        AssertSucceeded(result);
+        Assert.True(result.Value!.ActorRigCatalog.Available);
+        var rig = Assert.Single(result.Value.ActorRigCatalog.Rigs);
+        Assert.Equal("humanoid_v1", rig.RigId);
+        Assert.Contains(rig.Layers, value => value.LayerId == "right_hand");
+        Assert.Contains(rig.Sockets, value => value.SocketId == "right_hand_primary");
+    }
+
+    [Fact]
+    public async Task SaveDraftAllowsIncompleteSocketAnchorsButPublishRejectsThem()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+        var request = UnifiedSaveRequest(null) with
+        {
+            Equipment = EquipmentDraft() with
+            {
+                EquippedVisual = new ItemEquippedVisualDraft(
+                    "dark_sword",
+                    "humanoid_v1",
+                    "socket",
+                    "right_hand",
+                    "right_hand_primary",
+                    null,
+                    new SourcePixelPointDefinition(0, 0),
+                    new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>
+                    {
+                        ["N"] = new Dictionary<string, SourcePixelPointDefinition>
+                        {
+                            ["1"] = new(30, 12)
+                        }
+                    })
+            }
+        };
+
+        var preview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(preview);
+        var save = await service.SaveDraftAsync(
+            ItemId,
+            request with { PreviewSignature = preview.Value!.PreviewSignature },
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(save);
+
+        var publish = await service.PublishAsync(
+            ItemId,
+            new ItemPublicationRequest(repository.Records[ItemId].UpdatedAtUtc, null),
+            TestContext.Current.CancellationToken);
+        Assert.False(publish.Succeeded);
+        Assert.Contains(publish.Errors, error => error.Code == "missing_grip_anchor_direction");
+    }
+
+    [Fact]
+    public async Task PublishRejectsUnknownEquippedVisualRig()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+        var request = UnifiedSaveRequest(repository.Records[ItemId].UpdatedAtUtc) with
+        {
+            Equipment = EquipmentDraft() with
+            {
+                EquippedVisual = EquippedVisualDraft() with { RigId = "missing_rig" }
+            }
+        };
+
+        var preview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(request, "publish"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Contains(preview.Value!.Messages, message => message.Code == "unknown_equipped_visual_rig");
+        Assert.False(preview.Value.ValidForPublication);
+    }
+
+    [Fact]
     public async Task StaleConcurrencyIsEnforcedThroughUnifiedMutations()
     {
         var repository = new InMemoryUnifiedItemRepository();
@@ -419,20 +628,23 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
     private UnifiedItemAuthoringService CreateService(InMemoryUnifiedItemRepository repository)
     {
-        var assetService = new ItemAssetService(Options.Create(new AssetRootsOptions
+        var assetRoots = Options.Create(new AssetRootsOptions
         {
             Roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
                 ["game_client_assets"] = _assetRoot
             }
-        }));
+        });
+        var assetService = new ItemAssetService(assetRoots);
+        var actorAppearanceCatalogService = new ActorAppearanceCatalogService(assetRoots);
         var registry = new ItemAuthoringRegistry();
-        var validator = new UnifiedItemValidator(repository, registry, assetService);
+        var validator = new UnifiedItemValidator(repository, registry, assetService, actorAppearanceCatalogService);
         return new UnifiedItemAuthoringService(
             repository,
             validator,
             registry,
             assetService,
+            actorAppearanceCatalogService,
             NullLogger<UnifiedItemAuthoringService>.Instance);
     }
 
@@ -483,7 +695,18 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                     draft.Equipment.Requirements,
                     draft.Equipment.SkillModifiers,
                     draft.Equipment.CombatBonuses,
-                    draft.Equipment.WeaponProfile),
+                    draft.Equipment.WeaponProfile,
+                    draft.Equipment.EquippedVisual is null
+                        ? null
+                        : new ItemEquippedVisualDraft(
+                            draft.Equipment.EquippedVisual.AssetKey,
+                            draft.Equipment.EquippedVisual.RigId,
+                            draft.Equipment.EquippedVisual.BindingType,
+                            draft.Equipment.EquippedVisual.RenderLayerId,
+                            draft.Equipment.EquippedVisual.SocketId,
+                            draft.Equipment.EquippedVisual.SecondarySocketId,
+                            draft.Equipment.EquippedVisual.Nudge,
+                            draft.Equipment.EquippedVisual.GripAnchors)),
             draft.ToolCapabilities,
             expected,
             null);
@@ -525,7 +748,49 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             [new EquipmentSkillRequirementDraft("strength", 3)],
             [new EquipmentSkillModifierDraft("attack", 1)],
             EquipmentCombatBonusDefinition.Zero,
-            WeaponProfile());
+            WeaponProfile(),
+            EquippedVisualDraft());
+
+    private static ItemEquippedVisualDraft EquippedVisualDraft() =>
+        new(
+            "dark_sword",
+            "humanoid_v1",
+            "socket",
+            "right_hand",
+            "right_hand_primary",
+            null,
+            new SourcePixelPointDefinition(0, 0),
+            new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>
+            {
+                ["N"] = new Dictionary<string, SourcePixelPointDefinition>
+                {
+                    ["1"] = new(30, 12),
+                    ["2"] = new(30, 12),
+                    ["3"] = new(30, 12),
+                    ["4"] = new(30, 12)
+                },
+                ["E"] = new Dictionary<string, SourcePixelPointDefinition>
+                {
+                    ["1"] = new(32, 18),
+                    ["2"] = new(32, 18),
+                    ["3"] = new(32, 18),
+                    ["4"] = new(32, 18)
+                },
+                ["S"] = new Dictionary<string, SourcePixelPointDefinition>
+                {
+                    ["1"] = new(28, 20),
+                    ["2"] = new(28, 20),
+                    ["3"] = new(28, 20),
+                    ["4"] = new(28, 20)
+                },
+                ["W"] = new Dictionary<string, SourcePixelPointDefinition>
+                {
+                    ["1"] = new(24, 18),
+                    ["2"] = new(24, 18),
+                    ["3"] = new(24, 18),
+                    ["4"] = new(24, 18)
+                }
+            });
 
     private static EquipmentCombatProfileDefinition WeaponProfile() =>
         new("battle_pick", "melee", "crush", 1, 1, 4);
@@ -556,6 +821,15 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             [new EquipmentSkillModifierDefinition("attack", "Attack", 1)],
             WeaponProfile(),
             EquipmentCombatBonusDefinition.Zero,
+            new ItemEquippedVisualDefinition(
+                "dark_sword",
+                "humanoid_v1",
+                "socket",
+                "right_hand",
+                "right_hand_primary",
+                null,
+                new SourcePixelPointDefinition(0, 0),
+                EquippedVisualDraft().GripAnchors!),
             [new ItemToolCapabilityDefinition("mining", "Mining", 0, 1, "swing", null)],
             new DateTimeOffset(2026, 8, 4, 12, 0, 0, TimeSpan.Zero));
 
@@ -770,6 +1044,17 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                     .ToArray() ?? [],
                 equipment?.WeaponProfile,
                 equipment?.CombatBonuses,
+                equipment?.EquippedVisual is null
+                    ? null
+                    : new ItemEquippedVisualDefinition(
+                        equipment.EquippedVisual.AssetKey ?? string.Empty,
+                        equipment.EquippedVisual.RigId ?? string.Empty,
+                        equipment.EquippedVisual.BindingType ?? string.Empty,
+                        equipment.EquippedVisual.RenderLayerId ?? string.Empty,
+                        equipment.EquippedVisual.SocketId,
+                        equipment.EquippedVisual.SecondarySocketId,
+                        equipment.EquippedVisual.Nudge,
+                        equipment.EquippedVisual.GripAnchors),
                 draft.ToolCapabilities
                     .Select((value, index) => new ItemToolCapabilityDefinition(
                         value.CapabilityId,

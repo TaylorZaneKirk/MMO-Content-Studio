@@ -11,6 +11,7 @@ public static class ItemAuthoringFeature
 {
     public static IServiceCollection AddItemAuthoring(this IServiceCollection services)
     {
+        services.AddSingleton<ActorAppearanceCatalogService>();
         services.AddSingleton<ItemAssetService>();
         services.AddSingleton<ItemAssetAuthoringService>();
         services.AddSingleton<ItemAuthoringRegistry>();

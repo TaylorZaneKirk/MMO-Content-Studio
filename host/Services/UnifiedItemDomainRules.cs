@@ -6,6 +6,9 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public static partial class UnifiedItemDomainRules
 {
+    private static readonly string[] DirectionOrder = ["N", "E", "S", "W"];
+    private static readonly string[] FrameOrder = ["1", "2", "3", "4"];
+
     public const int MaximumConsumableRequirements = 16;
     public const int MaximumConsumableEffects = 16;
     public const int MaximumEquipmentRequirements = 16;
@@ -56,7 +59,18 @@ public static partial class UnifiedItemDomainRules
                     record.Requirements.Select(value => new EquipmentSkillRequirementDraft(value.SkillId, value.RequiredValue)).ToArray(),
                     record.SkillModifiers.Select(value => new EquipmentSkillModifierDraft(value.SkillId, value.ModifierValue)).ToArray(),
                     record.CombatBonuses,
-                    record.WeaponProfile)
+                    record.WeaponProfile,
+                    record.EquippedVisual is null
+                        ? null
+                        : new ItemEquippedVisualDraft(
+                            record.EquippedVisual.AssetKey,
+                            record.EquippedVisual.RigId,
+                            record.EquippedVisual.BindingType,
+                            record.EquippedVisual.RenderLayerId,
+                            record.EquippedVisual.SocketId,
+                            record.EquippedVisual.SecondarySocketId,
+                            record.EquippedVisual.Nudge,
+                            record.EquippedVisual.GripAnchors))
                 : null,
             record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
@@ -189,7 +203,8 @@ public static partial class UnifiedItemDomainRules
                 .OrderBy(value => value.SkillId, StringComparer.Ordinal)
                 .ToArray(),
             equipment.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero,
-            weaponProfile);
+            weaponProfile,
+            NormalizeEquippedVisual(equipment.EquippedVisual));
     }
 
     private static EquipmentCombatProfileDefinition? NormalizeWeaponProfile(
@@ -224,6 +239,78 @@ public static partial class UnifiedItemDomainRules
             .OrderBy(value => value.CapabilityId, StringComparer.Ordinal)
             .ToArray();
 
+    private static NormalizedItemEquippedVisual? NormalizeEquippedVisual(
+        ItemEquippedVisualDraft? equippedVisual)
+    {
+        if (equippedVisual is null)
+        {
+            return null;
+        }
+
+        var assetKey = NormalizeOptional(equippedVisual.AssetKey);
+        var rigId = NormalizeOptional(equippedVisual.RigId);
+        var bindingType = NormalizeOptional(equippedVisual.BindingType);
+        var renderLayerId = NormalizeOptional(equippedVisual.RenderLayerId);
+
+        if (assetKey is null
+            && rigId is null
+            && bindingType is null
+            && renderLayerId is null
+            && NormalizeOptional(equippedVisual.SocketId) is null
+            && NormalizeOptional(equippedVisual.SecondarySocketId) is null
+            && equippedVisual.Nudge is null
+            && (equippedVisual.GripAnchors is null || equippedVisual.GripAnchors.Count == 0))
+        {
+            return null;
+        }
+
+        return new NormalizedItemEquippedVisual(
+            assetKey,
+            rigId,
+            bindingType,
+            renderLayerId,
+            NormalizeOptional(equippedVisual.SocketId),
+            NormalizeOptional(equippedVisual.SecondarySocketId),
+            equippedVisual.Nudge ?? new SourcePixelPointDefinition(0, 0),
+            NormalizeGripAnchors(equippedVisual.GripAnchors));
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> NormalizeGripAnchors(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? gripAnchors)
+    {
+        var normalized = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>(StringComparer.Ordinal);
+        if (gripAnchors is null)
+        {
+            return normalized;
+        }
+
+        foreach (var direction in DirectionOrder)
+        {
+            if (!gripAnchors.TryGetValue(direction, out var frames) || frames is null)
+            {
+                continue;
+            }
+
+            var normalizedFrames = new Dictionary<string, SourcePixelPointDefinition>(StringComparer.Ordinal);
+            foreach (var frame in FrameOrder)
+            {
+                if (!frames.TryGetValue(frame, out var point))
+                {
+                    continue;
+                }
+
+                normalizedFrames[frame] = new SourcePixelPointDefinition(point.X, point.Y);
+            }
+
+            if (normalizedFrames.Count > 0)
+            {
+                normalized[direction] = normalizedFrames;
+            }
+        }
+
+        return normalized;
+    }
+
     [GeneratedRegex("^[a-z0-9]+(?:_[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
     public static partial Regex StableIdRegex();
 }
@@ -253,4 +340,15 @@ public sealed record NormalizedItemEquipmentMetadata(
     IReadOnlyList<EquipmentSkillRequirementDraft> Requirements,
     IReadOnlyList<EquipmentSkillModifierDraft> SkillModifiers,
     EquipmentCombatBonusDefinition CombatBonuses,
-    EquipmentCombatProfileDefinition? WeaponProfile);
+    EquipmentCombatProfileDefinition? WeaponProfile,
+    NormalizedItemEquippedVisual? EquippedVisual);
+
+public sealed record NormalizedItemEquippedVisual(
+    string? AssetKey,
+    string? RigId,
+    string? BindingType,
+    string? RenderLayerId,
+    string? SocketId,
+    string? SecondarySocketId,
+    SourcePixelPointDefinition Nudge,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors);

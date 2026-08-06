@@ -13,6 +13,7 @@ public sealed class UnifiedItemAuthoringService
     private readonly UnifiedItemValidator _validator;
     private readonly ItemAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
+    private readonly ActorAppearanceCatalogService _actorAppearanceCatalogService;
     private readonly ILogger<UnifiedItemAuthoringService> _logger;
 
     public UnifiedItemAuthoringService(
@@ -20,12 +21,14 @@ public sealed class UnifiedItemAuthoringService
         UnifiedItemValidator validator,
         ItemAuthoringRegistry registry,
         ItemAssetService assetService,
+        ActorAppearanceCatalogService actorAppearanceCatalogService,
         ILogger<UnifiedItemAuthoringService> logger)
     {
         _repository = repository;
         _validator = validator;
         _registry = registry;
         _assetService = assetService;
+        _actorAppearanceCatalogService = actorAppearanceCatalogService;
         _logger = logger;
     }
 
@@ -38,6 +41,7 @@ public sealed class UnifiedItemAuthoringService
             var skills = await _repository.LoadSkillsAsync(cancellationToken);
             var capabilities = await _repository.LoadGatheringCapabilitiesAsync(cancellationToken);
             var publishedItems = await _repository.LoadPublishedItemOptionsAsync(cancellationToken);
+            var actorRigCatalog = _actorAppearanceCatalogService.LoadRigCatalog();
             return AuthoringOperationResult<ItemOptionsResponse>.Success(
                 new ItemOptionsResponse(
                     slots.Select(slot => new AuthoringOption(slot.SlotId, slot.DisplayName)).ToArray(),
@@ -55,6 +59,8 @@ public sealed class UnifiedItemAuthoringService
                     [new("health", "Health"), new("concentration", "Concentration"), new("special", "Special")],
                     [new("skill_minimum", "Skill Minimum")],
                     publishedItems,
+                    [new("rig_layer", "Rig Layer"), new("socket", "Socket")],
+                    actorRigCatalog,
                     ItemAuthoringRegistry.CombatUnitMilliseconds,
                     UnifiedItemDomainRules.MaximumPowerTier,
                     true));
@@ -451,7 +457,18 @@ public sealed class UnifiedItemAuthoringService
                 .Select(value => new EquipmentSkillModifierDefinition(value.SkillId, value.SkillId, value.ModifierValue))
                 .ToArray(),
             equipment.CombatBonuses,
-            equipment.WeaponProfile);
+            equipment.WeaponProfile,
+            equipment.EquippedVisual is null
+                ? null
+                : new ItemEquippedVisualDefinition(
+                    equipment.EquippedVisual.AssetKey ?? string.Empty,
+                    equipment.EquippedVisual.RigId ?? string.Empty,
+                    equipment.EquippedVisual.BindingType ?? string.Empty,
+                    equipment.EquippedVisual.RenderLayerId ?? string.Empty,
+                    equipment.EquippedVisual.SocketId,
+                    equipment.EquippedVisual.SecondarySocketId,
+                    equipment.EquippedVisual.Nudge,
+                    equipment.EquippedVisual.GripAnchors));
 
     private static string ClassifySummary(
         bool hasConsumable,

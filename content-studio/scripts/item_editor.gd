@@ -98,11 +98,30 @@ var _paper_doll_stage: Control
 var _paper_doll_status: Label
 var _preview_direction: OptionButton
 var _preview_frame: SpinBox
+var _appearance_enabled: CheckBox
+var _appearance_rig: OptionButton
+var _appearance_binding: OptionButton
+var _appearance_render_layer: OptionButton
+var _appearance_socket: OptionButton
+var _appearance_asset_key: LineEdit
+var _appearance_asset_path: Label
+var _appearance_rig_status: Label
+var _appearance_nudge_x: SpinBox
+var _appearance_nudge_y: SpinBox
+var _appearance_actual_scale: CheckBox
+var _appearance_grip_x: SpinBox
+var _appearance_grip_y: SpinBox
+var _appearance_clear_pose: Button
+var _appearance_copy_previous: Button
+var _appearance_copy_next: Button
+var _equipped_visual_grip_anchors: Dictionary = {}
+var _appearance_updating := false
 
 
 func _ready() -> void:
 	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
 	_paper_doll_preview = PAPER_DOLL_PREVIEW_SCRIPT.new()
+	_paper_doll_preview.grip_anchor_changed.connect(_on_paper_doll_grip_anchor_changed)
 	_client = %AuthoringHostClient
 	_build_ui()
 	_connect_client()
@@ -249,6 +268,26 @@ func _build_ui() -> void:
 	doll_controls.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	doll_controls.add_theme_constant_override("separation", 8)
 	doll_row.add_child(doll_controls)
+	_appearance_enabled = CheckBox.new()
+	_appearance_enabled.text = "Enable authored equipped visual metadata"
+	_appearance_enabled.toggled.connect(_on_appearance_enabled_toggled)
+	doll_controls.add_child(_appearance_enabled)
+	_appearance_rig = OptionButton.new()
+	_appearance_rig.item_selected.connect(_on_appearance_rig_changed.unbind(1))
+	_add_control_row(doll_controls, "Rig", _appearance_rig)
+	_appearance_binding = OptionButton.new()
+	_appearance_binding.item_selected.connect(_on_appearance_binding_changed.unbind(1))
+	_add_control_row(doll_controls, "Binding", _appearance_binding)
+	_appearance_render_layer = OptionButton.new()
+	_appearance_render_layer.item_selected.connect(_on_appearance_render_layer_changed.unbind(1))
+	_add_control_row(doll_controls, "Render layer", _appearance_render_layer)
+	_appearance_socket = OptionButton.new()
+	_appearance_socket.item_selected.connect(_on_form_changed.unbind(1))
+	_add_control_row(doll_controls, "Socket", _appearance_socket)
+	_appearance_asset_key = LineEdit.new()
+	_appearance_asset_key.placeholder_text = "dark_sword"
+	_appearance_asset_key.text_changed.connect(_on_form_changed.unbind(1))
+	_add_control_row(doll_controls, "Visual asset key", _appearance_asset_key)
 	var direction_row := HBoxContainer.new()
 	direction_row.add_child(_field_label("Direction"))
 	_preview_direction = OptionButton.new()
@@ -268,6 +307,69 @@ func _build_ui() -> void:
 	_preview_frame.value_changed.connect(_on_visual_preview_changed.unbind(1))
 	frame_row.add_child(_preview_frame)
 	doll_controls.add_child(frame_row)
+	var nudge_row := HBoxContainer.new()
+	nudge_row.add_theme_constant_override("separation", 6)
+	nudge_row.add_child(_field_label("Nudge"))
+	_appearance_nudge_x = _row_spin(-64, 64, 0)
+	_appearance_nudge_x.value_changed.connect(_on_form_changed.unbind(1))
+	nudge_row.add_child(_appearance_nudge_x)
+	_appearance_nudge_y = _row_spin(-64, 64, 0)
+	_appearance_nudge_y.value_changed.connect(_on_form_changed.unbind(1))
+	nudge_row.add_child(_appearance_nudge_y)
+	doll_controls.add_child(nudge_row)
+	var grip_row := HBoxContainer.new()
+	grip_row.add_theme_constant_override("separation", 6)
+	grip_row.add_child(_field_label("Grip X/Y"))
+	_appearance_grip_x = _row_spin(0, 512, 0)
+	_appearance_grip_x.value_changed.connect(_on_grip_spin_changed.unbind(1))
+	grip_row.add_child(_appearance_grip_x)
+	_appearance_grip_y = _row_spin(0, 512, 0)
+	_appearance_grip_y.value_changed.connect(_on_grip_spin_changed.unbind(1))
+	grip_row.add_child(_appearance_grip_y)
+	doll_controls.add_child(grip_row)
+	var grip_actions := HBoxContainer.new()
+	grip_actions.add_theme_constant_override("separation", 6)
+	_appearance_copy_previous = Button.new()
+	_appearance_copy_previous.text = "Copy Prev"
+	_appearance_copy_previous.pressed.connect(_copy_previous_pose_anchor)
+	grip_actions.add_child(_appearance_copy_previous)
+	_appearance_copy_next = Button.new()
+	_appearance_copy_next.text = "Copy Next"
+	_appearance_copy_next.pressed.connect(_copy_next_pose_anchor)
+	grip_actions.add_child(_appearance_copy_next)
+	_appearance_clear_pose = Button.new()
+	_appearance_clear_pose.text = "Clear Pose"
+	_appearance_clear_pose.pressed.connect(_clear_current_pose_anchor)
+	grip_actions.add_child(_appearance_clear_pose)
+	var nudge_left := Button.new()
+	nudge_left.text = "X-"
+	nudge_left.pressed.connect(_nudge_current_grip_anchor.bind(-1, 0))
+	grip_actions.add_child(nudge_left)
+	var nudge_right := Button.new()
+	nudge_right.text = "X+"
+	nudge_right.pressed.connect(_nudge_current_grip_anchor.bind(1, 0))
+	grip_actions.add_child(nudge_right)
+	var nudge_up := Button.new()
+	nudge_up.text = "Y-"
+	nudge_up.pressed.connect(_nudge_current_grip_anchor.bind(0, -1))
+	grip_actions.add_child(nudge_up)
+	var nudge_down := Button.new()
+	nudge_down.text = "Y+"
+	nudge_down.pressed.connect(_nudge_current_grip_anchor.bind(0, 1))
+	grip_actions.add_child(nudge_down)
+	doll_controls.add_child(grip_actions)
+	_appearance_actual_scale = CheckBox.new()
+	_appearance_actual_scale.text = "Actual game scale"
+	_appearance_actual_scale.toggled.connect(_on_visual_preview_changed.unbind(1))
+	doll_controls.add_child(_appearance_actual_scale)
+	_appearance_asset_path = Label.new()
+	_appearance_asset_path.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_appearance_asset_path.modulate = Color(0.7, 0.73, 0.79, 1)
+	doll_controls.add_child(_appearance_asset_path)
+	_appearance_rig_status = Label.new()
+	_appearance_rig_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_appearance_rig_status.modulate = Color(0.7, 0.73, 0.79, 1)
+	doll_controls.add_child(_appearance_rig_status)
 	_paper_doll_status = Label.new()
 	_paper_doll_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_paper_doll_status.modulate = Color(0.7, 0.73, 0.79, 1)
@@ -423,6 +525,8 @@ func _on_options_received(payload: Dictionary) -> void:
 	_fill_option(_use_action, _option_array("use_actions", [{"id": "use", "display_name": "Use"}]))
 	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}]))
 	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
+	_fill_option(_appearance_binding, _option_array("equipped_visual_binding_types", [{"id": "rig_layer", "display_name": "Rig Layer"}, {"id": "socket", "display_name": "Socket"}]))
+	_apply_actor_rig_catalog(payload.get("actor_rig_catalog", {}))
 	_rebuild_bonus_grid(_bonus_controls.get("_grid", null))
 	_update_weapon_timing()
 
@@ -595,6 +699,7 @@ func _apply_equipment(value: Variant) -> void:
 	var bonuses := equipment.get("combat_bonuses", {}) as Dictionary
 	_apply_bonus_values(bonuses)
 	_apply_weapon_profile(equipment.get("weapon_profile", null))
+	_apply_equipped_visual(equipment.get("equipped_visual", null))
 
 
 func _payload() -> Dictionary:
@@ -676,6 +781,7 @@ func _equipment_payload() -> Dictionary:
 		"skill_modifiers": _collect_modifiers(),
 		"combat_bonuses": _collect_bonuses(),
 		"weapon_profile": _weapon_profile_payload(),
+		"equipped_visual": _equipped_visual_payload(),
 	}
 
 
@@ -690,6 +796,268 @@ func _weapon_profile_payload() -> Variant:
 		"maximum_range_tiles": int(_weapon_max_range.value),
 		"attack_speed_units": int(_weapon_speed_units.value),
 	}
+
+
+func _equipped_visual_payload() -> Variant:
+	if not _appearance_enabled.button_pressed:
+		return null
+	var payload := {
+		"asset_key": _optional_payload(_appearance_asset_key.text),
+		"rig_id": _selected_metadata(_appearance_rig),
+		"binding_type": _selected_metadata(_appearance_binding),
+		"render_layer_id": _selected_metadata(_appearance_render_layer),
+		"socket_id": _optional_payload(_selected_metadata(_appearance_socket)),
+		"secondary_socket_id": null,
+		"nudge": {
+			"x": int(_appearance_nudge_x.value),
+			"y": int(_appearance_nudge_y.value),
+		},
+		"grip_anchors": _copy_grip_anchor_payload(),
+	}
+	return payload
+
+
+func _copy_grip_anchor_payload() -> Dictionary:
+	var copied: Dictionary = {}
+	for direction_variant: Variant in _equipped_visual_grip_anchors.keys():
+		var direction := str(direction_variant)
+		var frames_variant: Variant = _equipped_visual_grip_anchors.get(direction, {})
+		if not (frames_variant is Dictionary):
+			continue
+		var frames := frames_variant as Dictionary
+		var copied_frames: Dictionary = {}
+		for frame_variant: Variant in frames.keys():
+			var frame := str(frame_variant)
+			var point_variant: Variant = frames.get(frame, null)
+			if point_variant is Dictionary:
+				copied_frames[frame] = (point_variant as Dictionary).duplicate(true)
+		if not copied_frames.is_empty():
+			copied[direction] = copied_frames
+	return copied
+
+
+func _apply_equipped_visual(value: Variant) -> void:
+	_equipped_visual_grip_anchors.clear()
+	var has_visual := value is Dictionary
+	var equipped_visual := value as Dictionary if has_visual else {}
+	_appearance_enabled.button_pressed = has_visual
+	_appearance_asset_key.text = str(equipped_visual.get("asset_key", ""))
+	_select_option(_appearance_rig, str(equipped_visual.get("rig_id", "humanoid_v1")))
+	_rebuild_actor_rig_controls()
+	_select_option(_appearance_binding, str(equipped_visual.get("binding_type", "rig_layer")))
+	_select_option(_appearance_render_layer, str(equipped_visual.get("render_layer_id", _selected_metadata(_equipment_slot))))
+	_select_option(_appearance_socket, str(equipped_visual.get("socket_id", "")))
+	var nudge := equipped_visual.get("nudge", {}) as Dictionary
+	_appearance_nudge_x.value = float(nudge.get("x", 0))
+	_appearance_nudge_y.value = float(nudge.get("y", 0))
+	var grip_anchors := equipped_visual.get("grip_anchors", {}) as Dictionary
+	for direction_variant: Variant in grip_anchors.keys():
+		var direction := str(direction_variant)
+		var frames_variant: Variant = grip_anchors.get(direction, {})
+		if frames_variant is Dictionary:
+			_equipped_visual_grip_anchors[direction] = (frames_variant as Dictionary).duplicate(true)
+	_update_grip_pose_controls()
+
+
+func _apply_actor_rig_catalog(catalog_variant: Variant) -> void:
+	var catalog := catalog_variant as Dictionary if catalog_variant is Dictionary else {}
+	_paper_doll_preview.configure_rig_catalog(catalog)
+	_fill_rig_options(catalog.get("rigs", []) as Array if catalog.get("rigs", []) is Array else [])
+	_appearance_rig_status.text = str(catalog.get("message", "Loaded canonical actor rig metadata."))
+	_rebuild_actor_rig_controls()
+
+
+func _fill_rig_options(rigs: Array) -> void:
+	var selected := _selected_metadata(_appearance_rig)
+	_appearance_rig.clear()
+	for variant in rigs:
+		if variant is Dictionary:
+			var rig := variant as Dictionary
+			var rig_id := str(rig.get("rig_id", ""))
+			if rig_id.is_empty():
+				continue
+			_appearance_rig.add_item(rig_id)
+			_appearance_rig.set_item_metadata(_appearance_rig.item_count - 1, rig_id)
+	if _appearance_rig.item_count == 0:
+		_appearance_rig.add_item("humanoid_v1")
+		_appearance_rig.set_item_metadata(0, "humanoid_v1")
+	_select_option(_appearance_rig, selected if not selected.is_empty() else "humanoid_v1")
+
+
+func _rebuild_actor_rig_controls() -> void:
+	var rig := _selected_actor_rig()
+	var selected_layer := _selected_metadata(_appearance_render_layer)
+	var selected_socket := _selected_metadata(_appearance_socket)
+	_appearance_render_layer.clear()
+	_appearance_socket.clear()
+	if rig.is_empty():
+		return
+	for variant in rig.get("layers", []) as Array:
+		if variant is Dictionary:
+			var layer := variant as Dictionary
+			var layer_id := str(layer.get("layer_id", ""))
+			if layer_id.is_empty():
+				continue
+			_appearance_render_layer.add_item(layer_id)
+			_appearance_render_layer.set_item_metadata(_appearance_render_layer.item_count - 1, layer_id)
+	for variant in rig.get("sockets", []) as Array:
+		if variant is Dictionary:
+			var socket := variant as Dictionary
+			var socket_id := str(socket.get("socket_id", ""))
+			if socket_id.is_empty():
+				continue
+			_appearance_socket.add_item(socket_id)
+			_appearance_socket.set_item_metadata(_appearance_socket.item_count - 1, socket_id)
+	if _appearance_render_layer.item_count == 0:
+		_appearance_render_layer.add_item(_selected_metadata(_equipment_slot))
+		_appearance_render_layer.set_item_metadata(0, _selected_metadata(_equipment_slot))
+	_select_option(_appearance_render_layer, selected_layer if not selected_layer.is_empty() else _selected_metadata(_equipment_slot))
+	_select_option(_appearance_socket, selected_socket if not selected_socket.is_empty() else "right_hand_primary")
+
+
+func _selected_actor_rig() -> Dictionary:
+	var catalog_variant: Variant = _options.get("actor_rig_catalog", {})
+	if not (catalog_variant is Dictionary):
+		return {}
+	var rigs_variant: Variant = (catalog_variant as Dictionary).get("rigs", [])
+	if not (rigs_variant is Array):
+		return {}
+	for variant in rigs_variant:
+		if variant is Dictionary and str((variant as Dictionary).get("rig_id", "")) == _selected_metadata(_appearance_rig):
+			return variant as Dictionary
+	return {}
+
+
+func _on_appearance_enabled_toggled(_value: bool) -> void:
+	if _is_loading:
+		return
+	if _value and _appearance_asset_key.text.strip_edges().is_empty():
+		_appearance_asset_key.text = _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
+	_rebuild_actor_rig_controls()
+	_update_contextual_sections()
+	_on_form_changed()
+
+
+func _on_appearance_rig_changed() -> void:
+	if _is_loading:
+		return
+	_rebuild_actor_rig_controls()
+	_update_contextual_sections()
+	_on_form_changed()
+
+
+func _on_appearance_binding_changed() -> void:
+	if _is_loading:
+		return
+	if _selected_metadata(_appearance_binding) == "socket" and _selected_metadata(_appearance_socket).is_empty():
+		_select_option(_appearance_socket, "right_hand_primary")
+	_update_contextual_sections()
+	_on_form_changed()
+
+
+func _on_appearance_render_layer_changed() -> void:
+	if _is_loading:
+		return
+	_on_form_changed()
+
+
+func _on_grip_spin_changed() -> void:
+	if _is_loading or _appearance_updating or not _appearance_enabled.button_pressed:
+		return
+	_set_current_pose_anchor(Vector2i(int(_appearance_grip_x.value), int(_appearance_grip_y.value)))
+	_on_form_changed()
+
+
+func _on_paper_doll_grip_anchor_changed(direction: String, frame: int, x: int, y: int) -> void:
+	if not _appearance_enabled.button_pressed:
+		return
+	_set_pose_anchor(direction, frame, Vector2i(x, y))
+	if direction == _selected_metadata(_preview_direction) and frame == int(_preview_frame.value):
+		_update_grip_pose_controls()
+	_on_form_changed()
+
+
+func _set_pose_anchor(direction: String, frame: int, point: Vector2i) -> void:
+	var frame_key := str(frame)
+	var frames_variant: Variant = _equipped_visual_grip_anchors.get(direction, {})
+	var frames: Dictionary = frames_variant as Dictionary if frames_variant is Dictionary else {}
+	frames[frame_key] = {"x": point.x, "y": point.y}
+	_equipped_visual_grip_anchors[direction] = frames
+
+
+func _set_current_pose_anchor(point: Vector2i) -> void:
+	_set_pose_anchor(_selected_metadata(_preview_direction), int(_preview_frame.value), point)
+	_update_grip_pose_controls()
+
+
+func _copy_previous_pose_anchor() -> void:
+	var frame := int(_preview_frame.value)
+	if frame <= 1:
+		return
+	var anchor: Variant = _get_pose_anchor(_selected_metadata(_preview_direction), frame - 1)
+	if anchor == null:
+		return
+	_set_current_pose_anchor(anchor)
+	_on_form_changed()
+
+
+func _copy_next_pose_anchor() -> void:
+	var frame := int(_preview_frame.value)
+	if frame >= 4:
+		return
+	var anchor: Variant = _get_pose_anchor(_selected_metadata(_preview_direction), frame + 1)
+	if anchor == null:
+		return
+	_set_current_pose_anchor(anchor)
+	_on_form_changed()
+
+
+func _clear_current_pose_anchor() -> void:
+	var direction := _selected_metadata(_preview_direction)
+	var frame_key := str(int(_preview_frame.value))
+	var frames_variant: Variant = _equipped_visual_grip_anchors.get(direction, {})
+	if not (frames_variant is Dictionary):
+		return
+	var frames := frames_variant as Dictionary
+	frames.erase(frame_key)
+	if frames.is_empty():
+		_equipped_visual_grip_anchors.erase(direction)
+	else:
+		_equipped_visual_grip_anchors[direction] = frames
+	_update_grip_pose_controls()
+	_on_form_changed()
+
+
+func _nudge_current_grip_anchor(delta_x: int, delta_y: int) -> void:
+	var anchor: Variant = _get_current_pose_anchor()
+	var next_anchor: Vector2i = anchor if anchor != null else Vector2i.ZERO
+	next_anchor.x += delta_x
+	next_anchor.y += delta_y
+	_set_current_pose_anchor(next_anchor)
+	_on_form_changed()
+
+
+func _get_current_pose_anchor():
+	return _get_pose_anchor(_selected_metadata(_preview_direction), int(_preview_frame.value))
+
+
+func _get_pose_anchor(direction: String, frame: int):
+	var frames_variant: Variant = _equipped_visual_grip_anchors.get(direction, {})
+	if not (frames_variant is Dictionary):
+		return null
+	var point_variant: Variant = (frames_variant as Dictionary).get(str(frame), null)
+	if not (point_variant is Dictionary):
+		return null
+	var point := point_variant as Dictionary
+	return Vector2i(int(point.get("x", 0)), int(point.get("y", 0)))
+
+
+func _update_grip_pose_controls() -> void:
+	_appearance_updating = true
+	var anchor = _get_current_pose_anchor()
+	_appearance_grip_x.value = float(anchor.x if anchor != null else 0)
+	_appearance_grip_y.value = float(anchor.y if anchor != null else 0)
+	_appearance_updating = false
 
 
 func _add_consumable_requirement_row(initial: Dictionary = {}) -> void:
@@ -942,6 +1310,8 @@ func _on_slot_changed() -> void:
 		return
 	if not _is_weapon_capable_slot(_selected_metadata(_equipment_slot)):
 		_weapon_enabled.button_pressed = false
+	if _selected_metadata(_appearance_render_layer).is_empty():
+		_rebuild_actor_rig_controls()
 	_update_contextual_sections()
 	_on_form_changed()
 
@@ -962,6 +1332,7 @@ func _on_operation_changed() -> void:
 
 
 func _on_visual_preview_changed() -> void:
+	_update_grip_pose_controls()
 	_update_paper_doll_preview()
 
 
@@ -976,6 +1347,8 @@ func _on_form_changed() -> void:
 func _update_contextual_sections() -> void:
 	var equipment_enabled := _equipable.button_pressed
 	var weapon_capable := equipment_enabled and _is_weapon_capable_slot(_selected_metadata(_equipment_slot))
+	var authored_visual := equipment_enabled and _appearance_enabled.button_pressed
+	var socket_binding := authored_visual and _selected_metadata(_appearance_binding) == "socket"
 	_appearance_section.visible = equipment_enabled
 	_requirements_section.visible = equipment_enabled
 	_combat_bonus_section.visible = equipment_enabled
@@ -984,6 +1357,7 @@ func _update_contextual_sections() -> void:
 	_set_consumable_controls_enabled(_consumable_enabled.button_pressed)
 	_set_equipment_controls_enabled(equipment_enabled)
 	_set_weapon_controls_enabled(weapon_capable and _weapon_enabled.button_pressed)
+	_set_appearance_controls_enabled(equipment_enabled, authored_visual, socket_binding)
 
 
 func _set_form_enabled(enabled: bool) -> void:
@@ -1030,6 +1404,23 @@ func _set_weapon_controls_enabled(enabled: bool) -> void:
 	_weapon_min_range.editable = enabled
 	_weapon_max_range.editable = enabled
 	_weapon_speed_units.editable = enabled
+
+
+func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: bool, socket_binding: bool) -> void:
+	_appearance_enabled.disabled = not equipment_enabled
+	_appearance_rig.disabled = not authored_visual
+	_appearance_binding.disabled = not authored_visual
+	_appearance_render_layer.disabled = not authored_visual
+	_appearance_socket.disabled = not socket_binding
+	_appearance_asset_key.editable = authored_visual
+	_appearance_nudge_x.editable = authored_visual
+	_appearance_nudge_y.editable = authored_visual
+	_appearance_actual_scale.disabled = not equipment_enabled
+	_appearance_grip_x.editable = socket_binding
+	_appearance_grip_y.editable = socket_binding
+	_appearance_clear_pose.disabled = not socket_binding
+	_appearance_copy_previous.disabled = not socket_binding
+	_appearance_copy_next.disabled = not socket_binding
 
 
 func _set_row_enabled(row: Node, enabled: bool) -> void:
@@ -1088,14 +1479,19 @@ func _update_icon_preview(explicit_file_path: String = "") -> void:
 
 func _update_paper_doll_preview() -> void:
 	var direction := _selected_metadata(_preview_direction)
-	_paper_doll_preview.update(
+	var equipped_visual_payload_variant: Variant = _equipped_visual_payload()
+	var equipped_visual_payload: Dictionary = equipped_visual_payload_variant if equipped_visual_payload_variant is Dictionary else {}
+	_paper_doll_preview.set_actual_scale_enabled(_appearance_actual_scale.button_pressed)
+	var preview_state: Dictionary = _paper_doll_preview.update(
 		_equipable.button_pressed,
 		_selected_metadata(_equipment_slot) if _equipable.button_pressed else "",
 		_paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges()),
 		direction if not direction.is_empty() else "N",
 		int(_preview_frame.value),
-		["head", "cape", "body", "legs", "boots", "gloves", "right_hand", "left_hand"]
+		["head", "cape", "body", "legs", "boots", "gloves", "right_hand", "left_hand"],
+		equipped_visual_payload
 	)
+	_appearance_asset_path.text = str(preview_state.get("resolved_asset_path", ""))
 
 
 func _open_import() -> void:
@@ -1133,6 +1529,15 @@ func _field_label(value: String) -> Label:
 	var label := Label.new()
 	label.text = value
 	return label
+
+
+func _add_control_row(parent: Node, label_text: String, control: Control) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.add_child(_field_label(label_text))
+	control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(control)
+	parent.add_child(row)
 
 
 func _section_grid(parent: Node, title: String) -> GridContainer:

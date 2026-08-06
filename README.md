@@ -36,13 +36,14 @@ The repository now contains:
 - declarative consumable profiles, ordered requirements, and ordered effects
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
 - backend/API and Godot UI support for unified item aggregates, weapon profiles, and tool capabilities
+- optional equipped-visual metadata inside unified equipment aggregates, including canonical actor-rig selectors, socket/grip authoring, and per-pose grip anchors
 - a T4B mob-authoring host boundary with schema handoff, repository, validation,
   options, catalog, load, preview, draft, publish, disable, concurrency, and
   preview-signature support
 - a top-level Godot Mobs workspace for reusable mob identity, visuals, footprint,
   stats, faction/aggression, one primary combat profile, combat bonuses, and
   ordered guaranteed drops
-- a shared directional paper-doll preview that follows the game client's current asset-key, frame-fallback, and layer-order rules
+- a shared directional paper-doll preview that now reads canonical MMO Project rig metadata for layer depth, sockets, and attachment math
 - an explicit Equippable / Not equippable control that removes stale equipment metadata atomically
 - portions/empty-container transformations through result items
 - exact validation and logical-change previews
@@ -234,6 +235,9 @@ adapters, U3 made that aggregate the normal Godot workflow, and U4 removed the
 obsolete Basic payload branch, specialization route groups, duplicate services,
 duplicate repositories, duplicate catalog/schema providers, and legacy Godot
 editor scripts. `/api/v1/items` is the only public item-authoring route family.
+A3 attachment authoring was intentionally implemented before A2 overlay art so
+item grip calibration can happen in Content Studio against the canonical MMO
+Project rig contract instead of by hand-editing JSON catalogs.
 See
 [`docs/UNIFIED_ITEM_AUTHORING_AUDIT.md`](docs/UNIFIED_ITEM_AUTHORING_AUDIT.md)
 and [`docs/UNIFIED_ITEM_AUTHORING_PLAN.md`](docs/UNIFIED_ITEM_AUTHORING_PLAN.md).

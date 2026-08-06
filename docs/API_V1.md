@@ -87,8 +87,9 @@ hand slot.
 
 Returns unified item-authoring options for equipment slots, weapon-capable
 slots, skills, combat bonus fields, attack families/styles, tool capability
-IDs, consumable action/effect/requirement types, published item references, and
-shared limits.
+IDs, consumable action/effect/requirement types, published item references,
+equipped-visual binding types, the canonical actor-rig catalog loaded from MMO
+Project, and shared limits.
 
 ### `GET /api/v1/items?search=ore`
 
@@ -100,8 +101,8 @@ Lists item definitions with derived classification labels such as `Basic`,
 
 Loads the complete aggregate: identity, icon, publication state, optional
 `consumable_behavior`, optional `equipment`, optional equipment
-`weapon_profile`, independent `tool_capabilities`, and one `updated_at_utc`
-concurrency token.
+`weapon_profile`, optional equipment `equipped_visual`, independent
+`tool_capabilities`, and one `updated_at_utc` concurrency token.
 
 ### `POST /api/v1/items/{itemId}/preview`
 

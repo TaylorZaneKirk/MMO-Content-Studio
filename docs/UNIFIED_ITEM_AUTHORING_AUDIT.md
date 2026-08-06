@@ -269,7 +269,8 @@ Inventory icons load `icon_texture_path` directly in
 `InventoryPanelController._load_icon`. Player equipment visuals are derived from
 equipment slot and item display-name derived asset keys in
 `PlayerComposite.SLOT_TO_DIRECTORY`, `SLOT_TO_NODE_PATH`, and the layer asset
-resolution code. There is no explicit persisted equipped visual override yet.
+resolution code. A3 adds explicit persisted equipped-visual authoring metadata
+in Content Studio while MMO Project runtime export remains deferred to A4.
 
 ## Required Audit Questions
 

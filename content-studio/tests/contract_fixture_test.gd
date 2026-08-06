@@ -2,6 +2,7 @@ extends SceneTree
 
 const EXPECTED_API_VERSION := "1"
 const AuthoringWorkspaceSupport = preload("res://scripts/authoring_workspace_support.gd")
+const PaperDollPreview = preload("res://scripts/paper_doll_preview.gd")
 
 
 func _initialize() -> void:
@@ -52,6 +53,31 @@ func _initialize() -> void:
 
 	if not envelope.data.valid_for_draft or envelope.data.changes.size() != 1:
 		push_error("T3A equipment-preview fixture mismatch")
+		quit(1)
+		return
+
+	var preview := PaperDollPreview.new()
+	var offset := preview.resolve_source_pixel_offset(Vector2i(80, 60), Vector2i(30, 20), Vector2i(1, -2))
+	if offset != Vector2(51, 38):
+		push_error("Actor attachment offset fixture mismatch")
+		quit(1)
+		return
+
+	var drag_result := []
+	preview.grip_anchor_changed.connect(func(direction: String, frame: int, x: int, y: int) -> void:
+		drag_result.clear()
+		drag_result.append_array([direction, frame, x, y])
+	)
+	preview._current_pose_context = {
+		"direction": "E",
+		"frame": 2,
+		"layer_position": Vector2.ZERO,
+		"preview_scale": 1.0,
+		"texture_size": Vector2(80, 60),
+	}
+	preview._apply_drag_position(Vector2(12.4, 18.6))
+	if drag_result.size() != 4 or drag_result[0] != "E" or drag_result[1] != 2 or drag_result[2] != 12 or drag_result[3] != 19:
+		push_error("Actor attachment drag fixture mismatch")
 		quit(1)
 		return
 

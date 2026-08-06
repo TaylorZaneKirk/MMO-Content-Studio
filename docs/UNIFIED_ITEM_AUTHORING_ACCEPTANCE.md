@@ -15,12 +15,13 @@ item specialization mutations through one unified item service and repository.
 Accepted U2 behavior:
 
 - `/api/v1/items/options` returns all option data needed by the future unified
-  Godot Items workspace.
+  Godot Items workspace, including canonical actor-rig metadata for equipped-visual authoring.
 - `/api/v1/items` lists complete item summaries with derived classification
   labels, not persisted exclusive item kinds.
 - `/api/v1/items/{itemId}` loads identity, publication state, optional
   consumable behavior, optional equipment metadata, optional weapon profile,
-  independent tool capabilities, and one aggregate `updated_at_utc`.
+  optional equipped-visual metadata, independent tool capabilities, and one
+  aggregate `updated_at_utc`.
 - `/api/v1/items/{itemId}/preview` validates the complete normalized draft and
   returns one preview signature.
 - `/api/v1/items/{itemId}/draft`, `publish`, `disable`, and `delete` mutate

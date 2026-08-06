@@ -155,16 +155,20 @@ public sealed class DialogueAuthoringServiceTests
             DialogueId,
             ToPreviewRequest(DialogueTestData.ValidDraft(expected), "save_draft"),
             TestContext.Current.CancellationToken);
+        AssertSucceeded(savePreview);
         await service.SaveDraftAsync(
             DialogueId,
             ToMutationRequest(DialogueTestData.ValidDraft(expected), savePreview.Value!.PreviewSignature),
             TestContext.Current.CancellationToken);
         Assert.Equal(0, catalogPublisher.PublishCount);
 
+        expected = repository.Records[DialogueId].UpdatedAtUtc;
+
         var publishPreview = await service.PreviewAsync(
             DialogueId,
             ToPreviewRequest(DialogueTestData.ValidDraft(expected), "publish"),
             TestContext.Current.CancellationToken);
+        AssertSucceeded(publishPreview);
         var publish = await service.PublishAsync(
             DialogueId,
             new DialogueLifecycleRequest(expected, publishPreview.Value!.PreviewSignature),

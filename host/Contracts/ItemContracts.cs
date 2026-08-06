@@ -74,7 +74,8 @@ public sealed record ItemEquipmentMetadataDefinition(
     [property: JsonPropertyName("requirements")] IReadOnlyList<EquipmentSkillRequirementDefinition> Requirements,
     [property: JsonPropertyName("skill_modifiers")] IReadOnlyList<EquipmentSkillModifierDefinition> SkillModifiers,
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition CombatBonuses,
-    [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile);
+    [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition? EquippedVisual);
 
 public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -112,7 +113,28 @@ public sealed record ItemEquipmentMetadataDraft(
     [property: JsonPropertyName("requirements")] IReadOnlyList<EquipmentSkillRequirementDraft>? Requirements,
     [property: JsonPropertyName("skill_modifiers")] IReadOnlyList<EquipmentSkillModifierDraft>? SkillModifiers,
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
-    [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile);
+    [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDraft? EquippedVisual);
+
+public sealed record ItemEquippedVisualDefinition(
+    [property: JsonPropertyName("asset_key")] string AssetKey,
+    [property: JsonPropertyName("rig_id")] string RigId,
+    [property: JsonPropertyName("binding_type")] string BindingType,
+    [property: JsonPropertyName("render_layer_id")] string RenderLayerId,
+    [property: JsonPropertyName("socket_id")] string? SocketId,
+    [property: JsonPropertyName("secondary_socket_id")] string? SecondarySocketId,
+    [property: JsonPropertyName("nudge")] SourcePixelPointDefinition Nudge,
+    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors);
+
+public sealed record ItemEquippedVisualDraft(
+    [property: JsonPropertyName("asset_key")] string? AssetKey,
+    [property: JsonPropertyName("rig_id")] string? RigId,
+    [property: JsonPropertyName("binding_type")] string? BindingType,
+    [property: JsonPropertyName("render_layer_id")] string? RenderLayerId,
+    [property: JsonPropertyName("socket_id")] string? SocketId,
+    [property: JsonPropertyName("secondary_socket_id")] string? SecondarySocketId,
+    [property: JsonPropertyName("nudge")] SourcePixelPointDefinition? Nudge,
+    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? GripAnchors);
 
 public sealed record ItemPreviewResponse(
     [property: JsonPropertyName("target_operation")] string TargetOperation,
@@ -141,6 +163,8 @@ public sealed record ItemOptionsResponse(
     [property: JsonPropertyName("resource_targets")] IReadOnlyList<AuthoringOption> ResourceTargets,
     [property: JsonPropertyName("requirement_types")] IReadOnlyList<AuthoringOption> RequirementTypes,
     [property: JsonPropertyName("published_item_references")] IReadOnlyList<AuthoringOption> PublishedItemReferences,
+    [property: JsonPropertyName("equipped_visual_binding_types")] IReadOnlyList<AuthoringOption> EquippedVisualBindingTypes,
+    [property: JsonPropertyName("actor_rig_catalog")] ActorRigCatalogDefinition ActorRigCatalog,
     [property: JsonPropertyName("combat_unit_milliseconds")] int CombatUnitMilliseconds,
     [property: JsonPropertyName("maximum_tool_power_tier")] int MaximumToolPowerTier,
     [property: JsonPropertyName("supports_runtime_tool_resolution")] bool SupportsRuntimeToolResolution);

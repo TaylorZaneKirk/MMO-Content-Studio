@@ -35,7 +35,8 @@ public sealed class UnifiedItemDomainRulesTests
             [],
             [],
             EquipmentCombatBonusDefinition.Zero,
-            new EquipmentCombatProfileDefinition("pickaxe", "melee", "crush", 1, 1, 4));
+            new EquipmentCombatProfileDefinition("pickaxe", "melee", "crush", 1, 1, 4),
+            null);
         var draft = UnifiedItemDomainRules.Normalize(
             "Battle Pick",
             "res://assets/items/battle_pick.png",

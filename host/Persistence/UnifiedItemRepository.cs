@@ -391,6 +391,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_equipped_visual_pose_anchors", itemId, cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_equipped_visuals", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_consumable_requirements", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_consumable_effects", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_consumable_profiles", itemId, cancellationToken);
@@ -429,6 +431,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             SkillModifiers = await LoadModifiersAsync(connection, transaction, itemId, cancellationToken),
             WeaponProfile = await LoadWeaponProfileAsync(connection, transaction, itemId, cancellationToken),
             CombatBonuses = await LoadCombatBonusesAsync(connection, transaction, itemId, cancellationToken),
+            EquippedVisual = await LoadEquippedVisualAsync(connection, transaction, itemId, cancellationToken),
             ToolCapabilities = await LoadToolCapabilitiesAsync(connection, transaction, itemId, cancellationToken)
         };
     }
@@ -712,6 +715,75 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return records;
     }
 
+    private static async Task<ItemEquippedVisualDefinition?> LoadEquippedVisualAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select asset_key, rig_id, binding_type, render_layer_id, socket_id, secondary_socket_id, nudge_x, nudge_y
+            from item_equipped_visuals
+            where item_id = @item_id;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        return new ItemEquippedVisualDefinition(
+            reader.GetString(reader.GetOrdinal("asset_key")),
+            reader.GetString(reader.GetOrdinal("rig_id")),
+            reader.GetString(reader.GetOrdinal("binding_type")),
+            reader.GetString(reader.GetOrdinal("render_layer_id")),
+            ReadNullableString(reader, "socket_id"),
+            ReadNullableString(reader, "secondary_socket_id"),
+            new SourcePixelPointDefinition(
+                reader.GetInt32(reader.GetOrdinal("nudge_x")),
+                reader.GetInt32(reader.GetOrdinal("nudge_y"))),
+            await LoadEquippedVisualGripAnchorsAsync(connection, transaction, itemId, cancellationToken));
+    }
+
+    private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>> LoadEquippedVisualGripAnchorsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select direction, frame, grip_anchor_x, grip_anchor_y
+            from item_equipped_visual_pose_anchors
+            where item_id = @item_id
+            order by direction, frame;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var anchors = new Dictionary<string, Dictionary<string, SourcePixelPointDefinition>>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var direction = reader.GetString(reader.GetOrdinal("direction"));
+            var frame = reader.GetInt32(reader.GetOrdinal("frame")).ToString();
+            if (!anchors.TryGetValue(direction, out var frames))
+            {
+                frames = new Dictionary<string, SourcePixelPointDefinition>(StringComparer.Ordinal);
+                anchors[direction] = frames;
+            }
+
+            frames[frame] = new SourcePixelPointDefinition(
+                reader.GetInt32(reader.GetOrdinal("grip_anchor_x")),
+                reader.GetInt32(reader.GetOrdinal("grip_anchor_y")));
+        }
+
+        return anchors.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyDictionary<string, SourcePixelPointDefinition>)pair.Value,
+            StringComparer.Ordinal);
+    }
+
     private static async Task ReplaceConsumableAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -873,6 +945,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
+            await ExecuteDeleteAsync(connection, transaction, "item_equipped_visual_pose_anchors", itemId, cancellationToken);
+            await ExecuteDeleteAsync(connection, transaction, "item_equipped_visuals", itemId, cancellationToken);
             return;
         }
 
@@ -880,6 +954,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await ReplaceModifiersAsync(connection, transaction, itemId, equipment.SkillModifiers, cancellationToken);
         await ReplaceWeaponProfileAsync(connection, transaction, itemId, equipment.WeaponProfile, cancellationToken);
         await ReplaceCombatBonusesAsync(connection, transaction, itemId, equipment.CombatBonuses, cancellationToken);
+        await ReplaceEquippedVisualAsync(connection, transaction, itemId, equipment.EquippedVisual, cancellationToken);
     }
 
     private static async Task ReplaceRequirementsAsync(
@@ -1041,6 +1116,103 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static async Task ReplaceEquippedVisualAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        NormalizedItemEquippedVisual? equippedVisual,
+        CancellationToken cancellationToken)
+    {
+        await ExecuteDeleteAsync(connection, transaction, "item_equipped_visual_pose_anchors", itemId, cancellationToken);
+        if (equippedVisual is null)
+        {
+            await ExecuteDeleteAsync(connection, transaction, "item_equipped_visuals", itemId, cancellationToken);
+            return;
+        }
+
+        const string visualSql = """
+            insert into item_equipped_visuals (
+                item_id,
+                asset_key,
+                rig_id,
+                binding_type,
+                render_layer_id,
+                socket_id,
+                secondary_socket_id,
+                nudge_x,
+                nudge_y,
+                updated_at
+            ) values (
+                @item_id,
+                @asset_key,
+                @rig_id,
+                @binding_type,
+                @render_layer_id,
+                @socket_id,
+                @secondary_socket_id,
+                @nudge_x,
+                @nudge_y,
+                now()
+            )
+            on conflict (item_id) do update set
+                asset_key = excluded.asset_key,
+                rig_id = excluded.rig_id,
+                binding_type = excluded.binding_type,
+                render_layer_id = excluded.render_layer_id,
+                socket_id = excluded.socket_id,
+                secondary_socket_id = excluded.secondary_socket_id,
+                nudge_x = excluded.nudge_x,
+                nudge_y = excluded.nudge_y,
+                updated_at = now();
+            """;
+        await using (var command = new NpgsqlCommand(visualSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("item_id", itemId);
+            command.Parameters.AddWithValue("asset_key", (object?)equippedVisual.AssetKey ?? string.Empty);
+            command.Parameters.AddWithValue("rig_id", (object?)equippedVisual.RigId ?? string.Empty);
+            command.Parameters.AddWithValue("binding_type", (object?)equippedVisual.BindingType ?? string.Empty);
+            command.Parameters.AddWithValue("render_layer_id", (object?)equippedVisual.RenderLayerId ?? string.Empty);
+            command.Parameters.Add("socket_id", NpgsqlDbType.Text).Value =
+                (object?)equippedVisual.SocketId ?? DBNull.Value;
+            command.Parameters.Add("secondary_socket_id", NpgsqlDbType.Text).Value =
+                (object?)equippedVisual.SecondarySocketId ?? DBNull.Value;
+            command.Parameters.AddWithValue("nudge_x", equippedVisual.Nudge.X);
+            command.Parameters.AddWithValue("nudge_y", equippedVisual.Nudge.Y);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        const string anchorSql = """
+            insert into item_equipped_visual_pose_anchors (
+                item_id,
+                direction,
+                frame,
+                grip_anchor_x,
+                grip_anchor_y,
+                updated_at
+            ) values (
+                @item_id,
+                @direction,
+                @frame,
+                @grip_anchor_x,
+                @grip_anchor_y,
+                now()
+            );
+            """;
+        foreach (var direction in equippedVisual.GripAnchors.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            foreach (var frame in direction.Value.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                await using var command = new NpgsqlCommand(anchorSql, connection, transaction);
+                command.Parameters.AddWithValue("item_id", itemId);
+                command.Parameters.AddWithValue("direction", direction.Key);
+                command.Parameters.AddWithValue("frame", int.Parse(frame.Key));
+                command.Parameters.AddWithValue("grip_anchor_x", frame.Value.X);
+                command.Parameters.AddWithValue("grip_anchor_y", frame.Value.Y);
+                await command.ExecuteNonQueryAsync(cancellationToken);
+            }
+        }
+    }
+
     private static async Task ReplaceToolCapabilitiesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -1130,6 +1302,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             [],
             weaponProfile,
             combatBonuses,
+            null,
             toolCapabilities,
             ReadUtc(reader, "updated_at"));
     }
@@ -1185,6 +1358,7 @@ public sealed record UnifiedItemRecord(
     IReadOnlyList<EquipmentSkillModifierDefinition> SkillModifiers,
     EquipmentCombatProfileDefinition? WeaponProfile,
     EquipmentCombatBonusDefinition? CombatBonuses,
+    ItemEquippedVisualDefinition? EquippedVisual,
     IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     DateTimeOffset UpdatedAtUtc);
 
