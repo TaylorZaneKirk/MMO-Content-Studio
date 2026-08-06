@@ -17,6 +17,7 @@ public sealed class NpcAuthoringService
     private readonly NpcAuthoringRegistry _registry;
     private readonly NpcDialogueReferenceProvider _dialogueReferences;
     private readonly ItemAssetService _assetService;
+    private readonly IRuntimeCatalogPublisher? _runtimeCatalogPublisher;
     private readonly ILogger<NpcAuthoringService> _logger;
 
     public NpcAuthoringService(
@@ -25,13 +26,15 @@ public sealed class NpcAuthoringService
         NpcAuthoringRegistry registry,
         NpcDialogueReferenceProvider dialogueReferences,
         ItemAssetService assetService,
-        ILogger<NpcAuthoringService> logger)
+        ILogger<NpcAuthoringService> logger,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         _repository = repository;
         _validator = validator;
         _registry = registry;
         _dialogueReferences = dialogueReferences;
         _assetService = assetService;
+        _runtimeCatalogPublisher = runtimeCatalogPublisher;
         _logger = logger;
     }
 
@@ -552,6 +555,11 @@ public sealed class NpcAuthoringService
             if (verified is null || !Equivalent(saved, verified) || verified.PublicationState != publicationState)
             {
                 return ReloadVerificationFailure<NpcMutationResponse>(stableId);
+            }
+
+            if (operation == "publish" && _runtimeCatalogPublisher is not null)
+            {
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
             }
 
             return AuthoringOperationResult<NpcMutationResponse>.Success(

@@ -143,6 +143,39 @@ public sealed class DialogueAuthoringServiceTests
     }
 
     [Fact]
+    public async Task PublishCallsRuntimeCatalogExporterAndSaveDraftDoesNot()
+    {
+        var repository = new InMemoryDialogueRepository();
+        repository.Put(Record(DialogueId, "Test NPC Greeting", "Draft"));
+        var catalogPublisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, catalogPublisher);
+        var expected = repository.Records[DialogueId].UpdatedAtUtc;
+
+        var savePreview = await service.PreviewAsync(
+            DialogueId,
+            ToPreviewRequest(DialogueTestData.ValidDraft(expected), "save_draft"),
+            TestContext.Current.CancellationToken);
+        await service.SaveDraftAsync(
+            DialogueId,
+            ToMutationRequest(DialogueTestData.ValidDraft(expected), savePreview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, catalogPublisher.PublishCount);
+
+        var publishPreview = await service.PreviewAsync(
+            DialogueId,
+            ToPreviewRequest(DialogueTestData.ValidDraft(expected), "publish"),
+            TestContext.Current.CancellationToken);
+        var publish = await service.PublishAsync(
+            DialogueId,
+            new DialogueLifecycleRequest(expected, publishPreview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(publish);
+        Assert.Equal(1, catalogPublisher.PublishCount);
+        Assert.DoesNotContain(publish.Value!.Messages, message => message.Code == "map_catalog_publish_warning");
+    }
+
+    [Fact]
     public async Task DisableAndDeleteReferencePolicyIsEnforced()
     {
         var repository = new InMemoryDialogueRepository();
@@ -246,7 +279,9 @@ public sealed class DialogueAuthoringServiceTests
         Assert.Contains(preview.Value!.Changes, change => change.Field == "nodes.start.text");
     }
 
-    private static DialogueAuthoringService CreateService(IDialogueRepository repository)
+    private static DialogueAuthoringService CreateService(
+        IDialogueRepository repository,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         var analyzer = new DialogueGraphAnalyzer();
         return new DialogueAuthoringService(
@@ -255,7 +290,19 @@ public sealed class DialogueAuthoringServiceTests
             new DialogueAuthoringRegistry(),
             analyzer,
             new DialoguePlaythroughService(),
-            NullLogger<DialogueAuthoringService>.Instance);
+            NullLogger<DialogueAuthoringService>.Instance,
+            runtimeCatalogPublisher);
+    }
+
+    private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
+    {
+        public int PublishCount { get; private set; }
+
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+        {
+            PublishCount++;
+            return Task.FromResult<IReadOnlyList<ApiError>>([]);
+        }
     }
 
     private static PreviewDialogueRequest ToPreviewRequest(DialogueDraft draft, string operation) =>

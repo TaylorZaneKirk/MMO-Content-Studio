@@ -15,6 +15,7 @@ public sealed class MobAuthoringService
     private readonly MobDefinitionValidator _validator;
     private readonly MobAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
+    private readonly IRuntimeCatalogPublisher? _runtimeCatalogPublisher;
     private readonly ILogger<MobAuthoringService> _logger;
 
     public MobAuthoringService(
@@ -22,12 +23,14 @@ public sealed class MobAuthoringService
         MobDefinitionValidator validator,
         MobAuthoringRegistry registry,
         ItemAssetService assetService,
-        ILogger<MobAuthoringService> logger)
+        ILogger<MobAuthoringService> logger,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         _repository = repository;
         _validator = validator;
         _registry = registry;
         _assetService = assetService;
+        _runtimeCatalogPublisher = runtimeCatalogPublisher;
         _logger = logger;
     }
 
@@ -606,6 +609,11 @@ public sealed class MobAuthoringService
             if (verified is null || !Equivalent(saved, verified) || verified.PublicationState != publicationState)
             {
                 throw new InvalidOperationException("The mob publication change failed reload-and-verify.");
+            }
+
+            if (operation == "publish" && _runtimeCatalogPublisher is not null)
+            {
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
             }
 
             return AuthoringOperationResult<MobMutationResponse>.Success(

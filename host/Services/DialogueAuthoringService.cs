@@ -14,6 +14,7 @@ public sealed class DialogueAuthoringService
     private readonly DialogueAuthoringRegistry _registry;
     private readonly DialogueGraphAnalyzer _analyzer;
     private readonly DialoguePlaythroughService _playthrough;
+    private readonly IRuntimeCatalogPublisher? _runtimeCatalogPublisher;
     private readonly ILogger<DialogueAuthoringService> _logger;
 
     public DialogueAuthoringService(
@@ -22,13 +23,15 @@ public sealed class DialogueAuthoringService
         DialogueAuthoringRegistry registry,
         DialogueGraphAnalyzer analyzer,
         DialoguePlaythroughService playthrough,
-        ILogger<DialogueAuthoringService> logger)
+        ILogger<DialogueAuthoringService> logger,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         _repository = repository;
         _validator = validator;
         _registry = registry;
         _analyzer = analyzer;
         _playthrough = playthrough;
+        _runtimeCatalogPublisher = runtimeCatalogPublisher;
         _logger = logger;
     }
 
@@ -437,6 +440,11 @@ public sealed class DialogueAuthoringService
             if (verified is null || !Equivalent(saved, verified) || verified.PublicationState != publicationState)
             {
                 return ReloadVerificationFailure<DialogueMutationResponse>(stableId);
+            }
+
+            if (operation == "publish" && _runtimeCatalogPublisher is not null)
+            {
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
             }
 
             return AuthoringOperationResult<DialogueMutationResponse>.Success(

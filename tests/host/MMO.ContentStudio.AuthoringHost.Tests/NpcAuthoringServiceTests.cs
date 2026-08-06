@@ -156,6 +156,42 @@ public sealed class NpcAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task PublishTriggersRuntimeCatalogRefresh()
+    {
+        var repository = new InMemoryNpcRepository();
+        repository.Put(Record(NpcId, "Test NPC", "Draft"));
+        var publisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, publisher);
+        var expected = repository.Records[NpcId].UpdatedAtUtc;
+
+        var savePreview = await service.PreviewAsync(
+            NpcId,
+            ToPreviewRequest(ValidSaveRequest(expected), "save_draft"),
+            TestContext.Current.CancellationToken);
+        await service.SaveDraftAsync(
+            NpcId,
+            ValidSaveRequest(expected) with
+            {
+                DisplayName = "Saved NPC",
+                PreviewSignature = savePreview.Value!.PreviewSignature
+            },
+            TestContext.Current.CancellationToken);
+        Assert.Equal(0, publisher.PublishCount);
+
+        var publishPreview = await service.PreviewAsync(
+            NpcId,
+            ToPreviewRequest(ValidSaveRequest(repository.Records[NpcId].UpdatedAtUtc), "publish"),
+            TestContext.Current.CancellationToken);
+        var publish = await service.PublishAsync(
+            NpcId,
+            new NpcPublicationRequest(repository.Records[NpcId].UpdatedAtUtc, publishPreview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(publish);
+        Assert.Equal(1, publisher.PublishCount);
+    }
+
+    [Fact]
     public async Task DisableAndDeleteAreBlockedByKnownReferences()
     {
         var repository = new InMemoryNpcRepository();
@@ -348,7 +384,9 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         }
     }
 
-    private NpcAuthoringService CreateService(InMemoryNpcRepository repository)
+    private NpcAuthoringService CreateService(
+        InMemoryNpcRepository repository,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         var options = Options.Create(new AssetRootsOptions
         {
@@ -365,7 +403,19 @@ public sealed class NpcAuthoringServiceTests : IDisposable
             new NpcAuthoringRegistry(),
             dialogueProvider,
             assetService,
-            NullLogger<NpcAuthoringService>.Instance);
+            NullLogger<NpcAuthoringService>.Instance,
+            runtimeCatalogPublisher);
+    }
+
+    private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
+    {
+        public int PublishCount { get; private set; }
+
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+        {
+            PublishCount++;
+            return Task.FromResult<IReadOnlyList<ApiError>>([]);
+        }
     }
 
     private static SaveNpcDraftRequest ValidSaveRequest(DateTimeOffset? expected) => new(

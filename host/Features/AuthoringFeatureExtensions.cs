@@ -3,6 +3,7 @@ using MMO.ContentStudio.AuthoringHost.Features.Dialogues;
 using MMO.ContentStudio.AuthoringHost.Features.Items;
 using MMO.ContentStudio.AuthoringHost.Features.Mobs;
 using MMO.ContentStudio.AuthoringHost.Features.Npcs;
+using MMO.ContentStudio.AuthoringHost.Services;
 
 namespace MMO.ContentStudio.AuthoringHost.Features;
 
@@ -14,6 +15,7 @@ public static class AuthoringFeatureExtensions
         services.AddMobAuthoring();
         services.AddNpcAuthoring();
         services.AddDialogueAuthoring();
+        services.AddSingleton<IRuntimeCatalogPublisher, RuntimeCatalogPublisherService>();
         return services;
     }
 
