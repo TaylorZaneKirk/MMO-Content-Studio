@@ -43,6 +43,8 @@ var _current_item: Dictionary = {}
 var _is_loading := false
 var _reload_item_id := ""
 var _game_client_assets_root := ""
+var _has_persisted_equipped_visual := false
+var _appearance_defaults_initialized := false
 
 var _search: LineEdit
 var _list: VBoxContainer
@@ -282,7 +284,7 @@ func _build_ui() -> void:
 	_appearance_render_layer.item_selected.connect(_on_appearance_render_layer_changed.unbind(1))
 	_add_control_row(doll_controls, "Render layer", _appearance_render_layer)
 	_appearance_socket = OptionButton.new()
-	_appearance_socket.item_selected.connect(_on_form_changed.unbind(1))
+	_appearance_socket.item_selected.connect(_on_appearance_socket_changed.unbind(1))
 	_add_control_row(doll_controls, "Socket", _appearance_socket)
 	_appearance_asset_key = LineEdit.new()
 	_appearance_asset_key.placeholder_text = "dark_sword"
@@ -542,6 +544,7 @@ func _on_catalog_received(payload: Dictionary) -> void:
 
 func _on_definition_received(payload: Dictionary) -> void:
 	_is_loading = true
+	_cancel_paper_doll_drag()
 	_current_item = payload.duplicate(true)
 	_item_id.text = str(payload.get("item_id", ""))
 	_item_id.editable = false
@@ -637,7 +640,10 @@ func _rebuild_list() -> void:
 
 func _start_new() -> void:
 	_is_loading = true
+	_cancel_paper_doll_drag()
 	_current_item = {}
+	_has_persisted_equipped_visual = false
+	_appearance_defaults_initialized = false
 	_item_id.text = ""
 	_item_id.editable = true
 	_display_name.text = ""
@@ -837,9 +843,12 @@ func _copy_grip_anchor_payload() -> Dictionary:
 
 
 func _apply_equipped_visual(value: Variant) -> void:
+	_cancel_paper_doll_drag()
 	_equipped_visual_grip_anchors.clear()
 	var has_visual := value is Dictionary
 	var equipped_visual := value as Dictionary if has_visual else {}
+	_has_persisted_equipped_visual = has_visual
+	_appearance_defaults_initialized = has_visual
 	_appearance_enabled.button_pressed = has_visual
 	_appearance_asset_key.text = str(equipped_visual.get("asset_key", ""))
 	_select_option(_appearance_rig, str(equipped_visual.get("rig_id", _first_actor_rig_id())))
@@ -979,8 +988,10 @@ func _actor_rig_catalog_status(catalog: Dictionary) -> String:
 func _on_appearance_enabled_toggled(_value: bool) -> void:
 	if _is_loading:
 		return
-	if _value and _appearance_asset_key.text.strip_edges().is_empty():
-		_appearance_asset_key.text = _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
+	if not _value:
+		_cancel_paper_doll_drag()
+	elif not _has_persisted_equipped_visual and not _appearance_defaults_initialized:
+		_initialize_authored_appearance_defaults()
 	_rebuild_actor_rig_controls()
 	_update_contextual_sections()
 	_on_form_changed()
@@ -989,6 +1000,7 @@ func _on_appearance_enabled_toggled(_value: bool) -> void:
 func _on_appearance_rig_changed() -> void:
 	if _is_loading:
 		return
+	_cancel_paper_doll_drag()
 	_rebuild_actor_rig_controls()
 	_update_contextual_sections()
 	_on_form_changed()
@@ -997,6 +1009,7 @@ func _on_appearance_rig_changed() -> void:
 func _on_appearance_binding_changed() -> void:
 	if _is_loading:
 		return
+	_cancel_paper_doll_drag()
 	if _selected_metadata(_appearance_binding) == "socket" and _selected_metadata(_appearance_socket).is_empty():
 		_select_option(_appearance_socket, "right_hand_primary")
 	_update_contextual_sections()
@@ -1006,6 +1019,14 @@ func _on_appearance_binding_changed() -> void:
 func _on_appearance_render_layer_changed() -> void:
 	if _is_loading:
 		return
+	_cancel_paper_doll_drag()
+	_on_form_changed()
+
+
+func _on_appearance_socket_changed() -> void:
+	if _is_loading:
+		return
+	_cancel_paper_doll_drag()
 	_on_form_changed()
 
 
@@ -1348,6 +1369,7 @@ func _on_equipable_toggled(_value: bool) -> void:
 	if _is_loading:
 		return
 	if not _value:
+		_cancel_paper_doll_drag()
 		_weapon_enabled.button_pressed = false
 	_update_contextual_sections()
 	_on_form_changed()
@@ -1356,6 +1378,7 @@ func _on_equipable_toggled(_value: bool) -> void:
 func _on_slot_changed() -> void:
 	if _is_loading:
 		return
+	_cancel_paper_doll_drag()
 	if not _is_weapon_capable_slot(_selected_metadata(_equipment_slot)):
 		_weapon_enabled.button_pressed = false
 	if _selected_metadata(_appearance_render_layer).is_empty():
@@ -1380,6 +1403,7 @@ func _on_operation_changed() -> void:
 
 
 func _on_visual_preview_changed() -> void:
+	_cancel_paper_doll_drag()
 	_update_grip_pose_controls()
 	_update_paper_doll_preview()
 
@@ -1540,7 +1564,12 @@ func _update_paper_doll_preview() -> void:
 		["head", "cape", "body", "legs", "boots", "gloves", "right_hand", "left_hand"],
 		equipped_visual_payload
 	)
-	_appearance_asset_path.text = str(preview_state.get("resolved_asset_path", ""))
+	var resolved_asset_path := str(preview_state.get("resolved_asset_path", ""))
+	if _appearance_enabled.button_pressed:
+		_appearance_asset_path.text = resolved_asset_path
+	else:
+		var legacy_visual_key: String = _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
+		_appearance_asset_path.text = "" if legacy_visual_key.is_empty() else "Legacy preview visual: %s" % legacy_visual_key
 
 
 func _open_import() -> void:
@@ -1773,6 +1802,33 @@ func _optional_payload(value: String) -> Variant:
 
 func _clear_preview() -> void:
 	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+
+
+func _initialize_authored_appearance_defaults() -> void:
+	if _appearance_asset_key.text.strip_edges().is_empty():
+		_appearance_asset_key.text = _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
+	var slot_id := _selected_metadata(_equipment_slot)
+	var rig_id := _first_actor_rig_id()
+	if not rig_id.is_empty():
+		_select_option(_appearance_rig, rig_id)
+	_rebuild_actor_rig_controls()
+	if slot_id == "right_hand":
+		_select_option(_appearance_binding, "socket")
+		_select_option(_appearance_render_layer, "right_hand")
+		_select_option(_appearance_socket, "right_hand_primary")
+	else:
+		_select_option(_appearance_binding, "rig_layer")
+		_select_option(_appearance_render_layer, slot_id)
+		_select_option(_appearance_socket, "")
+	_appearance_nudge_x.value = 0
+	_appearance_nudge_y.value = 0
+	_appearance_defaults_initialized = true
+	_update_grip_pose_controls()
+
+
+func _cancel_paper_doll_drag() -> void:
+	if _paper_doll_preview != null:
+		_paper_doll_preview.cancel_drag()
 
 
 func _clear_rows(container: Node) -> void:

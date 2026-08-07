@@ -109,6 +109,12 @@ func set_actual_scale_enabled(enabled: bool) -> void:
 	_actual_scale_enabled = enabled
 
 
+func cancel_drag() -> void:
+	_drag_state.clear()
+	_current_pose_context.clear()
+	_hide_markers()
+
+
 func get_last_resolved_asset_path() -> String:
 	return _last_resolved_asset_path
 
@@ -157,8 +163,9 @@ func update(
 		selected_frame,
 		visible_slots,
 		equipped_visual)
-	_drag_state.clear()
 	if layer_entries.is_empty():
+		if bool(_drag_state.get("active", false)):
+			cancel_drag()
 		var diagnostic := "No preview PNGs could be resolved from the configured game_client_assets root."
 		var first_missing := _first_asset_resolution_hint()
 		if not first_missing.is_empty():
@@ -187,8 +194,11 @@ func update(
 			selected_entry = layer_entry
 			_last_resolved_asset_path = str(layer_entry.get("resolved_asset_path", ""))
 
-	if not selected_entry.is_empty():
+	var valid_socket_attachment := _is_valid_socket_attachment(equipped_visual, selected_entry)
+	if valid_socket_attachment:
 		_update_markers(rig, equipped_visual, selected_direction, selected_frame, selected_entry, source_bounds, group_origin, preview_scale)
+	elif bool(_drag_state.get("active", false)):
+		cancel_drag()
 
 	_status.text = _status_text(equippable, slot_id, rig_id, selected_direction, selected_frame, selected_entry, equipped_visual)
 	return {
@@ -488,10 +498,11 @@ func _update_markers(
 	_grip_marker.position = grip_stage - (_grip_marker.size * 0.5)
 	var texture := selected_entry.get("texture") as Texture2D
 	if texture != null:
+		var layer_position := group_origin + ((source_position - source_bounds.position) * preview_scale)
 		_current_pose_context = {
 			"direction": direction,
 			"frame": frame,
-			"layer_position": group_origin + ((source_position - source_bounds.position) * preview_scale),
+			"layer_position": layer_position,
 			"layer_position_source": source_position,
 			"preview_scale": preview_scale,
 			"texture_size": texture.get_size(),
@@ -499,6 +510,7 @@ func _update_markers(
 			"used_attachment": used_attachment,
 			"can_drag": true,
 			"grip_anchor": Vector2(grip_anchor),
+			"selected_rect": Rect2(layer_position, texture.get_size() * preview_scale),
 		}
 
 
@@ -517,8 +529,8 @@ func _status_text(
 	if selected_entry.is_empty():
 		return "No preview PNG matched the selected item visual."
 	var binding_type := str(equipped_visual.get("binding_type", "legacy"))
-	var authored_anchor := bool(_current_pose_context.get("authored_anchor", false))
-	var used_attachment := bool(_current_pose_context.get("used_attachment", false))
+	var authored_anchor := bool(selected_entry.get("authored_anchor", false))
+	var used_attachment := bool(selected_entry.get("used_attachment", false))
 	var socket_id := str(equipped_visual.get("socket_id", ""))
 	if binding_type == "socket":
 		if not used_attachment:
@@ -586,11 +598,6 @@ func _frame_fallbacks(frame: int, direction: String) -> Array:
 
 
 func _on_stage_gui_input(event: InputEvent) -> void:
-	if _current_pose_context.is_empty():
-		return
-	var can_drag := bool(_current_pose_context.get("can_drag", false))
-	if not can_drag:
-		return
 	if event is InputEventMouseButton:
 		var mouse_button := event as InputEventMouseButton
 		if mouse_button.button_index == MOUSE_BUTTON_LEFT and mouse_button.pressed:
@@ -599,47 +606,37 @@ func _on_stage_gui_input(event: InputEvent) -> void:
 			_end_drag()
 	elif event is InputEventMouseMotion:
 		var mouse_motion := event as InputEventMouseMotion
-		if mouse_motion.button_mask & MOUSE_BUTTON_MASK_LEFT:
+		if mouse_motion.button_mask & MOUSE_BUTTON_MASK_LEFT and bool(_drag_state.get("active", false)):
 			_apply_drag_position(mouse_motion.position)
 
 
 func _apply_drag_position(local_position: Vector2) -> void:
-	if bool(_drag_state.get("active", false)):
-		_apply_drag_position_from_active_drag(local_position)
+	if not bool(_drag_state.get("active", false)):
 		return
-	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
-	if preview_scale <= 0.0:
-		return
-	var layer_position := _variant_to_vector2(_current_pose_context.get("layer_position", Vector2.ZERO), Vector2.ZERO)
-	var texture_size := _variant_to_vector2(_current_pose_context.get("texture_size", Vector2.ZERO), Vector2.ZERO)
-	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
-		return
-	var source_anchor := (local_position - layer_position) / preview_scale
-	var x := clampi(int(round(source_anchor.x)), 0, int(texture_size.x) - 1)
-	var y := clampi(int(round(source_anchor.y)), 0, int(texture_size.y) - 1)
-	grip_anchor_changed.emit(
-		str(_current_pose_context.get("direction", "N")),
-		int(_current_pose_context.get("frame", 1)),
-		x,
-		y)
+	_apply_drag_position_from_active_drag(local_position)
 
 
 func _begin_drag(local_position: Vector2) -> void:
+	if _current_pose_context.is_empty():
+		return
+	var can_drag := bool(_current_pose_context.get("can_drag", false))
+	if not can_drag:
+		return
+	var selected_rect := _variant_to_rect2(_current_pose_context.get("selected_rect", Rect2()), Rect2())
+	if selected_rect.size.x <= 0.0 or selected_rect.size.y <= 0.0 or not selected_rect.has_point(local_position):
+		return
 	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
 	if preview_scale <= 0.0:
 		return
 	var texture_size := _variant_to_vector2(_current_pose_context.get("texture_size", Vector2.ZERO), Vector2.ZERO)
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return
-	var layer_position := _variant_to_vector2(_current_pose_context.get("layer_position", Vector2.ZERO), Vector2.ZERO)
-	var layer_position_source := _variant_to_vector2(_current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
 	var grip_anchor := _variant_to_vector2(_current_pose_context.get("grip_anchor", Vector2.ZERO), Vector2.ZERO)
-	var grab_offset := (local_position - layer_position) / preview_scale
 	_drag_state = {
 		"active": true,
-		"layer_position_source": layer_position_source,
-		"grip_anchor": grip_anchor,
-		"grab_offset": grab_offset,
+		"mouse_start_position": local_position,
+		"start_grip_anchor": grip_anchor,
+		"preview_scale": preview_scale,
 		"texture_size": texture_size,
 		"direction": str(_current_pose_context.get("direction", "N")),
 		"frame": int(_current_pose_context.get("frame", 1)),
@@ -653,14 +650,10 @@ func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
 	var texture_size := _variant_to_vector2(_drag_state.get("texture_size", Vector2.ZERO), Vector2.ZERO)
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return
-	var start_layer_position_source := _variant_to_vector2(
-		_drag_state.get("layer_position_source", Vector2.ZERO),
-		Vector2.ZERO
-	)
-	var start_grip_anchor := _variant_to_vector2(_drag_state.get("grip_anchor", Vector2.ZERO), Vector2.ZERO)
-	var grab_offset := _variant_to_vector2(_drag_state.get("grab_offset", Vector2.ZERO), Vector2.ZERO)
-	var desired_layer_source := (local_position / preview_scale) - grab_offset
-	var grip_source := start_grip_anchor + (start_layer_position_source - desired_layer_source)
+	var start_mouse := _variant_to_vector2(_drag_state.get("mouse_start_position", Vector2.ZERO), Vector2.ZERO)
+	var start_grip_anchor := _variant_to_vector2(_drag_state.get("start_grip_anchor", Vector2.ZERO), Vector2.ZERO)
+	var drag_delta_source := (local_position - start_mouse) / preview_scale
+	var grip_source := start_grip_anchor - drag_delta_source
 	var max_x := int(maxf(texture_size.x - 1.0, 0.0))
 	var max_y := int(maxf(texture_size.y - 1.0, 0.0))
 	var x := clampi(int(round(grip_source.x)), 0, max_x)
@@ -674,6 +667,22 @@ func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
 
 func _end_drag() -> void:
 	_drag_state.clear()
+
+
+func _is_valid_socket_attachment(equipped_visual: Dictionary, selected_entry: Dictionary) -> bool:
+	if equipped_visual.is_empty() or selected_entry.is_empty():
+		return false
+	if str(equipped_visual.get("binding_type", "")) != "socket":
+		return false
+	if str(equipped_visual.get("render_layer_id", "")).is_empty():
+		return false
+	if str(equipped_visual.get("socket_id", "")).is_empty():
+		return false
+	if not bool(selected_entry.get("selected_visual", false)):
+		return false
+	if not bool(selected_entry.get("used_attachment", false)):
+		return false
+	return not str(selected_entry.get("resolved_asset_path", "")).is_empty()
 
 
 func _expected_layer_asset_path(layer_id: String, asset_key: String, frame: int, direction: String) -> String:
@@ -708,4 +717,11 @@ func _variant_to_vector2i(value: Variant, fallback: Vector2i) -> Vector2i:
 	if value is Vector2:
 		var vector_value: Vector2 = value
 		return Vector2i(vector_value)
+	return fallback
+
+
+func _variant_to_rect2(value: Variant, fallback: Rect2) -> Rect2:
+	if value is Rect2:
+		var rect_value: Rect2 = value
+		return rect_value
 	return fallback
