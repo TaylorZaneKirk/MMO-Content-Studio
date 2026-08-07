@@ -16,6 +16,7 @@ const FIT_ZOOM_MAX_PERCENT := 400
 const FIT_ZOOM_STEP_PERCENT := 25
 const SOURCE_EDIT_MARGIN_MIN := 32.0
 const SOURCE_EDIT_MARGIN_FACTOR := 1.0
+const ATTACHMENT_ANCHOR_LIMIT := 4096
 
 var game_client_assets_root := ""
 
@@ -154,6 +155,7 @@ func cancel_drag() -> void:
 	_drag_state.clear()
 	_current_pose_context.clear()
 	_hide_markers()
+	_stop_drag_polling()
 
 
 func get_last_resolved_asset_path() -> String:
@@ -742,6 +744,7 @@ func _begin_drag(local_position: Vector2) -> void:
 		"direction": str(_current_pose_context.get("direction", "N")),
 		"frame": int(_current_pose_context.get("frame", 1)),
 	}
+	_start_drag_polling()
 
 
 func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
@@ -754,11 +757,11 @@ func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
 	var start_mouse := _variant_to_vector2(_drag_state.get("mouse_start_position", Vector2.ZERO), Vector2.ZERO)
 	var start_grip_anchor := _variant_to_vector2(_drag_state.get("start_grip_anchor", Vector2.ZERO), Vector2.ZERO)
 	var drag_delta_source := (local_position - start_mouse) / preview_scale
+	# Persisted "grip_anchor" contract names remain for compatibility, but the
+	# authored value is a virtual local attachment anchor and may sit outside the PNG.
 	var grip_source := start_grip_anchor - drag_delta_source
-	var max_x := int(maxf(texture_size.x - 1.0, 0.0))
-	var max_y := int(maxf(texture_size.y - 1.0, 0.0))
-	var x := clampi(int(round(grip_source.x)), 0, max_x)
-	var y := clampi(int(round(grip_source.y)), 0, max_y)
+	var x := clampi(int(round(grip_source.x)), -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
+	var y := clampi(int(round(grip_source.y)), -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
 	grip_anchor_changed.emit(
 		str(_drag_state.get("direction", "N")),
 		int(_drag_state.get("frame", 1)),
@@ -768,6 +771,40 @@ func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
 
 func _end_drag() -> void:
 	_drag_state.clear()
+	_stop_drag_polling()
+
+
+func _start_drag_polling() -> void:
+	if _stage == null:
+		return
+	var tree := _stage.get_tree()
+	if tree == null:
+		return
+	if not tree.process_frame.is_connected(_on_drag_process_frame):
+		tree.process_frame.connect(_on_drag_process_frame)
+
+
+func _stop_drag_polling() -> void:
+	if _stage == null:
+		return
+	var tree := _stage.get_tree()
+	if tree == null:
+		return
+	if tree.process_frame.is_connected(_on_drag_process_frame):
+		tree.process_frame.disconnect(_on_drag_process_frame)
+
+
+func _on_drag_process_frame() -> void:
+	if not bool(_drag_state.get("active", false)):
+		_stop_drag_polling()
+		return
+	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_end_drag()
+		return
+	if _stage == null:
+		_end_drag()
+		return
+	_apply_drag_position(_stage.get_local_mouse_position())
 
 
 func _is_valid_socket_attachment(equipped_visual: Dictionary, selected_entry: Dictionary) -> bool:

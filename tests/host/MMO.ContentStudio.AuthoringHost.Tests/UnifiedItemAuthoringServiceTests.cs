@@ -467,6 +467,100 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SignedAndOutOfBoundsAttachmentAnchorsRoundTripWithoutClamp()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+        var outOfBoundsAnchors = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>
+        {
+            ["N"] = new Dictionary<string, SourcePixelPointDefinition>
+            {
+                ["1"] = new(-24, 80),
+                ["2"] = new(72, 100),
+                ["3"] = new(100, -12),
+                ["4"] = new(80, 24)
+            },
+            ["E"] = new Dictionary<string, SourcePixelPointDefinition>
+            {
+                ["1"] = new(-40, 16),
+                ["2"] = new(96, -32),
+                ["3"] = new(128, 64),
+                ["4"] = new(80, 40)
+            },
+            ["S"] = new Dictionary<string, SourcePixelPointDefinition>
+            {
+                ["1"] = new(24, 100),
+                ["2"] = new(-16, -24),
+                ["3"] = new(48, 72),
+                ["4"] = new(64, 88)
+            },
+            ["W"] = new Dictionary<string, SourcePixelPointDefinition>
+            {
+                ["1"] = new(36, -40),
+                ["2"] = new(71, 16),
+                ["3"] = new(80, 16),
+                ["4"] = new(100, 24)
+            }
+        };
+        var request = UnifiedSaveRequest(null) with
+        {
+            Equipment = EquipmentDraft() with
+            {
+                EquippedVisual = EquippedVisualDraft() with
+                {
+                    GripAnchors = outOfBoundsAnchors
+                }
+            }
+        };
+
+        var preview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(preview);
+
+        var changedPreview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(
+                request with
+                {
+                    Equipment = request.Equipment! with
+                    {
+                        EquippedVisual = request.Equipment.EquippedVisual! with
+                        {
+                            GripAnchors = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>(outOfBoundsAnchors)
+                            {
+                                ["W"] = new Dictionary<string, SourcePixelPointDefinition>(outOfBoundsAnchors["W"])
+                                {
+                                    ["4"] = new(101, 24)
+                                }
+                            }
+                        }
+                    }
+                },
+                "save_draft"),
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(changedPreview);
+        Assert.NotEqual(preview.Value!.PreviewSignature, changedPreview.Value!.PreviewSignature);
+
+        var save = await service.SaveDraftAsync(
+            ItemId,
+            request with { PreviewSignature = preview.Value.PreviewSignature },
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(save);
+
+        var savedVisual = repository.Records[ItemId].EquippedVisual;
+        Assert.NotNull(savedVisual);
+        Assert.Equal(-24, savedVisual!.GripAnchors["N"]["1"].X);
+        Assert.Equal(100, savedVisual.GripAnchors["N"]["2"].Y);
+        Assert.Equal(80, savedVisual.GripAnchors["W"]["3"].X);
+        Assert.Equal(100, savedVisual.GripAnchors["W"]["4"].X);
+        AssertSemanticallyEqual(
+            outOfBoundsAnchors,
+            repository.Records[ItemId].EquippedVisual!.GripAnchors);
+    }
+
+    [Fact]
     public async Task PublishRejectsUnknownEquippedVisualRig()
     {
         var repository = new InMemoryUnifiedItemRepository();

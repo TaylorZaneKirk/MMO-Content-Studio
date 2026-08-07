@@ -325,12 +325,12 @@ func _verify_paper_doll_preview_interactions() -> void:
 		_fail("Dragging up by -5 source pixels must increase grip Y by 5")
 		return
 	preview._apply_drag_position(start_mouse + Vector2(4000.0 * preview_scale, 0))
-	if emitted[2] != 0:
-		_fail("Grip drag must clamp X within the texture bounds")
+	if emitted[2] != -3984:
+		_fail("Grip drag must allow negative attachment anchors beyond the PNG bounds")
 		return
 	preview._apply_drag_position(start_mouse + Vector2(-4000.0 * preview_scale, -4000.0 * preview_scale))
-	if emitted[2] != 31 or emitted[3] != 31:
-		_fail("Grip drag must clamp both axes to the texture dimensions")
+	if emitted[2] != 4016 or emitted[3] != 4016:
+		_fail("Grip drag must allow positive attachment anchors beyond the PNG bounds")
 		return
 
 	var source_before := preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
@@ -495,6 +495,41 @@ func _verify_paper_doll_preview_camera_and_zoom() -> void:
 		_fail("Socket and grip markers should stay coincident in actual scale mode")
 		return
 
+	var axe_wall_visual := _make_socket_visual(Vector2i(71, 16), "right_hand_primary", "W", 4, "axe")
+	preview.set_actual_scale_enabled(false)
+	preview.reset_fit_view()
+	preview.update(true, "right_hand", "axe", "W", 4, ["right_hand"], axe_wall_visual)
+	var axe_selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	var axe_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	var axe_start_mouse := axe_selected_rect.position + (axe_selected_rect.size * 0.5)
+	var axe_emitted: Array = []
+	preview.grip_anchor_changed.connect(func(direction: String, frame: int, x: int, y: int) -> void:
+		axe_emitted.clear()
+		axe_emitted.append_array([direction, frame, x, y])
+	, CONNECT_ONE_SHOT)
+	preview._begin_drag(axe_start_mouse)
+	preview._apply_drag_position(axe_start_mouse + Vector2(-9.0 * axe_scale, 0))
+	if axe_emitted.size() != 4 or axe_emitted[2] != 80 or axe_emitted[3] != 16:
+		_fail("West-facing 72px axe drag must continue past the previous width-1 wall at X=71")
+		return
+	preview._end_drag()
+
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, _make_socket_visual(Vector2i(-20, 24), "right_hand_primary", "W"))
+	if preview._socket_marker.position != preview._grip_marker.position:
+		_fail("Socket and grip markers should stay coincident for negative attachment anchors")
+		return
+	var negative_source_position := preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, _make_socket_visual(Vector2i(-10, 24), "right_hand_primary", "W"))
+	var shifted_negative_source_position := preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
+	if int(round(shifted_negative_source_position.x - negative_source_position.x)) != -10:
+		_fail("Increasing the attachment anchor by +10 must move the visual -10 source pixels")
+		return
+
+	preview.update(true, "right_hand", "axe", "S", 1, visible_slots, _make_socket_visual(Vector2i(24, 100), "right_hand_primary", "S"))
+	if preview._socket_marker.position != preview._grip_marker.position:
+		_fail("Socket and grip markers should stay coincident for positive out-of-bounds Y anchors")
+		return
+
 	stage.free()
 	status.free()
 
@@ -560,8 +595,8 @@ func _verify_live_runtime_catalog_if_configured() -> void:
 	status.free()
 
 
-func _write_fixture_png(path: String, color: Color) -> void:
-	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+func _write_fixture_png(path: String, color: Color, size: Vector2i = Vector2i(32, 32)) -> void:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
 	image.fill(color)
 	image.save_png(path)
 
@@ -583,6 +618,7 @@ func _build_preview_fixture() -> Dictionary:
 		_write_fixture_png(temp_root.path_join("actors/player/body/defbod-F1-%s.png" % direction), Color(0, 1, 0, 1))
 		_write_fixture_png(temp_root.path_join("actors/player/legs/defbod-F1-%s.png" % direction), Color(0, 0, 1, 1))
 		_write_fixture_png(temp_root.path_join("actors/player/right_hand/dark_sword-F1-%s.png" % direction), Color(1, 1, 0, 1))
+	_write_fixture_png(temp_root.path_join("actors/player/right_hand/axe-F4-W.png"), Color(1, 0.6, 0.2, 1), Vector2i(72, 32))
 
 	preview.game_client_assets_root = temp_root
 	preview.configure_rig_catalog(_available_rig_catalog().actor_rig_catalog)
@@ -657,9 +693,9 @@ func _missing_rig_catalog() -> Dictionary:
 	}
 
 
-func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_primary", direction: String = "N", frame: int = 1) -> Dictionary:
+func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_primary", direction: String = "N", frame: int = 1, asset_key: String = "dark_sword") -> Dictionary:
 	return {
-		"asset_key": "dark_sword",
+		"asset_key": asset_key,
 		"rig_id": "humanoid_v1",
 		"binding_type": "socket",
 		"render_layer_id": "right_hand",
