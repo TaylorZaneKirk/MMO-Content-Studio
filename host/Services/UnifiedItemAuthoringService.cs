@@ -181,6 +181,7 @@ public sealed class UnifiedItemAuthoringService
         try
         {
             var existing = await _repository.LoadAsync(itemId, cancellationToken);
+            var wasRuntimeEnabled = existing?.RuntimeEnabled == true;
             var draft = Normalize(request);
             if (!IsMatchingPreview(itemId, "save_draft", draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature))
             {
@@ -192,7 +193,7 @@ public sealed class UnifiedItemAuthoringService
             {
                 return AuthoringOperationResult<ItemMutationResponse>.Failure(validation.Messages);
             }
-            if (existing?.RuntimeEnabled == true)
+            if (wasRuntimeEnabled)
             {
                 var referenceErrors = new List<ApiError>();
                 await AddDisableReferenceErrorsAsync(itemId, referenceErrors, cancellationToken);
@@ -215,7 +216,7 @@ public sealed class UnifiedItemAuthoringService
             }
 
             var messages = validation.Messages.ToList();
-            if (verified.RuntimeEnabled && _runtimeCatalogPublisher is not null)
+            if (wasRuntimeEnabled && _runtimeCatalogPublisher is not null)
             {
                 messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
             }

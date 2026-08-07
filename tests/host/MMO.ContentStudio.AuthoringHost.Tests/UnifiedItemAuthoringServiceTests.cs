@@ -742,11 +742,14 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RuntimeEnabledSaveDraftAndDisableRefreshRuntimeCatalogs()
+    public async Task RuntimeEnabledSaveDraftUnpublishesAndRefreshesRuntimeCatalogs()
     {
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord() with { RuntimeEnabled = true });
-        var publisher = new TestRuntimeCatalogPublisher();
+        var publisher = new TestRuntimeCatalogPublisher
+        {
+            OnPublish = () => Assert.False(repository.Records[ItemId].RuntimeEnabled)
+        };
         var service = CreateService(repository, runtimeCatalogPublisher: publisher);
 
         var save = await SaveDraftWithPreviewAsync(
@@ -761,23 +764,36 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             });
 
         AssertSucceeded(save);
+        Assert.Equal("Draft", save.Value!.Item.PublicationState);
+        Assert.False(repository.Records[ItemId].RuntimeEnabled);
         Assert.Equal(1, publisher.PublishCount);
+    }
+
+    [Fact]
+    public async Task DisableRunsRuntimeCatalogPublisher()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord() with { RuntimeEnabled = true });
+        var publisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, runtimeCatalogPublisher: publisher);
 
         var disable = await service.DisableAsync(
             ItemId,
-            new ItemPublicationRequest(save.Value!.Item.UpdatedAtUtc, null),
+            new ItemPublicationRequest(repository.Records[ItemId].UpdatedAtUtc, null),
             TestContext.Current.CancellationToken);
 
         AssertSucceeded(disable);
-        Assert.Equal(2, publisher.PublishCount);
+        Assert.False(repository.Records[ItemId].RuntimeEnabled);
+        Assert.Equal(1, publisher.PublishCount);
     }
 
     [Fact]
     public async Task ReloadVerificationFailureReturnsStructuredError()
     {
         var repository = new InMemoryUnifiedItemRepository { CorruptNextReloadAfterSave = true };
-        repository.Put(CompleteRecord());
-        var service = CreateService(repository);
+        repository.Put(CompleteRecord() with { RuntimeEnabled = true });
+        var publisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, runtimeCatalogPublisher: publisher);
         var expected = repository.Records[ItemId].UpdatedAtUtc;
 
         var preview = await service.PreviewAsync(
@@ -802,6 +818,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, error => error.Code == "database_unavailable");
+        Assert.Equal(0, publisher.PublishCount);
     }
 
     [Fact]
@@ -817,6 +834,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         Assert.Contains("await ReplaceToolCapabilitiesAsync(connection, transaction", saveBody);
         Assert.Contains("LoadAggregateAsync(connection, transaction", saveBody);
         Assert.Contains("CommitAsync", saveBody);
+        Assert.Contains("runtime_enabled = false", saveBody);
 
         Assert.Contains("ExecuteDeleteAsync(connection, transaction, \"item_consumable_requirements\"", source);
         Assert.Contains("ExecuteDeleteAsync(connection, transaction, \"item_consumable_effects\"", source);
@@ -1154,7 +1172,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             }
             EnsureExpectedVersion(itemId, existing, expectedUpdatedAtUtc);
 
-            var saved = ToRecord(itemId, draft, existing?.RuntimeEnabled ?? false, NextTimestamp());
+            var saved = ToRecord(itemId, draft, false, NextTimestamp());
             Records[itemId] = saved;
             _corruptNextLoad = CorruptNextReloadAfterSave;
             return Task.FromResult(saved);
@@ -1294,9 +1312,12 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     {
         public int PublishCount { get; private set; }
 
+        public Action? OnPublish { get; init; }
+
         public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
         {
             PublishCount += 1;
+            OnPublish?.Invoke();
             return Task.FromResult<IReadOnlyList<ApiError>>([]);
         }
     }
