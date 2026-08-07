@@ -86,6 +86,7 @@ func _run_fixture() -> void:
 	await _verify_grip_anchor_payload_normalization(main_scene)
 	await _verify_post_save_reload_uses_fresh_item_version(main_scene)
 	_verify_non_json_transport_failure()
+	_verify_mutation_transport_timeout_policy()
 	await _verify_paper_doll_preview_layers()
 	await _verify_paper_doll_preview_interactions()
 	await _verify_paper_doll_preview_camera_and_zoom()
@@ -446,6 +447,18 @@ func _verify_non_json_transport_failure() -> void:
 		"Microsoft.AspNetCore.Http.BadHttpRequestException".to_utf8_buffer())
 	if emitted.size() != 2 or emitted[0] != "preview_item" or not str(emitted[1]).contains("HTTP 400"):
 		_fail("Non-JSON host failures must become a readable request failure")
+
+
+func _verify_mutation_transport_timeout_policy() -> void:
+	var transport := AuthoringHttpTransport.new()
+	var preview_timeout := transport._timeout_seconds_for_operation("item_preview")
+	var publish_timeout := transport._timeout_seconds_for_operation("item_publish")
+	if publish_timeout <= preview_timeout:
+		_fail("Mutation requests must allow more time than normal preview requests")
+		return
+	var timeout_message := transport._transport_failure_message("item_publish", HTTPRequest.RESULT_TIMEOUT)
+	if not timeout_message.contains("reload before retrying"):
+		_fail("Mutation timeout messaging must tell the user to reload before retrying")
 
 
 func _verify_paper_doll_preview_layers() -> void:

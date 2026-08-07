@@ -11,7 +11,7 @@ public sealed class MobAuthoringService
 {
     private const string MobVisualResourcePrefix = "res://assets/maps/objects/mobs/";
 
-    private readonly MobRepository _repository;
+    private readonly IMobRepository _repository;
     private readonly MobDefinitionValidator _validator;
     private readonly MobAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
@@ -19,7 +19,7 @@ public sealed class MobAuthoringService
     private readonly ILogger<MobAuthoringService> _logger;
 
     public MobAuthoringService(
-        MobRepository repository,
+        IMobRepository repository,
         MobDefinitionValidator validator,
         MobAuthoringRegistry registry,
         ItemAssetService assetService,
@@ -613,7 +613,9 @@ public sealed class MobAuthoringService
 
             if (operation == "publish" && _runtimeCatalogPublisher is not null)
             {
-                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(
+                    RuntimeCatalogPublicationScope.Mob,
+                    cancellationToken));
             }
 
             return AuthoringOperationResult<MobMutationResponse>.Success(

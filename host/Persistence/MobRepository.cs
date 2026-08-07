@@ -5,7 +5,41 @@ using NpgsqlTypes;
 
 namespace MMO.ContentStudio.AuthoringHost.Persistence;
 
-public sealed class MobRepository
+public interface IMobRepository
+{
+    Task<IReadOnlyList<MobDefinitionRecord>> ListAsync(
+        string? search,
+        CancellationToken cancellationToken = default);
+
+    Task<MobDefinitionRecord?> LoadAsync(
+        string mobDefinitionId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MobFactionRecord>> LoadFactionsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<MobDropItemRecord>> LoadDropItemsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<MobDefinitionRecord> SaveDraftAsync(
+        string mobDefinitionId,
+        NormalizedMobDraft draft,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<MobDefinitionRecord> SetPublicationAsync(
+        string mobDefinitionId,
+        string publicationState,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task DeleteAsync(
+        string mobDefinitionId,
+        DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed class MobRepository : IMobRepository
 {
     private readonly AuthoringDatabaseConnectionFactory _connectionFactory;
 

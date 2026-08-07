@@ -559,7 +559,9 @@ public sealed class NpcAuthoringService
 
             if (operation == "publish" && _runtimeCatalogPublisher is not null)
             {
-                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(
+                    RuntimeCatalogPublicationScope.Npc,
+                    cancellationToken));
             }
 
             return AuthoringOperationResult<NpcMutationResponse>.Success(

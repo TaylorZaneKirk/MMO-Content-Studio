@@ -40,11 +40,11 @@ public sealed partial class MobDefinitionValidator
         "invalid_mob_drop_item"
     };
 
-    private readonly MobRepository _repository;
+    private readonly IMobRepository _repository;
     private readonly ItemAssetService _assetService;
 
     public MobDefinitionValidator(
-        MobRepository repository,
+        IMobRepository repository,
         ItemAssetService assetService)
     {
         _repository = repository;

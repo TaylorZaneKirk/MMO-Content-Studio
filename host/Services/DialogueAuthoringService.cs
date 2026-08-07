@@ -444,7 +444,9 @@ public sealed class DialogueAuthoringService
 
             if (operation == "publish" && _runtimeCatalogPublisher is not null)
             {
-                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(
+                    RuntimeCatalogPublicationScope.Dialogue,
+                    cancellationToken));
             }
 
             return AuthoringOperationResult<DialogueMutationResponse>.Success(

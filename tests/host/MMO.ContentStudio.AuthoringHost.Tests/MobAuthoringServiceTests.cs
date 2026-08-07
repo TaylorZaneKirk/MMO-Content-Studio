@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
 using MMO.ContentStudio.AuthoringHost.Services;
@@ -440,6 +443,52 @@ public sealed class MobAuthoringServiceTests
         Assert.False(MobAuthoringService.Equivalent(first, second));
     }
 
+    [Fact]
+    public async Task PublishTriggersMobRuntimeCatalogRefreshOnly()
+    {
+        var assetsRoot = Path.Combine(
+            Path.GetTempPath(),
+            "mmo-content-studio-mob-assets",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(assetsRoot, "maps", "objects", "mobs"));
+        await File.WriteAllBytesAsync(
+            Path.Combine(assetsRoot, "maps", "objects", "mobs", "slime.png"),
+            [0x89, 0x50, 0x4E, 0x47],
+            TestContext.Current.CancellationToken);
+
+        try
+        {
+            var repository = new InMemoryMobRepository();
+            repository.Put(Record());
+            var publisher = new TestRuntimeCatalogPublisher();
+            var service = CreateService(repository, assetsRoot, publisher);
+
+            var preview = await service.PreviewAsync(
+                "slime",
+                ToPreviewRequest(repository.Records["slime"], "publish"),
+                TestContext.Current.CancellationToken);
+            AssertSucceeded(preview);
+
+            var publish = await service.PublishAsync(
+                "slime",
+                new MobPublicationRequest(
+                    repository.Records["slime"].UpdatedAtUtc,
+                    preview.Value!.PreviewSignature),
+                TestContext.Current.CancellationToken);
+
+            AssertSucceeded(publish);
+            Assert.Equal("Published", repository.Records["slime"].PublicationState);
+            Assert.Equal([RuntimeCatalogPublicationScope.Mob], publisher.PublishScopes);
+        }
+        finally
+        {
+            if (Directory.Exists(assetsRoot))
+            {
+                Directory.Delete(assetsRoot, true);
+            }
+        }
+    }
+
     private static NormalizedMobDraft SampleDraft() =>
         MobAuthoringService.Normalize(
             "Slime",
@@ -515,4 +564,234 @@ public sealed class MobAuthoringServiceTests
             true,
             0,
             DateTimeOffset.Parse("2026-08-02T12:00:00Z"));
+
+    private static MobPreviewRequest ToPreviewRequest(MobDefinitionRecord record, string operation) =>
+        new(
+            record.DisplayName,
+            record.VisualTexturePath,
+            record.SourceWidth,
+            record.SourceHeight,
+            record.VisualAnchorOffsetX,
+            record.VisualAnchorOffsetY,
+            record.VisualRenderScale,
+            record.FootprintWidthTiles,
+            record.FootprintHeightTiles,
+            record.MaxHealth,
+            record.MovementSpeedTilesPerSecond,
+            record.MovementBehavior,
+            record.WanderRadiusTiles,
+            record.AggressionMode,
+            record.AggressionRadiusTiles,
+            record.LeashRadiusTiles,
+            record.ReturnHomeBehavior,
+            record.CombatFactionId,
+            record.CanProactivelyTargetHostileMobs,
+            record.MobDetectionRadiusTiles,
+            record.MobTargetScanIntervalMs,
+            record.MobTargetScanCandidateLimit,
+            record.PrimaryCombatProfile,
+            record.CombatBonuses,
+            record.GuaranteedDrops
+                .Select(drop => new MobDropDraft(drop.DropOrder, drop.ItemId, drop.StackCount))
+                .ToArray(),
+            record.UpdatedAtUtc,
+            operation);
+
+    private static MobAuthoringService CreateService(
+        IMobRepository repository,
+        string assetsRoot,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
+    {
+        var assetService = new ItemAssetService(Options.Create(new AssetRootsOptions
+        {
+            Roots = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["game_client_assets"] = assetsRoot
+            }
+        }));
+        var validator = new MobDefinitionValidator(repository, assetService);
+        return new MobAuthoringService(
+            repository,
+            validator,
+            new MobAuthoringRegistry(),
+            assetService,
+            NullLogger<MobAuthoringService>.Instance,
+            runtimeCatalogPublisher);
+    }
+
+    private static void AssertSucceeded<T>(AuthoringOperationResult<T> result) =>
+        Assert.True(
+            result.Succeeded,
+            string.Join("; ", result.Errors.Select(error => $"{error.Code}:{error.Field}:{error.Message}:{error.Remediation}")));
+
+    private sealed class InMemoryMobRepository : IMobRepository
+    {
+        private DateTimeOffset _clock = DateTimeOffset.Parse("2026-08-02T12:00:00Z");
+
+        public Dictionary<string, MobDefinitionRecord> Records { get; } = new(StringComparer.Ordinal);
+
+        public void Put(MobDefinitionRecord record) => Records[record.MobDefinitionId] = record;
+
+        public Task<IReadOnlyList<MobDefinitionRecord>> ListAsync(
+            string? search,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MobDefinitionRecord>>(Records.Values.ToArray());
+
+        public Task<MobDefinitionRecord?> LoadAsync(
+            string mobDefinitionId,
+            CancellationToken cancellationToken = default)
+        {
+            Records.TryGetValue(mobDefinitionId, out var record);
+            return Task.FromResult(record);
+        }
+
+        public Task<IReadOnlyList<MobFactionRecord>> LoadFactionsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MobFactionRecord>>(
+            [
+                new("mobs", "Mobs")
+            ]);
+
+        public Task<IReadOnlyList<MobDropItemRecord>> LoadDropItemsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<MobDropItemRecord>>(KnownDropItems().Values.ToArray());
+
+        public Task<MobDefinitionRecord> SaveDraftAsync(
+            string mobDefinitionId,
+            NormalizedMobDraft draft,
+            DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            Records.TryGetValue(mobDefinitionId, out var existing);
+            EnsureExpectedVersion(mobDefinitionId, existing, expectedUpdatedAtUtc);
+            var publicationState = existing?.PublicationState == "Published" ? "Draft" : existing?.PublicationState ?? "Draft";
+            var saved = ToRecord(mobDefinitionId, draft, publicationState, NextTimestamp());
+            Records[mobDefinitionId] = saved;
+            return Task.FromResult(saved);
+        }
+
+        public Task<MobDefinitionRecord> SetPublicationAsync(
+            string mobDefinitionId,
+            string publicationState,
+            DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Records.TryGetValue(mobDefinitionId, out var existing))
+            {
+                throw new MobDefinitionNotFoundException(mobDefinitionId);
+            }
+
+            EnsureExpectedVersion(mobDefinitionId, existing, expectedUpdatedAtUtc);
+            var saved = existing with
+            {
+                PublicationState = publicationState,
+                UpdatedAtUtc = existing.PublicationState == publicationState ? existing.UpdatedAtUtc : NextTimestamp()
+            };
+            Records[mobDefinitionId] = saved;
+            return Task.FromResult(saved);
+        }
+
+        public Task DeleteAsync(
+            string mobDefinitionId,
+            DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            if (!Records.TryGetValue(mobDefinitionId, out var existing))
+            {
+                throw new MobDefinitionNotFoundException(mobDefinitionId);
+            }
+
+            EnsureExpectedVersion(mobDefinitionId, existing, expectedUpdatedAtUtc);
+            Records.Remove(mobDefinitionId);
+            return Task.CompletedTask;
+        }
+
+        private DateTimeOffset NextTimestamp()
+        {
+            _clock = _clock.AddMinutes(1);
+            return _clock;
+        }
+
+        private static void EnsureExpectedVersion(
+            string mobDefinitionId,
+            MobDefinitionRecord? existing,
+            DateTimeOffset? expectedUpdatedAtUtc)
+        {
+            if (existing is null)
+            {
+                return;
+            }
+
+            if (expectedUpdatedAtUtc is null
+                || existing.UpdatedAtUtc.ToUniversalTime() != expectedUpdatedAtUtc.Value.ToUniversalTime())
+            {
+                throw new MobDefinitionConcurrencyException(mobDefinitionId, existing.UpdatedAtUtc);
+            }
+        }
+
+        private static MobDefinitionRecord ToRecord(
+            string mobDefinitionId,
+            NormalizedMobDraft draft,
+            string publicationState,
+            DateTimeOffset updatedAtUtc)
+        {
+            var dropDefinitions = draft.GuaranteedDrops
+                .Select(drop =>
+                {
+                    KnownDropItems().TryGetValue(drop.ItemId, out var known);
+                    return new MobDropDefinition(
+                        drop.DropOrder,
+                        drop.ItemId,
+                        known?.DisplayName ?? drop.ItemId,
+                        drop.StackCount);
+                })
+                .OrderBy(drop => drop.DropOrder)
+                .ToArray();
+            return new MobDefinitionRecord(
+                mobDefinitionId,
+                draft.DisplayName,
+                publicationState,
+                draft.VisualTexturePath,
+                draft.SourceWidth,
+                draft.SourceHeight,
+                draft.VisualAnchorOffsetX,
+                draft.VisualAnchorOffsetY,
+                draft.VisualRenderScale,
+                draft.FootprintWidthTiles,
+                draft.FootprintHeightTiles,
+                draft.MaxHealth,
+                draft.MovementSpeedTilesPerSecond,
+                draft.MovementBehavior,
+                draft.WanderRadiusTiles,
+                draft.AggressionMode,
+                draft.AggressionRadiusTiles,
+                draft.LeashRadiusTiles,
+                draft.ReturnHomeBehavior,
+                draft.CombatFactionId,
+                draft.CombatFactionId is null ? null : "Mobs",
+                draft.CanProactivelyTargetHostileMobs,
+                draft.MobDetectionRadiusTiles,
+                draft.MobTargetScanIntervalMs,
+                draft.MobTargetScanCandidateLimit,
+                draft.PrimaryCombatProfile,
+                draft.CombatBonuses,
+                dropDefinitions,
+                draft.PrimaryCombatProfile is not null,
+                dropDefinitions.Length,
+                updatedAtUtc);
+        }
+    }
+
+    private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
+    {
+        public List<RuntimeCatalogPublicationScope> PublishScopes { get; } = [];
+
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(
+            RuntimeCatalogPublicationScope scope,
+            CancellationToken cancellationToken)
+        {
+            PublishScopes.Add(scope);
+            return Task.FromResult<IReadOnlyList<ApiError>>([]);
+        }
+    }
 }

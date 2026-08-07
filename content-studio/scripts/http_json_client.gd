@@ -7,6 +7,7 @@ signal request_failed(operation: String, message: String, errors: Array)
 const API_VERSION := "1"
 const DEFAULT_BASE_URL := "http://127.0.0.1:5187"
 const REQUEST_TIMEOUT_SECONDS := 8.0
+const MUTATION_REQUEST_TIMEOUT_SECONDS := 30.0
 
 @export var base_url := DEFAULT_BASE_URL
 
@@ -40,6 +41,7 @@ func request(
 		return
 
 	_operation = operation
+	_http_request.timeout = _timeout_seconds_for_operation(operation)
 	var headers := PackedStringArray([
 		"Accept: application/json",
 		"Content-Type: application/json",
@@ -69,7 +71,7 @@ func _on_request_completed(
 	if result != HTTPRequest.RESULT_SUCCESS:
 		request_failed.emit(
 			completed_operation,
-			"The authoring host could not be reached (result %s)." % result,
+			_transport_failure_message(completed_operation, result),
 			[]
 		)
 		return
@@ -128,6 +130,23 @@ func _fail_current(message: String, errors: Array) -> void:
 	var failed_operation := _operation
 	_operation = ""
 	request_failed.emit(failed_operation, message, errors)
+
+
+func _timeout_seconds_for_operation(operation: String) -> float:
+	return MUTATION_REQUEST_TIMEOUT_SECONDS if _is_mutation_operation(operation) else REQUEST_TIMEOUT_SECONDS
+
+
+func _is_mutation_operation(operation: String) -> bool:
+	return operation.ends_with("_save_draft") \
+		or operation.ends_with("_publish") \
+		or operation.ends_with("_disable") \
+		or operation.ends_with("_delete")
+
+
+func _transport_failure_message(operation: String, result: int) -> String:
+	if result == HTTPRequest.RESULT_TIMEOUT and _is_mutation_operation(operation):
+		return "The authoring host mutation timed out after %s seconds. It may have committed already; reload before retrying." % int(_timeout_seconds_for_operation(operation))
+	return "The authoring host could not be reached (result %s)." % result
 
 
 func _extract_error_message(errors: Array, response_code: int) -> String:

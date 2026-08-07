@@ -176,7 +176,7 @@ public sealed class NpcAuthoringServiceTests : IDisposable
                 PreviewSignature = savePreview.Value!.PreviewSignature
             },
             TestContext.Current.CancellationToken);
-        Assert.Equal(0, publisher.PublishCount);
+        Assert.Empty(publisher.PublishScopes);
 
         var publishPreview = await service.PreviewAsync(
             NpcId,
@@ -188,7 +188,7 @@ public sealed class NpcAuthoringServiceTests : IDisposable
             TestContext.Current.CancellationToken);
 
         AssertSucceeded(publish);
-        Assert.Equal(1, publisher.PublishCount);
+        Assert.Equal([RuntimeCatalogPublicationScope.Npc], publisher.PublishScopes);
     }
 
     [Fact]
@@ -409,11 +409,13 @@ public sealed class NpcAuthoringServiceTests : IDisposable
 
     private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
     {
-        public int PublishCount { get; private set; }
+        public List<RuntimeCatalogPublicationScope> PublishScopes { get; } = [];
 
-        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(
+            RuntimeCatalogPublicationScope scope,
+            CancellationToken cancellationToken)
         {
-            PublishCount++;
+            PublishScopes.Add(scope);
             return Task.FromResult<IReadOnlyList<ApiError>>([]);
         }
     }

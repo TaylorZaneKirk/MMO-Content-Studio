@@ -218,7 +218,9 @@ public sealed class UnifiedItemAuthoringService
             var messages = validation.Messages.ToList();
             if (wasRuntimeEnabled && _runtimeCatalogPublisher is not null)
             {
-                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(
+                    RuntimeCatalogPublicationScope.EquipmentVisual,
+                    cancellationToken));
             }
 
             return AuthoringOperationResult<ItemMutationResponse>.Success(
@@ -342,7 +344,9 @@ public sealed class UnifiedItemAuthoringService
 
             if (_runtimeCatalogPublisher is not null)
             {
-                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(
+                    RuntimeCatalogPublicationScope.EquipmentVisual,
+                    cancellationToken));
             }
 
             return AuthoringOperationResult<ItemMutationResponse>.Success(

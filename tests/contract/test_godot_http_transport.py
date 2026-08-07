@@ -22,10 +22,20 @@ class GodotHttpTransportTests(unittest.TestCase):
             "X-Content-Studio-Api-Version",
             "X-Request-Id",
             "REQUEST_TIMEOUT_SECONDS",
+            "MUTATION_REQUEST_TIMEOUT_SECONDS",
+            "_timeout_seconds_for_operation",
+            "_transport_failure_message",
             "request_succeeded.emit",
             "request_failed.emit",
         ):
             self.assertIn(token, transport)
+
+    def test_mutation_timeout_policy_is_operation_aware(self) -> None:
+        transport = (SCRIPTS / "http_json_client.gd").read_text()
+        self.assertIn("HTTPRequest.RESULT_TIMEOUT", transport)
+        self.assertIn("reload before retrying", transport)
+        self.assertIn('operation.ends_with("_publish")', transport)
+        self.assertIn("MUTATION_REQUEST_TIMEOUT_SECONDS if _is_mutation_operation(operation) else REQUEST_TIMEOUT_SECONDS", transport)
 
     def test_facade_delegates_transport_instead_of_parsing_http(self) -> None:
         facade = (SCRIPTS / "authoring_host_client.gd").read_text()

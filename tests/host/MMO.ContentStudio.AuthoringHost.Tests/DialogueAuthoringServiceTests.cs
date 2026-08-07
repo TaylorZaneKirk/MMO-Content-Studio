@@ -160,7 +160,7 @@ public sealed class DialogueAuthoringServiceTests
             DialogueId,
             ToMutationRequest(DialogueTestData.ValidDraft(expected), savePreview.Value!.PreviewSignature),
             TestContext.Current.CancellationToken);
-        Assert.Equal(0, catalogPublisher.PublishCount);
+        Assert.Empty(catalogPublisher.PublishScopes);
 
         expected = repository.Records[DialogueId].UpdatedAtUtc;
 
@@ -175,7 +175,7 @@ public sealed class DialogueAuthoringServiceTests
             TestContext.Current.CancellationToken);
 
         AssertSucceeded(publish);
-        Assert.Equal(1, catalogPublisher.PublishCount);
+        Assert.Equal([RuntimeCatalogPublicationScope.Dialogue], catalogPublisher.PublishScopes);
         Assert.DoesNotContain(publish.Value!.Messages, message => message.Code == "map_catalog_publish_warning");
     }
 
@@ -300,11 +300,13 @@ public sealed class DialogueAuthoringServiceTests
 
     private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
     {
-        public int PublishCount { get; private set; }
+        public List<RuntimeCatalogPublicationScope> PublishScopes { get; } = [];
 
-        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(
+            RuntimeCatalogPublicationScope scope,
+            CancellationToken cancellationToken)
         {
-            PublishCount++;
+            PublishScopes.Add(scope);
             return Task.FromResult<IReadOnlyList<ApiError>>([]);
         }
     }

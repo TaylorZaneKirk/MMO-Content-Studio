@@ -8,43 +8,57 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
 {
-    private static readonly (string Command, string Label, string OutputPath)[] Exports =
+    private static readonly (RuntimeCatalogPublicationScope Scope, string Command, string Label, string OutputPath)[] Exports =
     [
-        ("export-npc-catalog", "NPC", "shared/maps/npcs/catalog.json"),
-        ("export-mob-catalog", "mob", "shared/maps/mobs/catalog.json"),
-        ("export-dialogue-catalog", "dialogue", "shared/dialogues/catalog.json"),
-        ("export-equipment-visual-catalog", "equipment visual", "client/actors/appearance/data/equipped_visuals/published_catalog_v1.json")
+        (RuntimeCatalogPublicationScope.Npc, "export-npc-catalog", "NPC", "shared/maps/npcs/catalog.json"),
+        (RuntimeCatalogPublicationScope.Mob, "export-mob-catalog", "mob", "shared/maps/mobs/catalog.json"),
+        (RuntimeCatalogPublicationScope.Dialogue, "export-dialogue-catalog", "dialogue", "shared/dialogues/catalog.json"),
+        (RuntimeCatalogPublicationScope.EquipmentVisual, "export-equipment-visual-catalog", "equipment visual", "client/actors/appearance/data/equipped_visuals/published_catalog_v1.json")
     ];
 
-    private readonly ItemAssetService _assetService;
     private readonly ILogger<RuntimeCatalogPublisherService> _logger;
     private readonly string _activeProfile;
     private readonly string _connectionString;
     private readonly string? _prototypeRoot;
+    private readonly Func<string, string, CancellationToken, Task<RuntimeCatalogCommandResult>> _commandRunner;
 
     public RuntimeCatalogPublisherService(
         IOptions<ConnectionProfilesOptions> connectionProfiles,
         ItemAssetService assetService,
         ILogger<RuntimeCatalogPublisherService> logger)
+        : this(
+            connectionProfiles.Value.Active,
+            connectionProfiles.Value.Profiles.TryGetValue(connectionProfiles.Value.Active, out var profile)
+                ? profile.ConnectionString
+                : string.Empty,
+            ResolvePrototypeRoot(assetService.GetGameAssetsRoot()),
+            logger)
     {
-        _assetService = assetService;
-        _logger = logger;
-        _activeProfile = connectionProfiles.Value.Active;
-
-        if (connectionProfiles.Value.Profiles.TryGetValue(_activeProfile, out var profile))
-        {
-            _connectionString = profile.ConnectionString;
-        }
-        else
-        {
-            _connectionString = string.Empty;
-        }
-
-        _prototypeRoot = ResolvePrototypeRoot(_assetService.GetGameAssetsRoot());
     }
 
-    public async Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+    internal RuntimeCatalogPublisherService(
+        string activeProfile,
+        string connectionString,
+        string? prototypeRoot,
+        ILogger<RuntimeCatalogPublisherService> logger,
+        Func<string, string, CancellationToken, Task<RuntimeCatalogCommandResult>>? commandRunner = null)
     {
+        _logger = logger;
+        _activeProfile = activeProfile;
+        _connectionString = connectionString;
+        _prototypeRoot = prototypeRoot;
+        _commandRunner = commandRunner ?? RunMapPublisherCommandAsync;
+    }
+
+    public async Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(
+        RuntimeCatalogPublicationScope scope,
+        CancellationToken cancellationToken)
+    {
+        if (scope == RuntimeCatalogPublicationScope.None)
+        {
+            return [];
+        }
+
         var messages = new List<ApiError>();
         var projectDirectory = ResolveMapPublisherProjectDirectory();
         if (projectDirectory is null)
@@ -71,8 +85,13 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
             ];
         }
 
-        foreach (var (command, label, outputPath) in Exports)
+        foreach (var (exportScope, command, label, outputPath) in Exports)
         {
+            if (!scope.HasFlag(exportScope))
+            {
+                continue;
+            }
+
             var warning = await PublishSingleCatalogAsync(
                 _prototypeRoot!,
                 command,
@@ -106,62 +125,36 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
         string outputPath,
         CancellationToken cancellationToken)
     {
-        var projectDirectory = Path.Combine(prototypeRoot, "tools", "MapPublisher");
         try
         {
-            var process = new Process();
-            process.StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                WorkingDirectory = prototypeRoot,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true
-            };
-
-            process.StartInfo.ArgumentList.Add("run");
-            process.StartInfo.ArgumentList.Add("--project");
-            process.StartInfo.ArgumentList.Add(projectDirectory);
-            process.StartInfo.ArgumentList.Add("--");
-            process.StartInfo.ArgumentList.Add(command);
-            process.StartInfo.ArgumentList.Add("--output");
-            process.StartInfo.ArgumentList.Add(outputPath);
-            process.StartInfo.ArgumentList.Add("--connection-string");
-            process.StartInfo.ArgumentList.Add(_connectionString);
-
             _logger.LogInformation(
                 "Running {Command} from {WorkingDirectory} for {Profile} profile.",
                 command,
                 prototypeRoot,
                 _activeProfile);
 
-            process.Start();
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken);
-            var stdout = await stdoutTask;
-            var stderr = await stderrTask;
+            var result = await _commandRunner(command, outputPath, cancellationToken);
 
-            if (process.ExitCode == 0)
+            if (result.ExitCode == 0)
             {
                 _logger.LogInformation(
                     "MapPublisher {Command} completed successfully for profile {Profile}.", command, _activeProfile);
                 return null;
             }
 
-            var details = CombineOutput(stdout, stderr);
+            var details = CombineOutput(result.Stdout, result.Stderr);
             var guidance =
                 $"dotnet run --project tools/MapPublisher -- {command} --output {outputPath} --connection-string <active-profile-connection-string>";
             _logger.LogWarning(
                 "MapPublisher {Command} failed with exit code {ExitCode} for profile {Profile}: {Details}",
                 command,
-                process.ExitCode,
+                result.ExitCode,
                 _activeProfile,
                 details);
 
             return new ApiError(
                 "map_catalog_publish_warning",
-                $"MapPublisher failed to refresh the runtime {label} catalog. Exit code {process.ExitCode}.",
+                $"MapPublisher failed to refresh the runtime {label} catalog. Exit code {result.ExitCode}.",
                 ValidationSeverity.Warning,
                 "publication_state",
                 $"Run manually: {guidance}");
@@ -185,6 +178,42 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
                 "publication_state",
                 "Inspect host logs and run the export command manually.");
         }
+    }
+
+    private async Task<RuntimeCatalogCommandResult> RunMapPublisherCommandAsync(
+        string command,
+        string outputPath,
+        CancellationToken cancellationToken)
+    {
+        var projectDirectory = Path.Combine(_prototypeRoot!, "tools", "MapPublisher");
+        var process = new Process();
+        process.StartInfo = new ProcessStartInfo
+        {
+            FileName = "dotnet",
+            WorkingDirectory = _prototypeRoot!,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
+        };
+
+        process.StartInfo.ArgumentList.Add("run");
+        process.StartInfo.ArgumentList.Add("--project");
+        process.StartInfo.ArgumentList.Add(projectDirectory);
+        process.StartInfo.ArgumentList.Add("--");
+        process.StartInfo.ArgumentList.Add(command);
+        process.StartInfo.ArgumentList.Add("--output");
+        process.StartInfo.ArgumentList.Add(outputPath);
+        process.StartInfo.ArgumentList.Add("--connection-string");
+        process.StartInfo.ArgumentList.Add(_connectionString);
+
+        process.Start();
+        var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+        var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+        await process.WaitForExitAsync(cancellationToken);
+        return new RuntimeCatalogCommandResult(
+            process.ExitCode,
+            await stdoutTask,
+            await stderrTask);
     }
 
     private static string CombineOutput(string stdout, string stderr)
@@ -229,4 +258,6 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
 
         return null;
     }
+
+    internal sealed record RuntimeCatalogCommandResult(int ExitCode, string Stdout, string Stderr);
 }

@@ -778,7 +778,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             TestContext.Current.CancellationToken);
 
         AssertSucceeded(publish);
-        Assert.Equal(1, publisher.PublishCount);
+        Assert.Equal([RuntimeCatalogPublicationScope.EquipmentVisual], publisher.PublishScopes);
     }
 
     [Fact]
@@ -798,7 +798,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             });
 
         AssertSucceeded(save);
-        Assert.Equal(0, publisher.PublishCount);
+        Assert.Empty(publisher.PublishScopes);
     }
 
     [Fact]
@@ -826,7 +826,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         AssertSucceeded(save);
         Assert.Equal("Draft", save.Value!.Item.PublicationState);
         Assert.False(repository.Records[ItemId].RuntimeEnabled);
-        Assert.Equal(1, publisher.PublishCount);
+        Assert.Equal([RuntimeCatalogPublicationScope.EquipmentVisual], publisher.PublishScopes);
     }
 
     [Fact]
@@ -844,7 +844,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
         AssertSucceeded(disable);
         Assert.False(repository.Records[ItemId].RuntimeEnabled);
-        Assert.Equal(1, publisher.PublishCount);
+        Assert.Equal([RuntimeCatalogPublicationScope.EquipmentVisual], publisher.PublishScopes);
     }
 
     [Fact]
@@ -878,7 +878,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, error => error.Code == "item_operation_failed");
-        Assert.Equal(0, publisher.PublishCount);
+        Assert.Empty(publisher.PublishScopes);
     }
 
     [Fact]
@@ -1370,13 +1370,15 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
     private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
     {
-        public int PublishCount { get; private set; }
+        public List<RuntimeCatalogPublicationScope> PublishScopes { get; } = [];
 
         public Action? OnPublish { get; init; }
 
-        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(
+            RuntimeCatalogPublicationScope scope,
+            CancellationToken cancellationToken)
         {
-            PublishCount += 1;
+            PublishScopes.Add(scope);
             OnPublish?.Invoke();
             return Task.FromResult<IReadOnlyList<ApiError>>([]);
         }

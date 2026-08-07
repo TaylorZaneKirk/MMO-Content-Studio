@@ -11,7 +11,7 @@ public static class MobAuthoringFeature
 {
     public static IServiceCollection AddMobAuthoring(this IServiceCollection services)
     {
-        services.AddSingleton<MobRepository>();
+        services.AddSingleton<IMobRepository, MobRepository>();
         services.AddSingleton<MobAuthoringRegistry>();
         services.AddSingleton<MobDefinitionValidator>();
         services.AddSingleton<MobAuthoringService>();
