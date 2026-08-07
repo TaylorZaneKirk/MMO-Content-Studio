@@ -726,25 +726,47 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             from item_equipped_visuals
             where item_id = @item_id;
             """;
-        await using var command = new NpgsqlCommand(sql, connection, transaction);
-        command.Parameters.AddWithValue("item_id", itemId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        string assetKey;
+        string rigId;
+        string bindingType;
+        string renderLayerId;
+        string? socketId;
+        string? secondarySocketId;
+        SourcePixelPointDefinition nudge;
+        await using (var command = new NpgsqlCommand(sql, connection, transaction))
         {
-            return null;
+            command.Parameters.AddWithValue("item_id", itemId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            assetKey = reader.GetString(reader.GetOrdinal("asset_key"));
+            rigId = reader.GetString(reader.GetOrdinal("rig_id"));
+            bindingType = reader.GetString(reader.GetOrdinal("binding_type"));
+            renderLayerId = reader.GetString(reader.GetOrdinal("render_layer_id"));
+            socketId = ReadNullableString(reader, "socket_id");
+            secondarySocketId = ReadNullableString(reader, "secondary_socket_id");
+            nudge = new SourcePixelPointDefinition(
+                reader.GetInt32(reader.GetOrdinal("nudge_x")),
+                reader.GetInt32(reader.GetOrdinal("nudge_y")));
         }
 
+        var gripAnchors = await LoadEquippedVisualGripAnchorsAsync(
+            connection,
+            transaction,
+            itemId,
+            cancellationToken);
         return new ItemEquippedVisualDefinition(
-            reader.GetString(reader.GetOrdinal("asset_key")),
-            reader.GetString(reader.GetOrdinal("rig_id")),
-            reader.GetString(reader.GetOrdinal("binding_type")),
-            reader.GetString(reader.GetOrdinal("render_layer_id")),
-            ReadNullableString(reader, "socket_id"),
-            ReadNullableString(reader, "secondary_socket_id"),
-            new SourcePixelPointDefinition(
-                reader.GetInt32(reader.GetOrdinal("nudge_x")),
-                reader.GetInt32(reader.GetOrdinal("nudge_y"))),
-            await LoadEquippedVisualGripAnchorsAsync(connection, transaction, itemId, cancellationToken));
+            assetKey,
+            rigId,
+            bindingType,
+            renderLayerId,
+            socketId,
+            secondarySocketId,
+            nudge,
+            gripAnchors);
     }
 
     private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>> LoadEquippedVisualGripAnchorsAsync(

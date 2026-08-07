@@ -63,6 +63,7 @@ func _run_fixture() -> void:
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
+	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_paper_doll_preview_layers()
 	await _verify_paper_doll_preview_interactions()
 	await _verify_paper_doll_preview_camera_and_zoom()
@@ -243,6 +244,49 @@ func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void
 		return
 	if items._paper_doll_preview.get_fit_zoom_percent() != 200:
 		_fail("Changing item/new item should not corrupt the preview zoom state")
+		return
+
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_existing_item_icon_preservation(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+
+	var items := scene.get_node("Margin/Root/Tabs/Items")
+	if items == null:
+		_fail("Unified item editor fixture could not locate the Items workspace for icon preservation")
+		return
+
+	items._on_options_received(_available_rig_catalog())
+	items._on_assets_received({"assets": []})
+	items._on_definition_received({
+		"item_id": "inventory_154_axe",
+		"display_name": "Axe",
+		"icon_texture_path": "res://assets/items/Inventory_154_Axe.png",
+		"publication_state": "Draft",
+		"classification_label": "Equipment",
+		"authoring_kind": "Unified",
+		"updated_at_utc": "2026-08-07T00:00:00+00:00",
+		"equipment": {
+			"equipment_slot_id": "right_hand",
+			"required_strength": 1,
+			"requirements": [],
+			"skill_modifiers": [],
+			"combat_bonuses": {},
+			"weapon_profile": null,
+			"equipped_visual": null,
+		},
+		"consumable_behavior": null,
+		"tool_capabilities": [],
+	})
+	items._appearance_enabled.button_pressed = true
+	items._on_appearance_enabled_toggled(true)
+	var payload: Dictionary = items._payload()
+	if str(payload.get("icon_texture_path", "")) != "res://assets/items/Inventory_154_Axe.png":
+		_fail("Appearance-only editing must retain an unavailable persisted icon path")
 		return
 
 	scene.queue_free()

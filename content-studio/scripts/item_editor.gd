@@ -574,7 +574,7 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_item_id.text = str(payload.get("item_id", ""))
 	_item_id.editable = false
 	_display_name.text = str(payload.get("display_name", ""))
-	_select_option(_icon, str(payload.get("icon_texture_path", "")))
+	_rebuild_asset_options(str(payload.get("icon_texture_path", "")))
 	_publication.text = str(payload.get("publication_state", "Unknown"))
 	_classification.text = str(payload.get("classification_label", "Unknown"))
 	_kind.text = str(payload.get("authoring_kind", "Unknown"))
@@ -1593,6 +1593,9 @@ func _rebuild_asset_options(selected_path: String = "") -> void:
 			_asset_by_path[path] = asset
 			_icon.add_item(str(asset.get("display_name", path)))
 			_icon.set_item_metadata(_icon.item_count - 1, path)
+	if not previous.is_empty() and not _asset_by_path.has(previous):
+		_icon.add_item("Unavailable current icon: %s" % previous)
+		_icon.set_item_metadata(_icon.item_count - 1, previous)
 	_select_option(_icon, previous)
 	_update_icon_preview()
 

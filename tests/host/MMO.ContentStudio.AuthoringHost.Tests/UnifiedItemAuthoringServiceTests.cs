@@ -384,6 +384,30 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task AppearanceOnlyPreviewDoesNotChangeExistingIconPath()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+        var existing = repository.Records[ItemId];
+        var request = ToSaveRequest(existing, existing.UpdatedAtUtc) with
+        {
+            Equipment = EquipmentDraft() with
+            {
+                EquippedVisual = EquippedVisualDraft() with { AssetKey = "war_hammer" }
+            }
+        };
+
+        var preview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.DoesNotContain(preview.Value!.Changes, change => change.Field == "icon_texture_path");
+    }
+
+    [Fact]
     public async Task DisablingEquipabilityClearsEquippedVisual()
     {
         var repository = new InMemoryUnifiedItemRepository();
@@ -817,7 +841,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             TestContext.Current.CancellationToken);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "database_unavailable");
+        Assert.Contains(result.Errors, error => error.Code == "item_operation_failed");
         Assert.Equal(0, publisher.PublishCount);
     }
 

@@ -232,6 +232,14 @@ public sealed class UnifiedItemAuthoringService
         {
             return VersionConflict<ItemMutationResponse>(itemId);
         }
+        catch (NpgsqlOperationInProgressException exception)
+        {
+            return OperationFailure<ItemMutationResponse>(exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return OperationFailure<ItemMutationResponse>(exception);
+        }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
             return DatabaseFailure<ItemMutationResponse>(exception);
@@ -347,6 +355,14 @@ public sealed class UnifiedItemAuthoringService
         catch (UnifiedItemConcurrencyException)
         {
             return VersionConflict<ItemMutationResponse>(itemId);
+        }
+        catch (NpgsqlOperationInProgressException exception)
+        {
+            return OperationFailure<ItemMutationResponse>(exception);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return OperationFailure<ItemMutationResponse>(exception);
         }
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
@@ -654,13 +670,27 @@ public sealed class UnifiedItemAuthoringService
             ValidationSeverity.Error,
             "expected_updated_at_utc"));
 
-    private static AuthoringOperationResult<T> DatabaseFailure<T>(Exception exception) =>
-        AuthoringOperationResult<T>.Failure(new ApiError(
+    private AuthoringOperationResult<T> DatabaseFailure<T>(Exception exception)
+    {
+        _logger.LogWarning(exception, "Item authoring database operation failed");
+        return AuthoringOperationResult<T>.Failure(new ApiError(
             "database_unavailable",
             "The configured development database is unavailable or missing the item-authoring schema.",
             ValidationSeverity.Error,
             null,
-            exception.Message));
+            "Verify the configured development database and item-authoring schema."));
+    }
+
+    private AuthoringOperationResult<T> OperationFailure<T>(Exception exception)
+    {
+        _logger.LogError(exception, "Item authoring operation failed");
+        return AuthoringOperationResult<T>.Failure(new ApiError(
+            "item_operation_failed",
+            "The item operation could not be completed.",
+            ValidationSeverity.Error,
+            null,
+            "Reload the item and try again."));
+    }
 
     private static bool HasVersionConflict(
         UnifiedItemRecord? existing,
@@ -672,8 +702,7 @@ public sealed class UnifiedItemAuthoringService
     private static bool IsDatabaseFailure(Exception exception) =>
         exception is AuthoringDatabaseUnavailableException
             or NpgsqlException
-            or TimeoutException
-            or InvalidOperationException;
+            or TimeoutException;
 
     private static bool IsLiveReferenceGuard(PostgresException exception) =>
         exception.SqlState == PostgresErrorCodes.RaiseException
