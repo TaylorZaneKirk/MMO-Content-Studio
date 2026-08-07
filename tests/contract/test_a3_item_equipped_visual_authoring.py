@@ -144,6 +144,25 @@ class A3ItemEquippedVisualAuthoringTests(unittest.TestCase):
         self.assertEqual(40, overlay["z_index_by_direction"]["N"])
         self.assertEqual({"x": 120, "y": 98, "width": 16, "height": 16}, rect)
 
+    def test_studio_tracks_the_runtime_left_hand_socket_and_optional_overlay(self) -> None:
+        runtime_catalog_path = ROOT.parent.parent / "prototype" / "client" / "actors" / "appearance" / "data" / "rigs" / "catalog_v1.json"
+        editor = (ROOT / "content-studio" / "scripts" / "item_editor.gd").read_text()
+
+        import json
+
+        catalog = json.loads(runtime_catalog_path.read_text())
+        rig = next(value for value in catalog["rigs"] if value["rig_id"] == "humanoid_v1")
+        socket = rig["sockets"]["left_hand_primary"]
+        overlay = rig["foreground_overlays"]["left_hand_primary_grip"]
+
+        self.assertEqual({"x": 52, "y": 84}, socket["N"]["1"])
+        self.assertEqual({"x": 116, "y": 84}, socket["S"]["4"])
+        self.assertEqual("left_hand_primary", overlay["socket_id"])
+        self.assertEqual("body", overlay["source_layer_id"])
+        self.assertIsNone(overlay["source_rect_by_direction"]["S"]["4"])
+        self.assertIn("_default_socket_id_for_equipment_slot", editor)
+        self.assertIn('return "left_hand_primary"', editor)
+
 
 if __name__ == "__main__":
     unittest.main()

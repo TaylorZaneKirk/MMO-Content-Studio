@@ -1035,8 +1035,8 @@ func _on_appearance_binding_changed() -> void:
 	if _is_loading:
 		return
 	_cancel_paper_doll_drag()
-	if _selected_metadata(_appearance_binding) == "socket" and _selected_metadata(_appearance_socket).is_empty():
-		_select_option(_appearance_socket, "right_hand_primary")
+	if _selected_metadata(_appearance_binding) == "socket":
+		_select_option(_appearance_socket, _default_socket_id_for_equipment_slot(_selected_metadata(_equipment_slot)))
 	_update_contextual_sections()
 	_on_form_changed()
 
@@ -1877,7 +1877,7 @@ func _initialize_authored_appearance_defaults() -> void:
 	if slot_id == "right_hand":
 		_select_option(_appearance_binding, "socket")
 		_select_option(_appearance_render_layer, "right_hand")
-		_select_option(_appearance_socket, "right_hand_primary")
+		_select_option(_appearance_socket, _default_socket_id_for_equipment_slot(slot_id))
 	else:
 		_select_option(_appearance_binding, "rig_layer")
 		_select_option(_appearance_render_layer, slot_id)
@@ -1886,6 +1886,12 @@ func _initialize_authored_appearance_defaults() -> void:
 	_appearance_nudge_y.value = 0
 	_appearance_defaults_initialized = true
 	_update_grip_pose_controls()
+
+
+func _default_socket_id_for_equipment_slot(slot_id: String) -> String:
+	if slot_id == "left_hand":
+		return "left_hand_primary"
+	return "right_hand_primary"
 
 
 func _cancel_paper_doll_drag() -> void:

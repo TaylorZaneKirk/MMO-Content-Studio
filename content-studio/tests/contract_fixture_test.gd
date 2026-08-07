@@ -172,6 +172,25 @@ func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void
 		return
 
 	items._start_new()
+	items._display_name.text = "Small Shield"
+	items._equipable.button_pressed = true
+	items._select_option(items._equipment_slot, "left_hand")
+	items._update_contextual_sections()
+	items._appearance_enabled.button_pressed = true
+	items._on_appearance_enabled_toggled(true)
+	if items._selected_metadata(items._appearance_binding) != "rig_layer":
+		_fail("New left-hand authored appearance should preserve the rig_layer default")
+		return
+	if items._selected_metadata(items._appearance_render_layer) != "left_hand":
+		_fail("New left-hand authored appearance should default render_layer_id to left_hand")
+		return
+	items._select_option(items._appearance_binding, "socket")
+	items._on_appearance_binding_changed()
+	if items._selected_metadata(items._appearance_socket) != "left_hand_primary":
+		_fail("Left-hand socket authoring should default to left_hand_primary when selected")
+		return
+
+	items._start_new()
 	items._display_name.text = "Axe"
 	items._equipable.button_pressed = true
 	items._select_option(items._equipment_slot, "right_hand")
@@ -626,6 +645,25 @@ func _verify_paper_doll_foreground_overlays() -> void:
 		_fail("Rig-layer preview must not activate socket-owned foreground overlays")
 		return
 
+	var left_visible_slots := ["head", "body", "legs", "left_hand"]
+	var left_socket_visual := _make_socket_visual(Vector2i(16, 16), "left_hand_primary", "N", 1, "flowers", "left_hand")
+	preview.update(true, "left_hand", "flowers", "N", 1, left_visible_slots, left_socket_visual)
+	var left_foreground_overlay := preview._foreground_overlays.get("left_hand_primary_grip", null) as TextureRect
+	var left_held_item := preview._layers.get("left_hand", null) as TextureRect
+	if left_foreground_overlay == null or not left_foreground_overlay.visible:
+		_fail("Left-hand socket-bound preview must render its rig-owned foreground grip overlay")
+		return
+	if left_held_item == null or left_foreground_overlay.z_index <= left_held_item.z_index:
+		_fail("Left-hand foreground grip overlay must render above its socket-bound item")
+		return
+	if left_foreground_overlay.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+		_fail("Left-hand foreground grip overlay must remain non-interactive")
+		return
+	preview.update(true, "left_hand", "small_shield", "N", 1, left_visible_slots, _make_rig_layer_visual("small_shield", "left_hand"))
+	if left_foreground_overlay.visible:
+		_fail("Left-hand rig-layer preview must not activate a socket-owned foreground overlay")
+		return
+
 	stage.free()
 	status.free()
 
@@ -709,11 +747,14 @@ func _build_preview_fixture() -> Dictionary:
 	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/body"))
 	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/legs"))
 	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/right_hand"))
+	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/left_hand"))
 	for direction in ["N", "S", "E", "W"]:
 		_write_fixture_png(temp_root.path_join("actors/player/head/head1-F1-%s.png" % direction), Color(1, 0, 0, 1))
 		_write_fixture_png(temp_root.path_join("actors/player/body/defbod-F1-%s.png" % direction), Color(0, 1, 0, 1))
 		_write_fixture_png(temp_root.path_join("actors/player/legs/defbod-F1-%s.png" % direction), Color(0, 0, 1, 1))
 		_write_fixture_png(temp_root.path_join("actors/player/right_hand/dark_sword-F1-%s.png" % direction), Color(1, 1, 0, 1))
+		_write_fixture_png(temp_root.path_join("actors/player/left_hand/flowers-F1-%s.png" % direction), Color(1, 0.5, 1, 1))
+		_write_fixture_png(temp_root.path_join("actors/player/left_hand/small_shield-F1-%s.png" % direction), Color(0.5, 0.7, 0.8, 1))
 	_write_fixture_png(temp_root.path_join("actors/player/right_hand/axe-F4-W.png"), Color(1, 0.6, 0.2, 1), Vector2i(72, 32))
 
 	preview.game_client_assets_root = temp_root
@@ -760,6 +801,12 @@ func _available_rig_catalog() -> Dictionary:
 							"default_render_plane": "front",
 							"z_index_by_direction": {"N": 40, "E": 40, "S": 40, "W": 40},
 						},
+						{
+							"layer_id": "left_hand",
+							"binding_type": "rig_layer",
+							"default_render_plane": "front",
+							"z_index_by_direction": {"N": 40, "E": 40, "S": 40, "W": 40},
+						},
 					],
 					"sockets": [
 						{
@@ -771,11 +818,32 @@ func _available_rig_catalog() -> Dictionary:
 								"W": {"1": {"x": 0, "y": 16}, "2": {"x": 0, "y": 16}, "3": {"x": 0, "y": 16}, "4": {"x": 0, "y": 16}},
 							},
 						},
+						{
+							"socket_id": "left_hand_primary",
+							"positions": {
+								"N": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
+								"E": {"1": {"x": 0, "y": 16}, "2": {"x": 0, "y": 16}, "3": {"x": 0, "y": 16}, "4": {"x": 0, "y": 16}},
+								"S": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
+								"W": {"1": {"x": 40, "y": 16}, "2": {"x": 40, "y": 16}, "3": {"x": 40, "y": 16}, "4": {"x": 40, "y": 16}},
+							},
+						},
 					],
 					"foreground_overlays": [
 						{
 							"overlay_id": "right_hand_primary_grip",
 							"socket_id": "right_hand_primary",
+							"source_layer_id": "body",
+							"z_index_by_direction": {"N": 50, "E": 50, "S": 50, "W": 50},
+							"source_rect_by_direction": {
+								"N": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+								"E": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+								"S": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+								"W": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+							},
+						},
+						{
+							"overlay_id": "left_hand_primary_grip",
+							"socket_id": "left_hand_primary",
 							"source_layer_id": "body",
 							"z_index_by_direction": {"N": 50, "E": 50, "S": 50, "W": 50},
 							"source_rect_by_direction": {
@@ -803,12 +871,12 @@ func _missing_rig_catalog() -> Dictionary:
 	}
 
 
-func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_primary", direction: String = "N", frame: int = 1, asset_key: String = "dark_sword") -> Dictionary:
+func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_primary", direction: String = "N", frame: int = 1, asset_key: String = "dark_sword", render_layer_id: String = "right_hand") -> Dictionary:
 	return {
 		"asset_key": asset_key,
 		"rig_id": "humanoid_v1",
 		"binding_type": "socket",
-		"render_layer_id": "right_hand",
+		"render_layer_id": render_layer_id,
 		"socket_id": socket_id,
 		"secondary_socket_id": null,
 		"nudge": {"x": 0, "y": 0},
@@ -820,12 +888,12 @@ func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_prima
 	}
 
 
-func _make_rig_layer_visual() -> Dictionary:
+func _make_rig_layer_visual(asset_key: String = "dark_sword", render_layer_id: String = "right_hand") -> Dictionary:
 	return {
-		"asset_key": "dark_sword",
+		"asset_key": asset_key,
 		"rig_id": "humanoid_v1",
 		"binding_type": "rig_layer",
-		"render_layer_id": "right_hand",
+		"render_layer_id": render_layer_id,
 		"socket_id": null,
 		"secondary_socket_id": null,
 		"nudge": {"x": 0, "y": 0},

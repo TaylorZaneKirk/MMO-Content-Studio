@@ -290,6 +290,14 @@ Rig-owned foreground overlays are intentionally not copied into item data. The
 older file-backed asset-key catalog remains a temporary fallback until A5
 migrates broader equipment coverage.
 
+A5 extends the canonical `humanoid_v1` rig with `left_hand_primary` and an
+optional rig-owned `left_hand_primary_grip` overlay. The item editor enumerates
+canonical sockets generically and selects `left_hand_primary` when an author
+changes a left-hand visual to socket binding. A5's approved Small Shield is a
+published `left_hand` `rig_layer` visual because its source art is already
+actor-aligned; the presence of a left-hand gameplay slot does not imply socket
+binding.
+
 Detailed evidence and the phased migration plan live in
 [`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md) and
 [`UNIFIED_ITEM_AUTHORING_PLAN.md`](UNIFIED_ITEM_AUTHORING_PLAN.md), and
