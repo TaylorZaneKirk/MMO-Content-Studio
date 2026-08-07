@@ -281,6 +281,15 @@ payload branch and retired `/api/v1/consumables`, `/api/v1/equipment`, and
 `/api/v1/hand-equipment` route groups. All item mutations now flow through
 `UnifiedItemAuthoringService` and `UnifiedItemRepository`.
 
+A4 publishes runtime-enabled equipped-visual rows through the existing runtime
+catalog publisher into MMO Project's deterministic
+`prototype/client/actors/appearance/data/equipped_visuals/published_catalog_v1.json`.
+The catalog is keyed by authoritative `item_id`; its entries resolve an
+`asset_key` plus canonical humanoid rig/socket metadata in the game client.
+Rig-owned foreground overlays are intentionally not copied into item data. The
+older file-backed asset-key catalog remains a temporary fallback until A5
+migrates broader equipment coverage.
+
 Detailed evidence and the phased migration plan live in
 [`UNIFIED_ITEM_AUTHORING_AUDIT.md`](UNIFIED_ITEM_AUTHORING_AUDIT.md) and
 [`UNIFIED_ITEM_AUTHORING_PLAN.md`](UNIFIED_ITEM_AUTHORING_PLAN.md), and

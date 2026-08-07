@@ -10,9 +10,10 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
 {
     private static readonly (string Command, string Label, string OutputPath)[] Exports =
     [
-        ("export-npc-catalog", "NPC", "prototype/shared/maps/npcs/catalog.json"),
-        ("export-mob-catalog", "mob", "prototype/shared/maps/mobs/catalog.json"),
-        ("export-dialogue-catalog", "dialogue", "prototype/shared/dialogues/catalog.json")
+        ("export-npc-catalog", "NPC", "shared/maps/npcs/catalog.json"),
+        ("export-mob-catalog", "mob", "shared/maps/mobs/catalog.json"),
+        ("export-dialogue-catalog", "dialogue", "shared/dialogues/catalog.json"),
+        ("export-equipment-visual-catalog", "equipment visual", "client/actors/appearance/data/equipped_visuals/published_catalog_v1.json")
     ];
 
     private readonly ItemAssetService _assetService;

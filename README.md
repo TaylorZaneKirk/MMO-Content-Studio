@@ -37,6 +37,7 @@ The repository now contains:
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
 - backend/API and Godot UI support for unified item aggregates, weapon profiles, and tool capabilities
 - optional equipped-visual metadata inside unified equipment aggregates, including canonical actor-rig selectors, socket/grip authoring, and per-pose grip anchors
+- deterministic publication of runtime-enabled equipped visuals to the MMO Project item-ID catalog, with the current file-backed catalog retained as migration fallback
 - a T4B mob-authoring host boundary with schema handoff, repository, validation,
   options, catalog, load, preview, draft, publish, disable, concurrency, and
   preview-signature support

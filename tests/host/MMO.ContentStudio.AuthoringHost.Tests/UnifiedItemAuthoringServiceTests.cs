@@ -742,6 +742,37 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RuntimeEnabledSaveDraftAndDisableRefreshRuntimeCatalogs()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord() with { RuntimeEnabled = true });
+        var publisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, runtimeCatalogPublisher: publisher);
+
+        var save = await SaveDraftWithPreviewAsync(
+            service,
+            ItemId,
+            ToSaveRequest(repository.Records[ItemId], repository.Records[ItemId].UpdatedAtUtc) with
+            {
+                Equipment = EquipmentDraft() with
+                {
+                    EquippedVisual = EquippedVisualDraft() with { AssetKey = "war_hammer" }
+                }
+            });
+
+        AssertSucceeded(save);
+        Assert.Equal(1, publisher.PublishCount);
+
+        var disable = await service.DisableAsync(
+            ItemId,
+            new ItemPublicationRequest(save.Value!.Item.UpdatedAtUtc, null),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(disable);
+        Assert.Equal(2, publisher.PublishCount);
+    }
+
+    [Fact]
     public async Task ReloadVerificationFailureReturnsStructuredError()
     {
         var repository = new InMemoryUnifiedItemRepository { CorruptNextReloadAfterSave = true };
@@ -1123,7 +1154,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             }
             EnsureExpectedVersion(itemId, existing, expectedUpdatedAtUtc);
 
-            var saved = ToRecord(itemId, draft, false, NextTimestamp());
+            var saved = ToRecord(itemId, draft, existing?.RuntimeEnabled ?? false, NextTimestamp());
             Records[itemId] = saved;
             _corruptNextLoad = CorruptNextReloadAfterSave;
             return Task.FromResult(saved);

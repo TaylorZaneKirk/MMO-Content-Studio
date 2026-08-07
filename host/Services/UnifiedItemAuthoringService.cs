@@ -214,8 +214,14 @@ public sealed class UnifiedItemAuthoringService
                 throw new InvalidOperationException("The saved item aggregate failed reload-and-verify.");
             }
 
+            var messages = validation.Messages.ToList();
+            if (verified.RuntimeEnabled && _runtimeCatalogPublisher is not null)
+            {
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+            }
+
             return AuthoringOperationResult<ItemMutationResponse>.Success(
-                new ItemMutationResponse("save_draft", ToDefinition(verified), validation.Messages));
+                new ItemMutationResponse("save_draft", ToDefinition(verified), messages));
         }
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
@@ -325,7 +331,7 @@ public sealed class UnifiedItemAuthoringService
                 throw new InvalidOperationException("The item publication mutation failed reload-and-verify.");
             }
 
-            if (operation == "publish" && _runtimeCatalogPublisher is not null)
+            if (_runtimeCatalogPublisher is not null)
             {
                 messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
             }
