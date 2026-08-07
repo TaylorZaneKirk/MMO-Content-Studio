@@ -5,6 +5,7 @@ const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_sup
 const PAPER_DOLL_PREVIEW_SCRIPT := preload("res://scripts/paper_doll_preview.gd")
 
 const COMBAT_UNIT_MILLISECONDS := 600
+const ATTACHMENT_ANCHOR_LIMIT := 4096
 const DEFAULT_BONUS_FIELDS := [
 	{"id": "attack_thrust", "display_name": "Attack Thrust"},
 	{"id": "attack_slash", "display_name": "Attack Slash"},
@@ -861,7 +862,11 @@ func _copy_grip_anchor_payload() -> Dictionary:
 			var frame := str(frame_variant)
 			var point_variant: Variant = frames.get(frame, null)
 			if point_variant is Dictionary:
-				copied_frames[frame] = (point_variant as Dictionary).duplicate(true)
+				var point := point_variant as Dictionary
+				copied_frames[frame] = {
+					"x": _normalize_attachment_anchor_coordinate(point.get("x", 0)),
+					"y": _normalize_attachment_anchor_coordinate(point.get("y", 0)),
+				}
 		if not copied_frames.is_empty():
 			copied[direction] = copied_frames
 	return copied
@@ -1143,7 +1148,22 @@ func _get_pose_anchor(direction: String, frame: int):
 	if not (point_variant is Dictionary):
 		return null
 	var point := point_variant as Dictionary
-	return Vector2i(int(point.get("x", 0)), int(point.get("y", 0)))
+	return Vector2i(
+		_normalize_attachment_anchor_coordinate(point.get("x", 0)),
+		_normalize_attachment_anchor_coordinate(point.get("y", 0)))
+
+
+func _normalize_attachment_anchor_coordinate(value: Variant) -> int:
+	if value is int:
+		return clampi(value, -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
+	if value is float:
+		var numeric := float(value)
+		if is_finite(numeric):
+			return clampi(
+				int(round(clampf(numeric, -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT))),
+				-ATTACHMENT_ANCHOR_LIMIT,
+				ATTACHMENT_ANCHOR_LIMIT)
+	return 0
 
 
 func _update_grip_pose_controls() -> void:

@@ -74,16 +74,16 @@ func _on_request_completed(
 		)
 		return
 
-	var decoded: Variant = JSON.parse_string(body.get_string_from_utf8())
-	if typeof(decoded) != TYPE_DICTIONARY:
+	var json := JSON.new()
+	if json.parse(body.get_string_from_utf8()) != OK or typeof(json.data) != TYPE_DICTIONARY:
 		request_failed.emit(
 			completed_operation,
-			"The authoring host returned invalid JSON.",
+			"The authoring host returned a non-JSON response (HTTP %s)." % response_code,
 			[]
 		)
 		return
 
-	var envelope := decoded as Dictionary
+	var envelope := json.data as Dictionary
 	var errors := envelope.get("errors", []) as Array
 	if response_code < 200 or response_code >= 300:
 		request_failed.emit(

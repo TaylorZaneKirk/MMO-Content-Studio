@@ -17,7 +17,8 @@ class GodotHttpTransportTests(unittest.TestCase):
         for token in (
             "class_name AuthoringHttpTransport",
             "HTTPRequest.new()",
-            "JSON.parse_string",
+            "JSON.new()",
+            "json.parse",
             "X-Content-Studio-Api-Version",
             "X-Request-Id",
             "REQUEST_TIMEOUT_SECONDS",

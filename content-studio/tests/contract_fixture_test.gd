@@ -2,6 +2,7 @@ extends SceneTree
 
 const EXPECTED_API_VERSION := "1"
 const AuthoringWorkspaceSupport = preload("res://scripts/authoring_workspace_support.gd")
+const AuthoringHttpTransport = preload("res://scripts/http_json_client.gd")
 const PaperDollPreview = preload("res://scripts/paper_doll_preview.gd")
 
 
@@ -64,6 +65,8 @@ func _run_fixture() -> void:
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
+	await _verify_grip_anchor_payload_normalization(main_scene)
+	_verify_non_json_transport_failure()
 	await _verify_paper_doll_preview_layers()
 	await _verify_paper_doll_preview_interactions()
 	await _verify_paper_doll_preview_camera_and_zoom()
@@ -291,6 +294,56 @@ func _verify_existing_item_icon_preservation(main_scene: PackedScene) -> void:
 
 	scene.queue_free()
 	await process_frame
+
+
+func _verify_grip_anchor_payload_normalization(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+
+	var items := scene.get_node("Margin/Root/Tabs/Items")
+	if items == null:
+		_fail("Unified item editor fixture could not locate the Items workspace for grip-anchor normalization")
+		return
+
+	items._on_options_received(_available_rig_catalog())
+	items._start_new()
+	items._equipable.button_pressed = true
+	items._select_option(items._equipment_slot, "right_hand")
+	items._update_contextual_sections()
+	items._appearance_enabled.button_pressed = true
+	items._on_appearance_enabled_toggled(true)
+	items._equipped_visual_grip_anchors["E"] = {
+		"1": {"x": 5000000000, "y": -5000000000},
+	}
+	var payload: Dictionary = items._payload()
+	var equipment := payload.get("equipment", {}) as Dictionary
+	var equipped_visual := equipment.get("equipped_visual", {}) as Dictionary
+	var grip_anchors := equipped_visual.get("grip_anchors", {}) as Dictionary
+	var east := grip_anchors.get("E", {}) as Dictionary
+	var anchor := east.get("1", {}) as Dictionary
+	if int(anchor.get("x", 0)) != 4096 or int(anchor.get("y", 0)) != -4096:
+		_fail("Grip-anchor payloads must clamp invalid transient values to the attachment contract")
+		return
+
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_non_json_transport_failure() -> void:
+	var transport := AuthoringHttpTransport.new()
+	var emitted: Array = []
+	transport.request_failed.connect(func(operation: String, message: String, _errors: Array) -> void:
+		emitted.append_array([operation, message])
+	)
+	transport._operation = "preview_item"
+	transport._on_request_completed(
+		HTTPRequest.RESULT_SUCCESS,
+		400,
+		PackedStringArray(),
+		"Microsoft.AspNetCore.Http.BadHttpRequestException".to_utf8_buffer())
+	if emitted.size() != 2 or emitted[0] != "preview_item" or not str(emitted[1]).contains("HTTP 400"):
+		_fail("Non-JSON host failures must become a readable request failure")
 
 
 func _verify_paper_doll_preview_layers() -> void:
