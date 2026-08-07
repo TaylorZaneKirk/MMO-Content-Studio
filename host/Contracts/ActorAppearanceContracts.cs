@@ -6,6 +6,12 @@ public sealed record SourcePixelPointDefinition(
     [property: JsonPropertyName("x")] int X,
     [property: JsonPropertyName("y")] int Y);
 
+public sealed record SourcePixelRectangleDefinition(
+    [property: JsonPropertyName("x")] int X,
+    [property: JsonPropertyName("y")] int Y,
+    [property: JsonPropertyName("width")] int Width,
+    [property: JsonPropertyName("height")] int Height);
+
 public sealed record ActorRigCatalogDefinition(
     [property: JsonPropertyName("available")] bool Available,
     [property: JsonPropertyName("source_path")] string? SourcePath,
@@ -16,7 +22,8 @@ public sealed record ActorRigDefinition(
     [property: JsonPropertyName("rig_id")] string RigId,
     [property: JsonPropertyName("schema_version")] int SchemaVersion,
     [property: JsonPropertyName("layers")] IReadOnlyList<ActorRigLayerDefinition> Layers,
-    [property: JsonPropertyName("sockets")] IReadOnlyList<ActorRigSocketDefinition> Sockets);
+    [property: JsonPropertyName("sockets")] IReadOnlyList<ActorRigSocketDefinition> Sockets,
+    [property: JsonPropertyName("foreground_overlays")] IReadOnlyList<ActorRigForegroundOverlayDefinition> ForegroundOverlays);
 
 public sealed record ActorRigLayerDefinition(
     [property: JsonPropertyName("layer_id")] string LayerId,
@@ -27,3 +34,10 @@ public sealed record ActorRigLayerDefinition(
 public sealed record ActorRigSocketDefinition(
     [property: JsonPropertyName("socket_id")] string SocketId,
     [property: JsonPropertyName("positions")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> Positions);
+
+public sealed record ActorRigForegroundOverlayDefinition(
+    [property: JsonPropertyName("overlay_id")] string OverlayId,
+    [property: JsonPropertyName("socket_id")] string SocketId,
+    [property: JsonPropertyName("source_layer_id")] string SourceLayerId,
+    [property: JsonPropertyName("z_index_by_direction")] IReadOnlyDictionary<string, int> ZIndexByDirection,
+    [property: JsonPropertyName("source_rect_by_direction")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition?>> SourceRectByDirection);

@@ -66,6 +66,7 @@ func _run_fixture() -> void:
 	await _verify_paper_doll_preview_layers()
 	await _verify_paper_doll_preview_interactions()
 	await _verify_paper_doll_preview_camera_and_zoom()
+	await _verify_paper_doll_foreground_overlays()
 	await _verify_live_runtime_catalog_if_configured()
 
 	print("[content-studio-contract-fixture] passed")
@@ -534,6 +535,101 @@ func _verify_paper_doll_preview_camera_and_zoom() -> void:
 	status.free()
 
 
+func _verify_paper_doll_foreground_overlays() -> void:
+	var preview_fixture := _build_preview_fixture()
+	var preview: PaperDollPreview = preview_fixture.preview
+	var stage: Control = preview_fixture.stage
+	var status: Label = preview_fixture.status
+	var visible_slots := ["head", "body", "legs", "right_hand"]
+	var socket_visual := _make_socket_visual(Vector2i(16, 16), "right_hand_primary", "N", 1)
+
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, socket_visual)
+	var foreground_overlay := preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	var held_item := preview._layers.get("right_hand", null) as TextureRect
+	if foreground_overlay == null or not foreground_overlay.visible:
+		_fail("Valid socket-bound preview must render the canonical foreground grip overlay")
+		return
+	if foreground_overlay.z_index <= held_item.z_index:
+		_fail("Foreground grip overlay must render above the held item")
+		return
+	if foreground_overlay.mouse_filter != Control.MOUSE_FILTER_IGNORE:
+		_fail("Foreground grip overlay must remain non-interactive")
+		return
+	if preview._layers.has("right_hand_primary_grip"):
+		_fail("Foreground grip overlay must not be registered as an item-owned preview layer")
+		return
+	var overlay_texture := foreground_overlay.texture as AtlasTexture
+	if overlay_texture == null or overlay_texture.region != Rect2(8, 8, 8, 8):
+		_fail("Foreground grip overlay must preserve canonical source crop metadata")
+		return
+	var fit_overlay_position := foreground_overlay.position
+	var fit_overlay_size := foreground_overlay.size
+	var fit_anchor_position := preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
+
+	preview.set_fit_zoom_percent(200)
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, socket_visual)
+	foreground_overlay = preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	if foreground_overlay.position == fit_overlay_position or foreground_overlay.size.x <= fit_overlay_size.x:
+		_fail("Fit zoom must preserve foreground-overlay registration while scaling its stage transform")
+		return
+	if preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO) != fit_anchor_position:
+		_fail("Foreground overlay rendering must not change attachment anchor calculations")
+		return
+	preview.update(true, "right_hand", "dark_sword", "W", 1, visible_slots, _make_socket_visual(Vector2i(-20, 24), "right_hand_primary", "W"))
+	foreground_overlay = preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	if foreground_overlay == null or not foreground_overlay.visible or preview._socket_marker.position != preview._grip_marker.position:
+		_fail("Foreground overlays must preserve signed virtual attachment-anchor registration")
+		return
+
+	preview.set_actual_scale_enabled(true)
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, socket_visual)
+	foreground_overlay = preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	if foreground_overlay == null or not foreground_overlay.visible or absf(foreground_overlay.size.x - 2.0) > 0.0001:
+		_fail("Actual scale must preserve foreground-overlay registration at canonical source-art scale")
+		return
+
+	var rig := (preview._rigs_by_id.get("humanoid_v1", {}) as Dictionary).duplicate(true)
+	var overlays: Array = rig.get("foreground_overlays", []) as Array
+	var optional_overlay := (overlays[0] as Dictionary).duplicate(true)
+	var rectangles: Dictionary = (optional_overlay.get("source_rect_by_direction", {}) as Dictionary).duplicate(true)
+	var north_rectangles: Dictionary = (rectangles.get("N", {}) as Dictionary).duplicate(true)
+	north_rectangles["1"] = null
+	rectangles["N"] = north_rectangles
+	optional_overlay["source_rect_by_direction"] = rectangles
+	rig["foreground_overlays"] = [optional_overlay]
+	rig["foreground_overlays_by_id"] = {"right_hand_primary_grip": optional_overlay}
+	preview._rigs_by_id["humanoid_v1"] = rig
+	preview.set_actual_scale_enabled(false)
+	preview.reset_fit_view()
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, socket_visual)
+	foreground_overlay = preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	if foreground_overlay == null or foreground_overlay.visible:
+		_fail("Optional missing foreground-overlay pose must render nothing")
+		return
+	if not held_item.visible:
+		_fail("Optional missing foreground-overlay pose must leave the held item visible")
+		return
+
+	var unavailable_source_overlay := (overlays[0] as Dictionary).duplicate(true)
+	unavailable_source_overlay["source_layer_id"] = "unavailable_source_layer"
+	rig["foreground_overlays"] = [unavailable_source_overlay]
+	rig["foreground_overlays_by_id"] = {"right_hand_primary_grip": unavailable_source_overlay}
+	preview._rigs_by_id["humanoid_v1"] = rig
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, socket_visual)
+	foreground_overlay = preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	if foreground_overlay == null or foreground_overlay.visible:
+		_fail("Unavailable foreground-overlay source art must degrade safely")
+		return
+
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, _make_rig_layer_visual())
+	if foreground_overlay.visible:
+		_fail("Rig-layer preview must not activate socket-owned foreground overlays")
+		return
+
+	stage.free()
+	status.free()
+
+
 func _verify_live_runtime_catalog_if_configured() -> void:
 	if not OS.has_environment("CONTENT_STUDIO_LIVE_OPTIONS_PATH"):
 		return
@@ -673,6 +769,20 @@ func _available_rig_catalog() -> Dictionary:
 								"E": {"1": {"x": 40, "y": 16}, "2": {"x": 40, "y": 16}, "3": {"x": 40, "y": 16}, "4": {"x": 40, "y": 16}},
 								"S": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
 								"W": {"1": {"x": 0, "y": 16}, "2": {"x": 0, "y": 16}, "3": {"x": 0, "y": 16}, "4": {"x": 0, "y": 16}},
+							},
+						},
+					],
+					"foreground_overlays": [
+						{
+							"overlay_id": "right_hand_primary_grip",
+							"socket_id": "right_hand_primary",
+							"source_layer_id": "body",
+							"z_index_by_direction": {"N": 50, "E": 50, "S": 50, "W": 50},
+							"source_rect_by_direction": {
+								"N": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+								"E": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+								"S": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
+								"W": {"1": {"x": 8, "y": 8, "width": 8, "height": 8}},
 							},
 						},
 					],

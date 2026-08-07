@@ -27,10 +27,12 @@ var _rigs_by_id: Dictionary = {}
 var _stage: Control
 var _status: Label
 var _layer_root: Control
+var _foreground_overlay_root: Control
 var _overlay_root: Control
 var _socket_marker: ColorRect
 var _grip_marker: ColorRect
 var _layers: Dictionary = {}
+var _foreground_overlays: Dictionary = {}
 var _file_cache: Dictionary = {}
 var _texture_cache: Dictionary = {}
 var _current_pose_context: Dictionary = {}
@@ -51,6 +53,10 @@ func bind(stage: Control, status: Label) -> void:
 	_layer_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_layer_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	stage.add_child(_layer_root)
+	_foreground_overlay_root = Control.new()
+	_foreground_overlay_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_foreground_overlay_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	stage.add_child(_foreground_overlay_root)
 	_overlay_root = Control.new()
 	_overlay_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_overlay_root.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -103,8 +109,14 @@ func configure_rig_catalog(catalog: Dictionary) -> void:
 			if socket_variant is Dictionary:
 				var socket := socket_variant as Dictionary
 				sockets_by_id[str(socket.get("socket_id", ""))] = socket
+		var foreground_overlays_by_id: Dictionary = {}
+		for foreground_overlay_variant: Variant in rig.get("foreground_overlays", []) as Array:
+			if foreground_overlay_variant is Dictionary:
+				var foreground_overlay := foreground_overlay_variant as Dictionary
+				foreground_overlays_by_id[str(foreground_overlay.get("overlay_id", ""))] = foreground_overlay
 		rig["layers_by_id"] = layers_by_id
 		rig["sockets_by_id"] = sockets_by_id
+		rig["foreground_overlays_by_id"] = foreground_overlays_by_id
 		_rigs_by_id[rig_id] = rig
 	if _rigs_by_id.is_empty():
 		_rig_catalog_status = "The canonical actor rig catalog is empty."
@@ -176,6 +188,7 @@ func update(
 	_current_pose_context.clear()
 	_asset_resolution_diagnostics.clear()
 	_reset_layers()
+	_reset_foreground_overlays()
 	_hide_markers()
 
 	if _stage == null or _status == null:
@@ -244,6 +257,16 @@ func update(
 		layer.z_index = int(layer_entry.get("z_index", 0))
 		layer.size = texture.get_size() * preview_scale
 		layer.position = group_origin + ((source_position - view_bounds.position) * preview_scale)
+	_render_foreground_overlays(
+		rig,
+		equipped_visual,
+		valid_socket_attachment,
+		selected_direction,
+		selected_frame,
+		layer_entries,
+		view_bounds,
+		group_origin,
+		preview_scale)
 
 	_last_view_state = {
 		"stage_size": stage_size,
@@ -457,6 +480,91 @@ func _resolve_layer_z_index(rig: Dictionary, layer_id: String, direction: String
 	return int(z_indexes.get(direction, 0))
 
 
+func _render_foreground_overlays(
+	rig: Dictionary,
+	equipped_visual: Dictionary,
+	valid_socket_attachment: bool,
+	direction: String,
+	frame: int,
+	layer_entries: Array,
+	view_bounds: Rect2,
+	group_origin: Vector2,
+	preview_scale: float) -> void:
+	if not valid_socket_attachment:
+		return
+
+	var socket_id := str(equipped_visual.get("socket_id", ""))
+	var layers_by_id: Dictionary = {}
+	for layer_entry_variant: Variant in layer_entries:
+		var layer_entry: Dictionary = layer_entry_variant
+		layers_by_id[str(layer_entry.get("layer_id", ""))] = layer_entry
+
+	var overlays_by_id: Dictionary = rig.get("foreground_overlays_by_id", {})
+	for overlay_id_variant: Variant in overlays_by_id.keys():
+		var overlay_id := str(overlay_id_variant)
+		var overlay: Dictionary = overlays_by_id[overlay_id]
+		if str(overlay.get("socket_id", "")) != socket_id:
+			continue
+
+		var source_layer_id := str(overlay.get("source_layer_id", ""))
+		var source_entry: Dictionary = layers_by_id.get(source_layer_id, {}) as Dictionary
+		if source_entry.is_empty():
+			continue
+
+		var source_texture := source_entry.get("texture") as Texture2D
+		var source_rect = _resolve_foreground_overlay_source_rect(overlay, direction, frame)
+		if source_texture == null or source_rect == null:
+			continue
+
+		if source_rect.position.x < 0 or source_rect.position.y < 0 or \
+			source_rect.end.x > source_texture.get_width() or source_rect.end.y > source_texture.get_height():
+			continue
+
+		var overlay_layer := _ensure_foreground_overlay(overlay_id)
+		var atlas_texture := AtlasTexture.new()
+		atlas_texture.atlas = source_texture
+		atlas_texture.region = Rect2(source_rect.position, source_rect.size)
+		var source_position := _variant_to_vector2(source_entry.get("source_position", ANCHOR_OFFSET), ANCHOR_OFFSET)
+		overlay_layer.texture = atlas_texture
+		overlay_layer.visible = true
+		overlay_layer.z_index = _resolve_foreground_overlay_z_index(overlay, direction)
+		overlay_layer.size = Vector2(source_rect.size) * preview_scale
+		overlay_layer.position = group_origin + (((source_position + Vector2(source_rect.position)) - view_bounds.position) * preview_scale)
+
+
+func _resolve_foreground_overlay_source_rect(overlay: Dictionary, direction: String, frame: int):
+	var rectangles_variant: Variant = overlay.get("source_rect_by_direction", {})
+	if not (rectangles_variant is Dictionary):
+		return null
+
+	var rectangles: Dictionary = rectangles_variant
+	var frames_variant: Variant = rectangles.get(direction, null)
+	if not (frames_variant is Dictionary):
+		return null
+
+	var frames: Dictionary = frames_variant
+	var rectangle_variant: Variant = frames.get(str(clampi(frame, 1, 4)), null)
+	if not (rectangle_variant is Dictionary):
+		return null
+
+	var rectangle: Dictionary = rectangle_variant
+	if not rectangle.has("x") or not rectangle.has("y") or \
+		not rectangle.has("width") or not rectangle.has("height"):
+		return null
+
+	var width := int(rectangle["width"])
+	var height := int(rectangle["height"])
+	if width <= 0 or height <= 0:
+		return null
+
+	return Rect2i(int(rectangle["x"]), int(rectangle["y"]), width, height)
+
+
+func _resolve_foreground_overlay_z_index(overlay: Dictionary, direction: String) -> int:
+	var z_indexes: Dictionary = overlay.get("z_index_by_direction", {}) as Dictionary
+	return int(z_indexes.get(direction, 0))
+
+
 func _load_texture(layer_id: String, asset_key: String, frame: int, direction: String) -> Dictionary:
 	for fallback_frame in _frame_fallbacks(frame, direction):
 		var file_path := _find_file(layer_id, asset_key, int(fallback_frame), direction)
@@ -542,6 +650,7 @@ func _build_marker(color: Color, marker_size: Vector2) -> ColorRect:
 	var marker := ColorRect.new()
 	marker.color = color
 	marker.size = marker_size
+	marker.z_index = 100
 	marker.visible = false
 	marker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return marker
@@ -559,6 +668,18 @@ func _ensure_layer(layer_id: String) -> TextureRect:
 	return layer
 
 
+func _ensure_foreground_overlay(overlay_id: String) -> TextureRect:
+	if _foreground_overlays.has(overlay_id):
+		return _foreground_overlays[overlay_id] as TextureRect
+	var overlay := TextureRect.new()
+	overlay.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	overlay.stretch_mode = TextureRect.STRETCH_SCALE
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_foreground_overlay_root.add_child(overlay)
+	_foreground_overlays[overlay_id] = overlay
+	return overlay
+
+
 func _reset_layers() -> void:
 	for layer_variant: Variant in _layers.values():
 		var layer := layer_variant as TextureRect
@@ -568,6 +689,17 @@ func _reset_layers() -> void:
 		layer.visible = false
 		layer.position = Vector2.ZERO
 		layer.size = Vector2.ZERO
+
+
+func _reset_foreground_overlays() -> void:
+	for overlay_variant: Variant in _foreground_overlays.values():
+		var overlay := overlay_variant as TextureRect
+		if overlay == null:
+			continue
+		overlay.texture = null
+		overlay.visible = false
+		overlay.position = Vector2.ZERO
+		overlay.size = Vector2.ZERO
 
 
 func _hide_markers() -> void:

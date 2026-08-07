@@ -106,6 +106,44 @@ class A3ItemEquippedVisualAuthoringTests(unittest.TestCase):
         ):
             self.assertIn(token, manifest)
 
+    def test_foreground_overlays_remain_canonical_rig_metadata(self) -> None:
+        contracts = (ROOT / "host" / "Contracts" / "ActorAppearanceContracts.cs").read_text()
+        parser = (ROOT / "host" / "Services" / "ActorAppearanceCatalogService.cs").read_text()
+        preview = (ROOT / "content-studio" / "scripts" / "paper_doll_preview.gd").read_text()
+        item_contracts = (ROOT / "host" / "Contracts" / "ItemContracts.cs").read_text()
+        migration = (ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "028_item_equipped_visuals.sql").read_text()
+
+        for token in (
+            "ActorRigForegroundOverlayDefinition",
+            "SourcePixelRectangleDefinition",
+            'JsonPropertyName("foreground_overlays")',
+            "TryReadForegroundOverlays",
+            "TryReadOptionalDirectionalRectangles",
+            "_render_foreground_overlays",
+            "_resolve_foreground_overlay_source_rect",
+            "AtlasTexture",
+        ):
+            self.assertIn(token, contracts + parser + preview)
+
+        self.assertNotIn("foreground_overlay", item_contracts)
+        self.assertNotIn("foreground_overlay", migration)
+
+    def test_studio_contract_tracks_the_runtime_foreground_overlay_pose(self) -> None:
+        runtime_catalog_path = ROOT.parent.parent / "prototype" / "client" / "actors" / "appearance" / "data" / "rigs" / "catalog_v1.json"
+        self.assertTrue(runtime_catalog_path.is_file())
+
+        import json
+
+        catalog = json.loads(runtime_catalog_path.read_text())
+        rig = next(value for value in catalog["rigs"] if value["rig_id"] == "humanoid_v1")
+        overlay = rig["foreground_overlays"]["right_hand_primary_grip"]
+        rect = overlay["source_rect_by_direction"]["N"]["1"]
+
+        self.assertEqual("right_hand_primary", overlay["socket_id"])
+        self.assertEqual("body", overlay["source_layer_id"])
+        self.assertEqual(40, overlay["z_index_by_direction"]["N"])
+        self.assertEqual({"x": 120, "y": 98, "width": 16, "height": 16}, rect)
+
 
 if __name__ == "__main__":
     unittest.main()

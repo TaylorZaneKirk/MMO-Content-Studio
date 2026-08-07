@@ -81,7 +81,8 @@ Capabilities:
 - Require preview signatures before save, publish, or disable apply calls
 - Share paper-doll asset resolution and rendering with T3A Equipment
 - Extend Equipped Appearance in-place with optional equipped-visual authoring,
-  canonical rig/socket metadata, and grip-anchor calibration before A2 overlay art
+  canonical rig/socket metadata, grip-anchor calibration, and canonical
+  optional foreground-overlay preview compatibility with the current A2 runtime
 - Replace child collections transactionally and clear stale hand specialization rows when equipability or slot changes
 - Reject publication states that the current runtime cannot load, including left-hand weapon profiles and right-hand items without a weapon profile
 - Defer durability, ammo, charges, item instance state, two-handed rules, and MMO Project runtime execution of tool capabilities

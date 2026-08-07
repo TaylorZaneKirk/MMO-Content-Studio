@@ -203,7 +203,57 @@ public sealed class ActorAppearanceCatalogService
             sockets.Add(new ActorRigSocketDefinition(property.Name, points));
         }
 
-        return new ActorRigDefinition(rigId, schemaVersion, layers, sockets);
+        var foregroundOverlays = new List<ActorRigForegroundOverlayDefinition>();
+        if (rigElement.TryGetProperty("foreground_overlays", out var foregroundOverlaysElement)
+            && foregroundOverlaysElement.ValueKind != JsonValueKind.Null
+            && !TryReadForegroundOverlays(
+                foregroundOverlaysElement,
+                layers.Select(layer => layer.LayerId),
+                sockets.Select(socket => socket.SocketId),
+                out foregroundOverlays))
+        {
+            return null;
+        }
+
+        return new ActorRigDefinition(rigId, schemaVersion, layers, sockets, foregroundOverlays);
+    }
+
+    private static bool TryReadForegroundOverlays(
+        JsonElement element,
+        IEnumerable<string> layerIds,
+        IEnumerable<string> socketIds,
+        out List<ActorRigForegroundOverlayDefinition> overlays)
+    {
+        overlays = [];
+        if (element.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        var knownLayerIds = layerIds.ToHashSet(StringComparer.Ordinal);
+        var knownSocketIds = socketIds.ToHashSet(StringComparer.Ordinal);
+        foreach (var property in element.EnumerateObject())
+        {
+            if (property.Value.ValueKind != JsonValueKind.Object
+                || !TryReadRequiredString(property.Value, "socket_id", out var socketId)
+                || !TryReadRequiredString(property.Value, "source_layer_id", out var sourceLayerId)
+                || !knownSocketIds.Contains(socketId)
+                || !knownLayerIds.Contains(sourceLayerId)
+                || !TryReadDirectionalZIndexes(property.Value, "z_index_by_direction", out var zIndexes)
+                || !TryReadOptionalDirectionalRectangles(property.Value, "source_rect_by_direction", out var sourceRects))
+            {
+                return false;
+            }
+
+            overlays.Add(new ActorRigForegroundOverlayDefinition(
+                property.Name,
+                socketId,
+                sourceLayerId,
+                zIndexes,
+                sourceRects));
+        }
+
+        return true;
     }
 
     private static bool TryReadDirectionalZIndexes(
@@ -273,12 +323,99 @@ public sealed class ActorAppearanceCatalogService
         return true;
     }
 
+    private static bool TryReadOptionalDirectionalRectangles(
+        JsonElement element,
+        string propertyName,
+        out IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition?>> rectangles)
+    {
+        var ordered = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition?>>(StringComparer.Ordinal);
+        foreach (var direction in DirectionOrder())
+        {
+            var frames = new Dictionary<string, SourcePixelRectangleDefinition?>(StringComparer.Ordinal);
+            foreach (var frame in FrameOrder())
+            {
+                frames[frame] = null;
+            }
+
+            ordered[direction] = frames;
+        }
+
+        if (!element.TryGetProperty(propertyName, out var rectanglesElement)
+            || rectanglesElement.ValueKind == JsonValueKind.Null)
+        {
+            rectangles = ordered;
+            return true;
+        }
+
+        if (rectanglesElement.ValueKind != JsonValueKind.Object)
+        {
+            rectangles = ordered;
+            return false;
+        }
+
+        foreach (var direction in DirectionOrder())
+        {
+            if (!rectanglesElement.TryGetProperty(direction, out var framesElement)
+                || framesElement.ValueKind == JsonValueKind.Null)
+            {
+                continue;
+            }
+
+            if (framesElement.ValueKind != JsonValueKind.Object)
+            {
+                rectangles = ordered;
+                return false;
+            }
+
+            var frames = new Dictionary<string, SourcePixelRectangleDefinition?>(StringComparer.Ordinal);
+            foreach (var frame in FrameOrder())
+            {
+                if (!framesElement.TryGetProperty(frame, out var rectangleElement)
+                    || rectangleElement.ValueKind == JsonValueKind.Null)
+                {
+                    frames[frame] = null;
+                    continue;
+                }
+
+                if (!TryReadRectangle(rectangleElement, out var rectangle))
+                {
+                    rectangles = ordered;
+                    return false;
+                }
+
+                frames[frame] = rectangle;
+            }
+
+            ordered[direction] = frames;
+        }
+
+        rectangles = ordered;
+        return true;
+    }
+
     private static bool TryReadPoint(JsonElement element, out SourcePixelPointDefinition point)
     {
         point = new SourcePixelPointDefinition(0, 0);
         return TryReadRequiredInt(element, "x", out var x)
             && TryReadRequiredInt(element, "y", out var y)
             && (point = new SourcePixelPointDefinition(x, y)) is not null;
+    }
+
+    private static bool TryReadRectangle(JsonElement element, out SourcePixelRectangleDefinition rectangle)
+    {
+        rectangle = new SourcePixelRectangleDefinition(0, 0, 0, 0);
+        if (!TryReadRequiredInt(element, "x", out var x)
+            || !TryReadRequiredInt(element, "y", out var y)
+            || !TryReadRequiredInt(element, "width", out var width)
+            || !TryReadRequiredInt(element, "height", out var height)
+            || width <= 0
+            || height <= 0)
+        {
+            return false;
+        }
+
+        rectangle = new SourcePixelRectangleDefinition(x, y, width, height);
+        return true;
     }
 
     private static bool TryReadRequiredString(JsonElement element, string propertyName, out string value)

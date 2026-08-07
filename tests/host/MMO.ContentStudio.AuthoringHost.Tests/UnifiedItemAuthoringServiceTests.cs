@@ -83,6 +83,20 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                         "4": { "x": 76, "y": 78 }
                       }
                     }
+                  },
+                  "foreground_overlays": {
+                    "right_hand_primary_grip": {
+                      "socket_id": "right_hand_primary",
+                      "source_layer_id": "body",
+                      "z_index_by_direction": { "N": 40, "E": 40, "S": 40, "W": 40 },
+                      "source_rect_by_direction": {
+                        "N": {
+                          "1": { "x": 72, "y": 72, "width": 8, "height": 8 },
+                          "2": null
+                        },
+                        "E": null
+                      }
+                    }
                   }
                 }
               ]
@@ -402,6 +416,14 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         Assert.Equal("humanoid_v1", rig.RigId);
         Assert.Contains(rig.Layers, value => value.LayerId == "right_hand");
         Assert.Contains(rig.Sockets, value => value.SocketId == "right_hand_primary");
+        var overlay = Assert.Single(rig.ForegroundOverlays);
+        Assert.Equal("right_hand_primary_grip", overlay.OverlayId);
+        Assert.Equal("right_hand_primary", overlay.SocketId);
+        Assert.Equal("body", overlay.SourceLayerId);
+        Assert.Equal(40, overlay.ZIndexByDirection["N"]);
+        Assert.Equal(8, overlay.SourceRectByDirection["N"]["1"]!.Width);
+        Assert.Null(overlay.SourceRectByDirection["N"]["2"]);
+        Assert.Null(overlay.SourceRectByDirection["E"]["1"]);
     }
 
     [Fact]

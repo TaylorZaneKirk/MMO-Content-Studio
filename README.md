@@ -43,7 +43,7 @@ The repository now contains:
 - a top-level Godot Mobs workspace for reusable mob identity, visuals, footprint,
   stats, faction/aggression, one primary combat profile, combat bonuses, and
   ordered guaranteed drops
-- a shared directional paper-doll preview that now reads canonical MMO Project rig metadata for layer depth, sockets, and attachment math
+- a shared directional paper-doll preview that now reads canonical MMO Project rig metadata for layer depth, sockets, attachment math, and optional foreground hand/grip overlays
 - an explicit Equippable / Not equippable control that removes stale equipment metadata atomically
 - portions/empty-container transformations through result items
 - exact validation and logical-change previews
