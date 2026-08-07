@@ -572,6 +572,44 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task PublishRunsRuntimeCatalogPublisher()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var publisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, publisher);
+        var expected = repository.Records[ItemId].UpdatedAtUtc;
+
+        var publish = await service.PublishAsync(
+            ItemId,
+            new ItemPublicationRequest(expected, null),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(publish);
+        Assert.Equal(1, publisher.PublishCount);
+    }
+
+    [Fact]
+    public async Task SaveDraftDoesNotRunRuntimeCatalogPublisher()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var publisher = new TestRuntimeCatalogPublisher();
+        var service = CreateService(repository, publisher);
+
+        var save = await SaveDraftWithPreviewAsync(
+            service,
+            ItemId,
+            ToSaveRequest(repository.Records[ItemId], repository.Records[ItemId].UpdatedAtUtc) with
+            {
+                DisplayName = "Draft Pick"
+            });
+
+        AssertSucceeded(save);
+        Assert.Equal(0, publisher.PublishCount);
+    }
+
+    [Fact]
     public async Task ReloadVerificationFailureReturnsStructuredError()
     {
         var repository = new InMemoryUnifiedItemRepository { CorruptNextReloadAfterSave = true };
@@ -626,7 +664,9 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         Assert.Contains("ExecuteDeleteAsync(connection, transaction, \"item_tool_capabilities\"", source);
     }
 
-    private UnifiedItemAuthoringService CreateService(InMemoryUnifiedItemRepository repository)
+    private UnifiedItemAuthoringService CreateService(
+        InMemoryUnifiedItemRepository repository,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         var assetRoots = Options.Create(new AssetRootsOptions
         {
@@ -645,7 +685,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             registry,
             assetService,
             actorAppearanceCatalogService,
-            NullLogger<UnifiedItemAuthoringService>.Instance);
+            NullLogger<UnifiedItemAuthoringService>.Instance,
+            runtimeCatalogPublisher);
     }
 
     private static SaveItemDraftRequest UnifiedSaveRequest(DateTimeOffset? expected) =>
@@ -1082,6 +1123,17 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             {
                 throw new UnifiedItemConcurrencyException(itemId, existing?.UpdatedAtUtc ?? DateTimeOffset.MinValue);
             }
+        }
+    }
+
+    private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher
+    {
+        public int PublishCount { get; private set; }
+
+        public Task<IReadOnlyList<ApiError>> PublishCatalogsAsync(CancellationToken cancellationToken)
+        {
+            PublishCount += 1;
+            return Task.FromResult<IReadOnlyList<ApiError>>([]);
         }
     }
 }

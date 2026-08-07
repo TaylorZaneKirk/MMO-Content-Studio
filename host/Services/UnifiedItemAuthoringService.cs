@@ -15,6 +15,7 @@ public sealed class UnifiedItemAuthoringService
     private readonly ItemAssetService _assetService;
     private readonly ActorAppearanceCatalogService _actorAppearanceCatalogService;
     private readonly ILogger<UnifiedItemAuthoringService> _logger;
+    private readonly IRuntimeCatalogPublisher? _runtimeCatalogPublisher;
 
     public UnifiedItemAuthoringService(
         IUnifiedItemRepository repository,
@@ -22,13 +23,15 @@ public sealed class UnifiedItemAuthoringService
         ItemAuthoringRegistry registry,
         ItemAssetService assetService,
         ActorAppearanceCatalogService actorAppearanceCatalogService,
-        ILogger<UnifiedItemAuthoringService> logger)
+        ILogger<UnifiedItemAuthoringService> logger,
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         _repository = repository;
         _validator = validator;
         _registry = registry;
         _assetService = assetService;
         _actorAppearanceCatalogService = actorAppearanceCatalogService;
+        _runtimeCatalogPublisher = runtimeCatalogPublisher;
         _logger = logger;
     }
 
@@ -321,6 +324,12 @@ public sealed class UnifiedItemAuthoringService
             {
                 throw new InvalidOperationException("The item publication mutation failed reload-and-verify.");
             }
+
+            if (operation == "publish" && _runtimeCatalogPublisher is not null)
+            {
+                messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(cancellationToken));
+            }
+
             return AuthoringOperationResult<ItemMutationResponse>.Success(
                 new ItemMutationResponse(operation, ToDefinition(verified), messages));
         }

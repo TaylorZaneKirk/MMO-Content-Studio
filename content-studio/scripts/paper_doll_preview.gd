@@ -11,6 +11,7 @@ const ANCHOR_OFFSET := Vector2(-7, -7)
 const ACTUAL_GAME_SCALE := 0.25
 const SOCKET_MARKER_SIZE := Vector2(8, 8)
 const GRIP_MARKER_SIZE := Vector2(8, 8)
+const MISSING_ASSET_HINT_LIMIT := 2
 
 var game_client_assets_root := ""
 
@@ -27,6 +28,8 @@ var _layers: Dictionary = {}
 var _file_cache: Dictionary = {}
 var _texture_cache: Dictionary = {}
 var _current_pose_context: Dictionary = {}
+var _drag_state: Dictionary = {}
+var _asset_resolution_diagnostics: Array = []
 var _last_resolved_asset_path := ""
 
 
@@ -147,8 +150,13 @@ func update(
 		selected_frame,
 		visible_slots,
 		equipped_visual)
+	_drag_state.clear()
 	if layer_entries.is_empty():
-		_status.text = "No preview PNGs could be resolved from the configured game_client_assets root."
+		var diagnostic := "No preview PNGs could be resolved from the configured game_client_assets root."
+		var first_missing := _first_asset_resolution_hint()
+		if not first_missing.is_empty():
+			diagnostic += " First missing asset hint: %s" % first_missing
+		_status.text = diagnostic
 		return {"status": _status.text, "resolved_asset_path": ""}
 
 	var source_bounds := _source_bounds(layer_entries)
@@ -242,6 +250,9 @@ func _resolve_loaded_layers(
 			continue
 		var load_result := _load_texture(layer_id, asset_key, frame, direction)
 		if load_result.is_empty():
+			var asset_path := _expected_layer_asset_path(layer_id, asset_key, frame, direction)
+			if not _asset_resolution_diagnostics.has(asset_path):
+				_asset_resolution_diagnostics.append(asset_path)
 			continue
 		var texture := load_result.get("texture") as Texture2D
 		if texture == null:
@@ -461,6 +472,7 @@ func _update_markers(
 	var socket_position := _variant_to_vector2i(selected_entry.get("socket_position", Vector2i.ZERO), Vector2i.ZERO)
 	var grip_anchor := _variant_to_vector2i(selected_entry.get("grip_anchor", Vector2i.ZERO), Vector2i.ZERO)
 	var source_position := _variant_to_vector2(selected_entry.get("source_position", ANCHOR_OFFSET), ANCHOR_OFFSET)
+	var used_attachment := bool(selected_entry.get("used_attachment", false))
 	var socket_stage := group_origin + (((ANCHOR_OFFSET + Vector2(socket_position)) - source_bounds.position) * preview_scale)
 	var grip_stage := group_origin + (((source_position + Vector2(grip_anchor)) - source_bounds.position) * preview_scale)
 	_socket_marker.visible = true
@@ -473,9 +485,13 @@ func _update_markers(
 			"direction": direction,
 			"frame": frame,
 			"layer_position": group_origin + ((source_position - source_bounds.position) * preview_scale),
+			"layer_position_source": source_position,
 			"preview_scale": preview_scale,
 			"texture_size": texture.get_size(),
 			"authored_anchor": bool(selected_entry.get("authored_anchor", false)),
+			"used_attachment": used_attachment,
+			"can_drag": true,
+			"grip_anchor": Vector2(grip_anchor),
 		}
 
 
@@ -495,7 +511,17 @@ func _status_text(
 		return "No preview PNG matched the selected item visual."
 	var binding_type := str(equipped_visual.get("binding_type", "legacy"))
 	var authored_anchor := bool(_current_pose_context.get("authored_anchor", false))
+	var used_attachment := bool(_current_pose_context.get("used_attachment", false))
+	var socket_id := str(equipped_visual.get("socket_id", ""))
 	if binding_type == "socket":
+		if not used_attachment:
+			return "%s • %s frame %d • %s anchor preview fallback (socket '%s' not available)" % [
+				rig_id,
+				direction,
+				frame,
+				str(selected_entry.get("asset_key", "")),
+				socket_id
+			]
 		return "%s • %s frame %d • %s anchor %s" % [
 			rig_id,
 			direction,
@@ -555,10 +581,15 @@ func _frame_fallbacks(frame: int, direction: String) -> Array:
 func _on_stage_gui_input(event: InputEvent) -> void:
 	if _current_pose_context.is_empty():
 		return
+	var can_drag := bool(_current_pose_context.get("can_drag", false))
+	if not can_drag:
+		return
 	if event is InputEventMouseButton:
 		var mouse_button := event as InputEventMouseButton
 		if mouse_button.button_index == MOUSE_BUTTON_LEFT and mouse_button.pressed:
-			_apply_drag_position(mouse_button.position)
+			_begin_drag(mouse_button.position)
+		elif mouse_button.button_index == MOUSE_BUTTON_LEFT and not mouse_button.pressed:
+			_end_drag()
 	elif event is InputEventMouseMotion:
 		var mouse_motion := event as InputEventMouseMotion
 		if mouse_motion.button_mask & MOUSE_BUTTON_MASK_LEFT:
@@ -566,6 +597,9 @@ func _on_stage_gui_input(event: InputEvent) -> void:
 
 
 func _apply_drag_position(local_position: Vector2) -> void:
+	if bool(_drag_state.get("active", false)):
+		_apply_drag_position_from_active_drag(local_position)
+		return
 	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
 	if preview_scale <= 0.0:
 		return
@@ -581,6 +615,73 @@ func _apply_drag_position(local_position: Vector2) -> void:
 		int(_current_pose_context.get("frame", 1)),
 		x,
 		y)
+
+
+func _begin_drag(local_position: Vector2) -> void:
+	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
+	if preview_scale <= 0.0:
+		return
+	var texture_size := _variant_to_vector2(_current_pose_context.get("texture_size", Vector2.ZERO), Vector2.ZERO)
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return
+	var layer_position := _variant_to_vector2(_current_pose_context.get("layer_position", Vector2.ZERO), Vector2.ZERO)
+	var layer_position_source := _variant_to_vector2(_current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
+	var grip_anchor := _variant_to_vector2(_current_pose_context.get("grip_anchor", Vector2.ZERO), Vector2.ZERO)
+	var grab_offset := (local_position - layer_position) / preview_scale
+	_drag_state = {
+		"active": true,
+		"layer_position_source": layer_position_source,
+		"grip_anchor": grip_anchor,
+		"grab_offset": grab_offset,
+		"texture_size": texture_size,
+		"direction": str(_current_pose_context.get("direction", "N")),
+		"frame": int(_current_pose_context.get("frame", 1)),
+	}
+
+
+func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
+	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
+	if preview_scale <= 0.0:
+		return
+	var texture_size := _variant_to_vector2(_drag_state.get("texture_size", Vector2.ZERO), Vector2.ZERO)
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return
+	var start_layer_position_source := _variant_to_vector2(
+		_drag_state.get("layer_position_source", Vector2.ZERO),
+		Vector2.ZERO
+	)
+	var start_grip_anchor := _variant_to_vector2(_drag_state.get("grip_anchor", Vector2.ZERO), Vector2.ZERO)
+	var grab_offset := _variant_to_vector2(_drag_state.get("grab_offset", Vector2.ZERO), Vector2.ZERO)
+	var desired_layer_source := (local_position / preview_scale) - grab_offset
+	var grip_source := start_grip_anchor + (start_layer_position_source - desired_layer_source)
+	var max_x := int(maxf(texture_size.x - 1.0, 0.0))
+	var max_y := int(maxf(texture_size.y - 1.0, 0.0))
+	var x := clampi(int(round(grip_source.x)), 0, max_x)
+	var y := clampi(int(round(grip_source.y)), 0, max_y)
+	grip_anchor_changed.emit(
+		str(_drag_state.get("direction", "N")),
+		int(_drag_state.get("frame", 1)),
+		x,
+		y)
+
+
+func _end_drag() -> void:
+	_drag_state.clear()
+
+
+func _expected_layer_asset_path(layer_id: String, asset_key: String, frame: int, direction: String) -> String:
+	var directory_path := game_client_assets_root.path_join("actors").path_join("player").path_join(layer_id)
+	return directory_path.path_join("%s-F%d-%s.png" % [asset_key, frame, direction])
+
+
+func _first_asset_resolution_hint() -> String:
+	if _asset_resolution_diagnostics.size() == 0:
+		return ""
+	var max_index := mini(_asset_resolution_diagnostics.size(), MISSING_ASSET_HINT_LIMIT)
+	var hints: Array = []
+	for index in range(max_index):
+		hints.append(str(_asset_resolution_diagnostics[index]))
+	return ", ".join(PackedStringArray(hints))
 
 
 func _variant_to_vector2(value: Variant, fallback: Vector2) -> Vector2:
