@@ -65,6 +65,7 @@ func _run_fixture() -> void:
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_paper_doll_preview_layers()
 	await _verify_paper_doll_preview_interactions()
+	await _verify_paper_doll_preview_camera_and_zoom()
 	await _verify_live_runtime_catalog_if_configured()
 
 	print("[content-studio-contract-fixture] passed")
@@ -194,20 +195,34 @@ func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void
 		_fail("Persisted equipped visual render layer must not be overwritten by defaults")
 		return
 
+	items._paper_doll_preview.set_fit_zoom_percent(200)
+	items._refresh_preview_zoom_controls()
+	if items._appearance_zoom_label.text != "Zoom 200%":
+		_fail("Preview zoom label should reflect transient fit zoom changes")
+		return
 	items._paper_doll_preview._drag_state = {"active": true}
 	items._on_visual_preview_changed()
 	if bool(items._paper_doll_preview._drag_state.get("active", false)):
 		_fail("Changing pose should cancel stale paper-doll drag state")
+		return
+	if items._paper_doll_preview.get_fit_zoom_percent() != 200:
+		_fail("Changing pose should not corrupt the preview zoom state")
 		return
 	items._paper_doll_preview._drag_state = {"active": true}
 	items._on_appearance_binding_changed()
 	if bool(items._paper_doll_preview._drag_state.get("active", false)):
 		_fail("Changing binding should cancel stale paper-doll drag state")
 		return
+	if items._paper_doll_preview.get_fit_zoom_percent() != 200:
+		_fail("Changing binding should not corrupt the preview zoom state")
+		return
 	items._paper_doll_preview._drag_state = {"active": true}
 	items._start_new()
 	if bool(items._paper_doll_preview._drag_state.get("active", false)):
 		_fail("Changing item/new item should cancel stale paper-doll drag state")
+		return
+	if items._paper_doll_preview.get_fit_zoom_percent() != 200:
+		_fail("Changing item/new item should not corrupt the preview zoom state")
 		return
 
 	scene.queue_free()
@@ -346,6 +361,144 @@ func _verify_paper_doll_preview_interactions() -> void:
 	status.free()
 
 
+func _verify_paper_doll_preview_camera_and_zoom() -> void:
+	var preview_fixture := _build_preview_fixture()
+	var preview: PaperDollPreview = preview_fixture.preview
+	var stage: Control = preview_fixture.stage
+	var status: Label = preview_fixture.status
+	var visible_slots := ["head", "body", "legs", "right_hand"]
+	var valid_west_visual := _make_socket_visual(Vector2i(16, 16), "right_hand_primary", "W")
+	var valid_east_visual := _make_socket_visual(Vector2i(16, 16), "right_hand_primary", "E")
+
+	preview.reset_fit_view()
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, valid_west_visual)
+	var body_layer := preview._layers.get("body", null) as TextureRect
+	if body_layer == null:
+		_fail("Preview camera fixture expected a visible body layer")
+		return
+	var west_body_position := body_layer.position
+	var west_body_size := body_layer.size
+	var west_view_state := preview._last_view_state
+	var actor_bounds := preview._variant_to_rect2(west_view_state.get("actor_bounds_source", Rect2()), Rect2())
+	var view_bounds := preview._variant_to_rect2(west_view_state.get("view_bounds_source", Rect2()), Rect2())
+	var padding_source := float(west_view_state.get("padding_source", 0.0))
+	if absf((actor_bounds.position.x - view_bounds.position.x) - padding_source) > 0.01:
+		_fail("Stable edit view should keep the configured left-side source padding around the actor")
+		return
+	if absf(((view_bounds.position.x + view_bounds.size.x) - (actor_bounds.position.x + actor_bounds.size.x)) - padding_source) > 0.01:
+		_fail("Stable edit view should keep the configured right-side source padding around the actor")
+		return
+	if absf((actor_bounds.position.y - view_bounds.position.y) - padding_source) > 0.01:
+		_fail("Stable edit view should keep the configured top-side source padding around the actor")
+		return
+	if absf(((view_bounds.position.y + view_bounds.size.y) - (actor_bounds.position.y + actor_bounds.size.y)) - padding_source) > 0.01:
+		_fail("Stable edit view should keep the configured bottom-side source padding around the actor")
+		return
+	if west_body_position.x <= 50.0:
+		_fail("West-facing pose should begin with meaningful left-side edit margin")
+		return
+
+	var fit_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	var fit_selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	var fit_source_position := preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO)
+	var fit_socket_marker_position := preview._socket_marker.position
+	var fit_grip_marker_position := preview._grip_marker.position
+	if fit_socket_marker_position != fit_grip_marker_position:
+		_fail("Socket and grip markers should stay coincident in the fitted edit view")
+		return
+
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, _make_socket_visual(Vector2i(11, 16), "right_hand_primary", "W"))
+	var west_body_position_after_drag := (preview._layers.get("body", null) as TextureRect).position
+	if west_body_position_after_drag != west_body_position:
+		_fail("Dragging selected equipment must not recenter the actor in the stable edit view")
+		return
+
+	preview.update(true, "right_hand", "axe", "E", 1, visible_slots, valid_east_visual)
+	body_layer = preview._layers.get("body", null) as TextureRect
+	var east_right_margin := stage.size.x - (body_layer.position.x + body_layer.size.x)
+	if east_right_margin <= 50.0:
+		_fail("East-facing pose should begin with meaningful right-side edit margin")
+		return
+
+	preview.reset_fit_view()
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, valid_west_visual)
+	var deterministic_body_position := (preview._layers.get("body", null) as TextureRect).position
+	var deterministic_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, valid_west_visual)
+	if (preview._layers.get("body", null) as TextureRect).position != deterministic_body_position or absf(float(preview._current_pose_context.get("preview_scale", 0.0)) - deterministic_scale) > 0.0001:
+		_fail("Fit view should be deterministic for the same actor pose and selected equipment")
+		return
+
+	preview.set_fit_zoom_percent(200)
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, valid_west_visual)
+	var zoomed_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	var zoomed_selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	if zoomed_scale <= fit_scale or zoomed_selected_rect.size.x <= fit_selected_rect.size.x:
+		_fail("Increasing fit zoom should enlarge the rendered attachment in stage space")
+		return
+	if preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO) != fit_source_position:
+		_fail("Changing zoom must not change the authored source-space attachment position")
+		return
+	if preview._socket_marker.position != preview._grip_marker.position:
+		_fail("Socket and grip markers should stay coincident at higher zoom levels")
+		return
+
+	var emitted: Array = []
+	preview.grip_anchor_changed.connect(func(direction: String, frame: int, x: int, y: int) -> void:
+		emitted.clear()
+		emitted.append_array([direction, frame, x, y])
+	, CONNECT_ONE_SHOT)
+	var selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	var start_mouse := selected_rect.position + (selected_rect.size * 0.5)
+	preview._begin_drag(start_mouse)
+	preview._apply_drag_position(start_mouse + Vector2(5.0 * zoomed_scale, 0))
+	if emitted.size() != 4 or emitted[2] != 11 or emitted[3] != 16:
+		_fail("Drag delta conversion must stay correct at higher zoom levels")
+		return
+	preview._end_drag()
+
+	preview.set_fit_zoom_percent(50)
+	preview.update(true, "right_hand", "axe", "N", 1, visible_slots, _make_socket_visual(Vector2i(16, 16)))
+	var low_zoom_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	var low_zoom_selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	if low_zoom_scale >= fit_scale or low_zoom_selected_rect.size.x >= fit_selected_rect.size.x:
+		_fail("Decreasing fit zoom should shrink the rendered attachment in stage space")
+		return
+	if preview._socket_marker.position != preview._grip_marker.position:
+		_fail("Socket and grip markers should stay coincident at lower zoom levels")
+		return
+
+	emitted.clear()
+	preview.grip_anchor_changed.connect(func(direction: String, frame: int, x: int, y: int) -> void:
+		emitted.clear()
+		emitted.append_array([direction, frame, x, y])
+	, CONNECT_ONE_SHOT)
+	selected_rect = preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	start_mouse = selected_rect.position + (selected_rect.size * 0.5)
+	preview._begin_drag(start_mouse)
+	preview._apply_drag_position(start_mouse + Vector2(5.0 * low_zoom_scale, 0))
+	if emitted.size() != 4 or emitted[2] != 11 or emitted[3] != 16:
+		_fail("Drag delta conversion must stay correct at lower zoom levels")
+		return
+	preview._end_drag()
+
+	preview.set_actual_scale_enabled(true)
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, valid_west_visual)
+	var actual_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	if absf(actual_scale - PaperDollPreview.ACTUAL_GAME_SCALE) > 0.0001:
+		_fail("Actual scale preset should preserve the canonical game render scale")
+		return
+	if preview._variant_to_vector2(preview._current_pose_context.get("layer_position_source", Vector2.ZERO), Vector2.ZERO) != fit_source_position:
+		_fail("Actual scale preset must not change the authored source-space attachment position")
+		return
+	if preview._socket_marker.position != preview._grip_marker.position:
+		_fail("Socket and grip markers should stay coincident in actual scale mode")
+		return
+
+	stage.free()
+	status.free()
+
+
 func _verify_live_runtime_catalog_if_configured() -> void:
 	if not OS.has_environment("CONTENT_STUDIO_LIVE_OPTIONS_PATH"):
 		return
@@ -374,7 +527,7 @@ func _verify_live_runtime_catalog_if_configured() -> void:
 
 	var preview := PaperDollPreview.new()
 	var stage := Control.new()
-	stage.size = Vector2(180, 180)
+	stage.size = PaperDollPreview.STAGE_SIZE
 	var status := Label.new()
 	preview.bind(stage, status)
 	preview.game_client_assets_root = OS.get_environment("CONTENT_STUDIO_GAME_CLIENT_ASSETS")
@@ -416,7 +569,7 @@ func _write_fixture_png(path: String, color: Color) -> void:
 func _build_preview_fixture() -> Dictionary:
 	var preview := PaperDollPreview.new()
 	var stage := Control.new()
-	stage.size = Vector2(180, 180)
+	stage.size = PaperDollPreview.STAGE_SIZE
 	var status := Label.new()
 	preview.bind(stage, status)
 
@@ -425,10 +578,11 @@ func _build_preview_fixture() -> Dictionary:
 	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/body"))
 	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/legs"))
 	DirAccess.make_dir_recursive_absolute(temp_root.path_join("actors/player/right_hand"))
-	_write_fixture_png(temp_root.path_join("actors/player/head/head1-F1-N.png"), Color(1, 0, 0, 1))
-	_write_fixture_png(temp_root.path_join("actors/player/body/defbod-F1-N.png"), Color(0, 1, 0, 1))
-	_write_fixture_png(temp_root.path_join("actors/player/legs/defbod-F1-N.png"), Color(0, 0, 1, 1))
-	_write_fixture_png(temp_root.path_join("actors/player/right_hand/dark_sword-F1-N.png"), Color(1, 1, 0, 1))
+	for direction in ["N", "S", "E", "W"]:
+		_write_fixture_png(temp_root.path_join("actors/player/head/head1-F1-%s.png" % direction), Color(1, 0, 0, 1))
+		_write_fixture_png(temp_root.path_join("actors/player/body/defbod-F1-%s.png" % direction), Color(0, 1, 0, 1))
+		_write_fixture_png(temp_root.path_join("actors/player/legs/defbod-F1-%s.png" % direction), Color(0, 0, 1, 1))
+		_write_fixture_png(temp_root.path_join("actors/player/right_hand/dark_sword-F1-%s.png" % direction), Color(1, 1, 0, 1))
 
 	preview.game_client_assets_root = temp_root
 	preview.configure_rig_catalog(_available_rig_catalog().actor_rig_catalog)
@@ -480,9 +634,9 @@ func _available_rig_catalog() -> Dictionary:
 							"socket_id": "right_hand_primary",
 							"positions": {
 								"N": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
-								"E": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
+								"E": {"1": {"x": 40, "y": 16}, "2": {"x": 40, "y": 16}, "3": {"x": 40, "y": 16}, "4": {"x": 40, "y": 16}},
 								"S": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
-								"W": {"1": {"x": 16, "y": 16}, "2": {"x": 16, "y": 16}, "3": {"x": 16, "y": 16}, "4": {"x": 16, "y": 16}},
+								"W": {"1": {"x": 0, "y": 16}, "2": {"x": 0, "y": 16}, "3": {"x": 0, "y": 16}, "4": {"x": 0, "y": 16}},
 							},
 						},
 					],
@@ -503,7 +657,7 @@ func _missing_rig_catalog() -> Dictionary:
 	}
 
 
-func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_primary") -> Dictionary:
+func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_primary", direction: String = "N", frame: int = 1) -> Dictionary:
 	return {
 		"asset_key": "dark_sword",
 		"rig_id": "humanoid_v1",
@@ -513,8 +667,8 @@ func _make_socket_visual(anchor: Vector2i, socket_id: String = "right_hand_prima
 		"secondary_socket_id": null,
 		"nudge": {"x": 0, "y": 0},
 		"grip_anchors": {
-			"N": {
-				"1": {"x": anchor.x, "y": anchor.y},
+			direction: {
+				str(frame): {"x": anchor.x, "y": anchor.y},
 			},
 		},
 	}

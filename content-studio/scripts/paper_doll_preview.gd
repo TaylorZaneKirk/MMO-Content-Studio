@@ -5,17 +5,22 @@ signal grip_anchor_changed(direction: String, frame: int, x: int, y: int)
 
 const DEFAULT_VISUAL_KEYS := {"head": "head1", "body": "defbod", "legs": "defbod"}
 const DEFAULT_RIG_ID := "humanoid_v1"
-const STAGE_SIZE := Vector2(180, 180)
-const STAGE_PADDING := 8.0
+const STAGE_SIZE := Vector2(280, 280)
 const ANCHOR_OFFSET := Vector2(-7, -7)
 const ACTUAL_GAME_SCALE := 0.25
 const SOCKET_MARKER_SIZE := Vector2(8, 8)
 const GRIP_MARKER_SIZE := Vector2(8, 8)
 const MISSING_ASSET_HINT_LIMIT := 2
+const FIT_ZOOM_MIN_PERCENT := 50
+const FIT_ZOOM_MAX_PERCENT := 400
+const FIT_ZOOM_STEP_PERCENT := 25
+const SOURCE_EDIT_MARGIN_MIN := 32.0
+const SOURCE_EDIT_MARGIN_FACTOR := 1.0
 
 var game_client_assets_root := ""
 
 var _actual_scale_enabled := false
+var _fit_zoom_percent := 100
 var _rig_catalog_status := "Actor rig metadata has not been loaded yet."
 var _rigs_by_id: Dictionary = {}
 var _stage: Control
@@ -31,6 +36,7 @@ var _current_pose_context: Dictionary = {}
 var _drag_state: Dictionary = {}
 var _asset_resolution_diagnostics: Array = []
 var _last_resolved_asset_path := ""
+var _last_view_state: Dictionary = {}
 
 
 func bind(stage: Control, status: Label) -> void:
@@ -109,6 +115,41 @@ func set_actual_scale_enabled(enabled: bool) -> void:
 	_actual_scale_enabled = enabled
 
 
+func set_fit_zoom_percent(percent: int) -> void:
+	_actual_scale_enabled = false
+	_fit_zoom_percent = clampi(percent, FIT_ZOOM_MIN_PERCENT, FIT_ZOOM_MAX_PERCENT)
+
+
+func zoom_in() -> void:
+	set_fit_zoom_percent(_fit_zoom_percent + FIT_ZOOM_STEP_PERCENT)
+
+
+func zoom_out() -> void:
+	set_fit_zoom_percent(_fit_zoom_percent - FIT_ZOOM_STEP_PERCENT)
+
+
+func reset_fit_view() -> void:
+	set_fit_zoom_percent(100)
+
+
+func get_fit_zoom_percent() -> int:
+	return _fit_zoom_percent
+
+
+func can_zoom_in() -> bool:
+	return _fit_zoom_percent < FIT_ZOOM_MAX_PERCENT or _actual_scale_enabled
+
+
+func can_zoom_out() -> bool:
+	return _fit_zoom_percent > FIT_ZOOM_MIN_PERCENT or _actual_scale_enabled
+
+
+func get_view_scale_label() -> String:
+	if _actual_scale_enabled:
+		return "Actual %d%%" % int(round(ACTUAL_GAME_SCALE * 100.0))
+	return "Zoom %d%%" % _fit_zoom_percent
+
+
 func cancel_drag() -> void:
 	_drag_state.clear()
 	_current_pose_context.clear()
@@ -129,6 +170,7 @@ func update(
 	equipped_visual: Dictionary = {}
 ) -> Dictionary:
 	_last_resolved_asset_path = ""
+	_last_view_state.clear()
 	_current_pose_context.clear()
 	_asset_resolution_diagnostics.clear()
 	_reset_layers()
@@ -173,10 +215,20 @@ func update(
 		_status.text = diagnostic
 		return {"status": _status.text, "resolved_asset_path": ""}
 
-	var source_bounds := _source_bounds(layer_entries)
-	var preview_scale := ACTUAL_GAME_SCALE if _actual_scale_enabled else _preview_scale(source_bounds.size)
-	var group_origin := (STAGE_SIZE - (source_bounds.size * preview_scale)) * 0.5
 	var selected_entry: Dictionary = {}
+	for layer_entry_variant: Variant in layer_entries:
+		var layer_entry: Dictionary = layer_entry_variant
+		if bool(layer_entry.get("selected_visual", false)):
+			selected_entry = layer_entry
+			_last_resolved_asset_path = str(layer_entry.get("resolved_asset_path", ""))
+
+	var valid_socket_attachment := _is_valid_socket_attachment(equipped_visual, selected_entry)
+	var actor_bounds := _actor_bounds(layer_entries, valid_socket_attachment)
+	var view_bounds_result := _view_bounds(actor_bounds)
+	var view_bounds: Rect2 = _variant_to_rect2(view_bounds_result.get("bounds", Rect2()), Rect2())
+	var stage_size := _stage_size()
+	var preview_scale := _view_scale(view_bounds.size, stage_size)
+	var group_origin := (stage_size - (view_bounds.size * preview_scale)) * 0.5
 	for layer_entry_variant: Variant in layer_entries:
 		var layer_entry: Dictionary = layer_entry_variant
 		var texture := layer_entry.get("texture") as Texture2D
@@ -189,14 +241,18 @@ func update(
 		layer.visible = true
 		layer.z_index = int(layer_entry.get("z_index", 0))
 		layer.size = texture.get_size() * preview_scale
-		layer.position = group_origin + ((source_position - source_bounds.position) * preview_scale)
-		if bool(layer_entry.get("selected_visual", false)):
-			selected_entry = layer_entry
-			_last_resolved_asset_path = str(layer_entry.get("resolved_asset_path", ""))
+		layer.position = group_origin + ((source_position - view_bounds.position) * preview_scale)
 
-	var valid_socket_attachment := _is_valid_socket_attachment(equipped_visual, selected_entry)
+	_last_view_state = {
+		"stage_size": stage_size,
+		"actor_bounds_source": actor_bounds,
+		"view_bounds_source": view_bounds,
+		"padding_source": float(view_bounds_result.get("padding_source", 0.0)),
+		"preview_scale": preview_scale,
+		"group_origin": group_origin,
+	}
 	if valid_socket_attachment:
-		_update_markers(rig, equipped_visual, selected_direction, selected_frame, selected_entry, source_bounds, group_origin, preview_scale)
+		_update_markers(rig, equipped_visual, selected_direction, selected_frame, selected_entry, view_bounds, group_origin, preview_scale)
 	elif bool(_drag_state.get("active", false)):
 		cancel_drag()
 
@@ -205,6 +261,9 @@ func update(
 		"status": _status.text,
 		"resolved_asset_path": _last_resolved_asset_path,
 		"current_pose_has_anchor": _current_pose_context.get("authored_anchor", false),
+		"preview_scale": preview_scale,
+		"view_bounds_source": view_bounds,
+		"actor_bounds_source": actor_bounds,
 	}
 
 
@@ -430,11 +489,51 @@ func _source_bounds(loaded_layers: Array) -> Rect2:
 	return source_bounds
 
 
-func _preview_scale(source_size: Vector2) -> float:
+func _actor_bounds(loaded_layers: Array, exclude_selected_attachment: bool) -> Rect2:
+	if not exclude_selected_attachment:
+		return _source_bounds(loaded_layers)
+	var actor_layers: Array = []
+	for layer_entry_variant: Variant in loaded_layers:
+		var layer_entry: Dictionary = layer_entry_variant
+		var is_selected_attachment := bool(layer_entry.get("selected_visual", false)) and bool(layer_entry.get("used_attachment", false))
+		if not is_selected_attachment:
+			actor_layers.append(layer_entry)
+	if actor_layers.is_empty():
+		return _source_bounds(loaded_layers)
+	return _source_bounds(actor_layers)
+
+
+func _view_bounds(actor_bounds: Rect2) -> Dictionary:
+	if actor_bounds.size.x <= 0.0 or actor_bounds.size.y <= 0.0:
+		return {
+			"bounds": Rect2(actor_bounds.position, Vector2.ONE * SOURCE_EDIT_MARGIN_MIN * 2.0),
+			"padding_source": SOURCE_EDIT_MARGIN_MIN,
+		}
+	var padding_source := maxf(SOURCE_EDIT_MARGIN_MIN, maxf(actor_bounds.size.x, actor_bounds.size.y) * SOURCE_EDIT_MARGIN_FACTOR)
+	return {
+		"bounds": Rect2(
+			actor_bounds.position - Vector2.ONE * padding_source,
+			actor_bounds.size + (Vector2.ONE * padding_source * 2.0)),
+		"padding_source": padding_source,
+	}
+
+
+func _stage_size() -> Vector2:
+	if _stage != null:
+		if _stage.size.x > 0.0 and _stage.size.y > 0.0:
+			return _stage.size
+		if _stage.custom_minimum_size.x > 0.0 and _stage.custom_minimum_size.y > 0.0:
+			return _stage.custom_minimum_size
+	return STAGE_SIZE
+
+
+func _view_scale(source_size: Vector2, stage_size: Vector2) -> float:
 	if source_size.x <= 0.0 or source_size.y <= 0.0:
 		return 1.0
-	var available_size := STAGE_SIZE - (Vector2.ONE * STAGE_PADDING * 2.0)
-	return minf(available_size.x / source_size.x, available_size.y / source_size.y)
+	if _actual_scale_enabled:
+		return ACTUAL_GAME_SCALE
+	var base_scale := minf(stage_size.x / source_size.x, stage_size.y / source_size.y)
+	return base_scale * (float(_fit_zoom_percent) / 100.0)
 
 
 func _build_marker(color: Color, marker_size: Vector2) -> ColorRect:
@@ -482,7 +581,7 @@ func _update_markers(
 	direction: String,
 	frame: int,
 	selected_entry: Dictionary,
-	source_bounds: Rect2,
+	view_bounds: Rect2,
 	group_origin: Vector2,
 	preview_scale: float
 ) -> void:
@@ -490,15 +589,15 @@ func _update_markers(
 	var grip_anchor := _variant_to_vector2i(selected_entry.get("grip_anchor", Vector2i.ZERO), Vector2i.ZERO)
 	var source_position := _variant_to_vector2(selected_entry.get("source_position", ANCHOR_OFFSET), ANCHOR_OFFSET)
 	var used_attachment := bool(selected_entry.get("used_attachment", false))
-	var socket_stage := group_origin + (((ANCHOR_OFFSET + Vector2(socket_position)) - source_bounds.position) * preview_scale)
-	var grip_stage := group_origin + (((source_position + Vector2(grip_anchor)) - source_bounds.position) * preview_scale)
+	var socket_stage := group_origin + (((ANCHOR_OFFSET + Vector2(socket_position)) - view_bounds.position) * preview_scale)
+	var grip_stage := group_origin + (((source_position + Vector2(grip_anchor)) - view_bounds.position) * preview_scale)
 	_socket_marker.visible = true
 	_grip_marker.visible = true
 	_socket_marker.position = socket_stage - (_socket_marker.size * 0.5)
 	_grip_marker.position = grip_stage - (_grip_marker.size * 0.5)
 	var texture := selected_entry.get("texture") as Texture2D
 	if texture != null:
-		var layer_position := group_origin + ((source_position - source_bounds.position) * preview_scale)
+		var layer_position := group_origin + ((source_position - view_bounds.position) * preview_scale)
 		_current_pose_context = {
 			"direction": direction,
 			"frame": frame,
@@ -511,6 +610,8 @@ func _update_markers(
 			"can_drag": true,
 			"grip_anchor": Vector2(grip_anchor),
 			"selected_rect": Rect2(layer_position, texture.get_size() * preview_scale),
+			"socket_stage": socket_stage,
+			"grip_stage": grip_stage,
 		}
 
 

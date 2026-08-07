@@ -111,6 +111,10 @@ var _appearance_rig_status: Label
 var _appearance_nudge_x: SpinBox
 var _appearance_nudge_y: SpinBox
 var _appearance_actual_scale: CheckBox
+var _appearance_zoom_out: Button
+var _appearance_zoom_label: Label
+var _appearance_zoom_in: Button
+var _appearance_fit: Button
 var _appearance_grip_x: SpinBox
 var _appearance_grip_y: SpinBox
 var _appearance_clear_pose: Button
@@ -126,6 +130,7 @@ func _ready() -> void:
 	_paper_doll_preview.grip_anchor_changed.connect(_on_paper_doll_grip_anchor_changed)
 	_client = %AuthoringHostClient
 	_build_ui()
+	_refresh_preview_zoom_controls()
 	_connect_client()
 	_set_form_enabled(false)
 
@@ -360,9 +365,29 @@ func _build_ui() -> void:
 	nudge_down.pressed.connect(_nudge_current_grip_anchor.bind(0, 1))
 	grip_actions.add_child(nudge_down)
 	doll_controls.add_child(grip_actions)
+	var zoom_row := HBoxContainer.new()
+	zoom_row.add_theme_constant_override("separation", 6)
+	_appearance_zoom_out = Button.new()
+	_appearance_zoom_out.text = "-"
+	_appearance_zoom_out.custom_minimum_size = Vector2(36, 0)
+	_appearance_zoom_out.pressed.connect(_on_preview_zoom_out_pressed)
+	zoom_row.add_child(_appearance_zoom_out)
+	_appearance_zoom_label = Label.new()
+	_appearance_zoom_label.custom_minimum_size = Vector2(90, 0)
+	zoom_row.add_child(_appearance_zoom_label)
+	_appearance_zoom_in = Button.new()
+	_appearance_zoom_in.text = "+"
+	_appearance_zoom_in.custom_minimum_size = Vector2(36, 0)
+	_appearance_zoom_in.pressed.connect(_on_preview_zoom_in_pressed)
+	zoom_row.add_child(_appearance_zoom_in)
+	_appearance_fit = Button.new()
+	_appearance_fit.text = "Fit"
+	_appearance_fit.pressed.connect(_on_preview_zoom_fit_pressed)
+	zoom_row.add_child(_appearance_fit)
+	doll_controls.add_child(zoom_row)
 	_appearance_actual_scale = CheckBox.new()
 	_appearance_actual_scale.text = "Actual game scale"
-	_appearance_actual_scale.toggled.connect(_on_visual_preview_changed.unbind(1))
+	_appearance_actual_scale.toggled.connect(_on_preview_actual_scale_toggled)
 	doll_controls.add_child(_appearance_actual_scale)
 	_appearance_asset_path = Label.new()
 	_appearance_asset_path.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -1408,6 +1433,37 @@ func _on_visual_preview_changed() -> void:
 	_update_paper_doll_preview()
 
 
+func _on_preview_zoom_out_pressed() -> void:
+	_cancel_paper_doll_drag()
+	_paper_doll_preview.zoom_out()
+	_appearance_actual_scale.button_pressed = false
+	_refresh_preview_zoom_controls()
+	_update_paper_doll_preview()
+
+
+func _on_preview_zoom_in_pressed() -> void:
+	_cancel_paper_doll_drag()
+	_paper_doll_preview.zoom_in()
+	_appearance_actual_scale.button_pressed = false
+	_refresh_preview_zoom_controls()
+	_update_paper_doll_preview()
+
+
+func _on_preview_zoom_fit_pressed() -> void:
+	_cancel_paper_doll_drag()
+	_paper_doll_preview.reset_fit_view()
+	_appearance_actual_scale.button_pressed = false
+	_refresh_preview_zoom_controls()
+	_update_paper_doll_preview()
+
+
+func _on_preview_actual_scale_toggled(enabled: bool) -> void:
+	_cancel_paper_doll_drag()
+	_paper_doll_preview.set_actual_scale_enabled(enabled)
+	_refresh_preview_zoom_controls()
+	_update_paper_doll_preview()
+
+
 func _on_form_changed() -> void:
 	if _is_loading:
 		return
@@ -1489,11 +1545,16 @@ func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: 
 	_appearance_nudge_x.editable = authored_visual and catalog_available
 	_appearance_nudge_y.editable = authored_visual and catalog_available
 	_appearance_actual_scale.disabled = not equipment_enabled or not catalog_available
+	_appearance_zoom_out.disabled = not equipment_enabled or not catalog_available or not _paper_doll_preview.can_zoom_out()
+	_appearance_zoom_in.disabled = not equipment_enabled or not catalog_available or not _paper_doll_preview.can_zoom_in()
+	_appearance_fit.disabled = not equipment_enabled or not catalog_available
+	_appearance_zoom_label.modulate = Color(0.7, 0.73, 0.79, 1) if equipment_enabled and catalog_available else Color(0.45, 0.48, 0.54, 1)
 	_appearance_grip_x.editable = socket_binding and catalog_available
 	_appearance_grip_y.editable = socket_binding and catalog_available
 	_appearance_clear_pose.disabled = not socket_binding or not catalog_available
 	_appearance_copy_previous.disabled = not socket_binding or not catalog_available
 	_appearance_copy_next.disabled = not socket_binding or not catalog_available
+	_refresh_preview_zoom_controls()
 
 
 func _set_row_enabled(row: Node, enabled: bool) -> void:
@@ -1555,6 +1616,7 @@ func _update_paper_doll_preview() -> void:
 	var equipped_visual_payload_variant: Variant = _equipped_visual_payload()
 	var equipped_visual_payload: Dictionary = equipped_visual_payload_variant if equipped_visual_payload_variant is Dictionary else {}
 	_paper_doll_preview.set_actual_scale_enabled(_appearance_actual_scale.button_pressed)
+	_refresh_preview_zoom_controls()
 	var preview_state: Dictionary = _paper_doll_preview.update(
 		_equipable.button_pressed,
 		_selected_metadata(_equipment_slot) if _equipable.button_pressed else "",
@@ -1829,6 +1891,12 @@ func _initialize_authored_appearance_defaults() -> void:
 func _cancel_paper_doll_drag() -> void:
 	if _paper_doll_preview != null:
 		_paper_doll_preview.cancel_drag()
+
+
+func _refresh_preview_zoom_controls() -> void:
+	if _appearance_zoom_label == null:
+		return
+	_appearance_zoom_label.text = _paper_doll_preview.get_view_scale_label()
 
 
 func _clear_rows(container: Node) -> void:
