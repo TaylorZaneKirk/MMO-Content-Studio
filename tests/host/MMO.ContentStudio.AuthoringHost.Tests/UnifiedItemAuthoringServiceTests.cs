@@ -405,6 +405,22 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadOptionsReadsActorRigCatalogWhenGameClientAssetsPointsToClientRoot()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository, _clientRoot);
+
+        var result = await service.LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        AssertSucceeded(result);
+        Assert.True(result.Value!.ActorRigCatalog.Available);
+        Assert.Equal(
+            Path.Combine(_clientRoot, "actors", "appearance", "data", "rigs", "catalog_v1.json"),
+            result.Value.ActorRigCatalog.SourcePath);
+        Assert.Contains(result.Value.ActorRigCatalog.Rigs, value => value.RigId == "humanoid_v1");
+    }
+
+    [Fact]
     public async Task SaveDraftAllowsIncompleteSocketAnchorsButPublishRejectsThem()
     {
         var repository = new InMemoryUnifiedItemRepository();
@@ -577,7 +593,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord());
         var publisher = new TestRuntimeCatalogPublisher();
-        var service = CreateService(repository, publisher);
+        var service = CreateService(repository, runtimeCatalogPublisher: publisher);
         var expected = repository.Records[ItemId].UpdatedAtUtc;
 
         var publish = await service.PublishAsync(
@@ -595,7 +611,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         var repository = new InMemoryUnifiedItemRepository();
         repository.Put(CompleteRecord());
         var publisher = new TestRuntimeCatalogPublisher();
-        var service = CreateService(repository, publisher);
+        var service = CreateService(repository, runtimeCatalogPublisher: publisher);
 
         var save = await SaveDraftWithPreviewAsync(
             service,
@@ -666,13 +682,14 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
     private UnifiedItemAuthoringService CreateService(
         InMemoryUnifiedItemRepository repository,
+        string? assetRoot = null,
         IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
         var assetRoots = Options.Create(new AssetRootsOptions
         {
             Roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["game_client_assets"] = _assetRoot
+                ["game_client_assets"] = assetRoot ?? _assetRoot
             }
         });
         var assetService = new ItemAssetService(assetRoots);

@@ -64,15 +64,19 @@ func clear_cache() -> void:
 func configure_rig_catalog(catalog: Dictionary) -> void:
 	_rigs_by_id.clear()
 	var available := bool(catalog.get("available", false))
+	var source_path := str(catalog.get("source_path", ""))
 	_rig_catalog_status = str(catalog.get("message", ""))
 	if not available:
 		if _rig_catalog_status.is_empty():
 			_rig_catalog_status = "The canonical actor rig catalog is unavailable."
+		if not source_path.is_empty():
+			_rig_catalog_status = "%s Path: %s" % [_rig_catalog_status, source_path]
 		return
 	var rigs_variant: Variant = catalog.get("rigs", [])
 	if not (rigs_variant is Array):
 		_rig_catalog_status = "The actor rig catalog payload is malformed."
 		return
+	var first_rig_id := ""
 	for rig_variant: Variant in rigs_variant:
 		if not (rig_variant is Dictionary):
 			continue
@@ -80,6 +84,8 @@ func configure_rig_catalog(catalog: Dictionary) -> void:
 		var rig_id := str(rig.get("rig_id", ""))
 		if rig_id.is_empty():
 			continue
+		if first_rig_id.is_empty():
+			first_rig_id = rig_id
 		var layers_by_id: Dictionary = {}
 		for layer_variant: Variant in rig.get("layers", []) as Array:
 			if layer_variant is Dictionary:
@@ -96,7 +102,7 @@ func configure_rig_catalog(catalog: Dictionary) -> void:
 	if _rigs_by_id.is_empty():
 		_rig_catalog_status = "The canonical actor rig catalog is empty."
 	elif _rig_catalog_status.is_empty():
-		_rig_catalog_status = "Loaded canonical actor rig metadata."
+		_rig_catalog_status = "Loaded %s from %s." % [first_rig_id, source_path] if not source_path.is_empty() else "Loaded %s." % first_rig_id
 
 
 func set_actual_scale_enabled(enabled: bool) -> void:
@@ -118,6 +124,7 @@ func update(
 ) -> Dictionary:
 	_last_resolved_asset_path = ""
 	_current_pose_context.clear()
+	_asset_resolution_diagnostics.clear()
 	_reset_layers()
 	_hide_markers()
 

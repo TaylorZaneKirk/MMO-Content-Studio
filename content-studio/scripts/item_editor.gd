@@ -842,7 +842,7 @@ func _apply_equipped_visual(value: Variant) -> void:
 	var equipped_visual := value as Dictionary if has_visual else {}
 	_appearance_enabled.button_pressed = has_visual
 	_appearance_asset_key.text = str(equipped_visual.get("asset_key", ""))
-	_select_option(_appearance_rig, str(equipped_visual.get("rig_id", "humanoid_v1")))
+	_select_option(_appearance_rig, str(equipped_visual.get("rig_id", _first_actor_rig_id())))
 	_rebuild_actor_rig_controls()
 	_select_option(_appearance_binding, str(equipped_visual.get("binding_type", "rig_layer")))
 	_select_option(_appearance_render_layer, str(equipped_visual.get("render_layer_id", _selected_metadata(_equipment_slot))))
@@ -863,12 +863,14 @@ func _apply_actor_rig_catalog(catalog_variant: Variant) -> void:
 	var catalog := catalog_variant as Dictionary if catalog_variant is Dictionary else {}
 	_paper_doll_preview.configure_rig_catalog(catalog)
 	_fill_rig_options(catalog.get("rigs", []) as Array if catalog.get("rigs", []) is Array else [])
-	_appearance_rig_status.text = str(catalog.get("message", "Loaded canonical actor rig metadata."))
+	_appearance_rig_status.text = _actor_rig_catalog_status(catalog)
 	_rebuild_actor_rig_controls()
+	_update_contextual_sections()
 
 
 func _fill_rig_options(rigs: Array) -> void:
 	var selected := _selected_metadata(_appearance_rig)
+	var first_rig_id := ""
 	_appearance_rig.clear()
 	for variant in rigs:
 		if variant is Dictionary:
@@ -876,18 +878,20 @@ func _fill_rig_options(rigs: Array) -> void:
 			var rig_id := str(rig.get("rig_id", ""))
 			if rig_id.is_empty():
 				continue
+			if first_rig_id.is_empty():
+				first_rig_id = rig_id
 			_appearance_rig.add_item(rig_id)
 			_appearance_rig.set_item_metadata(_appearance_rig.item_count - 1, rig_id)
-	if _appearance_rig.item_count == 0:
-		_appearance_rig.add_item("humanoid_v1")
-		_appearance_rig.set_item_metadata(0, "humanoid_v1")
-	_select_option(_appearance_rig, selected if not selected.is_empty() else "humanoid_v1")
+	if _appearance_rig.item_count > 0:
+		_select_option(_appearance_rig, selected if not selected.is_empty() else first_rig_id)
 
 
 func _rebuild_actor_rig_controls() -> void:
 	var rig := _selected_actor_rig()
 	var selected_layer := _selected_metadata(_appearance_render_layer)
 	var selected_socket := _selected_metadata(_appearance_socket)
+	var first_layer_id := ""
+	var first_socket_id := ""
 	_appearance_render_layer.clear()
 	_appearance_socket.clear()
 	if rig.is_empty():
@@ -898,6 +902,8 @@ func _rebuild_actor_rig_controls() -> void:
 			var layer_id := str(layer.get("layer_id", ""))
 			if layer_id.is_empty():
 				continue
+			if first_layer_id.is_empty():
+				first_layer_id = layer_id
 			_appearance_render_layer.add_item(layer_id)
 			_appearance_render_layer.set_item_metadata(_appearance_render_layer.item_count - 1, layer_id)
 	for variant in rig.get("sockets", []) as Array:
@@ -906,26 +912,68 @@ func _rebuild_actor_rig_controls() -> void:
 			var socket_id := str(socket.get("socket_id", ""))
 			if socket_id.is_empty():
 				continue
+			if first_socket_id.is_empty():
+				first_socket_id = socket_id
 			_appearance_socket.add_item(socket_id)
 			_appearance_socket.set_item_metadata(_appearance_socket.item_count - 1, socket_id)
-	if _appearance_render_layer.item_count == 0:
-		_appearance_render_layer.add_item(_selected_metadata(_equipment_slot))
-		_appearance_render_layer.set_item_metadata(0, _selected_metadata(_equipment_slot))
-	_select_option(_appearance_render_layer, selected_layer if not selected_layer.is_empty() else _selected_metadata(_equipment_slot))
-	_select_option(_appearance_socket, selected_socket if not selected_socket.is_empty() else "right_hand_primary")
+	if _appearance_render_layer.item_count > 0:
+		_select_option(_appearance_render_layer, selected_layer if not selected_layer.is_empty() else first_layer_id)
+	if _appearance_socket.item_count > 0:
+		_select_option(_appearance_socket, selected_socket if not selected_socket.is_empty() else first_socket_id)
 
 
 func _selected_actor_rig() -> Dictionary:
-	var catalog_variant: Variant = _options.get("actor_rig_catalog", {})
-	if not (catalog_variant is Dictionary):
-		return {}
-	var rigs_variant: Variant = (catalog_variant as Dictionary).get("rigs", [])
+	var rigs_variant: Variant = _actor_rig_catalog().get("rigs", [])
 	if not (rigs_variant is Array):
 		return {}
 	for variant in rigs_variant:
 		if variant is Dictionary and str((variant as Dictionary).get("rig_id", "")) == _selected_metadata(_appearance_rig):
 			return variant as Dictionary
 	return {}
+
+
+func _actor_rig_catalog() -> Dictionary:
+	var catalog_variant: Variant = _options.get("actor_rig_catalog", {})
+	return catalog_variant as Dictionary if catalog_variant is Dictionary else {}
+
+
+func _first_actor_rig_id() -> String:
+	var rigs_variant: Variant = _actor_rig_catalog().get("rigs", [])
+	if not (rigs_variant is Array):
+		return ""
+	for variant in rigs_variant:
+		if variant is Dictionary:
+			var rig_id := str((variant as Dictionary).get("rig_id", ""))
+			if not rig_id.is_empty():
+				return rig_id
+	return ""
+
+
+func _actor_rig_catalog_available() -> bool:
+	var catalog := _actor_rig_catalog()
+	if not bool(catalog.get("available", false)):
+		return false
+	return not _first_actor_rig_id().is_empty()
+
+
+func _actor_rig_catalog_status(catalog: Dictionary) -> String:
+	var source_path := str(catalog.get("source_path", ""))
+	var message := str(catalog.get("message", ""))
+	var first_rig_id := ""
+	var rigs_variant: Variant = catalog.get("rigs", [])
+	if rigs_variant is Array:
+		for variant in rigs_variant:
+			if variant is Dictionary:
+				first_rig_id = str((variant as Dictionary).get("rig_id", ""))
+				if not first_rig_id.is_empty():
+					break
+	if bool(catalog.get("available", false)) and not first_rig_id.is_empty():
+		return "Loaded %s from %s." % [first_rig_id, source_path] if not source_path.is_empty() else "Loaded %s." % first_rig_id
+	if message.is_empty():
+		message = "The canonical actor rig catalog is unavailable."
+	if not source_path.is_empty():
+		return "%s Path: %s" % [message, source_path]
+	return message
 
 
 func _on_appearance_enabled_toggled(_value: bool) -> void:
@@ -1407,20 +1455,21 @@ func _set_weapon_controls_enabled(enabled: bool) -> void:
 
 
 func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: bool, socket_binding: bool) -> void:
+	var catalog_available := _actor_rig_catalog_available()
 	_appearance_enabled.disabled = not equipment_enabled
-	_appearance_rig.disabled = not authored_visual
-	_appearance_binding.disabled = not authored_visual
-	_appearance_render_layer.disabled = not authored_visual
-	_appearance_socket.disabled = not socket_binding
-	_appearance_asset_key.editable = authored_visual
-	_appearance_nudge_x.editable = authored_visual
-	_appearance_nudge_y.editable = authored_visual
-	_appearance_actual_scale.disabled = not equipment_enabled
-	_appearance_grip_x.editable = socket_binding
-	_appearance_grip_y.editable = socket_binding
-	_appearance_clear_pose.disabled = not socket_binding
-	_appearance_copy_previous.disabled = not socket_binding
-	_appearance_copy_next.disabled = not socket_binding
+	_appearance_rig.disabled = not authored_visual or not catalog_available
+	_appearance_binding.disabled = not authored_visual or not catalog_available
+	_appearance_render_layer.disabled = not authored_visual or not catalog_available
+	_appearance_socket.disabled = not socket_binding or not catalog_available
+	_appearance_asset_key.editable = authored_visual and catalog_available
+	_appearance_nudge_x.editable = authored_visual and catalog_available
+	_appearance_nudge_y.editable = authored_visual and catalog_available
+	_appearance_actual_scale.disabled = not equipment_enabled or not catalog_available
+	_appearance_grip_x.editable = socket_binding and catalog_available
+	_appearance_grip_y.editable = socket_binding and catalog_available
+	_appearance_clear_pose.disabled = not socket_binding or not catalog_available
+	_appearance_copy_previous.disabled = not socket_binding or not catalog_available
+	_appearance_copy_next.disabled = not socket_binding or not catalog_available
 
 
 func _set_row_enabled(row: Node, enabled: bool) -> void:

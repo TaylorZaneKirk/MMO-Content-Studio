@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
@@ -115,14 +116,49 @@ public sealed class ActorAppearanceCatalogService
             return null;
         }
 
-        var assetsRoot = Path.GetFullPath(configured);
-        var clientRoot = Directory.GetParent(assetsRoot);
-        if (clientRoot is null)
+        var configuredRoot = Path.GetFullPath(configured);
+        foreach (var candidate in RigCatalogCandidates(configuredRoot))
         {
-            return null;
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
         }
 
-        return Path.Combine(clientRoot.FullName, RigCatalogRelativePath.Replace('/', Path.DirectorySeparatorChar));
+        return RigCatalogCandidates(configuredRoot).FirstOrDefault();
+    }
+
+    private static IReadOnlyList<string> RigCatalogCandidates(string configuredRoot)
+    {
+        var candidates = new List<string>();
+        var normalizedRelativePath = RigCatalogRelativePath.Replace('/', Path.DirectorySeparatorChar);
+
+        void AddCandidate(string basePath)
+        {
+            if (string.IsNullOrWhiteSpace(basePath))
+            {
+                return;
+            }
+
+            var candidate = Path.GetFullPath(Path.Combine(basePath, normalizedRelativePath));
+            if (!candidates.Contains(candidate, StringComparer.Ordinal))
+            {
+                candidates.Add(candidate);
+            }
+        }
+
+        AddCandidate(configuredRoot);
+
+        if (string.Equals(Path.GetFileName(configuredRoot), "assets", StringComparison.OrdinalIgnoreCase))
+        {
+            var clientRoot = Directory.GetParent(configuredRoot);
+            if (clientRoot is not null)
+            {
+                AddCandidate(clientRoot.FullName);
+            }
+        }
+
+        return candidates;
     }
 
     private static ActorRigDefinition? ParseRig(JsonElement rigElement)
