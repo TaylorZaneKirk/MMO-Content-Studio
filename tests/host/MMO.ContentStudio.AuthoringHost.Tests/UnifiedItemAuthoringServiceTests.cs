@@ -171,6 +171,42 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveDraftReturnsFreshTimestampUsableForImmediatePublish()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+        var before = repository.Records[ItemId].UpdatedAtUtc;
+
+        var save = await SaveDraftWithPreviewAsync(
+            service,
+            ItemId,
+            ToSaveRequest(repository.Records[ItemId], before) with
+            {
+                DisplayName = "Battle Pick Mk II"
+            });
+
+        AssertSucceeded(save);
+        var saved = save.Value!.Item;
+        Assert.True(saved.UpdatedAtUtc > before);
+        Assert.Equal(repository.Records[ItemId].UpdatedAtUtc, saved.UpdatedAtUtc);
+
+        var publishPreview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(ToSaveRequest(repository.Records[ItemId], saved.UpdatedAtUtc), "publish"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(publishPreview);
+        var publish = await service.PublishAsync(
+            ItemId,
+            new ItemPublicationRequest(saved.UpdatedAtUtc, publishPreview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(publish);
+        Assert.True(repository.Records[ItemId].RuntimeEnabled);
+    }
+
+    [Fact]
     public async Task EquipmentEditsPreserveHiddenConsumableBehavior()
     {
         var repository = new InMemoryUnifiedItemRepository();

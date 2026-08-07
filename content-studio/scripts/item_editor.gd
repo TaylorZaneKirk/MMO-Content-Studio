@@ -43,6 +43,7 @@ var _options: Dictionary = {}
 var _current_item: Dictionary = {}
 var _is_loading := false
 var _reload_item_id := ""
+var _mutation_reload_pending := false
 var _game_client_assets_root := ""
 var _has_persisted_equipped_visual := false
 var _appearance_defaults_initialized := false
@@ -570,6 +571,8 @@ func _on_catalog_received(payload: Dictionary) -> void:
 
 func _on_definition_received(payload: Dictionary) -> void:
 	_is_loading = true
+	_mutation_reload_pending = false
+	_reload_item_id = ""
 	_cancel_paper_doll_drag()
 	_current_item = payload.duplicate(true)
 	_item_id.text = str(payload.get("item_id", ""))
@@ -616,8 +619,15 @@ func _on_mutation_completed(payload: Dictionary) -> void:
 	var operation := str(payload.get("operation", "operation"))
 	var item := payload.get("item", {}) as Dictionary
 	var item_id := str(item.get("item_id", _item_id.text))
+	_current_item = item.duplicate(true)
 	_reload_item_id = item_id
+	_mutation_reload_pending = true
+	_updated.text = str(_current_item.get("updated_at_utc", _updated.text))
+	_publication.text = str(_current_item.get("publication_state", _publication.text))
+	_classification.text = str(_current_item.get("classification_label", _classification.text))
+	_kind.text = str(_current_item.get("authoring_kind", _kind.text))
 	_clear_preview()
+	_set_form_enabled(false)
 	_status.text = "%s completed. Reloading complete aggregate..." % _workspace_support.operation_name(operation)
 	_client.search_item_catalog(_search.text)
 
@@ -635,6 +645,12 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	_status.text = "%s failed: %s" % [operation, message]
 	_workspace_support.render_validation(_validation, errors)
 	_apply_button.disabled = true
+	if _has_error_code(errors, "item_version_conflict"):
+		_status.text = "Version conflict. Reload the item definition before applying changes."
+	if _mutation_reload_pending and operation in ["items", "item"]:
+		_reload_item_id = ""
+		_mutation_reload_pending = false
+		_status.text = "Reload after item mutation failed: %s" % message
 
 
 func _rebuild_list() -> void:
@@ -666,6 +682,8 @@ func _rebuild_list() -> void:
 
 func _start_new() -> void:
 	_is_loading = true
+	_mutation_reload_pending = false
+	_reload_item_id = ""
 	_cancel_paper_doll_drag()
 	_current_item = {}
 	_has_persisted_equipped_visual = false
@@ -1883,6 +1901,13 @@ func _nullable_string(value: Variant) -> String:
 func _optional_payload(value: String) -> Variant:
 	var trimmed := value.strip_edges()
 	return null if trimmed.is_empty() else trimmed
+
+
+func _has_error_code(errors: Array, code: String) -> bool:
+	for variant in errors:
+		if variant is Dictionary and str((variant as Dictionary).get("code", "")) == code:
+			return true
+	return false
 
 
 func _clear_preview() -> void:

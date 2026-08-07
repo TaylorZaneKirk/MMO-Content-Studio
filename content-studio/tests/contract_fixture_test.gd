@@ -6,6 +6,24 @@ const AuthoringHttpTransport = preload("res://scripts/http_json_client.gd")
 const PaperDollPreview = preload("res://scripts/paper_doll_preview.gd")
 
 
+class FixtureAuthoringHostClient extends AuthoringHostClient:
+	var catalog_searches: Array = []
+	var requested_item_ids: Array = []
+	var preview_requests: Array = []
+
+	func search_item_catalog(search: String = "") -> void:
+		catalog_searches.append(search)
+
+	func load_item_definition(item_id: String) -> void:
+		requested_item_ids.append(item_id)
+
+	func preview_item_operation(item_id: String, payload: Dictionary) -> void:
+		preview_requests.append({
+			"item_id": item_id,
+			"payload": payload.duplicate(true),
+		})
+
+
 func _initialize() -> void:
 	call_deferred("_run_fixture")
 
@@ -66,6 +84,7 @@ func _run_fixture() -> void:
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
+	await _verify_post_save_reload_uses_fresh_item_version(main_scene)
 	_verify_non_json_transport_failure()
 	await _verify_paper_doll_preview_layers()
 	await _verify_paper_doll_preview_interactions()
@@ -324,6 +343,89 @@ func _verify_grip_anchor_payload_normalization(main_scene: PackedScene) -> void:
 	var anchor := east.get("1", {}) as Dictionary
 	if int(anchor.get("x", 0)) != 4096 or int(anchor.get("y", 0)) != -4096:
 		_fail("Grip-anchor payloads must clamp invalid transient values to the attachment contract")
+		return
+
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_post_save_reload_uses_fresh_item_version(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+
+	var items := scene.get_node("Margin/Root/Tabs/Items")
+	if items == null:
+		_fail("Unified item editor fixture could not locate the Items workspace for post-save concurrency")
+		return
+
+	items._on_options_received(_available_rig_catalog())
+	items._on_assets_received({"assets": []})
+	items._on_definition_received({
+		"item_id": "inventory_154_axe",
+		"display_name": "Axe",
+		"icon_texture_path": "res://assets/items/Inventory_154_Axe.png",
+		"publication_state": "Draft",
+		"classification_label": "Equipment",
+		"authoring_kind": "Unified",
+		"updated_at_utc": "2026-08-07T00:00:00+00:00",
+		"equipment": {
+			"equipment_slot_id": "right_hand",
+			"required_strength": 1,
+			"requirements": [],
+			"skill_modifiers": [],
+			"combat_bonuses": {},
+			"weapon_profile": null,
+			"equipped_visual": null,
+		},
+		"consumable_behavior": null,
+		"tool_capabilities": [],
+	})
+	var client := FixtureAuthoringHostClient.new()
+	items._client = client
+	var saved_item := (items._current_item as Dictionary).duplicate(true)
+	saved_item["display_name"] = "Axe Mk II"
+	saved_item["updated_at_utc"] = "2026-08-07T00:05:00+00:00"
+	items._on_mutation_completed({
+		"operation": "save_draft",
+		"item": saved_item,
+		"messages": [],
+	})
+	if client.catalog_searches.size() != 1:
+		_fail("Successful item mutations should immediately request a catalog refresh")
+		return
+	if str(items._current_item.get("updated_at_utc", "")) != "2026-08-07T00:05:00+00:00":
+		_fail("Successful item mutations should adopt the authoritative updated_at_utc before reload completes")
+		return
+	if str(items._payload().get("expected_updated_at_utc", "")) != "2026-08-07T00:05:00+00:00":
+		_fail("Preview payloads should use the authoritative post-save updated_at_utc")
+		return
+	if not items._preview_button.disabled or not items._operation.disabled:
+		_fail("Item preview controls must stay disabled while the authoritative reload is pending")
+		return
+	if items._updated.text != "2026-08-07T00:05:00+00:00":
+		_fail("The item editor should surface the fresh post-save timestamp immediately")
+		return
+
+	items._on_definition_received(saved_item)
+	if items._preview_button.disabled or items._operation.disabled:
+		_fail("Item preview controls should re-enable after the authoritative reload completes")
+		return
+	items._select_option(items._operation, "publish")
+	items._preview()
+	if client.preview_requests.size() != 1:
+		_fail("Preview publish should not require a manual refresh after a successful save")
+		return
+	var preview_request := client.preview_requests[0] as Dictionary
+	var preview_payload := preview_request.get("payload", {}) as Dictionary
+	if str(preview_request.get("item_id", "")) != "inventory_154_axe":
+		_fail("Preview publish should continue using the current item after a successful save")
+		return
+	if str(preview_payload.get("target_operation", "")) != "publish":
+		_fail("Post-save preview should still target publish when requested")
+		return
+	if str(preview_payload.get("expected_updated_at_utc", "")) != "2026-08-07T00:05:00+00:00":
+		_fail("Immediate preview publish must use the fresh post-save updated_at_utc")
 		return
 
 	scene.queue_free()
