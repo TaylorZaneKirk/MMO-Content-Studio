@@ -888,9 +888,15 @@ func _begin_drag(local_position: Vector2) -> void:
 	var can_drag := bool(_current_pose_context.get("can_drag", false))
 	if not can_drag:
 		return
-	var selected_rect := _selected_layer_rect()
-	if selected_rect.size.x <= 0.0 or selected_rect.size.y <= 0.0 or not selected_rect.has_point(local_position):
-		return
+	var selected_layer_local_position: Variant = _selected_layer_local_position(local_position)
+	if selected_layer_local_position == null:
+		var selected_rect := _selected_layer_rect()
+		if selected_rect.size.x <= 0.0 or selected_rect.size.y <= 0.0 or not selected_rect.has_point(local_position):
+			return
+	else:
+		var selected_local_rect := _selected_layer_local_rect()
+		if selected_local_rect.size.x <= 0.0 or selected_local_rect.size.y <= 0.0 or not selected_local_rect.has_point(selected_layer_local_position):
+			return
 	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
 	if preview_scale <= 0.0:
 		return
@@ -911,11 +917,40 @@ func _begin_drag(local_position: Vector2) -> void:
 	_start_drag_polling()
 
 
-func _selected_layer_rect() -> Rect2:
+func _selected_layer() -> TextureRect:
 	var layer_id := str(_current_pose_context.get("layer_id", ""))
-	var layer := _layers.get(layer_id, null) as TextureRect
+	return _layers.get(layer_id, null) as TextureRect
+
+
+func _selected_layer_stage_position(layer_local_position: Vector2):
+	var layer := _selected_layer()
+	if layer == null or not layer.visible or _stage == null:
+		return null
+	var canvas_position := layer.get_global_transform_with_canvas() * layer_local_position
+	return _stage.get_global_transform_with_canvas().affine_inverse() * canvas_position
+
+
+func _selected_layer_local_position(stage_local_position: Vector2):
+	var layer := _selected_layer()
+	if layer == null or not layer.visible or _stage == null:
+		return null
+	var canvas_position := _stage.get_global_transform_with_canvas() * stage_local_position
+	return layer.get_global_transform_with_canvas().affine_inverse() * canvas_position
+
+
+func _selected_layer_local_rect() -> Rect2:
+	var layer := _selected_layer()
 	if layer != null and layer.visible:
-		return layer.get_rect()
+		return Rect2(Vector2.ZERO, layer.size)
+	var selected_rect := _variant_to_rect2(_current_pose_context.get("selected_rect", Rect2()), Rect2())
+	return Rect2(Vector2.ZERO, selected_rect.size)
+
+
+func _selected_layer_rect() -> Rect2:
+	var top_left: Variant = _selected_layer_stage_position(Vector2.ZERO)
+	var bottom_right: Variant = _selected_layer_stage_position(_variant_to_vector2(_current_pose_context.get("texture_size", Vector2.ZERO), Vector2.ZERO) * float(_current_pose_context.get("preview_scale", 0.0)))
+	if top_left != null and bottom_right != null:
+		return Rect2(top_left, bottom_right - top_left).abs()
 	return _variant_to_rect2(_current_pose_context.get("selected_rect", Rect2()), Rect2())
 
 

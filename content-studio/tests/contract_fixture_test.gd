@@ -609,35 +609,39 @@ func _verify_paper_doll_preview_interactions() -> void:
 	if not preview._socket_marker.visible or not preview._grip_marker.visible:
 		_fail("Valid socket-bound preview must show socket and grip markers")
 		return
-	var selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	var selected_rect := preview._selected_layer_rect()
 	var preview_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
 	var start_mouse := selected_rect.position + (selected_rect.size * 0.5)
-	preview._begin_drag(start_mouse)
+	_stage_mouse_press(preview, selected_rect.position + selected_rect.size + Vector2(8, 8))
+	if bool(preview._drag_state.get("active", false)):
+		_fail("Clicking outside the rendered socket-bound layer must not begin dragging")
+		return
+	_stage_mouse_press(preview, start_mouse)
 	if not bool(preview._drag_state.get("active", false)):
 		_fail("Valid socket-bound preview must begin dragging when the equipment sprite is grabbed")
 		return
 
-	preview._apply_drag_position(start_mouse + Vector2(5.0 * preview_scale, 0))
+	_stage_mouse_motion(preview, start_mouse + Vector2(5.0 * preview_scale, 0))
 	if emitted.size() != 4 or emitted[2] != 11 or emitted[3] != 16:
 		_fail("Dragging right by +5 source pixels must decrease grip X by 5")
 		return
-	preview._apply_drag_position(start_mouse + Vector2(-5.0 * preview_scale, 0))
+	_stage_mouse_motion(preview, start_mouse + Vector2(-5.0 * preview_scale, 0))
 	if emitted[2] != 21 or emitted[3] != 16:
 		_fail("Dragging left by -5 source pixels must increase grip X by 5")
 		return
-	preview._apply_drag_position(start_mouse + Vector2(0, 5.0 * preview_scale))
+	_stage_mouse_motion(preview, start_mouse + Vector2(0, 5.0 * preview_scale))
 	if emitted[2] != 16 or emitted[3] != 11:
 		_fail("Dragging down by +5 source pixels must decrease grip Y by 5")
 		return
-	preview._apply_drag_position(start_mouse + Vector2(0, -5.0 * preview_scale))
+	_stage_mouse_motion(preview, start_mouse + Vector2(0, -5.0 * preview_scale))
 	if emitted[2] != 16 or emitted[3] != 21:
 		_fail("Dragging up by -5 source pixels must increase grip Y by 5")
 		return
-	preview._apply_drag_position(start_mouse + Vector2(4000.0 * preview_scale, 0))
+	_stage_mouse_motion(preview, start_mouse + Vector2(4000.0 * preview_scale, 0))
 	if emitted[2] != -3984:
 		_fail("Grip drag must allow negative attachment anchors beyond the PNG bounds")
 		return
-	preview._apply_drag_position(start_mouse + Vector2(-4000.0 * preview_scale, -4000.0 * preview_scale))
+	_stage_mouse_motion(preview, start_mouse + Vector2(-4000.0 * preview_scale, -4000.0 * preview_scale))
 	if emitted[2] != 4016 or emitted[3] != 4016:
 		_fail("Grip drag must allow positive attachment anchors beyond the PNG bounds")
 		return
@@ -652,12 +656,12 @@ func _verify_paper_doll_preview_interactions() -> void:
 	if int(round(source_after.x - source_before.x)) != 5:
 		_fail("Updating a socket-bound grip anchor must immediately change the selected equipment source_position")
 		return
-	preview._apply_drag_position(start_mouse + Vector2(10.0 * preview_scale, 0))
+	_stage_mouse_motion(preview, start_mouse + Vector2(10.0 * preview_scale, 0))
 	if emitted[2] != 6:
 		_fail("Active drag must survive redraws caused by grip-anchor updates")
 		return
 
-	preview._end_drag()
+	_stage_mouse_release(preview, start_mouse + Vector2(10.0 * preview_scale, 0))
 	if bool(preview._drag_state.get("active", false)):
 		_fail("Mouse release/end drag must cancel the active grip drag")
 		return
@@ -668,15 +672,23 @@ func _verify_paper_doll_preview_interactions() -> void:
 	var flipped_rect := preview._selected_layer_rect()
 	var flipped_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
 	var flipped_start_mouse := flipped_rect.position + (flipped_rect.size * 0.5)
-	preview._begin_drag(flipped_start_mouse)
+	_stage_mouse_press(preview, flipped_start_mouse)
 	if not bool(preview._drag_state.get("active", false)):
 		_fail("Flipped socket-bound preview must begin dragging from the live rendered equipment layer")
 		return
-	preview._apply_drag_position(flipped_start_mouse + Vector2(5.0 * flipped_scale, 0))
+	_stage_mouse_motion(preview, flipped_start_mouse + Vector2(5.0 * flipped_scale, 0))
 	if emitted.size() != 4 or emitted[2] != 21 or emitted[3] != 16:
 		_fail("Dragging a flipped socket-bound preview must move its authored anchor in the mirrored horizontal direction")
 		return
-	preview._end_drag()
+	var flipped_source_before := (preview._layers.get("right_hand", null) as TextureRect).position
+	var updated_flipped_visual := _make_socket_visual(Vector2i(int(emitted[2]), int(emitted[3])))
+	updated_flipped_visual["flip_x"] = {"N": {"1": true}}
+	preview.update(true, "right_hand", "axe", "N", 1, visible_slots, updated_flipped_visual)
+	var flipped_source_after := (preview._layers.get("right_hand", null) as TextureRect).position
+	if flipped_source_after.x <= flipped_source_before.x:
+		_fail("Dragging a flipped socket-bound preview right must move the rendered sprite right after refresh")
+		return
+	_stage_mouse_release(preview, flipped_start_mouse + Vector2(5.0 * flipped_scale, 0))
 	preview.cancel_drag()
 	if bool(preview._drag_state.get("active", false)):
 		_fail("Explicit drag cancellation must clear drag state")
@@ -775,12 +787,12 @@ func _verify_paper_doll_preview_camera_and_zoom() -> void:
 	, CONNECT_ONE_SHOT)
 	var selected_rect := preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
 	var start_mouse := selected_rect.position + (selected_rect.size * 0.5)
-	preview._begin_drag(start_mouse)
-	preview._apply_drag_position(start_mouse + Vector2(5.0 * zoomed_scale, 0))
+	_stage_mouse_press(preview, start_mouse)
+	_stage_mouse_motion(preview, start_mouse + Vector2(5.0 * zoomed_scale, 0))
 	if emitted.size() != 4 or emitted[2] != 11 or emitted[3] != 16:
 		_fail("Drag delta conversion must stay correct at higher zoom levels")
 		return
-	preview._end_drag()
+	_stage_mouse_release(preview, start_mouse + Vector2(5.0 * zoomed_scale, 0))
 
 	preview.set_fit_zoom_percent(50)
 	preview.update(true, "right_hand", "axe", "N", 1, visible_slots, _make_socket_visual(Vector2i(16, 16)))
@@ -798,14 +810,14 @@ func _verify_paper_doll_preview_camera_and_zoom() -> void:
 		emitted.clear()
 		emitted.append_array([direction, frame, x, y])
 	, CONNECT_ONE_SHOT)
-	selected_rect = preview._variant_to_rect2(preview._current_pose_context.get("selected_rect", Rect2()), Rect2())
+	selected_rect = preview._selected_layer_rect()
 	start_mouse = selected_rect.position + (selected_rect.size * 0.5)
-	preview._begin_drag(start_mouse)
-	preview._apply_drag_position(start_mouse + Vector2(5.0 * low_zoom_scale, 0))
+	_stage_mouse_press(preview, start_mouse)
+	_stage_mouse_motion(preview, start_mouse + Vector2(5.0 * low_zoom_scale, 0))
 	if emitted.size() != 4 or emitted[2] != 11 or emitted[3] != 16:
 		_fail("Drag delta conversion must stay correct at lower zoom levels")
 		return
-	preview._end_drag()
+	_stage_mouse_release(preview, start_mouse + Vector2(5.0 * low_zoom_scale, 0))
 
 	preview.set_actual_scale_enabled(true)
 	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, valid_west_visual)
@@ -819,6 +831,38 @@ func _verify_paper_doll_preview_camera_and_zoom() -> void:
 	if preview._socket_marker.position != preview._grip_marker.position:
 		_fail("Socket and grip markers should stay coincident in actual scale mode")
 		return
+
+	var actual_flipped_visual := _make_socket_visual(Vector2i(-20, 24), "right_hand_primary", "W")
+	actual_flipped_visual["flip_x"] = {"W": {"1": true}}
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, actual_flipped_visual)
+	var actual_scale_rect := preview._selected_layer_rect()
+	var actual_scale_start_mouse := actual_scale_rect.position + (actual_scale_rect.size * 0.5)
+	var actual_scale_layer_before := (preview._layers.get("right_hand", null) as TextureRect).position
+	emitted.clear()
+	preview.grip_anchor_changed.connect(func(direction: String, frame: int, x: int, y: int) -> void:
+		emitted.clear()
+		emitted.append_array([direction, frame, x, y])
+	, CONNECT_ONE_SHOT)
+	_stage_mouse_press(preview, actual_scale_rect.position + actual_scale_rect.size + Vector2(8, 8))
+	if bool(preview._drag_state.get("active", false)):
+		_fail("Clicking outside the actual-scale rendered layer must not begin dragging")
+		return
+	_stage_mouse_press(preview, actual_scale_start_mouse)
+	if not bool(preview._drag_state.get("active", false)):
+		_fail("Actual-scale flipped socket previews must begin dragging from a stage-local click on the rendered layer")
+		return
+	_stage_mouse_motion(preview, actual_scale_start_mouse + Vector2(5.0 * actual_scale, 0))
+	if emitted.size() != 4 or emitted[2] != -15 or emitted[3] != 24:
+		_fail("Actual-scale flipped socket dragging must preserve mirrored authored-anchor movement for virtual anchors")
+		return
+	var updated_actual_flipped_visual := _make_socket_visual(Vector2i(int(emitted[2]), int(emitted[3])), "right_hand_primary", "W")
+	updated_actual_flipped_visual["flip_x"] = {"W": {"1": true}}
+	preview.update(true, "right_hand", "axe", "W", 1, visible_slots, updated_actual_flipped_visual)
+	var actual_scale_layer_after := (preview._layers.get("right_hand", null) as TextureRect).position
+	if actual_scale_layer_after.x <= actual_scale_layer_before.x:
+		_fail("Actual-scale flipped socket dragging must move the rendered sprite in the requested visual direction")
+		return
+	_stage_mouse_release(preview, actual_scale_start_mouse + Vector2(5.0 * actual_scale, 0))
 
 	var axe_wall_visual := _make_socket_visual(Vector2i(71, 16), "right_hand_primary", "W", 4, "axe")
 	preview.set_actual_scale_enabled(false)
@@ -1038,6 +1082,29 @@ func _write_fixture_png(path: String, color: Color, size: Vector2i = Vector2i(32
 	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
 	image.fill(color)
 	image.save_png(path)
+
+
+func _stage_mouse_press(preview: PaperDollPreview, position: Vector2) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	event.position = position
+	preview._on_stage_gui_input(event)
+
+
+func _stage_mouse_motion(preview: PaperDollPreview, position: Vector2) -> void:
+	var event := InputEventMouseMotion.new()
+	event.position = position
+	event.button_mask = MOUSE_BUTTON_MASK_LEFT
+	preview._on_stage_gui_input(event)
+
+
+func _stage_mouse_release(preview: PaperDollPreview, position: Vector2) -> void:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = false
+	event.position = position
+	preview._on_stage_gui_input(event)
 
 
 func _build_preview_fixture() -> Dictionary:
