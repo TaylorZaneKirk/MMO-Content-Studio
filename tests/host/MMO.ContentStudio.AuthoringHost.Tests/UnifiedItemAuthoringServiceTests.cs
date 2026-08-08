@@ -518,6 +518,25 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadOptionsProvidesCanonicalEquippedVisualMetadataForCompositeCosmetics()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord() with { RuntimeEnabled = true });
+        var service = CreateService(repository);
+
+        var result = await service.LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        AssertSucceeded(result);
+        var cosmetic = Assert.Single(result.Value!.CompositeCosmeticItems);
+        Assert.Equal(ItemId, cosmetic.ItemId);
+        Assert.Equal("humanoid_v1", cosmetic.RigId);
+        Assert.Equal("right_hand", cosmetic.RenderLayerId);
+        Assert.NotNull(cosmetic.EquippedVisual);
+        Assert.Equal("right_hand_primary", cosmetic.EquippedVisual.SocketId);
+        Assert.Equal("dark_sword", cosmetic.EquippedVisual.AssetKey);
+    }
+
+    [Fact]
     public async Task LoadOptionsReadsActorRigCatalogWhenGameClientAssetsPointsToClientRoot()
     {
         var repository = new InMemoryUnifiedItemRepository();

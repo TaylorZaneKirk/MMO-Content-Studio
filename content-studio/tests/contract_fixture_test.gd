@@ -33,6 +33,12 @@ func _run_fixture() -> void:
 	if main_scene == null:
 		_fail("T3A main scene or one of its scripts failed to parse")
 		return
+	if OS.has_environment("CONTENT_STUDIO_COMPOSITE_PREVIEW_ONLY"):
+		await _verify_composite_editor_rig_state(main_scene)
+		await _verify_composite_actor_preview_semantics()
+		print("[content-studio-contract-fixture] composite-only passed")
+		quit(0)
+		return
 
 	var workspace_support := AuthoringWorkspaceSupport.new()
 	var apply_button := Button.new()
@@ -81,6 +87,7 @@ func _run_fixture() -> void:
 		return
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
+	await _verify_composite_editor_rig_state(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
@@ -92,6 +99,7 @@ func _run_fixture() -> void:
 	await _verify_paper_doll_preview_interactions()
 	await _verify_paper_doll_preview_camera_and_zoom()
 	await _verify_paper_doll_foreground_overlays()
+	await _verify_composite_actor_preview_semantics()
 	await _verify_live_runtime_catalog_if_configured()
 
 	print("[content-studio-contract-fixture] passed")
@@ -135,6 +143,48 @@ func _verify_item_editor_rig_catalog_behavior(main_scene: PackedScene) -> void:
 		return
 
 	scene.queue_free()
+
+
+func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var catalog: Dictionary = _available_rig_catalog().actor_rig_catalog.duplicate(true)
+	var alternate_rig: Dictionary = (catalog.rigs[0] as Dictionary).duplicate(true)
+	alternate_rig["rig_id"] = "alternate_humanoid"
+	catalog.rigs.append(alternate_rig)
+	var options := {
+		"actor_rig_catalog": catalog,
+		"composite_cosmetic_items": [],
+	}
+	for workspace_path in ["Margin/Root/Tabs/NPCs", "Margin/Root/Tabs/Mobs"]:
+		var workspace = scene.get_node(workspace_path)
+		if workspace == null:
+			_fail("Composite editor fixture could not locate %s" % workspace_path)
+			return
+		workspace._on_item_options_received(options)
+		workspace._select_option(workspace._composite_rig_id, "humanoid_v1")
+		workspace._on_composite_rig_changed()
+		var body := workspace._composite_base_layer_controls.get("body", null) as LineEdit
+		if body == null:
+			_fail("Composite editor fixture expected humanoid body controls in %s" % workspace_path)
+			return
+		body.text = "edited_body"
+		workspace._on_composite_control_changed()
+		workspace._select_option(workspace._composite_rig_id, "alternate_humanoid")
+		workspace._on_composite_rig_changed()
+		workspace._select_option(workspace._composite_rig_id, "humanoid_v1")
+		workspace._on_composite_rig_changed()
+		body = workspace._composite_base_layer_controls.get("body", null) as LineEdit
+		if body == null or body.text != "edited_body":
+			_fail("Composite editor rig switching must preserve unsaved humanoid layer values in %s" % workspace_path)
+			return
+		var payload: Dictionary = workspace._composite_visual_payload()
+		if str(payload.get("rig_id", "")) != "humanoid_v1" or str((payload.get("base_layers", {}) as Dictionary).get("body", "")) != "edited_body" or (payload.get("base_layers", {}) as Dictionary).has("alternate_only"):
+			_fail("Composite editor payload must contain only the selected rig state in %s" % workspace_path)
+			return
+	scene.queue_free()
+	print("[content-studio-contract-fixture] composite editor rig-state passed")
 	await process_frame
 
 
@@ -1050,6 +1100,65 @@ func _verify_paper_doll_foreground_overlays() -> void:
 
 	stage.free()
 	status.free()
+
+
+func _verify_composite_actor_preview_semantics() -> void:
+	var preview_fixture := _build_preview_fixture()
+	var preview: PaperDollPreview = preview_fixture.preview
+	var stage: Control = preview_fixture.stage
+	var status: Label = preview_fixture.status
+	var asset_root := preview.game_client_assets_root
+	for direction in ["N", "S", "W"]:
+		_write_fixture_png(asset_root.path_join("actors/player/left_hand/champions_shield-F1-%s.png" % direction), Color(0.5, 0.7, 0.8, 1))
+	var shield := _make_socket_visual(Vector2i(16, 16), "left_hand_primary", "N", 1, "champions_shield", "left_hand")
+	shield["grip_anchors"] = {
+		"N": {"1": {"x": 16, "y": 16}},
+		"E": {"1": {"x": 16, "y": 16}},
+		"S": {"1": {"x": 16, "y": 16}},
+		"W": {"1": {"x": 16, "y": 16}},
+	}
+	shield["hidden_poses"] = {"E": {"1": true}}
+	shield["flip_x"] = {"W": {"1": true}}
+	shield["item_over_grip"] = {"S": {"1": true}, "W": {"1": true}}
+	var shield_descriptor := {
+		"rig_id": "humanoid_v1",
+		"base_layers": {"head": "head1", "body": "defbod", "legs": "defbod"},
+		"cosmetic_item_ids": {"left_hand": "inventory_209_champions_shield"},
+	}
+	var visuals := {"inventory_209_champions_shield": shield}
+	preview.update_composite(shield_descriptor, "E", 1, visuals)
+	var shield_layer := preview._layers.get("left_hand", null) as TextureRect
+	if shield_layer != null and shield_layer.visible:
+		_fail("Composite preview must honor the Champion's Shield East hidden pose")
+		return
+	preview.update_composite(shield_descriptor, "S", 1, visuals)
+	shield_layer = preview._layers.get("left_hand", null) as TextureRect
+	var shield_overlay := preview._foreground_overlays.get("left_hand_primary_grip", null) as TextureRect
+	if shield_layer == null or not shield_layer.visible or shield_overlay == null or not shield_overlay.visible or shield_layer.z_index <= shield_overlay.z_index:
+		_fail("Composite preview must render the South Champion's Shield above its grip overlay")
+		return
+	preview.update_composite(shield_descriptor, "W", 1, visuals)
+	shield_layer = preview._layers.get("left_hand", null) as TextureRect
+	shield_overlay = preview._foreground_overlays.get("left_hand_primary_grip", null) as TextureRect
+	if shield_layer == null or not shield_layer.visible or not shield_layer.flip_h or shield_overlay == null or shield_layer.z_index <= shield_overlay.z_index:
+		_fail("Composite preview must retain the authored West shield flip and item-over-grip depth")
+		return
+
+	var sword := _make_socket_visual(Vector2i(16, 16), "right_hand_primary", "S", 1, "dark_sword", "right_hand")
+	var sword_descriptor := {
+		"rig_id": "humanoid_v1",
+		"base_layers": {"head": "head1", "body": "defbod", "legs": "defbod"},
+		"cosmetic_item_ids": {"right_hand": "inventory_154_axe"},
+	}
+	preview.update_composite(sword_descriptor, "S", 1, {"inventory_154_axe": sword})
+	var sword_layer := preview._layers.get("right_hand", null) as TextureRect
+	var sword_overlay := preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	if sword_layer == null or sword_overlay == null or sword_layer.z_index >= sword_overlay.z_index:
+		_fail("Ordinary socket-held composite items must keep the hand/grip over the item")
+		return
+	stage.free()
+	status.free()
+	print("[content-studio-contract-fixture] composite preview semantics passed")
 
 
 func _verify_live_runtime_catalog_if_configured() -> void:

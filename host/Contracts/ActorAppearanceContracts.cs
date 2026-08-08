@@ -46,4 +46,5 @@ public sealed record CompositeCosmeticItemOption(
     [property: JsonPropertyName("item_id")] string ItemId,
     [property: JsonPropertyName("display_name")] string DisplayName,
     [property: JsonPropertyName("rig_id")] string RigId,
-    [property: JsonPropertyName("render_layer_id")] string RenderLayerId);
+    [property: JsonPropertyName("render_layer_id")] string RenderLayerId,
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition EquippedVisual);

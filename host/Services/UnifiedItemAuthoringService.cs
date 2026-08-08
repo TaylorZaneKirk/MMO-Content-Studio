@@ -96,7 +96,8 @@ public sealed class UnifiedItemAuthoringService
                 item.ItemId,
                 item.DisplayName,
                 visual.RigId ?? string.Empty,
-                visual.RenderLayerId ?? string.Empty));
+                visual.RenderLayerId ?? string.Empty,
+                visual));
         }
 
         return options

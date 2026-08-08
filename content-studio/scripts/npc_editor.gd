@@ -4,6 +4,7 @@ class_name NpcEditor
 signal workspace_open_requested(workspace_id: String, resource_id: String)
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
+const PAPER_DOLL_PREVIEW_SCRIPT := preload("res://scripts/paper_doll_preview.gd")
 const GAME_ASSET_PREFIX := "res://assets/"
 
 class NpcVisualPreview:
@@ -91,6 +92,8 @@ var _composite_cosmetics: LineEdit
 var _composite_layers: VBoxContainer
 var _composite_base_layer_controls: Dictionary = {}
 var _composite_cosmetic_controls: Dictionary = {}
+var _composite_rig_states: Dictionary = {}
+var _active_composite_rig_id := ""
 var _actor_rig_catalog: Dictionary = {}
 var _composite_cosmetic_items: Array = []
 var _source_width: SpinBox
@@ -129,11 +132,16 @@ var _validation: VBoxContainer
 var _visual_preview: NpcVisualPreview
 var _visual_status: Label
 var _preview_facing: OptionButton
+var _preview_frame: OptionButton
+var _composite_preview
+var _composite_preview_stage: Control
 
 
 func _ready() -> void:
 	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
 	_build_ui()
+	_composite_preview = PAPER_DOLL_PREVIEW_SCRIPT.new()
+	_composite_preview.bind(_composite_preview_stage, _visual_status)
 	_connect_client()
 	_client.load_item_options()
 	_on_visual_mode_changed()
@@ -323,6 +331,10 @@ func _add_preview_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "Preview", 20)
 	_visual_preview = NpcVisualPreview.new()
 	parent.add_child(_visual_preview)
+	_composite_preview_stage = Control.new()
+	_composite_preview_stage.custom_minimum_size = Vector2(280, 280)
+	_composite_preview_stage.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(_composite_preview_stage)
 	_visual_status = _wrapped_label("No NPC visual selected.")
 	parent.add_child(_visual_status)
 	var facing_row := HBoxContainer.new()
@@ -330,15 +342,22 @@ func _add_preview_section(parent: VBoxContainer) -> void:
 	facing_row.add_child(_label("Preview facing"))
 	_preview_facing = OptionButton.new()
 	for option in [
-		{"id": "south", "display_name": "South"},
-		{"id": "west", "display_name": "West"},
-		{"id": "east", "display_name": "East"},
-		{"id": "north", "display_name": "North"},
+		{"id": "S", "display_name": "South"},
+		{"id": "W", "display_name": "West"},
+		{"id": "E", "display_name": "East"},
+		{"id": "N", "display_name": "North"},
 	]:
 		_preview_facing.add_item(str(option.get("display_name", "")))
 		_preview_facing.set_item_metadata(_preview_facing.item_count - 1, str(option.get("id", "")))
 	_preview_facing.item_selected.connect(_on_preview_facing_changed.unbind(1))
 	facing_row.add_child(_preview_facing)
+	facing_row.add_child(_label("Frame"))
+	_preview_frame = OptionButton.new()
+	for frame in range(1, 5):
+		_preview_frame.add_item("F%d" % frame)
+		_preview_frame.set_item_metadata(_preview_frame.item_count - 1, frame)
+	_preview_frame.item_selected.connect(_on_preview_facing_changed.unbind(1))
+	facing_row.add_child(_preview_frame)
 	parent.add_child(facing_row)
 	_add_heading(parent, "Operation", 16)
 	_operation = OptionButton.new()
@@ -385,6 +404,9 @@ func _on_health_received(payload: Dictionary) -> void:
 		if str(asset_root.get("id", "")) == "game_client_assets":
 			_game_client_assets_root = str(asset_root.get("path", ""))
 			break
+	if _composite_preview != null:
+		_composite_preview.game_client_assets_root = _game_client_assets_root
+		_composite_preview.clear_cache()
 	_update_visual_preview()
 
 
@@ -404,6 +426,8 @@ func _on_npc_options_received(payload: Dictionary) -> void:
 func _on_item_options_received(payload: Dictionary) -> void:
 	_actor_rig_catalog = payload.get("actor_rig_catalog", {}) as Dictionary
 	_composite_cosmetic_items = payload.get("composite_cosmetic_items", []) as Array
+	if _composite_preview != null:
+		_composite_preview.configure_rig_catalog(_actor_rig_catalog)
 	_fill_composite_rigs(_actor_rig_catalog)
 	_rebuild_composite_layer_controls()
 
@@ -436,16 +460,17 @@ func _on_composite_rig_changed() -> void:
 func _rebuild_composite_layer_controls() -> void:
 	if _composite_layers == null:
 		return
-	var base_layers := _parse_key_value_text(_composite_base_layers.text)
-	var cosmetics := _parse_key_value_text(_composite_cosmetics.text)
-	for layer_id in _composite_base_layer_controls:
-		base_layers[layer_id] = (_composite_base_layer_controls[layer_id] as LineEdit).text.strip_edges()
-	for layer_id in _composite_cosmetic_controls:
-		cosmetics[layer_id] = _selected_metadata(_composite_cosmetic_controls[layer_id] as OptionButton)
+	_store_composite_rig_state()
 	_clear_children(_composite_layers)
 	_composite_base_layer_controls.clear()
 	_composite_cosmetic_controls.clear()
 	var rig_id := _selected_metadata(_composite_rig_id)
+	var state: Dictionary = _composite_rig_states.get(rig_id, {
+		"base_layers": _parse_key_value_text(_composite_base_layers.text),
+		"cosmetics": _parse_key_value_text(_composite_cosmetics.text),
+	}) as Dictionary
+	var base_layers: Dictionary = state.get("base_layers", {}) as Dictionary
+	var cosmetics: Dictionary = state.get("cosmetics", {}) as Dictionary
 	for rig_variant in _actor_rig_catalog.get("rigs", []) as Array:
 		if rig_variant is Dictionary and str((rig_variant as Dictionary).get("rig_id", "")) == rig_id:
 			var layers := (rig_variant as Dictionary).get("layers", []) as Array
@@ -464,7 +489,7 @@ func _rebuild_composite_layer_controls() -> void:
 				asset_key.placeholder_text = "Base asset key"
 				asset_key.text = str(base_layers.get(layer_id, ""))
 				asset_key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				asset_key.text_changed.connect(_on_form_changed)
+				asset_key.text_changed.connect(_on_composite_control_changed)
 				row.add_child(asset_key)
 				var cosmetic := OptionButton.new()
 				cosmetic.custom_minimum_size = Vector2(180, 0)
@@ -477,12 +502,33 @@ func _rebuild_composite_layer_controls() -> void:
 							cosmetic.add_item(str(option.get("display_name", "")))
 							cosmetic.set_item_metadata(cosmetic.item_count - 1, str(option.get("item_id", "")))
 				_select_option(cosmetic, str(cosmetics.get(layer_id, "")))
-				cosmetic.item_selected.connect(_on_form_changed.unbind(1))
+				cosmetic.item_selected.connect(_on_composite_control_changed.unbind(1))
 				row.add_child(cosmetic)
 				_composite_layers.add_child(row)
 				_composite_base_layer_controls[layer_id] = asset_key
 				_composite_cosmetic_controls[layer_id] = cosmetic
+			_composite_rig_states[rig_id] = {"base_layers": base_layers.duplicate(true), "cosmetics": cosmetics.duplicate(true)}
+			_active_composite_rig_id = rig_id
 			return
+	_update_visual_preview()
+
+
+func _store_composite_rig_state() -> void:
+	var rig_id := _active_composite_rig_id if not _active_composite_rig_id.is_empty() else _selected_metadata(_composite_rig_id)
+	if rig_id.is_empty():
+		return
+	var base_layers: Dictionary = _parse_key_value_text(_composite_base_layers.text)
+	var cosmetics: Dictionary = _parse_key_value_text(_composite_cosmetics.text)
+	for layer_id in _composite_base_layer_controls:
+		base_layers[layer_id] = (_composite_base_layer_controls[layer_id] as LineEdit).text.strip_edges()
+	for layer_id in _composite_cosmetic_controls:
+		cosmetics[layer_id] = _selected_metadata(_composite_cosmetic_controls[layer_id] as OptionButton)
+	_composite_rig_states[rig_id] = {"base_layers": base_layers, "cosmetics": cosmetics}
+
+
+func _on_composite_control_changed(_value: Variant = null) -> void:
+	_store_composite_rig_state()
+	_on_form_changed()
 
 
 func _on_npc_catalog_received(payload: Dictionary) -> void:
@@ -782,7 +828,17 @@ func _payload() -> Dictionary:
 
 func _load_composite_visual(value: Variant) -> void:
 	var composite: Dictionary = value as Dictionary if value is Dictionary else {}
-	_select_option(_composite_rig_id, str(composite.get("rig_id", "humanoid_v1")))
+	var rig_id := str(composite.get("rig_id", "humanoid_v1"))
+	_composite_rig_states.clear()
+	_active_composite_rig_id = ""
+	_clear_children(_composite_layers)
+	_composite_base_layer_controls.clear()
+	_composite_cosmetic_controls.clear()
+	_composite_rig_states[rig_id] = {
+		"base_layers": composite.get("base_layers", {}) as Dictionary,
+		"cosmetics": composite.get("cosmetic_item_ids", {}) as Dictionary,
+	}
+	_select_option(_composite_rig_id, rig_id)
 	_composite_base_layers.text = _key_value_text(composite.get("base_layers", {}))
 	_composite_cosmetics.text = _key_value_text(composite.get("cosmetic_item_ids", {}))
 	_rebuild_composite_layer_controls()
@@ -854,6 +910,8 @@ func _on_visual_mode_changed() -> void:
 	_composite_rig_id.visible = composite
 	_composite_layers.visible = composite
 	_visual_path.visible = not composite
+	_visual_preview.visible = not composite
+	_composite_preview_stage.visible = composite
 	_on_form_changed()
 
 
@@ -917,6 +975,17 @@ func _update_dialogue_workspace_button() -> void:
 func _update_visual_preview() -> void:
 	if _visual_preview == null:
 		return
+	if _selected_metadata(_visual_mode) == "composite_rig":
+		if _composite_preview == null:
+			return
+		_composite_preview.game_client_assets_root = _game_client_assets_root
+		var preview_state: Dictionary = _composite_preview.update_composite(
+			_composite_visual_payload(),
+			_selected_metadata(_preview_facing),
+			int(_selected_metadata(_preview_frame)),
+			_composite_equipped_visuals_by_item())
+		_visual_status.text = str(preview_state.get("status", "Composite preview unavailable."))
+		return
 	var resolved := _resolve_visual_preview_file_path()
 	var file_path := str(resolved.get("file_path", ""))
 	var status := str(resolved.get("status", "No NPC visual selected."))
@@ -940,6 +1009,18 @@ func _update_visual_preview() -> void:
 		status
 	)
 	_visual_status.text = status
+
+
+func _composite_equipped_visuals_by_item() -> Dictionary:
+	var visuals := {}
+	for option_variant in _composite_cosmetic_items:
+		if option_variant is Dictionary:
+			var option := option_variant as Dictionary
+			var item_id := str(option.get("item_id", ""))
+			var equipped_visual := option.get("equipped_visual", {}) as Dictionary
+			if not item_id.is_empty() and not equipped_visual.is_empty():
+				visuals[item_id] = equipped_visual
+	return visuals
 
 
 func _resolve_visual_preview_file_path() -> Dictionary:

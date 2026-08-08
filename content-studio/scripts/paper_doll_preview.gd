@@ -293,6 +293,107 @@ func update(
 	}
 
 
+func update_composite(
+	composite_visual: Dictionary,
+	direction: String,
+	frame: int,
+	equipped_visuals_by_item: Dictionary
+) -> Dictionary:
+	_last_resolved_asset_path = ""
+	_last_view_state.clear()
+	_current_pose_context.clear()
+	_asset_resolution_diagnostics.clear()
+	_reset_layers()
+	_reset_foreground_overlays()
+	_hide_markers()
+
+	if _stage == null or _status == null:
+		return {"status": "Preview stage is not available.", "resolved_asset_path": ""}
+	if game_client_assets_root.is_empty() or not DirAccess.dir_exists_absolute(game_client_assets_root):
+		_status.text = "The configured game_client_assets directory is unavailable."
+		return {"status": _status.text, "resolved_asset_path": ""}
+
+	var rig_id := str(composite_visual.get("rig_id", DEFAULT_RIG_ID))
+	var rig := _rigs_by_id.get(rig_id, {}) as Dictionary
+	if rig.is_empty():
+		var diagnostic := _rig_catalog_status
+		if diagnostic.is_empty():
+			diagnostic = "Rig '%s' is not available in the canonical actor rig catalog." % rig_id
+		_status.text = diagnostic
+		return {"status": diagnostic, "resolved_asset_path": ""}
+
+	var selected_direction := direction if not direction.is_empty() else "N"
+	var selected_frame := clampi(frame, 1, 4)
+	var layer_entries := _resolve_composite_loaded_layers(
+		rig,
+		composite_visual,
+		selected_direction,
+		selected_frame,
+		equipped_visuals_by_item)
+	if layer_entries.is_empty():
+		var missing_diagnostic := "No composite preview PNGs could be resolved from the configured game_client_assets root."
+		var first_missing := _first_asset_resolution_hint()
+		if not first_missing.is_empty():
+			missing_diagnostic += " First missing asset hint: %s" % first_missing
+		_status.text = missing_diagnostic
+		return {"status": missing_diagnostic, "resolved_asset_path": ""}
+
+	var actor_bounds := _source_bounds(layer_entries)
+	var view_bounds_result := _view_bounds(actor_bounds)
+	var view_bounds: Rect2 = _variant_to_rect2(view_bounds_result.get("bounds", Rect2()), Rect2())
+	var stage_size := _stage_size()
+	var preview_scale := _view_scale(view_bounds.size, stage_size)
+	var group_origin := (stage_size - (view_bounds.size * preview_scale)) * 0.5
+	for layer_entry_variant: Variant in layer_entries:
+		var layer_entry: Dictionary = layer_entry_variant
+		var texture := layer_entry.get("texture") as Texture2D
+		if texture == null:
+			continue
+		var layer_id := str(layer_entry.get("layer_id", ""))
+		var layer := _ensure_layer(layer_id)
+		var source_position := _variant_to_vector2(layer_entry.get("source_position", ANCHOR_OFFSET), ANCHOR_OFFSET)
+		layer.texture = texture
+		layer.visible = true
+		layer.z_index = int(layer_entry.get("z_index", 0))
+		layer.flip_h = bool(layer_entry.get("flip_x", false))
+		layer.size = texture.get_size() * preview_scale
+		layer.position = group_origin + ((source_position - view_bounds.position) * preview_scale)
+		if _last_resolved_asset_path.is_empty() and bool(layer_entry.get("is_cosmetic", false)):
+			_last_resolved_asset_path = str(layer_entry.get("resolved_asset_path", ""))
+
+	for layer_entry_variant: Variant in layer_entries:
+		var layer_entry: Dictionary = layer_entry_variant
+		var equipped_visual := layer_entry.get("equipped_visual", {}) as Dictionary
+		if _is_valid_socket_attachment(equipped_visual, layer_entry):
+			_render_foreground_overlays(
+				rig,
+				equipped_visual,
+				true,
+				selected_direction,
+				selected_frame,
+				layer_entries,
+				view_bounds,
+				group_origin,
+				preview_scale)
+
+	_last_view_state = {
+		"stage_size": stage_size,
+		"actor_bounds_source": actor_bounds,
+		"view_bounds_source": view_bounds,
+		"padding_source": float(view_bounds_result.get("padding_source", 0.0)),
+		"preview_scale": preview_scale,
+		"group_origin": group_origin,
+	}
+	_status.text = "%s • %s frame %d • composite rig preview" % [rig_id, selected_direction, selected_frame]
+	return {
+		"status": _status.text,
+		"resolved_asset_path": _last_resolved_asset_path,
+		"preview_scale": preview_scale,
+		"view_bounds_source": view_bounds,
+		"actor_bounds_source": actor_bounds,
+	}
+
+
 func normalize_visual_key(value: String) -> String:
 	var normalized := value.to_lower().replace("'", "").replace("’", "")
 	for separator in [" ", "-", "/"]:
@@ -383,6 +484,64 @@ func _resolve_loaded_layers(
 			"socket_position": pose.socket_position,
 			"authored_anchor": bool(pose.authored_anchor),
 			"flip_x": flip_x,
+		})
+	return entries
+
+
+func _resolve_composite_loaded_layers(
+	rig: Dictionary,
+	composite_visual: Dictionary,
+	direction: String,
+	frame: int,
+	equipped_visuals_by_item: Dictionary
+) -> Array:
+	var entries: Array = []
+	var base_layers := composite_visual.get("base_layers", {}) as Dictionary
+	var cosmetic_item_ids := composite_visual.get("cosmetic_item_ids", {}) as Dictionary
+	for layer_variant: Variant in rig.get("layers", []) as Array:
+		if not (layer_variant is Dictionary):
+			continue
+		var layer_id := str((layer_variant as Dictionary).get("layer_id", ""))
+		if layer_id.is_empty():
+			continue
+		var asset_key := str(base_layers.get(layer_id, DEFAULT_VISUAL_KEYS.get(layer_id, "")))
+		var equipped_visual: Dictionary = {}
+		var cosmetic_item_id := str(cosmetic_item_ids.get(layer_id, ""))
+		if not cosmetic_item_id.is_empty():
+			equipped_visual = equipped_visuals_by_item.get(cosmetic_item_id, {}) as Dictionary
+			if equipped_visual.is_empty() or str(equipped_visual.get("render_layer_id", "")) != layer_id:
+				continue
+			if _resolve_pose_hidden(equipped_visual, direction, frame):
+				continue
+			asset_key = str(equipped_visual.get("asset_key", ""))
+		if asset_key.is_empty():
+			continue
+		var load_result := _load_texture(layer_id, asset_key, frame, direction)
+		if load_result.is_empty():
+			var asset_path := _expected_layer_asset_path(layer_id, asset_key, frame, direction)
+			if not _asset_resolution_diagnostics.has(asset_path):
+				_asset_resolution_diagnostics.append(asset_path)
+			continue
+		var texture := load_result.get("texture") as Texture2D
+		if texture == null:
+			continue
+		var pose := _resolve_layer_pose(rig, equipped_visual, layer_id, direction, frame, texture.get_width())
+		entries.append({
+			"layer_id": layer_id,
+			"texture": texture,
+			"source_position": pose.position,
+			"z_index": _resolve_equipped_visual_z_index(rig, equipped_visual, layer_id, direction, frame),
+			"selected_visual": not equipped_visual.is_empty(),
+			"is_cosmetic": not equipped_visual.is_empty(),
+			"asset_key": asset_key,
+			"resolved_asset_path": str(load_result.get("path", "")),
+			"used_attachment": bool(pose.used_attachment),
+			"grip_anchor": pose.grip_anchor,
+			"authored_grip_anchor": pose.authored_grip_anchor,
+			"socket_position": pose.socket_position,
+			"authored_anchor": bool(pose.authored_anchor),
+			"flip_x": _resolve_pose_flip_x(equipped_visual, direction, frame),
+			"equipped_visual": equipped_visual,
 		})
 	return entries
 
