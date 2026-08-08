@@ -106,6 +106,7 @@ public sealed class ItemSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("item_equipped_visual_pose_anchors", "grip_anchor_y"),
         AuthoringSchemaRequirement.Column("item_equipped_visual_pose_anchors", "flip_x"),
         AuthoringSchemaRequirement.Column("item_equipped_visual_pose_anchors", "hidden"),
+        AuthoringSchemaRequirement.Column("item_equipped_visual_pose_anchors", "item_over_grip"),
         AuthoringSchemaRequirement.Constraint("item_definitions_equipment_slot_id_fkey"),
         AuthoringSchemaRequirement.Constraint("item_consumable_profiles_use_action_check"),
         AuthoringSchemaRequirement.Constraint("item_consumable_profiles_consume_quantity_check"),

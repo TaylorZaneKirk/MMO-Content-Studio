@@ -768,6 +768,11 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             transaction,
             itemId,
             cancellationToken);
+        var itemOverGripByPose = await LoadEquippedVisualItemOverGripByPoseAsync(
+            connection,
+            transaction,
+            itemId,
+            cancellationToken);
         return new ItemEquippedVisualDefinition(
             assetKey,
             rigId,
@@ -778,7 +783,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             nudge,
             gripAnchors,
             flipXByPose,
-            hiddenPoses);
+            hiddenPoses,
+            itemOverGripByPose);
     }
 
     private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>> LoadEquippedVisualGripAnchorsAsync(
@@ -867,6 +873,42 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             from item_equipped_visual_pose_anchors
             where item_id = @item_id
               and hidden = true
+            order by direction, frame;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var poses = new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var direction = reader.GetString(reader.GetOrdinal("direction"));
+            var frame = reader.GetInt32(reader.GetOrdinal("frame")).ToString();
+            if (!poses.TryGetValue(direction, out var frames))
+            {
+                frames = new Dictionary<string, bool>(StringComparer.Ordinal);
+                poses[direction] = frames;
+            }
+
+            frames[frame] = true;
+        }
+
+        return poses.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyDictionary<string, bool>)pair.Value,
+            StringComparer.Ordinal);
+    }
+
+    private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>> LoadEquippedVisualItemOverGripByPoseAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select direction, frame
+            from item_equipped_visual_pose_anchors
+            where item_id = @item_id
+              and item_over_grip = true
             order by direction, frame;
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -1298,6 +1340,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 grip_anchor_y,
                 flip_x,
                 hidden,
+                item_over_grip,
                 updated_at
             ) values (
                 @item_id,
@@ -1307,6 +1350,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @grip_anchor_y,
                 @flip_x,
                 @hidden,
+                @item_over_grip,
                 now()
             );
             """;
@@ -1333,6 +1377,12 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                         equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal),
                         direction.Key,
                         frame.Key));
+                command.Parameters.AddWithValue(
+                    "item_over_grip",
+                    IsItemOverGrip(
+                        equippedVisual.ItemOverGripByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal),
+                        direction.Key,
+                        frame.Key));
                 await command.ExecuteNonQueryAsync(cancellationToken);
                 persistedPoses.Add($"{direction.Key}|{frame.Key}");
             }
@@ -1341,6 +1391,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         var nonAnchorPoses = (equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal))
             .SelectMany(direction => direction.Value.Where(frame => frame.Value).Select(frame => (Direction: direction.Key, Frame: frame.Key)))
             .Concat((equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal))
+                .SelectMany(direction => direction.Value.Where(frame => frame.Value).Select(frame => (Direction: direction.Key, Frame: frame.Key))))
+            .Concat((equippedVisual.ItemOverGripByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal))
                 .SelectMany(direction => direction.Value.Where(frame => frame.Value).Select(frame => (Direction: direction.Key, Frame: frame.Key))))
             .Distinct()
             .OrderBy(pose => pose.Direction, StringComparer.Ordinal)
@@ -1370,6 +1422,12 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                     equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal),
                     pose.Direction,
                     pose.Frame));
+            command.Parameters.AddWithValue(
+                "item_over_grip",
+                IsItemOverGrip(
+                    equippedVisual.ItemOverGripByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal),
+                    pose.Direction,
+                    pose.Frame));
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
@@ -1389,6 +1447,14 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         hiddenPoses.TryGetValue(direction, out var frames)
         && frames.TryGetValue(frame, out var hidden)
         && hidden;
+
+    private static bool IsItemOverGrip(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> itemOverGripByPose,
+        string direction,
+        string frame) =>
+        itemOverGripByPose.TryGetValue(direction, out var frames)
+        && frames.TryGetValue(frame, out var itemOverGrip)
+        && itemOverGrip;
 
     private static async Task ReplaceToolCapabilitiesAsync(
         NpgsqlConnection connection,

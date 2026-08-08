@@ -597,6 +597,23 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                 ["4"] = true
             }
         };
+        var itemOverGripByPose = new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal)
+        {
+            ["S"] = new Dictionary<string, bool>(StringComparer.Ordinal)
+            {
+                ["1"] = true,
+                ["2"] = true,
+                ["3"] = true,
+                ["4"] = true
+            },
+            ["W"] = new Dictionary<string, bool>(StringComparer.Ordinal)
+            {
+                ["1"] = true,
+                ["2"] = true,
+                ["3"] = true,
+                ["4"] = true
+            }
+        };
         var request = UnifiedSaveRequest(null) with
         {
             Equipment = EquipmentDraft() with
@@ -609,7 +626,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                     RenderLayerId = "left_hand",
                     SocketId = "left_hand_primary",
                     GripAnchors = gripAnchors,
-                    HiddenPoses = hiddenPoses
+                    HiddenPoses = hiddenPoses,
+                    ItemOverGripByPose = itemOverGripByPose
                 }
             }
         };
@@ -618,6 +636,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         AssertSucceeded(save);
         Assert.True(repository.Records[ItemId].EquippedVisual!.HiddenPoses!["E"]["4"]);
         Assert.False(repository.Records[ItemId].EquippedVisual!.GripAnchors.ContainsKey("E"));
+        Assert.True(repository.Records[ItemId].EquippedVisual!.ItemOverGripByPose!["S"]["1"]);
+        Assert.True(repository.Records[ItemId].EquippedVisual!.ItemOverGripByPose!["W"]["4"]);
 
         var publish = await service.PublishAsync(
             ItemId,
@@ -1127,7 +1147,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                             draft.Equipment.EquippedVisual.Nudge,
                             draft.Equipment.EquippedVisual.GripAnchors,
                             draft.Equipment.EquippedVisual.FlipXByPose,
-                            draft.Equipment.EquippedVisual.HiddenPoses)),
+                            draft.Equipment.EquippedVisual.HiddenPoses,
+                            draft.Equipment.EquippedVisual.ItemOverGripByPose)),
             draft.ToolCapabilities,
             expected,
             null);
@@ -1477,7 +1498,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                         equipment.EquippedVisual.Nudge,
                         equipment.EquippedVisual.GripAnchors,
                         equipment.EquippedVisual.FlipXByPose,
-                        equipment.EquippedVisual.HiddenPoses),
+                        equipment.EquippedVisual.HiddenPoses,
+                        equipment.EquippedVisual.ItemOverGripByPose),
                 draft.ToolCapabilities
                     .Select((value, index) => new ItemToolCapabilityDefinition(
                         value.CapabilityId,

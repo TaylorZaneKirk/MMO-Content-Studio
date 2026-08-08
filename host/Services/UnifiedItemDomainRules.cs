@@ -72,7 +72,8 @@ public static partial class UnifiedItemDomainRules
                             record.EquippedVisual.Nudge,
                             record.EquippedVisual.GripAnchors,
                             record.EquippedVisual.FlipXByPose,
-                            record.EquippedVisual.HiddenPoses))
+                            record.EquippedVisual.HiddenPoses,
+                            record.EquippedVisual.ItemOverGripByPose))
                 : null,
             record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
@@ -263,7 +264,8 @@ public static partial class UnifiedItemDomainRules
             && equippedVisual.Nudge is null
             && (equippedVisual.GripAnchors is null || equippedVisual.GripAnchors.Count == 0)
             && (equippedVisual.FlipXByPose is null || equippedVisual.FlipXByPose.Count == 0)
-            && (equippedVisual.HiddenPoses is null || equippedVisual.HiddenPoses.Count == 0))
+            && (equippedVisual.HiddenPoses is null || equippedVisual.HiddenPoses.Count == 0)
+            && (equippedVisual.ItemOverGripByPose is null || equippedVisual.ItemOverGripByPose.Count == 0))
         {
             return null;
         }
@@ -278,7 +280,8 @@ public static partial class UnifiedItemDomainRules
             equippedVisual.Nudge ?? new SourcePixelPointDefinition(0, 0),
             NormalizeGripAnchors(equippedVisual.GripAnchors),
             NormalizeFlipXByPose(equippedVisual.FlipXByPose),
-            NormalizeHiddenPoses(equippedVisual.HiddenPoses));
+            NormalizeHiddenPoses(equippedVisual.HiddenPoses),
+            NormalizeItemOverGripByPose(equippedVisual.ItemOverGripByPose));
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> NormalizeGripAnchors(
@@ -355,6 +358,10 @@ public static partial class UnifiedItemDomainRules
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? hiddenPoses) =>
         NormalizeFlipXByPose(hiddenPoses);
 
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> NormalizeItemOverGripByPose(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? itemOverGripByPose) =>
+        NormalizeFlipXByPose(itemOverGripByPose);
+
     [GeneratedRegex("^[a-z0-9]+(?:_[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
     public static partial Regex StableIdRegex();
 }
@@ -397,4 +404,5 @@ public sealed record NormalizedItemEquippedVisual(
     SourcePixelPointDefinition Nudge,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors,
     IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipXByPose = null,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? HiddenPoses = null);
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? HiddenPoses = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? ItemOverGripByPose = null);

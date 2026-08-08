@@ -429,13 +429,25 @@ func _verify_per_pose_flip_payload_and_preview_math(main_scene: PackedScene) -> 
 	if not bool((hidden_poses.get("W", {}) as Dictionary).get("4", false)):
 		_fail("Visible in this pose must persist only explicitly hidden poses")
 		return
-	if items._appearance_grip_x.editable or not items._appearance_flip_x.disabled:
-		_fail("Hidden poses must disable attachment and flip editing")
+	if items._appearance_grip_x.editable or not items._appearance_flip_x.disabled or not items._appearance_item_over_grip.disabled:
+		_fail("Hidden poses must disable attachment, flip, and item-over-grip editing")
 		return
 	items._appearance_visible_in_pose.button_pressed = true
 	items._on_appearance_visible_in_pose_toggled(true)
-	if not items._appearance_grip_x.editable or items._appearance_flip_x.disabled:
+	if not items._appearance_grip_x.editable or items._appearance_flip_x.disabled or items._appearance_item_over_grip.disabled:
 		_fail("Revealing a pose must restore normal pose editing")
+		return
+	items._appearance_item_over_grip.button_pressed = true
+	items._on_appearance_item_over_grip_toggled(true)
+	var item_over_grip_payload: Dictionary = (items._equipped_visual_payload() as Dictionary)
+	var item_over_grip := item_over_grip_payload.get("item_over_grip", {}) as Dictionary
+	if not bool((item_over_grip.get("W", {}) as Dictionary).get("4", false)):
+		_fail("Render in front of hand must persist only the selected pose")
+		return
+	items._select_option(items._preview_direction, "N")
+	items._update_grip_pose_controls()
+	if items._appearance_item_over_grip.button_pressed:
+		_fail("Changing pose must restore the selected pose item-over-grip state")
 		return
 
 	scene.queue_free()
@@ -934,6 +946,14 @@ func _verify_paper_doll_foreground_overlays() -> void:
 		return
 	if foreground_overlay.z_index <= held_item.z_index:
 		_fail("Foreground grip overlay must render above the held item")
+		return
+	var item_over_grip_visual := socket_visual.duplicate(true)
+	item_over_grip_visual["item_over_grip"] = {"N": {"1": true}}
+	preview.update(true, "right_hand", "dark_sword", "N", 1, visible_slots, item_over_grip_visual)
+	foreground_overlay = preview._foreground_overlays.get("right_hand_primary_grip", null) as TextureRect
+	held_item = preview._layers.get("right_hand", null) as TextureRect
+	if held_item == null or foreground_overlay == null or held_item.z_index <= foreground_overlay.z_index:
+		_fail("Item-over-grip preview poses must render above the applicable rig-owned grip overlay")
 		return
 	if foreground_overlay.mouse_filter != Control.MOUSE_FILTER_IGNORE:
 		_fail("Foreground grip overlay must remain non-interactive")

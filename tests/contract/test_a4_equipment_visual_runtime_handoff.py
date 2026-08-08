@@ -51,6 +51,25 @@ class A4EquipmentVisualRuntimeHandoffTests(unittest.TestCase):
         self.assertEqual(studio_migration, runtime_migration)
         self.assertIn("ADD COLUMN IF NOT EXISTS hidden BOOLEAN NOT NULL DEFAULT FALSE", studio_migration)
 
+    def test_item_over_grip_migration_matches_content_studio_handoff(self) -> None:
+        studio_migration = (
+            ROOT
+            / "integrations"
+            / "mmo-project"
+            / "prototype"
+            / "sql"
+            / "032_a5_2_2_equipped_visual_item_over_grip.sql"
+        ).read_text()
+        runtime_migration = (
+            MMO_PROJECT_ROOT
+            / "prototype"
+            / "sql"
+            / "032_a5_2_2_equipped_visual_item_over_grip.sql"
+        ).read_text()
+
+        self.assertEqual(studio_migration, runtime_migration)
+        self.assertIn("ADD COLUMN IF NOT EXISTS item_over_grip BOOLEAN NOT NULL DEFAULT FALSE", studio_migration)
+
     def test_runtime_publisher_uses_item_id_catalog_export(self) -> None:
         publisher = (ROOT / "host" / "Services" / "RuntimeCatalogPublisherService.cs").read_text()
         item_service = (ROOT / "host" / "Services" / "UnifiedItemAuthoringService.cs").read_text()

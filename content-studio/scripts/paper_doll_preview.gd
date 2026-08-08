@@ -373,7 +373,7 @@ func _resolve_loaded_layers(
 			"layer_id": layer_id,
 			"texture": texture,
 			"source_position": pose.position,
-			"z_index": _resolve_layer_z_index(rig, layer_id, direction),
+			"z_index": _resolve_equipped_visual_z_index(rig, equipped_visual, layer_id, direction, frame),
 			"selected_visual": selected_visual and (active_binding_type != "rig_layer" or active_render_layer_id == layer_id),
 			"asset_key": asset_key,
 			"resolved_asset_path": str(load_result.get("path", "")),
@@ -453,6 +453,14 @@ func _resolve_pose_hidden(equipped_visual: Dictionary, direction: String, frame:
 	return bool((direction_variant as Dictionary).get(str(clampi(frame, 1, 4)), false)) if direction_variant is Dictionary else false
 
 
+func _resolve_pose_item_over_grip(equipped_visual: Dictionary, direction: String, frame: int) -> bool:
+	var item_over_grip: Variant = equipped_visual.get("item_over_grip", null)
+	if not (item_over_grip is Dictionary):
+		return false
+	var direction_variant: Variant = (item_over_grip as Dictionary).get(direction, null)
+	return bool((direction_variant as Dictionary).get(str(clampi(frame, 1, 4)), false)) if direction_variant is Dictionary else false
+
+
 func _resolve_preview_grip_anchor(
 	grip_points_variant: Variant,
 	direction: String,
@@ -513,6 +521,52 @@ func _resolve_layer_z_index(rig: Dictionary, layer_id: String, direction: String
 		return 0
 	var z_indexes := layer.get("z_index_by_direction", {}) as Dictionary
 	return int(z_indexes.get(direction, 0))
+
+
+func _resolve_equipped_visual_z_index(
+	rig: Dictionary,
+	equipped_visual: Dictionary,
+	layer_id: String,
+	direction: String,
+	frame: int) -> int:
+	var default_z_index := _resolve_layer_z_index(rig, layer_id, direction)
+	if str(equipped_visual.get("render_layer_id", "")) != layer_id or \
+		not _resolve_pose_item_over_grip(equipped_visual, direction, frame):
+		return default_z_index
+
+	var socket_id := str(equipped_visual.get("socket_id", ""))
+	var overlay_z_index = _resolve_socket_foreground_overlay_z_index(rig, socket_id, direction, frame)
+	if overlay_z_index != null:
+		return int(overlay_z_index) + 1
+	return _resolve_foreground_rig_z_index(rig, direction, default_z_index) + 1
+
+
+func _resolve_socket_foreground_overlay_z_index(rig: Dictionary, socket_id: String, direction: String, frame: int):
+	if socket_id.is_empty():
+		return null
+	var overlays_by_id: Dictionary = rig.get("foreground_overlays_by_id", {})
+	var resolved_z_index: Variant = null
+	for overlay_variant: Variant in overlays_by_id.values():
+		if not (overlay_variant is Dictionary):
+			continue
+		var overlay := overlay_variant as Dictionary
+		if str(overlay.get("socket_id", "")) != socket_id or \
+			_resolve_foreground_overlay_source_rect(overlay, direction, frame) == null:
+			continue
+		var overlay_z_index := _resolve_foreground_overlay_z_index(overlay, direction)
+		resolved_z_index = maxi(int(resolved_z_index), overlay_z_index) if resolved_z_index != null else overlay_z_index
+	return resolved_z_index
+
+
+func _resolve_foreground_rig_z_index(rig: Dictionary, direction: String, fallback_z_index: int) -> int:
+	var resolved_z_index := fallback_z_index
+	var layers_by_id: Dictionary = rig.get("layers_by_id", {})
+	for layer_variant: Variant in layers_by_id.values():
+		if not (layer_variant is Dictionary):
+			continue
+		var z_indexes: Dictionary = (layer_variant as Dictionary).get("z_index_by_direction", {}) as Dictionary
+		resolved_z_index = maxi(resolved_z_index, int(z_indexes.get(direction, 0)))
+	return resolved_z_index
 
 
 func _render_foreground_overlays(

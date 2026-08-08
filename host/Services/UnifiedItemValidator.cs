@@ -658,6 +658,7 @@ public sealed class UnifiedItemValidator
             }
             ValidateFlipXByPose(equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
             ValidateHiddenPoses(equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
+            ValidateItemOverGripByPose(equippedVisual.ItemOverGripByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
             return;
         }
 
@@ -679,6 +680,7 @@ public sealed class UnifiedItemValidator
             messages);
         ValidateFlipXByPose(equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
         ValidateHiddenPoses(equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
+        ValidateItemOverGripByPose(equippedVisual.ItemOverGripByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
     }
 
     private static void ValidateFlipXByPose(
@@ -815,6 +817,39 @@ public sealed class UnifiedItemValidator
                         $"Hidden pose frame '{frame}' is not supported.",
                         ValidationSeverity.Error,
                         $"equipment.equipped_visual.hidden_poses.{direction}.{frame}"));
+                }
+            }
+        }
+    }
+
+    private static void ValidateItemOverGripByPose(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> itemOverGripByPose,
+        ICollection<ApiError> messages)
+    {
+        var expectedDirections = new HashSet<string>(["N", "E", "S", "W"], StringComparer.Ordinal);
+        var expectedFrames = new HashSet<string>(["1", "2", "3", "4"], StringComparer.Ordinal);
+
+        foreach (var direction in itemOverGripByPose.Keys)
+        {
+            if (!expectedDirections.Contains(direction))
+            {
+                messages.Add(new ApiError(
+                    "invalid_equipped_visual_item_over_grip_direction",
+                    $"Item-over-grip direction '{direction}' is not supported.",
+                    ValidationSeverity.Error,
+                    $"equipment.equipped_visual.item_over_grip.{direction}"));
+                continue;
+            }
+
+            foreach (var frame in itemOverGripByPose[direction].Keys)
+            {
+                if (!expectedFrames.Contains(frame))
+                {
+                    messages.Add(new ApiError(
+                        "invalid_equipped_visual_item_over_grip_frame",
+                        $"Item-over-grip frame '{frame}' is not supported.",
+                        ValidationSeverity.Error,
+                        $"equipment.equipped_visual.item_over_grip.{direction}.{frame}"));
                 }
             }
         }
