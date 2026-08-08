@@ -430,6 +430,10 @@ func _add_drops_section(parent: VBoxContainer) -> void:
 func _on_mob_options_received(payload: Dictionary) -> void:
 	_schema_available = true
 	_options = payload
+	var visual_assets := _options.get("visual_assets", {}) as Dictionary
+	var options_root := str(visual_assets.get("game_assets_root", ""))
+	if not options_root.is_empty():
+		_game_client_assets_root = options_root
 	_apply_options()
 	_set_form_enabled(not _current_mob.is_empty() or _is_new)
 	if _current_mob.is_empty() and not _is_new:

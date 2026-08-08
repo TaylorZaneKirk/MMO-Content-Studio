@@ -44,6 +44,7 @@ func _run_fixture() -> void:
 		return
 	if OS.has_environment("CONTENT_STUDIO_COMPOSITE_PREVIEW_ONLY"):
 		await _verify_composite_editor_rig_state(main_scene)
+		await _verify_mob_options_asset_root_fallback(main_scene)
 		await _verify_composite_actor_preview_semantics()
 		print("[content-studio-contract-fixture] composite-only passed")
 		quit(0)
@@ -97,6 +98,7 @@ func _run_fixture() -> void:
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_composite_editor_rig_state(main_scene)
+	await _verify_mob_options_asset_root_fallback(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
@@ -194,6 +196,45 @@ func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
 			return
 	scene.queue_free()
 	print("[content-studio-contract-fixture] composite editor rig-state passed")
+	await process_frame
+
+
+func _verify_mob_options_asset_root_fallback(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var mobs = scene.get_node("Margin/Root/Tabs/Mobs")
+	if mobs == null:
+		_fail("Mob options fixture could not locate the Mobs workspace")
+		return
+	var asset_root := ProjectSettings.globalize_path("user://contract-fixture-mob-options-assets")
+	DirAccess.make_dir_recursive_absolute(asset_root.path_join("actors/player/body"))
+	for direction in ["N", "E", "S", "W"]:
+		_write_fixture_png(asset_root.path_join("actors/player/body/defbod-F1-%s.png" % direction), Color(0, 1, 0, 1))
+	mobs._on_health_received({"asset_roots": []})
+	mobs._on_item_options_received({
+		"actor_rig_catalog": _available_rig_catalog().actor_rig_catalog,
+		"composite_cosmetic_items": [],
+	})
+	mobs._on_mob_options_received({"visual_assets": {"game_assets_root": asset_root}})
+	mobs._select_option(mobs._visual_mode, "composite_rig")
+	mobs._on_visual_mode_changed()
+	mobs._select_option(mobs._composite_rig_id, "humanoid_v1")
+	mobs._on_composite_rig_changed()
+	var body := mobs._composite_base_layer_controls.get("body", null) as LineEdit
+	if body == null:
+		_fail("Mob options fixture expected a humanoid body layer control")
+		return
+	body.text = "defbod"
+	mobs._update_visual_preview()
+	var body_layer := mobs._composite_preview._layers.get("body", null) as TextureRect
+	if mobs._game_client_assets_root != asset_root or mobs._composite_preview.game_client_assets_root != asset_root:
+		_fail("Mob options must retain visual_assets.game_assets_root for the composite preview")
+		return
+	if body_layer == null or not body_layer.visible or body_layer.texture == null:
+		_fail("Mob composite preview must resolve a body PNG from the options asset root: %s" % mobs._visual_status.text)
+		return
+	scene.queue_free()
 	await process_frame
 
 
