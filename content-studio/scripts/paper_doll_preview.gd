@@ -11,6 +11,7 @@ const ACTUAL_GAME_SCALE := 0.25
 const SOCKET_MARKER_SIZE := Vector2(8, 8)
 const GRIP_MARKER_SIZE := Vector2(8, 8)
 const MISSING_ASSET_HINT_LIMIT := 2
+const COMPOSITE_TRACE_LIMIT := 80
 const FIT_ZOOM_MIN_PERCENT := 50
 const FIT_ZOOM_MAX_PERCENT := 400
 const FIT_ZOOM_STEP_PERCENT := 25
@@ -38,6 +39,7 @@ var _texture_cache: Dictionary = {}
 var _current_pose_context: Dictionary = {}
 var _drag_state: Dictionary = {}
 var _asset_resolution_diagnostics: Array = []
+var _composite_trace: Array[String] = []
 var _last_resolved_asset_path := ""
 var _last_view_state: Dictionary = {}
 
@@ -72,6 +74,11 @@ func bind(stage: Control, status: Label) -> void:
 func clear_cache() -> void:
 	_file_cache.clear()
 	_texture_cache.clear()
+	_trace_composite("Cache cleared.")
+
+
+func get_composite_trace() -> Array[String]:
+	return _composite_trace.duplicate()
 
 
 func configure_rig_catalog(catalog: Dictionary) -> void:
@@ -299,6 +306,7 @@ func update_composite(
 	frame: int,
 	equipped_visuals_by_item: Dictionary
 ) -> Dictionary:
+	_composite_trace.clear()
 	_last_resolved_asset_path = ""
 	_last_view_state.clear()
 	_current_pose_context.clear()
@@ -308,10 +316,18 @@ func update_composite(
 	_hide_markers()
 
 	if _stage == null or _status == null:
-		return {"status": "Preview stage is not available.", "resolved_asset_path": ""}
+		_trace_composite("FAILED: Preview stage or status label is unavailable.")
+		return _composite_preview_result(false, "Preview stage is not available.")
+	_trace_composite("Request: root='%s', rig='%s', direction='%s', frame=%d, base_layers=%s, cosmetics=%s." % [
+		game_client_assets_root,
+		str(composite_visual.get("rig_id", DEFAULT_RIG_ID)),
+		direction if not direction.is_empty() else "N",
+		clampi(frame, 1, 4),
+		str(composite_visual.get("base_layers", {})),
+		str(composite_visual.get("cosmetic_item_ids", {})),
+	])
 	if game_client_assets_root.is_empty() or not DirAccess.dir_exists_absolute(game_client_assets_root):
-		_status.text = "The configured game_client_assets directory is unavailable."
-		return {"status": _status.text, "resolved_asset_path": ""}
+		return _composite_preview_result(false, "The configured game_client_assets directory is unavailable.")
 
 	var rig_id := str(composite_visual.get("rig_id", DEFAULT_RIG_ID))
 	var rig := _rigs_by_id.get(rig_id, {}) as Dictionary
@@ -319,8 +335,7 @@ func update_composite(
 		var diagnostic := _rig_catalog_status
 		if diagnostic.is_empty():
 			diagnostic = "Rig '%s' is not available in the canonical actor rig catalog." % rig_id
-		_status.text = diagnostic
-		return {"status": diagnostic, "resolved_asset_path": ""}
+		return _composite_preview_result(false, diagnostic)
 
 	var selected_direction := direction if not direction.is_empty() else "N"
 	var selected_frame := clampi(frame, 1, 4)
@@ -335,8 +350,7 @@ func update_composite(
 		var first_missing := _first_asset_resolution_hint()
 		if not first_missing.is_empty():
 			missing_diagnostic += " First missing asset hint: %s" % first_missing
-		_status.text = missing_diagnostic
-		return {"status": missing_diagnostic, "resolved_asset_path": ""}
+		return _composite_preview_result(false, missing_diagnostic)
 
 	var actor_bounds := _source_bounds(layer_entries)
 	var view_bounds_result := _view_bounds(actor_bounds)
@@ -384,14 +398,16 @@ func update_composite(
 		"preview_scale": preview_scale,
 		"group_origin": group_origin,
 	}
-	_status.text = "%s • %s frame %d • composite rig preview" % [rig_id, selected_direction, selected_frame]
-	return {
-		"status": _status.text,
-		"resolved_asset_path": _last_resolved_asset_path,
+	var resolved_layers: Array[String] = []
+	for layer_entry_variant: Variant in layer_entries:
+		var layer_entry: Dictionary = layer_entry_variant
+		resolved_layers.append("%s=%s" % [str(layer_entry.get("layer_id", "")), str(layer_entry.get("resolved_asset_path", ""))])
+	_trace_composite("SUCCESS: Resolved %d layer(s): %s." % [resolved_layers.size(), "; ".join(resolved_layers)])
+	return _composite_preview_result(true, "%s • %s frame %d • composite rig preview" % [rig_id, selected_direction, selected_frame], {
 		"preview_scale": preview_scale,
 		"view_bounds_source": view_bounds,
 		"actor_bounds_source": actor_bounds,
-	}
+	})
 
 
 func normalize_visual_key(value: String) -> String:
@@ -509,21 +525,30 @@ func _resolve_composite_loaded_layers(
 		var cosmetic_item_id := str(cosmetic_item_ids.get(layer_id, ""))
 		if not cosmetic_item_id.is_empty():
 			equipped_visual = equipped_visuals_by_item.get(cosmetic_item_id, {}) as Dictionary
-			if equipped_visual.is_empty() or str(equipped_visual.get("render_layer_id", "")) != layer_id:
+			if equipped_visual.is_empty():
+				_trace_composite("SKIPPED %s: cosmetic '%s' has no equipped visual metadata." % [layer_id, cosmetic_item_id])
+				continue
+			if str(equipped_visual.get("render_layer_id", "")) != layer_id:
+				_trace_composite("SKIPPED %s: cosmetic '%s' targets render layer '%s'." % [layer_id, cosmetic_item_id, str(equipped_visual.get("render_layer_id", ""))])
 				continue
 			if _resolve_pose_hidden(equipped_visual, direction, frame):
+				_trace_composite("SKIPPED %s: cosmetic '%s' is explicitly hidden at %s F%d." % [layer_id, cosmetic_item_id, direction, frame])
 				continue
 			asset_key = str(equipped_visual.get("asset_key", ""))
 		if asset_key.is_empty():
+			_trace_composite("SKIPPED %s: no configured base asset or cosmetic." % layer_id)
 			continue
-		var load_result := _load_texture(layer_id, asset_key, frame, direction)
+		_trace_composite("Loading %s: asset '%s' for %s F%d." % [layer_id, asset_key, direction, frame])
+		var load_result := _load_texture(layer_id, asset_key, frame, direction, true)
 		if load_result.is_empty():
 			var asset_path := _expected_layer_asset_path(layer_id, asset_key, frame, direction)
 			if not _asset_resolution_diagnostics.has(asset_path):
 				_asset_resolution_diagnostics.append(asset_path)
+			_trace_composite("FAILED %s: no readable PNG was found; canonical request was %s." % [layer_id, asset_path])
 			continue
 		var texture := load_result.get("texture") as Texture2D
 		if texture == null:
+			_trace_composite("FAILED %s: image loaded without a usable texture." % layer_id)
 			continue
 		var pose := _resolve_layer_pose(rig, equipped_visual, layer_id, direction, frame, texture.get_width())
 		entries.append({
@@ -814,18 +839,26 @@ func _resolve_foreground_overlay_z_index(overlay: Dictionary, direction: String)
 	return int(z_indexes.get(direction, 0))
 
 
-func _load_texture(layer_id: String, asset_key: String, frame: int, direction: String) -> Dictionary:
+func _load_texture(layer_id: String, asset_key: String, frame: int, direction: String, trace_composite: bool = false) -> Dictionary:
 	for fallback_frame in _frame_fallbacks(frame, direction):
 		var file_path := _find_file(layer_id, asset_key, int(fallback_frame), direction)
 		if file_path.is_empty():
+			if trace_composite:
+				_trace_composite("  F%d: no matching PNG at %s." % [fallback_frame, _expected_layer_asset_path(layer_id, asset_key, int(fallback_frame), direction)])
 			continue
 		if _texture_cache.has(file_path):
+			if trace_composite:
+				_trace_composite("  F%d: resolved cached PNG %s." % [fallback_frame, file_path])
 			return {"texture": _texture_cache[file_path], "path": file_path}
 		var image := Image.load_from_file(file_path)
 		if image == null or image.is_empty():
+			if trace_composite:
+				_trace_composite("  F%d: PNG exists but could not be decoded: %s." % [fallback_frame, file_path])
 			continue
 		var texture := ImageTexture.create_from_image(image)
 		_texture_cache[file_path] = texture
+		if trace_composite:
+			_trace_composite("  F%d: loaded PNG %s (%dx%d)." % [fallback_frame, file_path, image.get_width(), image.get_height()])
 		return {"texture": texture, "path": file_path}
 	return {}
 
@@ -1258,6 +1291,29 @@ func _is_valid_socket_attachment(equipped_visual: Dictionary, selected_entry: Di
 func _expected_layer_asset_path(layer_id: String, asset_key: String, frame: int, direction: String) -> String:
 	var directory_path := game_client_assets_root.path_join("actors").path_join("player").path_join(layer_id)
 	return directory_path.path_join("%s-F%d-%s.png" % [asset_key, frame, direction])
+
+
+func _composite_preview_result(success: bool, status: String, details: Dictionary = {}) -> Dictionary:
+	if _status != null:
+		_status.text = status
+	if not success:
+		_trace_composite("FAILED: %s" % status)
+	var result := {
+		"success": success,
+		"status": status,
+		"resolved_asset_path": _last_resolved_asset_path,
+		"diagnostics": get_composite_trace(),
+	}
+	for key_variant in details:
+		result[key_variant] = details[key_variant]
+	return result
+
+
+func _trace_composite(message: String) -> void:
+	if _composite_trace.size() >= COMPOSITE_TRACE_LIMIT:
+		_composite_trace.remove_at(0)
+	_composite_trace.append(message)
+	print("[composite-preview] %s" % message)
 
 
 func _first_asset_resolution_hint() -> String:

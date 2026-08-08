@@ -162,6 +162,9 @@ var _preview_direction: OptionButton
 var _preview_frame: OptionButton
 var _composite_preview
 var _composite_preview_stage: Control
+var _composite_preview_trace_heading: Label
+var _composite_preview_trace: TextEdit
+var _game_client_assets_root_source := "not received"
 
 
 func _ready() -> void:
@@ -254,6 +257,16 @@ func _build_ui() -> void:
 	preview_content.add_child(_composite_preview_stage)
 	_visual_status = _wrapped_label("No mob visual selected.")
 	preview_content.add_child(_visual_status)
+	_composite_preview_trace_heading = Label.new()
+	_composite_preview_trace_heading.text = "Composite Preview Trace"
+	_composite_preview_trace_heading.add_theme_font_size_override("font_size", 16)
+	preview_content.add_child(_composite_preview_trace_heading)
+	_composite_preview_trace = TextEdit.new()
+	_composite_preview_trace.editable = false
+	_composite_preview_trace.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
+	_composite_preview_trace.custom_minimum_size = Vector2(280, 160)
+	_composite_preview_trace.tooltip_text = "Latest composite preview request, asset resolution attempts, and failures."
+	preview_content.add_child(_composite_preview_trace)
 	var pose_row := HBoxContainer.new()
 	pose_row.add_theme_constant_override("separation", 8)
 	pose_row.add_child(_label("Preview direction"))
@@ -434,6 +447,8 @@ func _on_mob_options_received(payload: Dictionary) -> void:
 	var options_root := str(visual_assets.get("game_assets_root", ""))
 	if not options_root.is_empty():
 		_game_client_assets_root = options_root
+		_game_client_assets_root_source = "mob options visual_assets.game_assets_root"
+	print("[mob-composite-preview] Mob options set game_client_assets root to '%s'." % _game_client_assets_root)
 	_apply_options()
 	_set_form_enabled(not _current_mob.is_empty() or _is_new)
 	if _current_mob.is_empty() and not _is_new:
@@ -443,6 +458,11 @@ func _on_mob_options_received(payload: Dictionary) -> void:
 func _on_item_options_received(payload: Dictionary) -> void:
 	_actor_rig_catalog = payload.get("actor_rig_catalog", {}) as Dictionary
 	_composite_cosmetic_items = payload.get("composite_cosmetic_items", []) as Array
+	print("[mob-composite-preview] Item options received rig catalog available=%s rigs=%d cosmetics=%d." % [
+		str(bool(_actor_rig_catalog.get("available", false))),
+		(_actor_rig_catalog.get("rigs", []) as Array).size(),
+		_composite_cosmetic_items.size(),
+	])
 	if _composite_preview != null:
 		_composite_preview.configure_rig_catalog(_actor_rig_catalog)
 	_fill_composite_rigs(_actor_rig_catalog)
@@ -550,6 +570,7 @@ func _on_composite_control_changed(_value: Variant = null) -> void:
 
 func _on_health_received(payload: Dictionary) -> void:
 	_game_client_assets_root = ""
+	_game_client_assets_root_source = "health asset_roots"
 	for variant in payload.get("asset_roots", []) as Array:
 		if variant is not Dictionary:
 			continue
@@ -557,6 +578,9 @@ func _on_health_received(payload: Dictionary) -> void:
 		if str(asset_root.get("id", "")) == "game_client_assets":
 			_game_client_assets_root = str(asset_root.get("path", ""))
 			break
+	if _game_client_assets_root.is_empty():
+		_game_client_assets_root_source = "health asset_roots (game_client_assets missing)"
+	print("[mob-composite-preview] Health set game_client_assets root to '%s' via %s." % [_game_client_assets_root, _game_client_assets_root_source])
 	if _composite_preview != null:
 		_composite_preview.game_client_assets_root = _game_client_assets_root
 		_composite_preview.clear_cache()
@@ -1121,10 +1145,14 @@ func _on_visual_mode_changed() -> void:
 	_visual_path.visible = not composite
 	_visual_preview.visible = not composite
 	_composite_preview_stage.visible = composite
+	_composite_preview_trace_heading.visible = composite
+	_composite_preview_trace.visible = composite
+	print("[mob-composite-preview] Visual mode changed to %s." % ("Composite Rig" if composite else "Flat Sprite"))
 	_on_form_changed()
 
 
 func _on_preview_pose_changed() -> void:
+	print("[mob-composite-preview] Pose changed to %s F%s." % [_selected_metadata(_preview_direction), _selected_metadata(_preview_frame)])
 	_update_visual_preview()
 
 
@@ -1218,6 +1246,8 @@ func _update_visual_preview() -> void:
 			int(_selected_metadata(_preview_frame)),
 			_composite_equipped_visuals_by_item())
 		_visual_status.text = str(preview_state.get("status", "Composite preview unavailable."))
+		_visual_status.modulate = Color(0.95, 0.48, 0.48, 1) if not bool(preview_state.get("success", false)) else Color(0.72, 0.75, 0.82, 1)
+		_render_composite_preview_trace(preview_state)
 		return
 	var resolved := _resolve_visual_preview_file_path()
 	var file_path := str(resolved.get("file_path", ""))
@@ -1241,6 +1271,20 @@ func _update_visual_preview() -> void:
 		status
 	)
 	_visual_status.text = status
+	_visual_status.modulate = Color(0.72, 0.75, 0.82, 1)
+
+
+func _render_composite_preview_trace(preview_state: Dictionary) -> void:
+	if _composite_preview_trace == null:
+		return
+	var lines: Array[String] = [
+		"Mob input: root source=%s; root=%s." % [_game_client_assets_root_source, _game_client_assets_root],
+		"Result: %s." % ("SUCCESS" if bool(preview_state.get("success", false)) else "FAILED"),
+	]
+	for diagnostic_variant in preview_state.get("diagnostics", []) as Array:
+		lines.append(str(diagnostic_variant))
+	_composite_preview_trace.text = "\n".join(lines)
+	_composite_preview_trace.scroll_vertical = _composite_preview_trace.get_line_count()
 
 
 func _composite_equipped_visuals_by_item() -> Dictionary:

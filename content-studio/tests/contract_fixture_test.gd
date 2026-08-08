@@ -234,6 +234,9 @@ func _verify_mob_options_asset_root_fallback(main_scene: PackedScene) -> void:
 	if body_layer == null or not body_layer.visible or body_layer.texture == null:
 		_fail("Mob composite preview must resolve a body PNG from the options asset root: %s" % mobs._visual_status.text)
 		return
+	if not mobs._composite_preview_trace.text.contains("Result: SUCCESS") or not mobs._composite_preview_trace.text.contains("loaded PNG"):
+		_fail("Mob composite preview must expose its resolved asset trace in the workspace")
+		return
 	scene.queue_free()
 	await process_frame
 
