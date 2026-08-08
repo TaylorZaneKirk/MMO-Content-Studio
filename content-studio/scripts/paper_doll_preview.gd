@@ -763,6 +763,7 @@ func _update_markers(
 		_current_pose_context = {
 			"direction": direction,
 			"frame": frame,
+			"layer_id": str(selected_entry.get("layer_id", "")),
 			"layer_position": layer_position,
 			"layer_position_source": source_position,
 			"preview_scale": preview_scale,
@@ -887,7 +888,7 @@ func _begin_drag(local_position: Vector2) -> void:
 	var can_drag := bool(_current_pose_context.get("can_drag", false))
 	if not can_drag:
 		return
-	var selected_rect := _variant_to_rect2(_current_pose_context.get("selected_rect", Rect2()), Rect2())
+	var selected_rect := _selected_layer_rect()
 	if selected_rect.size.x <= 0.0 or selected_rect.size.y <= 0.0 or not selected_rect.has_point(local_position):
 		return
 	var preview_scale := float(_current_pose_context.get("preview_scale", 0.0))
@@ -908,6 +909,14 @@ func _begin_drag(local_position: Vector2) -> void:
 		"frame": int(_current_pose_context.get("frame", 1)),
 	}
 	_start_drag_polling()
+
+
+func _selected_layer_rect() -> Rect2:
+	var layer_id := str(_current_pose_context.get("layer_id", ""))
+	var layer := _layers.get(layer_id, null) as TextureRect
+	if layer != null and layer.visible:
+		return layer.get_rect()
+	return _variant_to_rect2(_current_pose_context.get("selected_rect", Rect2()), Rect2())
 
 
 func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:

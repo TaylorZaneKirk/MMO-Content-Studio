@@ -661,6 +661,22 @@ func _verify_paper_doll_preview_interactions() -> void:
 	if bool(preview._drag_state.get("active", false)):
 		_fail("Mouse release/end drag must cancel the active grip drag")
 		return
+
+	var flipped_visual := _make_socket_visual(Vector2i(16, 16))
+	flipped_visual["flip_x"] = {"N": {"1": true}}
+	preview.update(true, "right_hand", "axe", "N", 1, visible_slots, flipped_visual)
+	var flipped_rect := preview._selected_layer_rect()
+	var flipped_scale := float(preview._current_pose_context.get("preview_scale", 0.0))
+	var flipped_start_mouse := flipped_rect.position + (flipped_rect.size * 0.5)
+	preview._begin_drag(flipped_start_mouse)
+	if not bool(preview._drag_state.get("active", false)):
+		_fail("Flipped socket-bound preview must begin dragging from the live rendered equipment layer")
+		return
+	preview._apply_drag_position(flipped_start_mouse + Vector2(5.0 * flipped_scale, 0))
+	if emitted.size() != 4 or emitted[2] != 21 or emitted[3] != 16:
+		_fail("Dragging a flipped socket-bound preview must move its authored anchor in the mirrored horizontal direction")
+		return
+	preview._end_drag()
 	preview.cancel_drag()
 	if bool(preview._drag_state.get("active", false)):
 		_fail("Explicit drag cancellation must clear drag state")
