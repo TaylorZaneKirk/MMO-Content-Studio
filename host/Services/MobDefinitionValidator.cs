@@ -42,13 +42,23 @@ public sealed partial class MobDefinitionValidator
 
     private readonly IMobRepository _repository;
     private readonly ItemAssetService _assetService;
+    private readonly CompositeActorVisualValidator? _compositeVisualValidator;
 
     public MobDefinitionValidator(
         IMobRepository repository,
         ItemAssetService assetService)
+        : this(repository, assetService, null)
+    {
+    }
+
+    public MobDefinitionValidator(
+        IMobRepository repository,
+        ItemAssetService assetService,
+        CompositeActorVisualValidator? compositeVisualValidator)
     {
         _repository = repository;
         _assetService = assetService;
+        _compositeVisualValidator = compositeVisualValidator;
     }
 
     public async Task<MobValidationOutcome> ValidateAsync(
@@ -61,6 +71,14 @@ public sealed partial class MobDefinitionValidator
         var messages = new List<ApiError>();
         ValidateIdentity(mobDefinitionId, draft, existing, messages);
         ValidateVisuals(draft, messages, forPublication);
+        if (draft.VisualMode == "composite_rig" && _compositeVisualValidator is not null)
+        {
+            await _compositeVisualValidator.ValidateAsync(
+                draft.CompositeVisual,
+                "mob",
+                messages,
+                cancellationToken);
+        }
         ValidateFootprintHealthMovement(draft, messages);
         ValidateBehavior(draft, messages);
 

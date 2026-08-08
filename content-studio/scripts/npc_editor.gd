@@ -85,7 +85,7 @@ var _publication: Label
 var _updated: Label
 var _visual_path: LineEdit
 var _visual_mode: OptionButton
-var _composite_rig_id: LineEdit
+var _composite_rig_id: OptionButton
 var _composite_base_layers: LineEdit
 var _composite_cosmetics: LineEdit
 var _source_width: SpinBox
@@ -130,12 +130,14 @@ func _ready() -> void:
 	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
 	_build_ui()
 	_connect_client()
+	_client.load_item_options()
 	_set_form_enabled(false)
 	_clear_preview()
 
 
 func _connect_client() -> void:
 	_client.health_received.connect(_on_health_received)
+	_client.item_options_received.connect(_on_item_options_received)
 	_client.npc_options_received.connect(_on_npc_options_received)
 	_client.npc_catalog_received.connect(_on_npc_catalog_received)
 	_client.npc_definition_received.connect(_on_npc_definition_received)
@@ -230,7 +232,7 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_render_scale = _spin_field(grid, "Render scale", 0.01, 8, 0.25, 0.01)
 	_footprint_width = _spin_field(grid, "Footprint width tiles", 1, 1, 1, 1)
 	_footprint_height = _spin_field(grid, "Footprint height tiles", 1, 1, 1, 1)
-	_composite_rig_id = _line_field(grid, "Composite rig ID", "humanoid_v1")
+	_composite_rig_id = _option_field(grid, "Composite rig")
 	_composite_base_layers = _line_field(grid, "Base layers (slot=asset key)", "head=head1, body=defbod, legs=defbod")
 	_composite_cosmetics = _line_field(grid, "Cosmetics (slot=item ID)", "right_hand=inventory_154_axe")
 	parent.add_child(_wrapped_label("Initial T5 NPC runtime support uses a 1x1 logical footprint. Facing is placement-owned in Tiled."))
@@ -385,6 +387,28 @@ func _on_npc_options_received(payload: Dictionary) -> void:
 	_set_form_enabled(not _current_npc.is_empty() or _is_new)
 	if _current_npc.is_empty() and not _is_new:
 		_status.text = "NPC schema ready. Load or create an NPC definition."
+
+
+func _on_item_options_received(payload: Dictionary) -> void:
+	_fill_composite_rigs(payload.get("actor_rig_catalog", {}) as Dictionary)
+
+
+func _fill_composite_rigs(catalog: Dictionary) -> void:
+	var selected := _selected_metadata(_composite_rig_id)
+	if selected.is_empty():
+		selected = "humanoid_v1"
+	_composite_rig_id.clear()
+	for rig_variant in catalog.get("rigs", []) as Array:
+		if rig_variant is Dictionary:
+			var rig := rig_variant as Dictionary
+			var rig_id := str(rig.get("rig_id", ""))
+			if not rig_id.is_empty():
+				_composite_rig_id.add_item(rig_id)
+				_composite_rig_id.set_item_metadata(_composite_rig_id.item_count - 1, rig_id)
+	if _composite_rig_id.item_count == 0:
+		_composite_rig_id.add_item("Rig catalog unavailable")
+		_composite_rig_id.set_item_metadata(0, "")
+	_select_option(_composite_rig_id, selected)
 
 
 func _on_npc_catalog_received(payload: Dictionary) -> void:
@@ -573,7 +597,7 @@ func _start_new_npc() -> void:
 	_updated.text = "Not saved"
 	_visual_path.text = ""
 	_select_option(_visual_mode, "flat_sprite")
-	_composite_rig_id.text = "humanoid_v1"
+	_select_option(_composite_rig_id, "humanoid_v1")
 	_composite_base_layers.text = "head=head1, body=defbod, legs=defbod"
 	_composite_cosmetics.text = ""
 	_source_width.value = 128
@@ -684,14 +708,14 @@ func _payload() -> Dictionary:
 
 func _load_composite_visual(value: Variant) -> void:
 	var composite: Dictionary = value as Dictionary if value is Dictionary else {}
-	_composite_rig_id.text = str(composite.get("rig_id", "humanoid_v1"))
+	_select_option(_composite_rig_id, str(composite.get("rig_id", "humanoid_v1")))
 	_composite_base_layers.text = _key_value_text(composite.get("base_layers", {}))
 	_composite_cosmetics.text = _key_value_text(composite.get("cosmetic_item_ids", {}))
 
 
 func _composite_visual_payload() -> Dictionary:
 	return {
-		"rig_id": _composite_rig_id.text.strip_edges(),
+		"rig_id": _selected_metadata(_composite_rig_id),
 		"base_layers": _parse_key_value_text(_composite_base_layers.text),
 		"cosmetic_item_ids": _parse_key_value_text(_composite_cosmetics.text)
 	}

@@ -26,13 +26,23 @@ public sealed partial class NpcDefinitionValidator
 
     private readonly ItemAssetService _assetService;
     private readonly NpcDialogueReferenceProvider _dialogueReferences;
+    private readonly CompositeActorVisualValidator? _compositeVisualValidator;
 
     public NpcDefinitionValidator(
         ItemAssetService assetService,
         NpcDialogueReferenceProvider dialogueReferences)
+        : this(assetService, dialogueReferences, null)
+    {
+    }
+
+    public NpcDefinitionValidator(
+        ItemAssetService assetService,
+        NpcDialogueReferenceProvider dialogueReferences,
+        CompositeActorVisualValidator? compositeVisualValidator)
     {
         _assetService = assetService;
         _dialogueReferences = dialogueReferences;
+        _compositeVisualValidator = compositeVisualValidator;
     }
 
     public async Task<NpcValidationOutcome> ValidateAsync(
@@ -45,6 +55,14 @@ public sealed partial class NpcDefinitionValidator
         var messages = new List<ApiError>();
         ValidateIdentity(npcDefinitionId, draft, existing, messages);
         ValidateVisuals(draft, messages, forPublication);
+        if (draft.VisualMode == "composite_rig" && _compositeVisualValidator is not null)
+        {
+            await _compositeVisualValidator.ValidateAsync(
+                draft.CompositeVisual,
+                "npc",
+                messages,
+                cancellationToken);
+        }
         ValidateMovement(draft, messages);
         await ValidateInteractionAsync(draft, messages, forPublication, cancellationToken);
         ValidateNotes(draft, messages);

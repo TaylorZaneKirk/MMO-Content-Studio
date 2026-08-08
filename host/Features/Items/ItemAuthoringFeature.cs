@@ -13,6 +13,7 @@ public static class ItemAuthoringFeature
     {
         services.AddSingleton<ActorAppearanceCatalogService>();
         services.AddSingleton<ItemAssetService>();
+		services.AddSingleton<CompositeActorVisualValidator>();
         services.AddSingleton<ItemAssetAuthoringService>();
         services.AddSingleton<ItemAuthoringRegistry>();
         services.AddSingleton<IUnifiedItemRepository, UnifiedItemRepository>();
