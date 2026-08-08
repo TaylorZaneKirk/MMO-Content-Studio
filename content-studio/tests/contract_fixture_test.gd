@@ -1184,6 +1184,27 @@ func _verify_composite_actor_preview_semantics() -> void:
 	if sword_layer == null or sword_overlay == null or sword_layer.z_index >= sword_overlay.z_index:
 		_fail("Ordinary socket-held composite items must keep the hand/grip over the item")
 		return
+
+	var body_only_descriptor := {
+		"rig_id": "humanoid_v1",
+		"base_layers": {"body": "defbod"},
+		"cosmetic_item_ids": {},
+	}
+	preview.update_composite(body_only_descriptor, "N", 1, {})
+	if _visible_preview_layer_ids(preview) != ["body"]:
+		_fail("Composite preview must match runtime semantics: omitted base layers stay absent")
+		return
+
+	var omitted_hand_cosmetic := _make_socket_visual(Vector2i(16, 16), "right_hand_primary", "N", 1, "dark_sword", "right_hand")
+	var body_and_hand_descriptor := {
+		"rig_id": "humanoid_v1",
+		"base_layers": {"body": "defbod"},
+		"cosmetic_item_ids": {"right_hand": "inventory_154_axe"},
+	}
+	preview.update_composite(body_and_hand_descriptor, "N", 1, {"inventory_154_axe": omitted_hand_cosmetic})
+	if _visible_preview_layer_ids(preview) != ["body", "right_hand"]:
+		_fail("Composite cosmetics must render even when their base layer is omitted")
+		return
 	stage.free()
 	status.free()
 	print("[content-studio-contract-fixture] composite preview semantics passed")
@@ -1277,6 +1298,17 @@ func _stage_mouse_release(preview: PaperDollPreview, position: Vector2) -> void:
 	event.pressed = false
 	event.position = position
 	preview._on_stage_gui_input(event)
+
+
+func _visible_preview_layer_ids(preview: PaperDollPreview) -> Array[String]:
+	var visible_layer_ids: Array[String] = []
+	for layer_id_variant in preview._layers:
+		var layer_id := str(layer_id_variant)
+		var layer := preview._layers[layer_id] as TextureRect
+		if layer != null and layer.visible and layer.texture != null:
+			visible_layer_ids.append(layer_id)
+	visible_layer_ids.sort()
+	return visible_layer_ids
 
 
 func _build_preview_fixture() -> Dictionary:

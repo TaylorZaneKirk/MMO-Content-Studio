@@ -504,7 +504,7 @@ func _resolve_composite_loaded_layers(
 		var layer_id := str((layer_variant as Dictionary).get("layer_id", ""))
 		if layer_id.is_empty():
 			continue
-		var asset_key := str(base_layers.get(layer_id, DEFAULT_VISUAL_KEYS.get(layer_id, "")))
+		var asset_key := str(base_layers.get(layer_id, ""))
 		var equipped_visual: Dictionary = {}
 		var cosmetic_item_id := str(cosmetic_item_ids.get(layer_id, ""))
 		if not cosmetic_item_id.is_empty():
