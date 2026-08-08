@@ -42,8 +42,14 @@ func _run_fixture() -> void:
 	if main_scene == null:
 		_fail("T3A main scene or one of its scripts failed to parse")
 		return
+	if OS.has_environment("CONTENT_STUDIO_STARTUP_ONLY"):
+		await _verify_authoring_client_startup_sequence()
+		print("[content-studio-contract-fixture] startup-only passed")
+		quit(0)
+		return
 	if OS.has_environment("CONTENT_STUDIO_COMPOSITE_PREVIEW_ONLY"):
 		await _verify_composite_editor_rig_state(main_scene)
+		await _verify_shared_editor_asset_initialization(main_scene)
 		await _verify_mob_options_asset_root_fallback(main_scene)
 		await _verify_composite_actor_preview_semantics()
 		print("[content-studio-contract-fixture] composite-only passed")
@@ -84,6 +90,7 @@ func _run_fixture() -> void:
 	if envelope.api_version != EXPECTED_API_VERSION:
 		_fail("API version fixture mismatch")
 		return
+	await _verify_authoring_client_startup_sequence()
 	await _verify_authoring_client_health_cache()
 
 	if not envelope.data.valid_for_draft or envelope.data.changes.size() != 1:
@@ -98,6 +105,7 @@ func _run_fixture() -> void:
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_composite_editor_rig_state(main_scene)
+	await _verify_shared_editor_asset_initialization(main_scene)
 	await _verify_mob_options_asset_root_fallback(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
@@ -199,6 +207,74 @@ func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
 	await process_frame
 
 
+func _verify_shared_editor_asset_initialization(main_scene: PackedScene) -> void:
+	var preview_fixture := _build_preview_fixture()
+	var asset_root := str(preview_fixture.preview.game_client_assets_root)
+	DirAccess.make_dir_recursive_absolute(asset_root.path_join("items"))
+	var fire_hammer_path := asset_root.path_join("items/Fire_Hammer.png")
+	_write_fixture_png(fire_hammer_path, Color(0.9, 0.4, 0.1, 1))
+	var health := {"asset_roots": [{"id": "game_client_assets", "path": asset_root, "status": "Healthy"}]}
+	var item_options := {
+		"actor_rig_catalog": _available_rig_catalog().actor_rig_catalog,
+		"composite_cosmetic_items": [],
+	}
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var items = scene.get_node("Margin/Root/Tabs/Items")
+	var npcs = scene.get_node("Margin/Root/Tabs/NPCs")
+	var mobs = scene.get_node("Margin/Root/Tabs/Mobs")
+	if items == null or npcs == null or mobs == null:
+		_fail("Shared startup fixture could not locate every authoring workspace")
+		return
+
+	items._on_health_received(health)
+	items._on_assets_received({"assets": [{
+		"resource_path": "res://assets/items/Fire_Hammer.png",
+		"display_name": "Fire Hammer",
+		"file_path": fire_hammer_path,
+	}]})
+	items._on_options_received(item_options)
+	items._rebuild_asset_options("res://assets/items/Fire_Hammer.png")
+	if items._game_client_assets_root != asset_root or items._paper_doll_preview.game_client_assets_root != asset_root:
+		_fail("Item editor must receive the shared game_client_assets root")
+		return
+	if items._icon.get_item_text(items._icon.selected).contains("Unavailable current icon"):
+		_fail("Canonical Fire Hammer icons must be populated from item_assets instead of marked unavailable")
+		return
+	items._paper_doll_preview.update(false, "", "", "S", 1, ["head", "body", "legs"], {})
+	var item_body := items._paper_doll_preview._layers.get("body", null) as TextureRect
+	if item_body == null or not item_body.visible or item_body.texture == null:
+		_fail("Item paper-doll preview must resolve canonical player layers after shared startup")
+		return
+
+	for workspace in [npcs, mobs]:
+		workspace._on_health_received(health)
+		workspace._on_item_options_received(item_options)
+		workspace._select_option(workspace._visual_mode, "composite_rig")
+		workspace._on_visual_mode_changed()
+		workspace._select_option(workspace._composite_rig_id, "humanoid_v1")
+		workspace._on_composite_rig_changed()
+		var body := workspace._composite_base_layer_controls.get("body", null) as LineEdit
+		if body == null:
+			_fail("Composite preview fixture expected a humanoid body control")
+			return
+		body.text = "defbod"
+		workspace._update_visual_preview()
+		var composite_body := workspace._composite_preview._layers.get("body", null) as TextureRect
+		if workspace._game_client_assets_root != asset_root or workspace._composite_preview.game_client_assets_root != asset_root:
+			_fail("NPC and Mob previews must receive the shared game_client_assets root")
+			return
+		if composite_body == null or not composite_body.visible or composite_body.texture == null:
+			_fail("NPC and Mob composite previews must resolve canonical humanoid base layers after shared startup")
+			return
+
+	scene.queue_free()
+	preview_fixture.stage.free()
+	preview_fixture.status.free()
+	await process_frame
+
+
 func _verify_mob_options_asset_root_fallback(main_scene: PackedScene) -> void:
 	var scene := main_scene.instantiate()
 	root.add_child(scene)
@@ -258,6 +334,47 @@ func _verify_authoring_client_health_cache() -> void:
 		_fail("Caching health must preserve the normal startup catalog request")
 		return
 	client.queue_free()
+
+
+func _verify_authoring_client_startup_sequence() -> void:
+	var client := FixtureAuthoringHostClient.new()
+	root.add_child(client)
+	await process_frame
+	var received_operations: Array[String] = []
+	var connection_states: Array[String] = []
+	client.handshake_received.connect(func(_payload: Dictionary) -> void: received_operations.append("handshake"))
+	client.health_received.connect(func(_payload: Dictionary) -> void: received_operations.append("health"))
+	client.catalog_received.connect(func(_payload: Dictionary) -> void: received_operations.append("catalog"))
+	client.item_assets_received.connect(func(_payload: Dictionary) -> void: received_operations.append("item_assets"))
+	client.item_options_received.connect(func(_payload: Dictionary) -> void: received_operations.append("item_options"))
+	client.items_received.connect(func(_payload: Dictionary) -> void: received_operations.append("items"))
+	client.connection_state_changed.connect(func(state: String, _message: String) -> void: connection_states.append(state))
+
+	client.connect_and_load()
+	if client.requested_operations != ["handshake"]:
+		_fail("Fresh startup must request handshake before any workspace request")
+		return
+	client.call("_on_request_succeeded", "handshake", {"api_version": EXPECTED_API_VERSION})
+	client.call("_on_request_succeeded", "health", {"asset_roots": [{"id": "game_client_assets", "path": "/tmp/client-assets", "status": "Healthy"}]})
+	client.call("_on_request_succeeded", "catalog", {"sections": []})
+	client.call("_on_request_succeeded", "item_assets", {"assets": [{"resource_path": "res://assets/items/Fire_Hammer.png", "display_name": "Fire Hammer"}]})
+	client.call("_on_request_succeeded", "item_options", {"actor_rig_catalog": _available_rig_catalog().actor_rig_catalog, "composite_cosmetic_items": []})
+	client.call("_on_request_succeeded", "items", {"items": []})
+
+	if received_operations != ["handshake", "health", "catalog", "item_assets", "item_options", "items"]:
+		_fail("Startup signals must follow handshake, health, catalog, item assets, item options, then items")
+		return
+	if client.requested_operations.slice(0, 7) != ["handshake", "health", "catalog", "item_assets", "item_options", "items", "mob_options"]:
+		_fail("Startup requests must initialize shared item data before workspace initialization")
+		return
+	if client.requested_operations.count("item_options") != 1 or client.latest_health.is_empty() or client.latest_item_assets.is_empty() or client.latest_item_options.is_empty():
+		_fail("Shared startup must broadcast item options once and retain the shared payloads for consumers")
+		return
+	if client.get("_startup_state") != "ready" or connection_states != ["connecting", "connected"]:
+		_fail("Startup must become connected only after shared initialization reaches items")
+		return
+	client.queue_free()
+	await process_frame
 
 
 func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void:

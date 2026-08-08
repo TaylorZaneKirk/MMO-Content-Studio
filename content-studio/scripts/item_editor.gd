@@ -142,6 +142,10 @@ func _ready() -> void:
 	_connect_client()
 	if not _client.latest_health.is_empty():
 		_on_health_received(_client.latest_health)
+	if not _client.latest_item_assets.is_empty():
+		_on_assets_received(_client.latest_item_assets)
+	if not _client.latest_item_options.is_empty():
+		_on_options_received(_client.latest_item_options)
 	_set_form_enabled(false)
 
 

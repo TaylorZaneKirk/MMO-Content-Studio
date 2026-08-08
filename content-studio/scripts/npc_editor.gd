@@ -145,7 +145,8 @@ func _ready() -> void:
 	_connect_client()
 	if not _client.latest_health.is_empty():
 		_on_health_received(_client.latest_health)
-	_client.load_item_options()
+	if not _client.latest_item_options.is_empty():
+		_on_item_options_received(_client.latest_item_options)
 	_on_visual_mode_changed()
 	_set_form_enabled(false)
 	_clear_preview()

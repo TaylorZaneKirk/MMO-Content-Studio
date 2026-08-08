@@ -86,11 +86,19 @@ const CONNECTION_OPERATIONS := [
 	OP_ITEMS,
 ]
 
+const STARTUP_NOT_STARTED := "not_started"
+const STARTUP_CONNECTING := "connecting"
+const STARTUP_READY := "ready"
+const STARTUP_FAILED := "failed"
+
 @export var base_url := DEFAULT_BASE_URL
 
 var _transport: AuthoringHttpTransport
 var _startup_operations: Array = []
 var latest_health: Dictionary = {}
+var latest_item_assets: Dictionary = {}
+var latest_item_options: Dictionary = {}
+var _startup_state := STARTUP_NOT_STARTED
 
 
 func _ready() -> void:
@@ -102,15 +110,23 @@ func _ready() -> void:
 
 
 func connect_and_load() -> void:
+	if _startup_state in [STARTUP_CONNECTING, STARTUP_READY]:
+		return
 	if _transport.is_busy():
+		_startup_state = STARTUP_FAILED
+		connection_state_changed.emit("disconnected", "Startup could not begin because the host transport was already occupied. Retry after the active request completes.")
 		return
 
+	_startup_state = STARTUP_CONNECTING
+	_startup_operations.clear()
 	connection_state_changed.emit("connecting", "Connecting to the local authoring host…")
 	_request(OP_HANDSHAKE, "/api/v1/system/handshake")
 
 
 func retry() -> void:
 	_transport.reset()
+	_startup_state = STARTUP_NOT_STARTED
+	_startup_operations.clear()
 	connect_and_load()
 
 
@@ -323,6 +339,9 @@ func _request(
 	method: int = HTTPClient.METHOD_GET,
 	payload: Dictionary = {}
 ) -> void:
+	if _startup_state == STARTUP_NOT_STARTED and operation != OP_HANDSHAKE:
+		request_failed.emit(operation, "Startup has not begun. Shared host requests must wait for the handshake.", [])
+		return
 	_transport.request(operation, path, method, payload)
 
 
@@ -346,16 +365,19 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			catalog_received.emit(data)
 			_request(OP_ITEM_ASSETS, "/api/v1/assets/items")
 		OP_ITEM_ASSETS:
+			latest_item_assets = data.duplicate(true)
 			item_assets_received.emit(data)
 			_request(OP_ITEM_OPTIONS, "/api/v1/items/options")
 		OP_ITEM_ASSET_IMPORT:
 			item_asset_imported.emit(data)
 		OP_ITEM_OPTIONS:
+			latest_item_options = data.duplicate(true)
 			item_options_received.emit(data)
 			_request(OP_ITEMS, "/api/v1/items")
 		OP_ITEMS:
 			item_catalog_received.emit(data)
 			items_received.emit(data)
+			_startup_state = STARTUP_READY
 			connection_state_changed.emit("connected", "Connected to the local authoring host.")
 			_start_workspace_initialization()
 		OP_MOB_OPTIONS:
@@ -415,6 +437,7 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 
 func _on_request_failed(operation: String, message: String, errors: Array) -> void:
 	if operation in CONNECTION_OPERATIONS:
+		_startup_state = STARTUP_FAILED
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
 	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES]:
