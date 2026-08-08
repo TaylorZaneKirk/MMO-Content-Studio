@@ -90,6 +90,7 @@ const CONNECTION_OPERATIONS := [
 
 var _transport: AuthoringHttpTransport
 var _startup_operations: Array = []
+var latest_health: Dictionary = {}
 
 
 func _ready() -> void:
@@ -338,7 +339,8 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			handshake_received.emit(data)
 			_request(OP_HEALTH, "/api/v1/system/health")
 		OP_HEALTH:
-			health_received.emit(data)
+			latest_health = data.duplicate(true)
+			health_received.emit(latest_health)
 			_request(OP_CATALOG, "/api/v1/catalog")
 		OP_CATALOG:
 			catalog_received.emit(data)

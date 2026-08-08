@@ -171,6 +171,8 @@ func _ready() -> void:
 	_composite_preview = PAPER_DOLL_PREVIEW_SCRIPT.new()
 	_composite_preview.bind(_composite_preview_stage, _visual_status)
 	_connect_client()
+	if not _client.latest_health.is_empty():
+		_on_health_received(_client.latest_health)
 	_client.load_item_options()
 	_on_visual_mode_changed()
 	_set_form_enabled(false)

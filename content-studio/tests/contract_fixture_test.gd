@@ -10,6 +10,15 @@ class FixtureAuthoringHostClient extends AuthoringHostClient:
 	var catalog_searches: Array = []
 	var requested_item_ids: Array = []
 	var preview_requests: Array = []
+	var requested_operations: Array = []
+
+	func _request(
+		operation: String,
+		_path: String,
+		_method: int = HTTPClient.METHOD_GET,
+		_payload: Dictionary = {}
+	) -> void:
+		requested_operations.append(operation)
 
 	func search_item_catalog(search: String = "") -> void:
 		catalog_searches.append(search)
@@ -39,7 +48,6 @@ func _run_fixture() -> void:
 		print("[content-studio-contract-fixture] composite-only passed")
 		quit(0)
 		return
-
 	var workspace_support := AuthoringWorkspaceSupport.new()
 	var apply_button := Button.new()
 	workspace_support.accept_preview(
@@ -75,6 +83,7 @@ func _run_fixture() -> void:
 	if envelope.api_version != EXPECTED_API_VERSION:
 		_fail("API version fixture mismatch")
 		return
+	await _verify_authoring_client_health_cache()
 
 	if not envelope.data.valid_for_draft or envelope.data.changes.size() != 1:
 		_fail("T3A equipment-preview fixture mismatch")
@@ -186,6 +195,25 @@ func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
 	scene.queue_free()
 	print("[content-studio-contract-fixture] composite editor rig-state passed")
 	await process_frame
+
+
+func _verify_authoring_client_health_cache() -> void:
+	var client := FixtureAuthoringHostClient.new()
+	root.add_child(client)
+	await process_frame
+	var health := {
+		"asset_roots": [
+			{"id": "game_client_assets", "path": "/tmp/client-assets", "status": "Healthy"},
+		],
+	}
+	client.call("_on_request_succeeded", "health", health)
+	if str(((client.latest_health.get("asset_roots", []) as Array)[0] as Dictionary).get("path", "")) != "/tmp/client-assets":
+		_fail("Authoring host client must retain the latest health payload for late workspace initialization")
+		return
+	if not client.requested_operations.has("catalog"):
+		_fail("Caching health must preserve the normal startup catalog request")
+		return
+	client.queue_free()
 
 
 func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void:

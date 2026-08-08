@@ -140,6 +140,8 @@ func _ready() -> void:
 	_build_ui()
 	_refresh_preview_zoom_controls()
 	_connect_client()
+	if not _client.latest_health.is_empty():
+		_on_health_received(_client.latest_health)
 	_set_form_enabled(false)
 
 
