@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
@@ -40,7 +41,13 @@ public sealed record NpcDefinition(
     [property: JsonPropertyName("notes")] string? Notes,
     [property: JsonPropertyName("created_at_utc")] DateTimeOffset CreatedAtUtc,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
-    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath);
+    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath)
+{
+    [JsonPropertyName("visual_mode")]
+    public string VisualMode { get; init; } = "flat_sprite";
+    [JsonPropertyName("composite_visual")]
+    public JsonElement? CompositeVisual { get; init; }
+}
 
 public sealed record NpcDraft(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -62,7 +69,13 @@ public sealed record NpcDraft(
     [property: JsonPropertyName("default_dialogue_id")] string? DefaultDialogueId,
     [property: JsonPropertyName("notes")] string? Notes,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("preview_signature")] string? PreviewSignature);
+    [property: JsonPropertyName("preview_signature")] string? PreviewSignature)
+{
+    [JsonPropertyName("visual_mode")]
+    public string VisualMode { get; init; } = "flat_sprite";
+    [JsonPropertyName("composite_visual")]
+    public JsonElement? CompositeVisual { get; init; }
+}
 
 public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -84,7 +97,13 @@ public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("default_dialogue_id")] string? DefaultDialogueId,
     [property: JsonPropertyName("notes")] string? Notes,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("target_operation")] string TargetOperation);
+    [property: JsonPropertyName("target_operation")] string TargetOperation)
+{
+    [JsonPropertyName("visual_mode")]
+    public string VisualMode { get; init; } = "flat_sprite";
+    [JsonPropertyName("composite_visual")]
+    public JsonElement? CompositeVisual { get; init; }
+}
 
 public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -106,7 +125,13 @@ public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("default_dialogue_id")] string? DefaultDialogueId,
     [property: JsonPropertyName("notes")] string? Notes,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("preview_signature")] string? PreviewSignature);
+    [property: JsonPropertyName("preview_signature")] string? PreviewSignature)
+{
+    [JsonPropertyName("visual_mode")]
+    public string VisualMode { get; init; } = "flat_sprite";
+    [JsonPropertyName("composite_visual")]
+    public JsonElement? CompositeVisual { get; init; }
+}
 
 public sealed record NpcPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,

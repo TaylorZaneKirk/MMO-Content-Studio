@@ -4,6 +4,11 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public static class MobDomainRules
 {
+    public static string NormalizeVisualMode(string? value) =>
+        string.Equals(value?.Trim(), "composite_rig", StringComparison.OrdinalIgnoreCase)
+            ? "composite_rig"
+            : "flat_sprite";
+
     public static string NormalizeStableId(string value) =>
         NormalizeRequired(value).ToLowerInvariant();
 

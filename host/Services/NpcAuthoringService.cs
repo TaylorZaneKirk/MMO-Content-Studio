@@ -333,7 +333,11 @@ public sealed class NpcAuthoringService
             request.DefaultDialogueId,
             request.Notes,
             request.ExpectedUpdatedAtUtc,
-            request.PreviewSignature);
+            request.PreviewSignature) with
+        {
+            VisualMode = NpcDomainRules.NormalizeVisualMode(request.VisualMode),
+            CompositeVisual = request.CompositeVisual?.Clone()
+        };
 
     public static NpcDraft Normalize(PreviewNpcRequest request) =>
         Normalize(
@@ -356,7 +360,11 @@ public sealed class NpcAuthoringService
             request.DefaultDialogueId,
             request.Notes,
             request.ExpectedUpdatedAtUtc,
-            null);
+            null) with
+        {
+            VisualMode = NpcDomainRules.NormalizeVisualMode(request.VisualMode),
+            CompositeVisual = request.CompositeVisual?.Clone()
+        };
 
     public static NpcDraft Normalize(
         string displayName,
@@ -426,7 +434,11 @@ public sealed class NpcAuthoringService
             record.DefaultDialogueId,
             record.Notes,
             null,
-            null);
+            null) with
+        {
+            VisualMode = record.VisualMode,
+            CompositeVisual = record.CompositeVisual?.Clone()
+        };
 
     public static string ComputePreviewSignature(
         string npcDefinitionId,
@@ -610,7 +622,11 @@ public sealed class NpcAuthoringService
             record.Notes,
             record.CreatedAtUtc,
             record.UpdatedAtUtc,
-            asset.FilePath);
+            asset.FilePath)
+        {
+            VisualMode = record.VisualMode,
+            CompositeVisual = record.CompositeVisual?.Clone()
+        };
     }
 
     private static NpcDefinitionSummary ToSummary(NpcDefinitionRecord record) =>

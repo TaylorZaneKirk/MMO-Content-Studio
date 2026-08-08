@@ -104,6 +104,10 @@ var _display_name: LineEdit
 var _publication: Label
 var _updated: Label
 var _visual_path: LineEdit
+var _visual_mode: OptionButton
+var _composite_rig_id: LineEdit
+var _composite_base_layers: LineEdit
+var _composite_cosmetics: LineEdit
 var _source_width: SpinBox
 var _source_height: SpinBox
 var _anchor_x: SpinBox
@@ -276,6 +280,11 @@ func _add_identity_section(parent: VBoxContainer) -> void:
 func _add_visual_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "Visuals and Footprint", 18)
 	var grid := _grid(parent)
+	_visual_mode = _option_field(grid, "Visual mode")
+	_visual_mode.add_item("Flat Sprite", 0)
+	_visual_mode.set_item_metadata(0, "flat_sprite")
+	_visual_mode.add_item("Composite Rig", 1)
+	_visual_mode.set_item_metadata(1, "composite_rig")
 	_visual_path = _line_field(grid, "Texture path", "res://assets/maps/objects/mobs/slime.png")
 	_visual_path.text_changed.connect(_on_visual_path_changed)
 	_source_width = _spin_field(grid, "Source width", 1, 2048, 32, 1)
@@ -285,6 +294,9 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_render_scale = _spin_field(grid, "Render scale", 0.01, 8, 0.25, 0.01)
 	_footprint_width = _spin_field(grid, "Footprint width tiles", 1, 16, 1, 1)
 	_footprint_height = _spin_field(grid, "Footprint height tiles", 1, 16, 1, 1)
+	_composite_rig_id = _line_field(grid, "Composite rig ID", "humanoid_v1")
+	_composite_base_layers = _line_field(grid, "Base layers (slot=asset key)", "head=head1, body=defbod, legs=defbod")
+	_composite_cosmetics = _line_field(grid, "Cosmetics (slot=item ID)", "right_hand=inventory_154_axe")
 
 
 func _add_stats_section(parent: VBoxContainer) -> void:
@@ -511,6 +523,8 @@ func _load_mob(payload: Dictionary) -> void:
 	_publication.text = str(payload.get("publication_state", "Unknown"))
 	_updated.text = str(payload.get("updated_at_utc", "Unknown"))
 	_visual_path.text = str(payload.get("visual_texture_path", ""))
+	_select_option(_visual_mode, str(payload.get("visual_mode", "flat_sprite")))
+	_load_composite_visual(payload.get("composite_visual", {}))
 	_source_width.value = int(payload.get("source_width", 32))
 	_source_height.value = int(payload.get("source_height", 32))
 	_anchor_x.value = float(payload.get("visual_anchor_offset_x", 0.0))
@@ -557,6 +571,10 @@ func _start_new_mob() -> void:
 	_publication.text = "Unsaved"
 	_updated.text = "Not saved"
 	_visual_path.text = ""
+	_select_option(_visual_mode, "flat_sprite")
+	_composite_rig_id.text = "humanoid_v1"
+	_composite_base_layers.text = "head=head1, body=defbod, legs=defbod"
+	_composite_cosmetics.text = ""
 	_source_width.value = 32
 	_source_height.value = 32
 	_anchor_x.value = 0
@@ -691,6 +709,8 @@ func _payload() -> Dictionary:
 	return {
 		"display_name": _display_name.text,
 		"visual_texture_path": _visual_path.text,
+		"visual_mode": _selected_metadata(_visual_mode),
+		"composite_visual": _composite_visual_payload() if _selected_metadata(_visual_mode) == "composite_rig" else null,
 		"source_width": int(_source_width.value),
 		"source_height": int(_source_height.value),
 		"visual_anchor_offset_x": float(_anchor_x.value),
@@ -716,6 +736,40 @@ func _payload() -> Dictionary:
 		"guaranteed_drops": _drop_payload(),
 		"expected_updated_at_utc": _current_mob.get("updated_at_utc", null),
 	}
+
+
+func _load_composite_visual(value: Variant) -> void:
+	var composite: Dictionary = value as Dictionary if value is Dictionary else {}
+	_composite_rig_id.text = str(composite.get("rig_id", "humanoid_v1"))
+	_composite_base_layers.text = _key_value_text(composite.get("base_layers", {}))
+	_composite_cosmetics.text = _key_value_text(composite.get("cosmetic_item_ids", {}))
+
+
+func _composite_visual_payload() -> Dictionary:
+	return {
+		"rig_id": _composite_rig_id.text.strip_edges(),
+		"base_layers": _parse_key_value_text(_composite_base_layers.text),
+		"cosmetic_item_ids": _parse_key_value_text(_composite_cosmetics.text)
+	}
+
+
+func _parse_key_value_text(value: String) -> Dictionary:
+	var result := {}
+	for segment in value.split(",", false):
+		var pair := segment.split("=", false, 1)
+		if pair.size() == 2 and not pair[0].strip_edges().is_empty() and not pair[1].strip_edges().is_empty():
+			result[pair[0].strip_edges()] = pair[1].strip_edges()
+	return result
+
+
+func _key_value_text(value: Variant) -> String:
+	if not (value is Dictionary):
+		return ""
+	var pairs: Array[String] = []
+	for key in (value as Dictionary).keys():
+		pairs.append("%s=%s" % [str(key), str((value as Dictionary)[key])])
+	pairs.sort()
+	return ", ".join(pairs)
 
 
 func _combat_profile_payload() -> Dictionary:

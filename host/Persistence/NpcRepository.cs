@@ -2,6 +2,7 @@ using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
 using NpgsqlTypes;
+using System.Text.Json;
 
 namespace MMO.ContentStudio.AuthoringHost.Persistence;
 
@@ -77,7 +78,9 @@ public sealed class NpcRepository : INpcRepository
                 default_dialogue_id,
                 notes,
                 created_at_utc,
-                updated_at_utc
+                updated_at_utc,
+                coalesce(visual_mode, 'flat_sprite') as visual_mode,
+                composite_visual
             from npc_definitions
             where @search is null
                or npc_definition_id ilike '%' || @search || '%'
@@ -281,7 +284,9 @@ public sealed class NpcRepository : INpcRepository
                 default_dialogue_id,
                 notes,
                 created_at_utc,
-                updated_at_utc
+                updated_at_utc,
+                coalesce(visual_mode, 'flat_sprite') as visual_mode,
+                composite_visual
             from npc_definitions
             where npc_definition_id = @npc_definition_id
             """ + (forUpdate ? " for update;" : ";");
@@ -321,6 +326,8 @@ public sealed class NpcRepository : INpcRepository
                 default_interaction,
                 default_dialogue_id,
                 notes,
+                visual_mode,
+                composite_visual,
                 created_at_utc,
                 updated_at_utc
             ) values (
@@ -344,6 +351,8 @@ public sealed class NpcRepository : INpcRepository
                 @default_interaction,
                 @default_dialogue_id,
                 @notes,
+                @visual_mode,
+                @composite_visual::jsonb,
                 now(),
                 now()
             );
@@ -381,6 +390,8 @@ public sealed class NpcRepository : INpcRepository
                 default_interaction = @default_interaction,
                 default_dialogue_id = @default_dialogue_id,
                 notes = @notes,
+                visual_mode = @visual_mode,
+                composite_visual = @composite_visual::jsonb,
                 updated_at_utc = now()
             where npc_definition_id = @npc_definition_id;
             """;
@@ -419,12 +430,18 @@ public sealed class NpcRepository : INpcRepository
             (object?)draft.DefaultDialogueId ?? DBNull.Value;
         command.Parameters.Add("notes", NpgsqlDbType.Text).Value =
             (object?)draft.Notes ?? DBNull.Value;
+        command.Parameters.AddWithValue("visual_mode", draft.VisualMode);
+        command.Parameters.Add("composite_visual", NpgsqlDbType.Text).Value = draft.CompositeVisual is null
+            ? DBNull.Value
+            : draft.CompositeVisual.Value.GetRawText();
     }
 
     private static NpcDefinitionRecord ReadRecord(NpgsqlDataReader reader)
     {
         var dialogueOrdinal = reader.GetOrdinal("default_dialogue_id");
         var notesOrdinal = reader.GetOrdinal("notes");
+        var visualModeOrdinal = reader.GetOrdinal("visual_mode");
+        var compositeVisualOrdinal = reader.GetOrdinal("composite_visual");
         return new NpcDefinitionRecord(
             reader.GetString(reader.GetOrdinal("npc_definition_id")),
             reader.GetString(reader.GetOrdinal("display_name")),
@@ -447,7 +464,13 @@ public sealed class NpcRepository : INpcRepository
             reader.IsDBNull(dialogueOrdinal) ? null : reader.GetString(dialogueOrdinal),
             reader.IsDBNull(notesOrdinal) ? null : reader.GetString(notesOrdinal),
             ReadUtc(reader, "created_at_utc"),
-            ReadUtc(reader, "updated_at_utc"));
+            ReadUtc(reader, "updated_at_utc"))
+        {
+            VisualMode = reader.GetString(visualModeOrdinal),
+            CompositeVisual = reader.IsDBNull(compositeVisualOrdinal)
+                ? null
+                : JsonDocument.Parse(reader.GetString(compositeVisualOrdinal)).RootElement.Clone()
+        };
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -498,7 +521,11 @@ public sealed record NpcDefinitionRecord(
     string? DefaultDialogueId,
     string? Notes,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc)
+{
+    public string VisualMode { get; init; } = "flat_sprite";
+    public JsonElement? CompositeVisual { get; init; }
+}
 
 public sealed record NpcReferenceSummaryRecord(
     string NpcDefinitionId,

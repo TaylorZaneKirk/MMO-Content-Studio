@@ -35,6 +35,11 @@ public static class NpcDomainRules
             var normalized => normalized
         };
 
+    public static string NormalizeVisualMode(string? value) =>
+        string.Equals(value?.Trim(), "composite_rig", StringComparison.OrdinalIgnoreCase)
+            ? "composite_rig"
+            : "flat_sprite";
+
     public static string NormalizeMovementBehavior(string value) =>
         NormalizeStableId(value);
 
@@ -120,7 +125,11 @@ public static class NpcDomainRules
             interactionEnabled ? NormalizeOptional(draft.DefaultDialogueId) : null,
             NormalizeOptional(draft.Notes),
             draft.ExpectedUpdatedAtUtc,
-            draft.PreviewSignature);
+            draft.PreviewSignature)
+        {
+            VisualMode = NormalizeVisualMode(draft.VisualMode),
+            CompositeVisual = draft.CompositeVisual?.Clone()
+        };
     }
 
     public static string BuildSemanticComparisonInput(NpcDraft draft)
@@ -145,7 +154,9 @@ public static class NpcDomainRules
             normalized.InteractionRangeTiles,
             normalized.DefaultInteraction,
             normalized.DefaultDialogueId ?? string.Empty,
-            normalized.Notes ?? string.Empty);
+            normalized.Notes ?? string.Empty,
+            normalized.VisualMode,
+            normalized.CompositeVisual?.GetRawText() ?? string.Empty);
     }
 
     private static bool IsIdentifierSegment(string segment) =>

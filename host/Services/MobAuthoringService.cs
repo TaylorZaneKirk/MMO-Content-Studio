@@ -340,7 +340,11 @@ public sealed class MobAuthoringService
             request.MobTargetScanCandidateLimit,
             request.PrimaryCombatProfile,
             request.CombatBonuses,
-            request.GuaranteedDrops);
+            request.GuaranteedDrops) with
+        {
+            VisualMode = MobDomainRules.NormalizeVisualMode(request.VisualMode),
+            CompositeVisual = request.CompositeVisual?.Clone()
+        };
 
     public static NormalizedMobDraft Normalize(MobPreviewRequest request) =>
         Normalize(
@@ -368,7 +372,11 @@ public sealed class MobAuthoringService
             request.MobTargetScanCandidateLimit,
             request.PrimaryCombatProfile,
             request.CombatBonuses,
-            request.GuaranteedDrops);
+            request.GuaranteedDrops) with
+        {
+            VisualMode = MobDomainRules.NormalizeVisualMode(request.VisualMode),
+            CompositeVisual = request.CompositeVisual?.Clone()
+        };
 
     public static NormalizedMobDraft Normalize(
         string displayName,
@@ -467,7 +475,11 @@ public sealed class MobAuthoringService
                     drop.DropOrder,
                     drop.ItemId,
                     drop.StackCount))
-                .ToArray());
+                .ToArray()) with
+        {
+            VisualMode = record.VisualMode,
+            CompositeVisual = record.CompositeVisual?.Clone()
+        };
 
     public static string ComputePreviewSignature(
         string mobDefinitionId,
@@ -675,7 +687,11 @@ public sealed class MobAuthoringService
             record.CombatBonuses,
             record.GuaranteedDrops,
             record.UpdatedAtUtc,
-            asset.FilePath);
+            asset.FilePath)
+        {
+            VisualMode = record.VisualMode,
+            CompositeVisual = record.CompositeVisual?.Clone()
+        };
     }
 
     private static MobDefinitionSummary ToSummary(MobDefinitionRecord record) =>

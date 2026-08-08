@@ -2,6 +2,7 @@ using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
 using NpgsqlTypes;
+using System.Text.Json;
 
 namespace MMO.ContentStudio.AuthoringHost.Persistence;
 
@@ -80,6 +81,8 @@ public sealed class MobRepository : IMobRepository
                 m.mob_target_scan_interval_ms,
                 m.mob_target_scan_candidate_limit,
                 m.updated_at,
+                coalesce(m.visual_mode, 'flat_sprite') as visual_mode,
+                m.composite_visual,
                 exists (
                     select 1 from mob_combat_profiles profile
                     where profile.mob_definition_id = m.mob_definition_id
@@ -309,6 +312,8 @@ public sealed class MobRepository : IMobRepository
                 m.mob_target_scan_interval_ms,
                 m.mob_target_scan_candidate_limit,
                 m.updated_at,
+                coalesce(m.visual_mode, 'flat_sprite') as visual_mode,
+                m.composite_visual,
                 exists (
                     select 1 from mob_combat_profiles profile
                     where profile.mob_definition_id = m.mob_definition_id
@@ -460,6 +465,8 @@ public sealed class MobRepository : IMobRepository
                 mob_detection_radius_tiles,
                 mob_target_scan_interval_ms,
                 mob_target_scan_candidate_limit,
+                visual_mode,
+                composite_visual,
                 created_at,
                 updated_at
             ) values (
@@ -487,6 +494,8 @@ public sealed class MobRepository : IMobRepository
                 @mob_detection_radius_tiles,
                 @mob_target_scan_interval_ms,
                 @mob_target_scan_candidate_limit,
+                @visual_mode,
+                @composite_visual::jsonb,
                 now(),
                 now()
             );
@@ -529,6 +538,8 @@ public sealed class MobRepository : IMobRepository
                 mob_detection_radius_tiles = @mob_detection_radius_tiles,
                 mob_target_scan_interval_ms = @mob_target_scan_interval_ms,
                 mob_target_scan_candidate_limit = @mob_target_scan_candidate_limit,
+                visual_mode = @visual_mode,
+                composite_visual = @composite_visual::jsonb,
                 updated_at = now()
             where mob_definition_id = @mob_definition_id;
             """;
@@ -730,6 +741,10 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("mob_detection_radius_tiles", draft.MobDetectionRadiusTiles);
         command.Parameters.AddWithValue("mob_target_scan_interval_ms", draft.MobTargetScanIntervalMs);
         command.Parameters.AddWithValue("mob_target_scan_candidate_limit", draft.MobTargetScanCandidateLimit);
+        command.Parameters.AddWithValue("visual_mode", draft.VisualMode);
+        command.Parameters.Add("composite_visual", NpgsqlDbType.Text).Value = draft.CompositeVisual is null
+            ? DBNull.Value
+            : draft.CompositeVisual.Value.GetRawText();
     }
 
     private static void AddCombatBonusParameters(
@@ -760,6 +775,8 @@ public sealed class MobRepository : IMobRepository
     {
         var factionOrdinal = reader.GetOrdinal("combat_faction_id");
         var factionDisplayOrdinal = reader.GetOrdinal("combat_faction_display_name");
+        var visualModeOrdinal = reader.GetOrdinal("visual_mode");
+        var compositeVisualOrdinal = reader.GetOrdinal("composite_visual");
         return new MobDefinitionRecord(
             reader.GetString(reader.GetOrdinal("mob_definition_id")),
             reader.GetString(reader.GetOrdinal("display_name")),
@@ -791,7 +808,13 @@ public sealed class MobRepository : IMobRepository
             drops,
             hasCombatProfile,
             reader.GetInt32(reader.GetOrdinal("guaranteed_drop_count")),
-            ReadUtc(reader, "updated_at"));
+            ReadUtc(reader, "updated_at"))
+        {
+            VisualMode = reader.GetString(visualModeOrdinal),
+            CompositeVisual = reader.IsDBNull(compositeVisualOrdinal)
+                ? null
+                : JsonDocument.Parse(reader.GetString(compositeVisualOrdinal)).RootElement.Clone()
+        };
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -851,7 +874,11 @@ public sealed record MobDefinitionRecord(
     IReadOnlyList<MobDropDefinition> GuaranteedDrops,
     bool HasCombatProfile,
     int GuaranteedDropCount,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc)
+{
+    public string VisualMode { get; init; } = "flat_sprite";
+    public JsonElement? CompositeVisual { get; init; }
+}
 
 public sealed record MobFactionRecord(string FactionId, string DisplayName);
 
