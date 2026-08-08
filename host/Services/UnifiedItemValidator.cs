@@ -656,6 +656,7 @@ public sealed class UnifiedItemValidator
                     ValidationSeverity.Error,
                     "equipment.equipped_visual.grip_anchors"));
             }
+            ValidateFlipXByPose(equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
             return;
         }
 
@@ -671,6 +672,40 @@ public sealed class UnifiedItemValidator
         }
 
         ValidateGripAnchors(equippedVisual.GripAnchors, forPublication, messages);
+        ValidateFlipXByPose(equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
+    }
+
+    private static void ValidateFlipXByPose(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> flipXByPose,
+        ICollection<ApiError> messages)
+    {
+        var expectedDirections = new HashSet<string>(["N", "E", "S", "W"], StringComparer.Ordinal);
+        var expectedFrames = new HashSet<string>(["1", "2", "3", "4"], StringComparer.Ordinal);
+
+        foreach (var direction in flipXByPose.Keys)
+        {
+            if (!expectedDirections.Contains(direction))
+            {
+                messages.Add(new ApiError(
+                    "invalid_equipped_visual_flip_direction",
+                    $"Flip direction '{direction}' is not supported.",
+                    ValidationSeverity.Error,
+                    $"equipment.equipped_visual.flip_x.{direction}"));
+                continue;
+            }
+
+            foreach (var frame in flipXByPose[direction].Keys)
+            {
+                if (!expectedFrames.Contains(frame))
+                {
+                    messages.Add(new ApiError(
+                        "invalid_equipped_visual_flip_frame",
+                        $"Flip frame '{frame}' is not supported.",
+                        ValidationSeverity.Error,
+                        $"equipment.equipped_visual.flip_x.{direction}.{frame}"));
+                }
+            }
+        }
     }
 
     private static void ValidateGripAnchors(

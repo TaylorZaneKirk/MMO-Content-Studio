@@ -124,7 +124,8 @@ public sealed record ItemEquippedVisualDefinition(
     [property: JsonPropertyName("socket_id")] string? SocketId,
     [property: JsonPropertyName("secondary_socket_id")] string? SecondarySocketId,
     [property: JsonPropertyName("nudge")] SourcePixelPointDefinition Nudge,
-    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors);
+    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors,
+    [property: JsonPropertyName("flip_x"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipXByPose = null);
 
 public sealed record ItemEquippedVisualDraft(
     [property: JsonPropertyName("asset_key")] string? AssetKey,
@@ -134,7 +135,8 @@ public sealed record ItemEquippedVisualDraft(
     [property: JsonPropertyName("socket_id")] string? SocketId,
     [property: JsonPropertyName("secondary_socket_id")] string? SecondarySocketId,
     [property: JsonPropertyName("nudge")] SourcePixelPointDefinition? Nudge,
-    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? GripAnchors);
+    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? GripAnchors,
+    [property: JsonPropertyName("flip_x"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipXByPose = null);
 
 public sealed record ItemPreviewResponse(
     [property: JsonPropertyName("target_operation")] string TargetOperation,

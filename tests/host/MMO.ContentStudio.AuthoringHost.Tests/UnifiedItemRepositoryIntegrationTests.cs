@@ -41,6 +41,10 @@ public sealed class UnifiedItemRepositoryIntegrationTests
         var draft = UnifiedItemDomainRules.FromRecord(existing);
         Assert.NotNull(draft.Equipment);
         var gripAnchors = AxeGripAnchors();
+        var flipXByPose = new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal)
+        {
+            ["N"] = new Dictionary<string, bool>(StringComparer.Ordinal) { ["1"] = true }
+        };
         var expectedVisual = new NormalizedItemEquippedVisual(
             "axe",
             "humanoid_v1",
@@ -49,7 +53,8 @@ public sealed class UnifiedItemRepositoryIntegrationTests
             "right_hand_primary",
             null,
             new SourcePixelPointDefinition(0, 0),
-            gripAnchors);
+            gripAnchors,
+            flipXByPose);
         draft = draft with
         {
             Equipment = draft.Equipment! with { EquippedVisual = expectedVisual }
@@ -75,6 +80,8 @@ public sealed class UnifiedItemRepositoryIntegrationTests
         Assert.Equal("right_hand_primary", reloaded.EquippedVisual.SocketId);
         Assert.Null(reloaded.EquippedVisual.SecondarySocketId);
         Assert.Equal(16, reloaded.EquippedVisual.GripAnchors.Sum(pair => pair.Value.Count));
+        Assert.True(reloaded.EquippedVisual.FlipXByPose!["N"]["1"]);
+        Assert.False(reloaded.EquippedVisual.FlipXByPose.ContainsKey("E"));
         foreach (var direction in gripAnchors)
         {
             Assert.True(reloaded.EquippedVisual.GripAnchors.TryGetValue(direction.Key, out var reloadedFrames));

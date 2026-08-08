@@ -549,6 +549,38 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveDraft_PersistsOnlyTheSelectedEquippedVisualFlipPose()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+        var request = UnifiedSaveRequest(null) with
+        {
+            Equipment = EquipmentDraft() with
+            {
+                EquippedVisual = EquippedVisualDraft() with
+                {
+                    FlipXByPose = new Dictionary<string, IReadOnlyDictionary<string, bool>>
+                    {
+                        ["N"] = new Dictionary<string, bool>
+                        {
+                            ["1"] = true,
+                            ["2"] = false
+                        }
+                    }
+                }
+            }
+        };
+
+        var result = await SaveDraftWithPreviewAsync(service, ItemId, request);
+
+        AssertSucceeded(result);
+        var flipXByPose = repository.Records[ItemId].EquippedVisual!.FlipXByPose!;
+        Assert.True(flipXByPose["N"]["1"]);
+        Assert.DoesNotContain("2", flipXByPose["N"].Keys);
+        Assert.False(repository.Records[ItemId].EquippedVisual!.FlipXByPose!.ContainsKey("E"));
+    }
+
+    [Fact]
     public async Task SignedAndOutOfBoundsAttachmentAnchorsRoundTripWithoutClamp()
     {
         var repository = new InMemoryUnifiedItemRepository();
@@ -989,7 +1021,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                             draft.Equipment.EquippedVisual.SocketId,
                             draft.Equipment.EquippedVisual.SecondarySocketId,
                             draft.Equipment.EquippedVisual.Nudge,
-                            draft.Equipment.EquippedVisual.GripAnchors)),
+                            draft.Equipment.EquippedVisual.GripAnchors,
+                            draft.Equipment.EquippedVisual.FlipXByPose)),
             draft.ToolCapabilities,
             expected,
             null);
@@ -1337,7 +1370,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                         equipment.EquippedVisual.SocketId,
                         equipment.EquippedVisual.SecondarySocketId,
                         equipment.EquippedVisual.Nudge,
-                        equipment.EquippedVisual.GripAnchors),
+                        equipment.EquippedVisual.GripAnchors,
+                        equipment.EquippedVisual.FlipXByPose),
                 draft.ToolCapabilities
                     .Select((value, index) => new ItemToolCapabilityDefinition(
                         value.CapabilityId,

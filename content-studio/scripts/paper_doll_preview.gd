@@ -255,6 +255,7 @@ func update(
 		layer.texture = texture
 		layer.visible = true
 		layer.z_index = int(layer_entry.get("z_index", 0))
+		layer.flip_h = bool(layer_entry.get("flip_x", false))
 		layer.size = texture.get_size() * preview_scale
 		layer.position = group_origin + ((source_position - view_bounds.position) * preview_scale)
 	_render_foreground_overlays(
@@ -299,6 +300,12 @@ func normalize_visual_key(value: String) -> String:
 	while normalized.contains("__"):
 		normalized = normalized.replace("__", "_")
 	return normalized.trim_prefix("_").trim_suffix("_")
+
+
+func resolve_effective_grip_anchor(grip_anchor: Vector2i, texture_width: int, flip_x: bool) -> Vector2i:
+	if not flip_x:
+		return grip_anchor
+	return Vector2i((texture_width - 1) - grip_anchor.x, grip_anchor.y)
 
 
 func resolve_source_pixel_offset(socket_position: Vector2i, grip_anchor: Vector2i, nudge: Vector2i = Vector2i.ZERO) -> Vector2:
@@ -358,7 +365,8 @@ func _resolve_loaded_layers(
 		var texture := load_result.get("texture") as Texture2D
 		if texture == null:
 			continue
-		var pose := _resolve_layer_pose(rig, equipped_visual, layer_id, direction, frame)
+		var pose := _resolve_layer_pose(rig, equipped_visual, layer_id, direction, frame, texture.get_width())
+		var flip_x := selected_visual and _resolve_pose_flip_x(equipped_visual, direction, frame)
 		entries.append({
 			"layer_id": layer_id,
 			"texture": texture,
@@ -369,8 +377,10 @@ func _resolve_loaded_layers(
 			"resolved_asset_path": str(load_result.get("path", "")),
 			"used_attachment": bool(pose.used_attachment),
 			"grip_anchor": pose.grip_anchor,
+			"authored_grip_anchor": pose.authored_grip_anchor,
 			"socket_position": pose.socket_position,
 			"authored_anchor": bool(pose.authored_anchor),
+			"flip_x": flip_x,
 		})
 	return entries
 
@@ -380,12 +390,14 @@ func _resolve_layer_pose(
 	equipped_visual: Dictionary,
 	layer_id: String,
 	direction: String,
-	frame: int
+	frame: int,
+	texture_width: int
 ) -> Dictionary:
 	var pose := {
 		"position": ANCHOR_OFFSET,
 		"used_attachment": false,
 		"grip_anchor": Vector2i.ZERO,
+		"authored_grip_anchor": Vector2i.ZERO,
 		"socket_position": Vector2i.ZERO,
 		"authored_anchor": false,
 	}
@@ -410,12 +422,25 @@ func _resolve_layer_pose(
 		direction,
 		frame)
 	var nudge := _resolve_optional_point(equipped_visual.get("nudge", null))
-	pose.position = ANCHOR_OFFSET + resolve_source_pixel_offset(socket_position, grip_anchor, nudge)
+	var effective_grip_anchor := resolve_effective_grip_anchor(
+		grip_anchor,
+		texture_width,
+		_resolve_pose_flip_x(equipped_visual, direction, frame))
+	pose.position = ANCHOR_OFFSET + resolve_source_pixel_offset(socket_position, effective_grip_anchor, nudge)
 	pose.used_attachment = true
-	pose.grip_anchor = grip_anchor
+	pose.grip_anchor = effective_grip_anchor
+	pose.authored_grip_anchor = grip_anchor
 	pose.socket_position = socket_position
 	pose.authored_anchor = authored_anchor != null
 	return pose
+
+
+func _resolve_pose_flip_x(equipped_visual: Dictionary, direction: String, frame: int) -> bool:
+	var flip_x_by_pose: Variant = equipped_visual.get("flip_x", null)
+	if not (flip_x_by_pose is Dictionary):
+		return false
+	var direction_variant: Variant = (flip_x_by_pose as Dictionary).get(direction, null)
+	return bool((direction_variant as Dictionary).get(str(clampi(frame, 1, 4)), false)) if direction_variant is Dictionary else false
 
 
 func _resolve_preview_grip_anchor(
@@ -528,6 +553,7 @@ func _render_foreground_overlays(
 		overlay_layer.texture = atlas_texture
 		overlay_layer.visible = true
 		overlay_layer.z_index = _resolve_foreground_overlay_z_index(overlay, direction)
+		overlay_layer.flip_h = false
 		overlay_layer.size = Vector2(source_rect.size) * preview_scale
 		overlay_layer.position = group_origin + (((source_position + Vector2(source_rect.position)) - view_bounds.position) * preview_scale)
 
@@ -689,6 +715,7 @@ func _reset_layers() -> void:
 		layer.visible = false
 		layer.position = Vector2.ZERO
 		layer.size = Vector2.ZERO
+		layer.flip_h = false
 
 
 func _reset_foreground_overlays() -> void:
@@ -700,6 +727,7 @@ func _reset_foreground_overlays() -> void:
 		overlay.visible = false
 		overlay.position = Vector2.ZERO
 		overlay.size = Vector2.ZERO
+		overlay.flip_h = false
 
 
 func _hide_markers() -> void:
@@ -743,6 +771,8 @@ func _update_markers(
 			"used_attachment": used_attachment,
 			"can_drag": true,
 			"grip_anchor": Vector2(grip_anchor),
+			"authored_grip_anchor": Vector2(_variant_to_vector2i(selected_entry.get("authored_grip_anchor", grip_anchor), grip_anchor)),
+			"flip_x": bool(selected_entry.get("flip_x", false)),
 			"selected_rect": Rect2(layer_position, texture.get_size() * preview_scale),
 			"socket_stage": socket_stage,
 			"grip_stage": grip_stage,
@@ -866,13 +896,14 @@ func _begin_drag(local_position: Vector2) -> void:
 	var texture_size := _variant_to_vector2(_current_pose_context.get("texture_size", Vector2.ZERO), Vector2.ZERO)
 	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
 		return
-	var grip_anchor := _variant_to_vector2(_current_pose_context.get("grip_anchor", Vector2.ZERO), Vector2.ZERO)
+	var grip_anchor := _variant_to_vector2(_current_pose_context.get("authored_grip_anchor", Vector2.ZERO), Vector2.ZERO)
 	_drag_state = {
 		"active": true,
 		"mouse_start_position": local_position,
 		"start_grip_anchor": grip_anchor,
 		"preview_scale": preview_scale,
 		"texture_size": texture_size,
+		"flip_x": bool(_current_pose_context.get("flip_x", false)),
 		"direction": str(_current_pose_context.get("direction", "N")),
 		"frame": int(_current_pose_context.get("frame", 1)),
 	}
@@ -892,6 +923,8 @@ func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
 	# Persisted "grip_anchor" contract names remain for compatibility, but the
 	# authored value is a virtual local attachment anchor and may sit outside the PNG.
 	var grip_source := start_grip_anchor - drag_delta_source
+	if bool(_drag_state.get("flip_x", false)):
+		grip_source.x = start_grip_anchor.x + drag_delta_source.x
 	var x := clampi(int(round(grip_source.x)), -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
 	var y := clampi(int(round(grip_source.y)), -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
 	grip_anchor_changed.emit(

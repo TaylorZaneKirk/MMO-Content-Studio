@@ -70,7 +70,8 @@ public static partial class UnifiedItemDomainRules
                             record.EquippedVisual.SocketId,
                             record.EquippedVisual.SecondarySocketId,
                             record.EquippedVisual.Nudge,
-                            record.EquippedVisual.GripAnchors))
+                            record.EquippedVisual.GripAnchors,
+                            record.EquippedVisual.FlipXByPose))
                 : null,
             record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
@@ -259,7 +260,8 @@ public static partial class UnifiedItemDomainRules
             && NormalizeOptional(equippedVisual.SocketId) is null
             && NormalizeOptional(equippedVisual.SecondarySocketId) is null
             && equippedVisual.Nudge is null
-            && (equippedVisual.GripAnchors is null || equippedVisual.GripAnchors.Count == 0))
+            && (equippedVisual.GripAnchors is null || equippedVisual.GripAnchors.Count == 0)
+            && (equippedVisual.FlipXByPose is null || equippedVisual.FlipXByPose.Count == 0))
         {
             return null;
         }
@@ -272,7 +274,8 @@ public static partial class UnifiedItemDomainRules
             NormalizeOptional(equippedVisual.SocketId),
             NormalizeOptional(equippedVisual.SecondarySocketId),
             equippedVisual.Nudge ?? new SourcePixelPointDefinition(0, 0),
-            NormalizeGripAnchors(equippedVisual.GripAnchors));
+            NormalizeGripAnchors(equippedVisual.GripAnchors),
+            NormalizeFlipXByPose(equippedVisual.FlipXByPose));
     }
 
     private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> NormalizeGripAnchors(
@@ -300,6 +303,40 @@ public static partial class UnifiedItemDomainRules
                 }
 
                 normalizedFrames[frame] = new SourcePixelPointDefinition(point.X, point.Y);
+            }
+
+            if (normalizedFrames.Count > 0)
+            {
+                normalized[direction] = normalizedFrames;
+            }
+        }
+
+        return normalized;
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> NormalizeFlipXByPose(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? flipXByPose)
+    {
+        var normalized = new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal);
+        if (flipXByPose is null)
+        {
+            return normalized;
+        }
+
+        foreach (var direction in DirectionOrder)
+        {
+            if (!flipXByPose.TryGetValue(direction, out var frames) || frames is null)
+            {
+                continue;
+            }
+
+            var normalizedFrames = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var frame in FrameOrder)
+            {
+                if (frames.TryGetValue(frame, out var flipX) && flipX)
+                {
+                    normalizedFrames[frame] = true;
+                }
             }
 
             if (normalizedFrames.Count > 0)
@@ -351,4 +388,5 @@ public sealed record NormalizedItemEquippedVisual(
     string? SocketId,
     string? SecondarySocketId,
     SourcePixelPointDefinition Nudge,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors);
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> GripAnchors,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipXByPose = null);

@@ -119,10 +119,12 @@ var _appearance_zoom_in: Button
 var _appearance_fit: Button
 var _appearance_grip_x: SpinBox
 var _appearance_grip_y: SpinBox
+var _appearance_flip_x: CheckBox
 var _appearance_clear_pose: Button
 var _appearance_copy_previous: Button
 var _appearance_copy_next: Button
 var _equipped_visual_grip_anchors: Dictionary = {}
+var _equipped_visual_flip_x: Dictionary = {}
 var _appearance_updating := false
 
 
@@ -336,6 +338,10 @@ func _build_ui() -> void:
 	_appearance_grip_y.value_changed.connect(_on_grip_spin_changed.unbind(1))
 	grip_row.add_child(_appearance_grip_y)
 	doll_controls.add_child(grip_row)
+	_appearance_flip_x = CheckBox.new()
+	_appearance_flip_x.text = "Flip horizontally"
+	_appearance_flip_x.toggled.connect(_on_appearance_flip_x_toggled)
+	doll_controls.add_child(_appearance_flip_x)
 	var grip_actions := HBoxContainer.new()
 	grip_actions.add_theme_constant_override("separation", 6)
 	_appearance_copy_previous = Button.new()
@@ -863,6 +869,7 @@ func _equipped_visual_payload() -> Variant:
 			"y": int(_appearance_nudge_y.value),
 		},
 		"grip_anchors": _copy_grip_anchor_payload(),
+		"flip_x": _copy_flip_x_payload(),
 	}
 	return payload
 
@@ -890,9 +897,27 @@ func _copy_grip_anchor_payload() -> Dictionary:
 	return copied
 
 
+func _copy_flip_x_payload() -> Dictionary:
+	var copied: Dictionary = {}
+	for direction_variant: Variant in _equipped_visual_flip_x.keys():
+		var direction := str(direction_variant)
+		var frames_variant: Variant = _equipped_visual_flip_x.get(direction, {})
+		if not (frames_variant is Dictionary):
+			continue
+		var copied_frames: Dictionary = {}
+		for frame_variant: Variant in (frames_variant as Dictionary).keys():
+			var frame := str(frame_variant)
+			if bool((frames_variant as Dictionary).get(frame, false)):
+				copied_frames[frame] = true
+		if not copied_frames.is_empty():
+			copied[direction] = copied_frames
+	return copied
+
+
 func _apply_equipped_visual(value: Variant) -> void:
 	_cancel_paper_doll_drag()
 	_equipped_visual_grip_anchors.clear()
+	_equipped_visual_flip_x.clear()
 	var has_visual := value is Dictionary
 	var equipped_visual := value as Dictionary if has_visual else {}
 	_has_persisted_equipped_visual = has_visual
@@ -913,6 +938,12 @@ func _apply_equipped_visual(value: Variant) -> void:
 		var frames_variant: Variant = grip_anchors.get(direction, {})
 		if frames_variant is Dictionary:
 			_equipped_visual_grip_anchors[direction] = (frames_variant as Dictionary).duplicate(true)
+	var flip_x_by_pose := equipped_visual.get("flip_x", {}) as Dictionary
+	for direction_variant: Variant in flip_x_by_pose.keys():
+		var direction := str(direction_variant)
+		var frames_variant: Variant = flip_x_by_pose.get(direction, {})
+		if frames_variant is Dictionary:
+			_equipped_visual_flip_x[direction] = (frames_variant as Dictionary).duplicate(true)
 	_update_grip_pose_controls()
 
 
@@ -1085,6 +1116,13 @@ func _on_grip_spin_changed() -> void:
 	_on_form_changed()
 
 
+func _on_appearance_flip_x_toggled(_enabled: bool) -> void:
+	if _is_loading or _appearance_updating or not _appearance_enabled.button_pressed:
+		return
+	_set_current_pose_flip_x(_appearance_flip_x.button_pressed)
+	_on_form_changed()
+
+
 func _on_paper_doll_grip_anchor_changed(direction: String, frame: int, x: int, y: int) -> void:
 	if not _appearance_enabled.button_pressed:
 		return
@@ -1105,6 +1143,26 @@ func _set_pose_anchor(direction: String, frame: int, point: Vector2i) -> void:
 func _set_current_pose_anchor(point: Vector2i) -> void:
 	_set_pose_anchor(_selected_metadata(_preview_direction), int(_preview_frame.value), point)
 	_update_grip_pose_controls()
+
+
+func _set_current_pose_flip_x(flip_x: bool) -> void:
+	var direction := _selected_metadata(_preview_direction)
+	var frame_key := str(int(_preview_frame.value))
+	var frames_variant: Variant = _equipped_visual_flip_x.get(direction, {})
+	var frames: Dictionary = frames_variant as Dictionary if frames_variant is Dictionary else {}
+	if flip_x:
+		frames[frame_key] = true
+	else:
+		frames.erase(frame_key)
+	if frames.is_empty():
+		_equipped_visual_flip_x.erase(direction)
+	else:
+		_equipped_visual_flip_x[direction] = frames
+
+
+func _get_current_pose_flip_x() -> bool:
+	var frames_variant: Variant = _equipped_visual_flip_x.get(_selected_metadata(_preview_direction), {})
+	return bool((frames_variant as Dictionary).get(str(int(_preview_frame.value)), false)) if frames_variant is Dictionary else false
 
 
 func _copy_previous_pose_anchor() -> void:
@@ -1189,6 +1247,7 @@ func _update_grip_pose_controls() -> void:
 	var anchor = _get_current_pose_anchor()
 	_appearance_grip_x.value = float(anchor.x if anchor != null else 0)
 	_appearance_grip_y.value = float(anchor.y if anchor != null else 0)
+	_appearance_flip_x.button_pressed = _get_current_pose_flip_x()
 	_appearance_updating = false
 
 
@@ -1589,6 +1648,7 @@ func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: 
 	_appearance_zoom_label.modulate = Color(0.7, 0.73, 0.79, 1) if equipment_enabled and catalog_available else Color(0.45, 0.48, 0.54, 1)
 	_appearance_grip_x.editable = socket_binding and catalog_available
 	_appearance_grip_y.editable = socket_binding and catalog_available
+	_appearance_flip_x.disabled = not authored_visual or not catalog_available
 	_appearance_clear_pose.disabled = not socket_binding or not catalog_available
 	_appearance_copy_previous.disabled = not socket_binding or not catalog_available
 	_appearance_copy_next.disabled = not socket_binding or not catalog_available

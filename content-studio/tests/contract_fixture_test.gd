@@ -84,6 +84,7 @@ func _run_fixture() -> void:
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
+	await _verify_per_pose_flip_payload_and_preview_math(main_scene)
 	await _verify_post_save_reload_uses_fresh_item_version(main_scene)
 	_verify_non_json_transport_failure()
 	_verify_mutation_transport_timeout_policy()
@@ -321,6 +322,7 @@ func _verify_grip_anchor_payload_normalization(main_scene: PackedScene) -> void:
 	root.add_child(scene)
 	await process_frame
 
+
 	var items := scene.get_node("Margin/Root/Tabs/Items")
 	if items == null:
 		_fail("Unified item editor fixture could not locate the Items workspace for grip-anchor normalization")
@@ -344,6 +346,81 @@ func _verify_grip_anchor_payload_normalization(main_scene: PackedScene) -> void:
 	var anchor := east.get("1", {}) as Dictionary
 	if int(anchor.get("x", 0)) != 4096 or int(anchor.get("y", 0)) != -4096:
 		_fail("Grip-anchor payloads must clamp invalid transient values to the attachment contract")
+		return
+
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_per_pose_flip_payload_and_preview_math(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+
+	var items := scene.get_node("Margin/Root/Tabs/Items")
+	if items == null:
+		_fail("Unified item editor fixture could not locate the Items workspace for per-pose flip authoring")
+		return
+
+	items._on_options_received(_available_rig_catalog())
+	items._start_new()
+	items._equipable.button_pressed = true
+	items._select_option(items._equipment_slot, "right_hand")
+	items._update_contextual_sections()
+	items._appearance_enabled.button_pressed = true
+	items._on_appearance_enabled_toggled(true)
+	items._select_option(items._preview_direction, "N")
+	items._preview_frame.value = 1
+	items._update_grip_pose_controls()
+	items._appearance_flip_x.button_pressed = true
+	items._on_appearance_flip_x_toggled(true)
+
+	var socket_payload: Dictionary = (items._equipped_visual_payload() as Dictionary)
+	var flip_x := socket_payload.get("flip_x", {}) as Dictionary
+	if not bool((flip_x.get("N", {}) as Dictionary).get("1", false)):
+		_fail("Flip horizontally must persist only the selected socket pose")
+		return
+	items._select_option(items._preview_direction, "E")
+	items._update_grip_pose_controls()
+	if items._appearance_flip_x.button_pressed:
+		_fail("Changing pose must restore the selected pose flip state")
+		return
+
+	var preview := PaperDollPreview.new()
+	if preview.resolve_effective_grip_anchor(Vector2i(-24, 72), 80, true) != Vector2i(103, 72):
+		_fail("Studio socket flip math must preserve signed virtual anchors")
+		return
+	if preview.resolve_effective_grip_anchor(Vector2i(73, 43), 80, false) != Vector2i(73, 43):
+		_fail("Missing flip metadata must retain the authored socket anchor")
+		return
+	var dragged_anchor: Array = []
+	preview.grip_anchor_changed.connect(func(_direction: String, _frame: int, x: int, y: int) -> void:
+		dragged_anchor = [x, y])
+	preview._current_pose_context = {"preview_scale": 1.0}
+	preview._drag_state = {
+		"mouse_start_position": Vector2.ZERO,
+		"start_grip_anchor": Vector2(10, 20),
+		"texture_size": Vector2(80, 60),
+		"flip_x": true,
+		"direction": "N",
+		"frame": 1,
+	}
+	preview._apply_drag_position_from_active_drag(Vector2(4, -3))
+	if dragged_anchor != [14, 23]:
+		_fail("Flipped socket dragging must update the authored anchor in the mirrored horizontal direction")
+		return
+
+	items._select_option(items._appearance_binding, "rig_layer")
+	items._select_option(items._appearance_render_layer, "left_hand")
+	items._select_option(items._preview_direction, "W")
+	items._preview_frame.value = 4
+	items._update_grip_pose_controls()
+	items._appearance_flip_x.button_pressed = true
+	items._on_appearance_flip_x_toggled(true)
+	var shield_payload: Dictionary = (items._equipped_visual_payload() as Dictionary)
+	var shield_flip_x := shield_payload.get("flip_x", {}) as Dictionary
+	if not bool((shield_flip_x.get("W", {}) as Dictionary).get("4", false)):
+		_fail("Rig-layer visuals must persist selected pose flip metadata without a socket anchor")
 		return
 
 	scene.queue_free()

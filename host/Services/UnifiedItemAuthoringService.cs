@@ -504,7 +504,8 @@ public sealed class UnifiedItemAuthoringService
                     equipment.EquippedVisual.SocketId,
                     equipment.EquippedVisual.SecondarySocketId,
                     equipment.EquippedVisual.Nudge,
-                    equipment.EquippedVisual.GripAnchors));
+                    equipment.EquippedVisual.GripAnchors,
+                    equipment.EquippedVisual.FlipXByPose));
 
     private static string ClassifySummary(
         bool hasConsumable,

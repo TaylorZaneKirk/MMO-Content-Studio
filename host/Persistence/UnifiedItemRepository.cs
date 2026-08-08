@@ -758,6 +758,11 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             transaction,
             itemId,
             cancellationToken);
+        var flipXByPose = await LoadEquippedVisualFlipXByPoseAsync(
+            connection,
+            transaction,
+            itemId,
+            cancellationToken);
         return new ItemEquippedVisualDefinition(
             assetKey,
             rigId,
@@ -766,7 +771,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             socketId,
             secondarySocketId,
             nudge,
-            gripAnchors);
+            gripAnchors,
+            flipXByPose);
     }
 
     private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>> LoadEquippedVisualGripAnchorsAsync(
@@ -779,6 +785,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             select direction, frame, grip_anchor_x, grip_anchor_y
             from item_equipped_visual_pose_anchors
             where item_id = @item_id
+              and grip_anchor_x is not null
+              and grip_anchor_y is not null
             order by direction, frame;
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -803,6 +811,42 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return anchors.ToDictionary(
             pair => pair.Key,
             pair => (IReadOnlyDictionary<string, SourcePixelPointDefinition>)pair.Value,
+            StringComparer.Ordinal);
+    }
+
+    private static async Task<IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>> LoadEquippedVisualFlipXByPoseAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select direction, frame
+            from item_equipped_visual_pose_anchors
+            where item_id = @item_id
+              and flip_x = true
+            order by direction, frame;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("item_id", itemId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var poses = new Dictionary<string, Dictionary<string, bool>>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var direction = reader.GetString(reader.GetOrdinal("direction"));
+            var frame = reader.GetInt32(reader.GetOrdinal("frame")).ToString();
+            if (!poses.TryGetValue(direction, out var frames))
+            {
+                frames = new Dictionary<string, bool>(StringComparer.Ordinal);
+                poses[direction] = frames;
+            }
+
+            frames[frame] = true;
+        }
+
+        return poses.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyDictionary<string, bool>)pair.Value,
             StringComparer.Ordinal);
     }
 
@@ -1210,6 +1254,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 frame,
                 grip_anchor_x,
                 grip_anchor_y,
+                flip_x,
                 updated_at
             ) values (
                 @item_id,
@@ -1217,9 +1262,11 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @frame,
                 @grip_anchor_x,
                 @grip_anchor_y,
+                @flip_x,
                 now()
             );
             """;
+        var persistedPoses = new HashSet<string>(StringComparer.Ordinal);
         foreach (var direction in equippedVisual.GripAnchors.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             foreach (var frame in direction.Value.OrderBy(pair => pair.Key, StringComparer.Ordinal))
@@ -1230,10 +1277,46 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 command.Parameters.AddWithValue("frame", int.Parse(frame.Key));
                 command.Parameters.AddWithValue("grip_anchor_x", frame.Value.X);
                 command.Parameters.AddWithValue("grip_anchor_y", frame.Value.Y);
+                command.Parameters.AddWithValue(
+                    "flip_x",
+                    IsFlipX(
+                        equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal),
+                        direction.Key,
+                        frame.Key));
+                await command.ExecuteNonQueryAsync(cancellationToken);
+                persistedPoses.Add($"{direction.Key}|{frame.Key}");
+            }
+        }
+
+        foreach (var direction in (equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal))
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            foreach (var frame in direction.Value.Where(pair => pair.Value).OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                if (persistedPoses.Contains($"{direction.Key}|{frame.Key}"))
+                {
+                    continue;
+                }
+
+                await using var command = new NpgsqlCommand(anchorSql, connection, transaction);
+                command.Parameters.AddWithValue("item_id", itemId);
+                command.Parameters.AddWithValue("direction", direction.Key);
+                command.Parameters.AddWithValue("frame", int.Parse(frame.Key));
+                command.Parameters.Add("grip_anchor_x", NpgsqlDbType.Integer).Value = DBNull.Value;
+                command.Parameters.Add("grip_anchor_y", NpgsqlDbType.Integer).Value = DBNull.Value;
+                command.Parameters.AddWithValue("flip_x", true);
                 await command.ExecuteNonQueryAsync(cancellationToken);
             }
         }
     }
+
+    private static bool IsFlipX(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> flipXByPose,
+        string direction,
+        string frame) =>
+        flipXByPose.TryGetValue(direction, out var frames)
+        && frames.TryGetValue(frame, out var flipX)
+        && flipX;
 
     private static async Task ReplaceToolCapabilitiesAsync(
         NpgsqlConnection connection,
