@@ -173,7 +173,11 @@ public sealed record ItemOptionsResponse(
     [property: JsonPropertyName("actor_rig_catalog")] ActorRigCatalogDefinition ActorRigCatalog,
     [property: JsonPropertyName("combat_unit_milliseconds")] int CombatUnitMilliseconds,
     [property: JsonPropertyName("maximum_tool_power_tier")] int MaximumToolPowerTier,
-    [property: JsonPropertyName("supports_runtime_tool_resolution")] bool SupportsRuntimeToolResolution);
+    [property: JsonPropertyName("supports_runtime_tool_resolution")] bool SupportsRuntimeToolResolution)
+{
+    [JsonPropertyName("composite_cosmetic_items")]
+    public IReadOnlyList<CompositeCosmeticItemOption> CompositeCosmeticItems { get; init; } = [];
+}
 
 public sealed record ItemAssetCatalogResponse(
     [property: JsonPropertyName("generated_at_utc")] DateTimeOffset GeneratedAtUtc,

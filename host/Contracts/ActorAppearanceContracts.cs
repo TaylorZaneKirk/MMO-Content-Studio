@@ -41,3 +41,9 @@ public sealed record ActorRigForegroundOverlayDefinition(
     [property: JsonPropertyName("source_layer_id")] string SourceLayerId,
     [property: JsonPropertyName("z_index_by_direction")] IReadOnlyDictionary<string, int> ZIndexByDirection,
     [property: JsonPropertyName("source_rect_by_direction")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition?>> SourceRectByDirection);
+
+public sealed record CompositeCosmeticItemOption(
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("rig_id")] string RigId,
+    [property: JsonPropertyName("render_layer_id")] string RenderLayerId);

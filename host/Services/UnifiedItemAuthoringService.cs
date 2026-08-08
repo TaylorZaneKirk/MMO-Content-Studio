@@ -45,6 +45,7 @@ public sealed class UnifiedItemAuthoringService
             var capabilities = await _repository.LoadGatheringCapabilitiesAsync(cancellationToken);
             var publishedItems = await _repository.LoadPublishedItemOptionsAsync(cancellationToken);
             var actorRigCatalog = _actorAppearanceCatalogService.LoadRigCatalog();
+            var compositeCosmeticItems = await LoadCompositeCosmeticItemsAsync(cancellationToken);
             return AuthoringOperationResult<ItemOptionsResponse>.Success(
                 new ItemOptionsResponse(
                     slots.Select(slot => new AuthoringOption(slot.SlotId, slot.DisplayName)).ToArray(),
@@ -66,12 +67,43 @@ public sealed class UnifiedItemAuthoringService
                     actorRigCatalog,
                     ItemAuthoringRegistry.CombatUnitMilliseconds,
                     UnifiedItemDomainRules.MaximumPowerTier,
-                    true));
+                    true)
+                {
+                    CompositeCosmeticItems = compositeCosmeticItems
+                });
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
             return DatabaseFailure<ItemOptionsResponse>(exception);
         }
+    }
+
+    private async Task<IReadOnlyList<CompositeCosmeticItemOption>> LoadCompositeCosmeticItemsAsync(
+        CancellationToken cancellationToken)
+    {
+        var summaries = await _repository.ListAsync(null, cancellationToken);
+        var options = new List<CompositeCosmeticItemOption>();
+        foreach (var summary in summaries)
+        {
+            var item = await _repository.LoadAsync(summary.ItemId, cancellationToken);
+            var visual = item?.EquippedVisual;
+            if (item is null || !item.RuntimeEnabled || visual is null || !string.IsNullOrWhiteSpace(visual.SecondarySocketId))
+            {
+                continue;
+            }
+
+            options.Add(new CompositeCosmeticItemOption(
+                item.ItemId,
+                item.DisplayName,
+                visual.RigId ?? string.Empty,
+                visual.RenderLayerId ?? string.Empty));
+        }
+
+        return options
+            .Where(option => !string.IsNullOrWhiteSpace(option.RigId) && !string.IsNullOrWhiteSpace(option.RenderLayerId))
+            .OrderBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(option => option.ItemId, StringComparer.Ordinal)
+            .ToArray();
     }
 
     public async Task<AuthoringOperationResult<ItemCatalogResponse>> ListAsync(

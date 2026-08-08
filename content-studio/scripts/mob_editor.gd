@@ -108,6 +108,11 @@ var _visual_mode: OptionButton
 var _composite_rig_id: OptionButton
 var _composite_base_layers: LineEdit
 var _composite_cosmetics: LineEdit
+var _composite_layers: VBoxContainer
+var _composite_base_layer_controls: Dictionary = {}
+var _composite_cosmetic_controls: Dictionary = {}
+var _actor_rig_catalog: Dictionary = {}
+var _composite_cosmetic_items: Array = []
 var _source_width: SpinBox
 var _source_height: SpinBox
 var _anchor_x: SpinBox
@@ -158,6 +163,7 @@ func _ready() -> void:
 	_build_ui()
 	_connect_client()
 	_client.load_item_options()
+	_on_visual_mode_changed()
 	_set_form_enabled(false)
 	_update_attack_controls()
 	_update_targeting_controls()
@@ -287,6 +293,7 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_visual_mode.set_item_metadata(0, "flat_sprite")
 	_visual_mode.add_item("Composite Rig", 1)
 	_visual_mode.set_item_metadata(1, "composite_rig")
+	_visual_mode.item_selected.connect(_on_visual_mode_changed.unbind(1))
 	_visual_path = _line_field(grid, "Texture path", "res://assets/maps/objects/mobs/slime.png")
 	_visual_path.text_changed.connect(_on_visual_path_changed)
 	_source_width = _spin_field(grid, "Source width", 1, 2048, 32, 1)
@@ -299,6 +306,11 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_composite_rig_id = _option_field(grid, "Composite rig")
 	_composite_base_layers = _line_field(grid, "Base layers (slot=asset key)", "head=head1, body=defbod, legs=defbod")
 	_composite_cosmetics = _line_field(grid, "Cosmetics (slot=item ID)", "right_hand=inventory_154_axe")
+	_composite_base_layers.visible = false
+	_composite_cosmetics.visible = false
+	_composite_layers = VBoxContainer.new()
+	_composite_layers.add_theme_constant_override("separation", 6)
+	parent.add_child(_composite_layers)
 
 
 func _add_stats_section(parent: VBoxContainer) -> void:
@@ -388,7 +400,10 @@ func _on_mob_options_received(payload: Dictionary) -> void:
 
 
 func _on_item_options_received(payload: Dictionary) -> void:
-	_fill_composite_rigs(payload.get("actor_rig_catalog", {}) as Dictionary)
+	_actor_rig_catalog = payload.get("actor_rig_catalog", {}) as Dictionary
+	_composite_cosmetic_items = payload.get("composite_cosmetic_items", []) as Array
+	_fill_composite_rigs(_actor_rig_catalog)
+	_rebuild_composite_layer_controls()
 
 
 func _fill_composite_rigs(catalog: Dictionary) -> void:
@@ -407,6 +422,65 @@ func _fill_composite_rigs(catalog: Dictionary) -> void:
 		_composite_rig_id.add_item("Rig catalog unavailable")
 		_composite_rig_id.set_item_metadata(0, "")
 	_select_option(_composite_rig_id, selected)
+	if not _composite_rig_id.item_selected.is_connected(_on_composite_rig_changed):
+		_composite_rig_id.item_selected.connect(_on_composite_rig_changed.unbind(1))
+
+
+func _on_composite_rig_changed() -> void:
+	_rebuild_composite_layer_controls()
+	_on_form_changed()
+
+
+func _rebuild_composite_layer_controls() -> void:
+	if _composite_layers == null:
+		return
+	var base_layers := _parse_key_value_text(_composite_base_layers.text)
+	var cosmetics := _parse_key_value_text(_composite_cosmetics.text)
+	for layer_id in _composite_base_layer_controls:
+		base_layers[layer_id] = (_composite_base_layer_controls[layer_id] as LineEdit).text.strip_edges()
+	for layer_id in _composite_cosmetic_controls:
+		cosmetics[layer_id] = _selected_metadata(_composite_cosmetic_controls[layer_id] as OptionButton)
+	_clear_children(_composite_layers)
+	_composite_base_layer_controls.clear()
+	_composite_cosmetic_controls.clear()
+	var rig_id := _selected_metadata(_composite_rig_id)
+	for rig_variant in _actor_rig_catalog.get("rigs", []) as Array:
+		if rig_variant is Dictionary and str((rig_variant as Dictionary).get("rig_id", "")) == rig_id:
+			var layers := (rig_variant as Dictionary).get("layers", []) as Array
+			for layer_variant in layers:
+				if not (layer_variant is Dictionary):
+					continue
+				var layer_id := str((layer_variant as Dictionary).get("layer_id", ""))
+				if layer_id.is_empty():
+					continue
+				var row := HBoxContainer.new()
+				var label := Label.new()
+				label.text = layer_id
+				label.custom_minimum_size = Vector2(96, 0)
+				row.add_child(label)
+				var asset_key := LineEdit.new()
+				asset_key.placeholder_text = "Base asset key"
+				asset_key.text = str(base_layers.get(layer_id, ""))
+				asset_key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+				asset_key.text_changed.connect(_on_form_changed)
+				row.add_child(asset_key)
+				var cosmetic := OptionButton.new()
+				cosmetic.custom_minimum_size = Vector2(180, 0)
+				cosmetic.add_item("No cosmetic")
+				cosmetic.set_item_metadata(0, "")
+				for option_variant in _composite_cosmetic_items:
+					if option_variant is Dictionary:
+						var option := option_variant as Dictionary
+						if str(option.get("rig_id", "")) == rig_id and str(option.get("render_layer_id", "")) == layer_id:
+							cosmetic.add_item(str(option.get("display_name", "")))
+							cosmetic.set_item_metadata(cosmetic.item_count - 1, str(option.get("item_id", "")))
+				_select_option(cosmetic, str(cosmetics.get(layer_id, "")))
+				cosmetic.item_selected.connect(_on_form_changed.unbind(1))
+				row.add_child(cosmetic)
+				_composite_layers.add_child(row)
+				_composite_base_layer_controls[layer_id] = asset_key
+				_composite_cosmetic_controls[layer_id] = cosmetic
+			return
 
 
 func _on_health_received(payload: Dictionary) -> void:
@@ -767,13 +841,24 @@ func _load_composite_visual(value: Variant) -> void:
 	_select_option(_composite_rig_id, str(composite.get("rig_id", "humanoid_v1")))
 	_composite_base_layers.text = _key_value_text(composite.get("base_layers", {}))
 	_composite_cosmetics.text = _key_value_text(composite.get("cosmetic_item_ids", {}))
+	_rebuild_composite_layer_controls()
 
 
 func _composite_visual_payload() -> Dictionary:
+	var base_layers := {}
+	var cosmetics := {}
+	for layer_id in _composite_base_layer_controls:
+		var asset_key := (_composite_base_layer_controls[layer_id] as LineEdit).text.strip_edges()
+		if not asset_key.is_empty():
+			base_layers[layer_id] = asset_key
+	for layer_id in _composite_cosmetic_controls:
+		var item_id := _selected_metadata(_composite_cosmetic_controls[layer_id] as OptionButton)
+		if not item_id.is_empty():
+			cosmetics[layer_id] = item_id
 	return {
 		"rig_id": _selected_metadata(_composite_rig_id),
-		"base_layers": _parse_key_value_text(_composite_base_layers.text),
-		"cosmetic_item_ids": _parse_key_value_text(_composite_cosmetics.text)
+		"base_layers": base_layers,
+		"cosmetic_item_ids": cosmetics
 	}
 
 
@@ -949,6 +1034,14 @@ func _on_visual_path_changed(_value: String) -> void:
 	_asset_preview_file_path = ""
 	_clear_preview()
 	_update_visual_preview()
+
+
+func _on_visual_mode_changed() -> void:
+	var composite := _selected_metadata(_visual_mode) == "composite_rig"
+	_composite_rig_id.visible = composite
+	_composite_layers.visible = composite
+	_visual_path.visible = not composite
+	_on_form_changed()
 
 
 func _on_option_changed() -> void:
