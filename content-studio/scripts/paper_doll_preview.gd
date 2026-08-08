@@ -339,6 +339,10 @@ func update_composite(
 
 	var selected_direction := direction if not direction.is_empty() else "N"
 	var selected_frame := clampi(frame, 1, 4)
+	var base_layers := composite_visual.get("base_layers", {}) as Dictionary
+	var cosmetic_item_ids := composite_visual.get("cosmetic_item_ids", {}) as Dictionary
+	if base_layers.is_empty() and cosmetic_item_ids.is_empty():
+		return _composite_preview_result(false, "Composite rig has no configured base layers or cosmetics.")
 	var layer_entries := _resolve_composite_loaded_layers(
 		rig,
 		composite_visual,

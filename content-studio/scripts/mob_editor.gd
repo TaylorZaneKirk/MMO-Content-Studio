@@ -3,6 +3,7 @@ class_name MobEditor
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const PAPER_DOLL_PREVIEW_SCRIPT := preload("res://scripts/paper_doll_preview.gd")
+const COMPOSITE_AUTHORING_STATE_SCRIPT := preload("res://scripts/composite_authoring_state.gd")
 const DEFAULT_BONUS_FIELDS := [
 	"attack_thrust",
 	"attack_slash",
@@ -107,8 +108,6 @@ var _updated: Label
 var _visual_path: LineEdit
 var _visual_mode: OptionButton
 var _composite_rig_id: OptionButton
-var _composite_base_layers: LineEdit
-var _composite_cosmetics: LineEdit
 var _composite_layers: VBoxContainer
 var _composite_base_layer_controls: Dictionary = {}
 var _composite_cosmetic_controls: Dictionary = {}
@@ -355,10 +354,6 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_footprint_width = _spin_field(grid, "Footprint width tiles", 1, 16, 1, 1)
 	_footprint_height = _spin_field(grid, "Footprint height tiles", 1, 16, 1, 1)
 	_composite_rig_id = _option_field(grid, "Composite rig")
-	_composite_base_layers = _line_field(grid, "Base layers (slot=asset key)", "head=head1, body=defbod, legs=defbod")
-	_composite_cosmetics = _line_field(grid, "Cosmetics (slot=item ID)", "right_hand=inventory_154_axe")
-	_composite_base_layers.visible = false
-	_composite_cosmetics.visible = false
 	_composite_layers = VBoxContainer.new()
 	_composite_layers.add_theme_constant_override("separation", 6)
 	parent.add_child(_composite_layers)
@@ -467,7 +462,7 @@ func _on_item_options_received(payload: Dictionary) -> void:
 	if _composite_preview != null:
 		_composite_preview.configure_rig_catalog(_actor_rig_catalog)
 	_fill_composite_rigs(_actor_rig_catalog)
-	_rebuild_composite_layer_controls()
+	_rebuild_composite_layer_controls(not _composite_base_layer_controls.is_empty() or not _composite_cosmetic_controls.is_empty())
 
 
 func _fill_composite_rigs(catalog: Dictionary) -> void:
@@ -495,18 +490,19 @@ func _on_composite_rig_changed() -> void:
 	_on_form_changed()
 
 
-func _rebuild_composite_layer_controls() -> void:
+func _rebuild_composite_layer_controls(store_existing_controls: bool = true) -> void:
 	if _composite_layers == null:
 		return
-	_store_composite_rig_state()
+	if store_existing_controls:
+		_store_composite_rig_state()
 	_clear_children(_composite_layers)
 	_composite_base_layer_controls.clear()
 	_composite_cosmetic_controls.clear()
 	var rig_id := _selected_metadata(_composite_rig_id)
-	var state: Dictionary = _composite_rig_states.get(rig_id, {
-		"base_layers": _parse_key_value_text(_composite_base_layers.text),
-		"cosmetics": _parse_key_value_text(_composite_cosmetics.text),
-	}) as Dictionary
+	if _selected_metadata(_visual_mode) == "composite_rig":
+		_ensure_composite_rig_state(rig_id)
+	var has_state := _composite_rig_states.has(rig_id)
+	var state: Dictionary = _composite_rig_states.get(rig_id, {}) as Dictionary
 	var base_layers: Dictionary = state.get("base_layers", {}) as Dictionary
 	var cosmetics: Dictionary = state.get("cosmetics", {}) as Dictionary
 	for rig_variant in _actor_rig_catalog.get("rigs", []) as Array:
@@ -545,7 +541,8 @@ func _rebuild_composite_layer_controls() -> void:
 				_composite_layers.add_child(row)
 				_composite_base_layer_controls[layer_id] = asset_key
 				_composite_cosmetic_controls[layer_id] = cosmetic
-			_composite_rig_states[rig_id] = {"base_layers": base_layers.duplicate(true), "cosmetics": cosmetics.duplicate(true)}
+			if has_state:
+				_composite_rig_states[rig_id] = {"base_layers": base_layers.duplicate(true), "cosmetics": cosmetics.duplicate(true)}
 			_active_composite_rig_id = rig_id
 			return
 	_update_visual_preview()
@@ -555,13 +552,25 @@ func _store_composite_rig_state() -> void:
 	var rig_id := _active_composite_rig_id if not _active_composite_rig_id.is_empty() else _selected_metadata(_composite_rig_id)
 	if rig_id.is_empty():
 		return
-	var base_layers: Dictionary = _parse_key_value_text(_composite_base_layers.text)
-	var cosmetics: Dictionary = _parse_key_value_text(_composite_cosmetics.text)
+	if not _composite_rig_states.has(rig_id):
+		return
+	var state: Dictionary = _composite_rig_states.get(rig_id, {
+		"base_layers": {},
+		"cosmetics": {},
+	}) as Dictionary
+	var base_layers: Dictionary = (state.get("base_layers", {}) as Dictionary).duplicate(true)
+	var cosmetics: Dictionary = (state.get("cosmetics", {}) as Dictionary).duplicate(true)
 	for layer_id in _composite_base_layer_controls:
 		base_layers[layer_id] = (_composite_base_layer_controls[layer_id] as LineEdit).text.strip_edges()
 	for layer_id in _composite_cosmetic_controls:
 		cosmetics[layer_id] = _selected_metadata(_composite_cosmetic_controls[layer_id] as OptionButton)
 	_composite_rig_states[rig_id] = {"base_layers": base_layers, "cosmetics": cosmetics}
+
+
+func _ensure_composite_rig_state(rig_id: String) -> void:
+	if rig_id.is_empty() or _composite_rig_states.has(rig_id):
+		return
+	_composite_rig_states[rig_id] = COMPOSITE_AUTHORING_STATE_SCRIPT.initial_state_for_rig(rig_id, _actor_rig_catalog)
 
 
 func _on_composite_control_changed(_value: Variant = null) -> void:
@@ -715,7 +724,7 @@ func _load_mob(payload: Dictionary) -> void:
 	_updated.text = str(payload.get("updated_at_utc", "Unknown"))
 	_visual_path.text = str(payload.get("visual_texture_path", ""))
 	_select_option(_visual_mode, str(payload.get("visual_mode", "flat_sprite")))
-	_load_composite_visual(payload.get("composite_visual", {}))
+	_load_composite_visual(payload.get("composite_visual", {}), str(payload.get("visual_mode", "flat_sprite")) == "composite_rig")
 	_source_width.value = int(payload.get("source_width", 32))
 	_source_height.value = int(payload.get("source_height", 32))
 	_anchor_x.value = float(payload.get("visual_anchor_offset_x", 0.0))
@@ -764,8 +773,8 @@ func _start_new_mob() -> void:
 	_visual_path.text = ""
 	_select_option(_visual_mode, "flat_sprite")
 	_select_option(_composite_rig_id, "humanoid_v1")
-	_composite_base_layers.text = "head=head1, body=defbod, legs=defbod"
-	_composite_cosmetics.text = ""
+	_composite_rig_states.clear()
+	_active_composite_rig_id = ""
 	_source_width.value = 32
 	_source_height.value = 32
 	_anchor_x.value = 0
@@ -929,7 +938,7 @@ func _payload() -> Dictionary:
 	}
 
 
-func _load_composite_visual(value: Variant) -> void:
+func _load_composite_visual(value: Variant, preserve_descriptor_state: bool) -> void:
 	var composite: Dictionary = value as Dictionary if value is Dictionary else {}
 	var rig_id := str(composite.get("rig_id", "humanoid_v1"))
 	_composite_rig_states.clear()
@@ -937,14 +946,13 @@ func _load_composite_visual(value: Variant) -> void:
 	_clear_children(_composite_layers)
 	_composite_base_layer_controls.clear()
 	_composite_cosmetic_controls.clear()
-	_composite_rig_states[rig_id] = {
-		"base_layers": composite.get("base_layers", {}) as Dictionary,
-		"cosmetics": composite.get("cosmetic_item_ids", {}) as Dictionary,
-	}
+	if preserve_descriptor_state:
+		_composite_rig_states[rig_id] = {
+			"base_layers": composite.get("base_layers", {}) as Dictionary,
+			"cosmetics": composite.get("cosmetic_item_ids", {}) as Dictionary,
+		}
 	_select_option(_composite_rig_id, rig_id)
-	_composite_base_layers.text = _key_value_text(composite.get("base_layers", {}))
-	_composite_cosmetics.text = _key_value_text(composite.get("cosmetic_item_ids", {}))
-	_rebuild_composite_layer_controls()
+	_rebuild_composite_layer_controls(false)
 
 
 func _composite_visual_payload() -> Dictionary:
@@ -963,25 +971,6 @@ func _composite_visual_payload() -> Dictionary:
 		"base_layers": base_layers,
 		"cosmetic_item_ids": cosmetics
 	}
-
-
-func _parse_key_value_text(value: String) -> Dictionary:
-	var result := {}
-	for segment in value.split(",", false):
-		var pair := segment.split("=", false, 1)
-		if pair.size() == 2 and not pair[0].strip_edges().is_empty() and not pair[1].strip_edges().is_empty():
-			result[pair[0].strip_edges()] = pair[1].strip_edges()
-	return result
-
-
-func _key_value_text(value: Variant) -> String:
-	if not (value is Dictionary):
-		return ""
-	var pairs: Array[String] = []
-	for key in (value as Dictionary).keys():
-		pairs.append("%s=%s" % [str(key), str((value as Dictionary)[key])])
-	pairs.sort()
-	return ", ".join(pairs)
 
 
 func _combat_profile_payload() -> Dictionary:
@@ -1148,6 +1137,11 @@ func _on_visual_mode_changed() -> void:
 	_composite_preview_stage.visible = composite
 	_composite_preview_trace_heading.visible = composite
 	_composite_preview_trace.visible = composite
+	if composite:
+		var rig_id := _selected_metadata(_composite_rig_id)
+		var has_state := _composite_rig_states.has(rig_id)
+		_ensure_composite_rig_state(rig_id)
+		_rebuild_composite_layer_controls(has_state)
 	print("[mob-composite-preview] Visual mode changed to %s." % ("Composite Rig" if composite else "Flat Sprite"))
 	_on_form_changed()
 

@@ -165,6 +165,9 @@ func _verify_item_editor_rig_catalog_behavior(main_scene: PackedScene) -> void:
 
 
 func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
+	var preview_fixture := _build_preview_fixture()
+	var asset_root := str(preview_fixture.preview.game_client_assets_root)
+	var health := {"asset_roots": [{"id": "game_client_assets", "path": asset_root, "status": "Healthy"}]}
 	var scene := main_scene.instantiate()
 	root.add_child(scene)
 	await process_frame
@@ -181,15 +184,42 @@ func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
 		if workspace == null:
 			_fail("Composite editor fixture could not locate %s" % workspace_path)
 			return
+		workspace._on_health_received(health)
 		workspace._on_item_options_received(options)
 		workspace._select_option(workspace._composite_rig_id, "humanoid_v1")
+		workspace._select_option(workspace._visual_mode, "composite_rig")
+		workspace._on_visual_mode_changed()
+		var head := workspace._composite_base_layer_controls.get("head", null) as LineEdit
 		workspace._on_composite_rig_changed()
 		var body := workspace._composite_base_layer_controls.get("body", null) as LineEdit
-		if body == null:
-			_fail("Composite editor fixture expected humanoid body controls in %s" % workspace_path)
+		var legs := workspace._composite_base_layer_controls.get("legs", null) as LineEdit
+		if head == null or body == null or legs == null:
+			_fail("Composite editor fixture expected humanoid default layer controls in %s" % workspace_path)
+			return
+		if head.text != "head1" or body.text != "defbod" or legs.text != "defbod":
+			_fail("Existing flat actors must seed authored humanoid defaults on Composite Rig conversion in %s" % workspace_path)
+			return
+		var payload: Dictionary = workspace._composite_visual_payload()
+		var seeded_layers := payload.get("base_layers", {}) as Dictionary
+		if str(seeded_layers.get("head", "")) != "head1" or str(seeded_layers.get("body", "")) != "defbod" or str(seeded_layers.get("legs", "")) != "defbod":
+			_fail("Composite Rig conversion payload must explicitly contain seeded humanoid base layers in %s" % workspace_path)
+			return
+		var preview_head := workspace._composite_preview._layers.get("head", null) as TextureRect
+		var preview_body := workspace._composite_preview._layers.get("body", null) as TextureRect
+		var preview_legs := workspace._composite_preview._layers.get("legs", null) as TextureRect
+		if preview_head == null or preview_body == null or preview_legs == null or not preview_head.visible or not preview_body.visible or not preview_legs.visible:
+			_fail("Composite Rig conversion must immediately resolve the seeded humanoid preview layers in %s" % workspace_path)
 			return
 		body.text = "edited_body"
 		workspace._on_composite_control_changed()
+		workspace._select_option(workspace._visual_mode, "flat_sprite")
+		workspace._on_visual_mode_changed()
+		workspace._select_option(workspace._visual_mode, "composite_rig")
+		workspace._on_visual_mode_changed()
+		body = workspace._composite_base_layer_controls.get("body", null) as LineEdit
+		if body == null or body.text != "edited_body":
+			_fail("Composite to Flat to Composite must preserve unsaved layer edits in %s" % workspace_path)
+			return
 		workspace._select_option(workspace._composite_rig_id, "alternate_humanoid")
 		workspace._on_composite_rig_changed()
 		workspace._select_option(workspace._composite_rig_id, "humanoid_v1")
@@ -198,11 +228,35 @@ func _verify_composite_editor_rig_state(main_scene: PackedScene) -> void:
 		if body == null or body.text != "edited_body":
 			_fail("Composite editor rig switching must preserve unsaved humanoid layer values in %s" % workspace_path)
 			return
-		var payload: Dictionary = workspace._composite_visual_payload()
+		payload = workspace._composite_visual_payload()
 		if str(payload.get("rig_id", "")) != "humanoid_v1" or str((payload.get("base_layers", {}) as Dictionary).get("body", "")) != "edited_body" or (payload.get("base_layers", {}) as Dictionary).has("alternate_only"):
 			_fail("Composite editor payload must contain only the selected rig state in %s" % workspace_path)
 			return
+		head = workspace._composite_base_layer_controls.get("head", null) as LineEdit
+		head.text = ""
+		workspace._on_composite_control_changed()
+		workspace._select_option(workspace._visual_mode, "flat_sprite")
+		workspace._on_visual_mode_changed()
+		workspace._select_option(workspace._visual_mode, "composite_rig")
+		workspace._on_visual_mode_changed()
+		head = workspace._composite_base_layer_controls.get("head", null) as LineEdit
+		payload = workspace._composite_visual_payload()
+		if head == null or not head.text.is_empty() or (payload.get("base_layers", {}) as Dictionary).has("head"):
+			_fail("Intentionally cleared composite layers must remain absent in %s" % workspace_path)
+			return
+		workspace._load_composite_visual({
+			"rig_id": "humanoid_v1",
+			"base_layers": {"body": "persisted_body"},
+			"cosmetic_item_ids": {},
+		}, true)
+		head = workspace._composite_base_layer_controls.get("head", null) as LineEdit
+		body = workspace._composite_base_layer_controls.get("body", null) as LineEdit
+		if head == null or body == null or not head.text.is_empty() or body.text != "persisted_body":
+			_fail("Loaded composite descriptors must not be overwritten by initialization defaults in %s" % workspace_path)
+			return
 	scene.queue_free()
+	preview_fixture.stage.free()
+	preview_fixture.status.free()
 	print("[content-studio-contract-fixture] composite editor rig-state passed")
 	await process_frame
 
@@ -1297,6 +1351,14 @@ func _verify_composite_actor_preview_semantics() -> void:
 	var stage: Control = preview_fixture.stage
 	var status: Label = preview_fixture.status
 	var asset_root := preview.game_client_assets_root
+	var empty_result := preview.update_composite({
+		"rig_id": "humanoid_v1",
+		"base_layers": {},
+		"cosmetic_item_ids": {},
+	}, "N", 1, {})
+	if bool(empty_result.get("success", true)) or str(empty_result.get("status", "")) != "Composite rig has no configured base layers or cosmetics.":
+		_fail("Genuinely empty composite descriptors must report missing authoring state instead of an asset-resolution failure")
+		return
 	for direction in ["N", "S", "W"]:
 		_write_fixture_png(asset_root.path_join("actors/player/left_hand/champions_shield-F1-%s.png" % direction), Color(0.5, 0.7, 0.8, 1))
 	var shield := _make_socket_visual(Vector2i(16, 16), "left_hand_primary", "N", 1, "champions_shield", "left_hand")
