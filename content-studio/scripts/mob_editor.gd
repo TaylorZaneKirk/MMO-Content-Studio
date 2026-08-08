@@ -341,7 +341,7 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_visual_mode = _option_field(grid, "Visual mode")
 	_visual_mode.add_item("Flat Sprite", 0)
 	_visual_mode.set_item_metadata(0, "flat_sprite")
-	_visual_mode.add_item("Composite Rig", 1)
+	_visual_mode.add_item("Rigged Sprite", 1)
 	_visual_mode.set_item_metadata(1, "composite_rig")
 	_visual_mode.item_selected.connect(_on_visual_mode_changed.unbind(1))
 	_visual_path = _line_field(grid, "Texture path", "res://assets/maps/objects/mobs/slime.png")
@@ -519,12 +519,6 @@ func _rebuild_composite_layer_controls(store_existing_controls: bool = true) -> 
 				label.text = layer_id
 				label.custom_minimum_size = Vector2(96, 0)
 				row.add_child(label)
-				var asset_key := LineEdit.new()
-				asset_key.placeholder_text = "Base asset key"
-				asset_key.text = str(base_layers.get(layer_id, ""))
-				asset_key.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-				asset_key.text_changed.connect(_on_composite_control_changed)
-				row.add_child(asset_key)
 				var cosmetic := OptionButton.new()
 				cosmetic.custom_minimum_size = Vector2(180, 0)
 				cosmetic.add_item("No cosmetic")
@@ -539,7 +533,6 @@ func _rebuild_composite_layer_controls(store_existing_controls: bool = true) -> 
 				cosmetic.item_selected.connect(_on_composite_control_changed.unbind(1))
 				row.add_child(cosmetic)
 				_composite_layers.add_child(row)
-				_composite_base_layer_controls[layer_id] = asset_key
 				_composite_cosmetic_controls[layer_id] = cosmetic
 			if has_state:
 				_composite_rig_states[rig_id] = {"base_layers": base_layers.duplicate(true), "cosmetics": cosmetics.duplicate(true)}
@@ -1132,7 +1125,7 @@ func _on_visual_mode_changed() -> void:
 	var composite := _selected_metadata(_visual_mode) == "composite_rig"
 	_composite_rig_id.visible = composite
 	_composite_layers.visible = composite
-	_visual_path.visible = not composite
+	_visual_path.visible = true
 	_visual_preview.visible = not composite
 	_composite_preview_stage.visible = composite
 	_composite_preview_trace_heading.visible = composite
@@ -1142,7 +1135,7 @@ func _on_visual_mode_changed() -> void:
 		var has_state := _composite_rig_states.has(rig_id)
 		_ensure_composite_rig_state(rig_id)
 		_rebuild_composite_layer_controls(has_state)
-	print("[mob-composite-preview] Visual mode changed to %s." % ("Composite Rig" if composite else "Flat Sprite"))
+	print("[mob-composite-preview] Visual mode changed to %s." % ("Rigged Sprite" if composite else "Flat Sprite"))
 	_on_form_changed()
 
 

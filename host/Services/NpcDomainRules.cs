@@ -128,7 +128,7 @@ public static class NpcDomainRules
             draft.PreviewSignature)
         {
             VisualMode = NormalizeVisualMode(draft.VisualMode),
-            CompositeVisual = draft.CompositeVisual?.Clone()
+            CompositeVisual = CompositeActorVisualDescriptor.Normalize(draft.CompositeVisual)
         };
     }
 

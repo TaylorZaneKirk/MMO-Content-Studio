@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
 
@@ -14,7 +15,7 @@ public sealed record CompositeActorVisualDescriptor(
         descriptor = null;
         if (value is not { ValueKind: JsonValueKind.Object } element
             || !TryReadString(element, "rig_id", out var rigId)
-            || !TryReadStringMap(element, "base_layers", out var baseLayers)
+            || !TryReadOptionalStringMap(element, "base_layers", out var baseLayers)
             || !TryReadOptionalStringMap(element, "cosmetic_item_ids", out var cosmetics))
         {
             return false;
@@ -23,6 +24,22 @@ public sealed record CompositeActorVisualDescriptor(
         descriptor = new CompositeActorVisualDescriptor(rigId, baseLayers, cosmetics);
         return true;
     }
+
+    public static JsonElement? Normalize(JsonElement? value)
+    {
+        if (!TryParse(value, out var descriptor))
+        {
+            return value?.Clone();
+        }
+
+        return JsonSerializer.SerializeToElement(new CanonicalCompositeActorVisual(
+            descriptor!.RigId,
+            descriptor.CosmeticItemIds));
+    }
+
+    private sealed record CanonicalCompositeActorVisual(
+        [property: JsonPropertyName("rig_id")] string RigId,
+        [property: JsonPropertyName("cosmetic_item_ids")] IReadOnlyDictionary<string, string> CosmeticItemIds);
 
     private static bool TryReadString(JsonElement element, string propertyName, out string value)
     {
@@ -35,21 +52,6 @@ public sealed record CompositeActorVisualDescriptor(
 
         value = property.GetString()?.Trim() ?? string.Empty;
         return value.Length > 0;
-    }
-
-    private static bool TryReadStringMap(
-        JsonElement element,
-        string propertyName,
-        out IReadOnlyDictionary<string, string> values)
-    {
-        values = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (!element.TryGetProperty(propertyName, out var property)
-            || property.ValueKind != JsonValueKind.Object)
-        {
-            return false;
-        }
-
-        return TryReadMap(property, out values);
     }
 
     private static bool TryReadOptionalStringMap(

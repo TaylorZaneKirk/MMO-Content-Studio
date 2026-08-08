@@ -76,9 +76,7 @@ public sealed partial class NpcDefinitionValidator
                 "publication_state"));
         }
 
-        var asset = draft.VisualMode == "composite_rig"
-            ? new ItemAssetResolution(true, null, null)
-            : _assetService.ResolveGameAssetPng(draft.VisualTexturePath, "NPC visual texture");
+        var asset = _assetService.ResolveGameAssetPng(draft.VisualTexturePath, "NPC visual texture");
         var hasErrors = messages.Any(message => message.Severity == ValidationSeverity.Error);
         var hasDraftBlockingErrors = messages.Any(IsDraftBlocking);
         return new NpcValidationOutcome(
@@ -134,11 +132,6 @@ public sealed partial class NpcDefinitionValidator
         ICollection<ApiError> messages,
         bool forPublication)
     {
-        if (draft.VisualMode == "composite_rig")
-        {
-            ValidateCompositeVisual(draft.CompositeVisual, messages);
-            return;
-        }
         var asset = _assetService.ResolveGameAssetPng(draft.VisualTexturePath, "NPC visual texture");
         if (draft.VisualTexturePath.Length == 0)
         {
@@ -212,10 +205,9 @@ public sealed partial class NpcDefinitionValidator
     private static void ValidateCompositeVisual(System.Text.Json.JsonElement? compositeVisual, ICollection<ApiError> messages)
     {
         if (compositeVisual is not { ValueKind: System.Text.Json.JsonValueKind.Object } value ||
-            !value.TryGetProperty("rig_id", out var rigId) || rigId.ValueKind != System.Text.Json.JsonValueKind.String ||
-            !value.TryGetProperty("base_layers", out var baseLayers) || baseLayers.ValueKind != System.Text.Json.JsonValueKind.Object)
+            !value.TryGetProperty("rig_id", out var rigId) || rigId.ValueKind != System.Text.Json.JsonValueKind.String)
         {
-            messages.Add(new ApiError("invalid_npc_composite_visual", "Composite NPC visuals require rig_id and base_layers.", ValidationSeverity.Error, "composite_visual"));
+            messages.Add(new ApiError("invalid_npc_composite_visual", "Rigged sprite NPC visuals require rig_id.", ValidationSeverity.Error, "composite_visual"));
         }
     }
 

@@ -6,19 +6,6 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public sealed partial class CompositeActorVisualValidator
 {
-    private static readonly IReadOnlyDictionary<string, string> LayerDirectories =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["head"] = "head",
-            ["body"] = "body",
-            ["legs"] = "legs",
-            ["boots"] = "boots",
-            ["right_hand"] = "right_hand",
-            ["left_hand"] = "left_hand",
-            ["gloves"] = "gloves",
-            ["cape"] = "cape"
-        };
-
     private readonly ActorAppearanceCatalogService _rigCatalogService;
     private readonly IUnifiedItemRepository _itemRepository;
     private readonly ItemAssetService _assetService;
@@ -43,7 +30,7 @@ public sealed partial class CompositeActorVisualValidator
         {
             messages.Add(new ApiError(
                 $"invalid_{errorPrefix}_composite_visual",
-                "Composite visuals require a rig_id, base_layers object, and optional cosmetic_item_ids object of non-empty strings.",
+                "Rigged sprite visuals require a rig_id and optional cosmetic_item_ids object of non-empty strings.",
                 ValidationSeverity.Error,
                 "composite_visual"));
             return;
@@ -72,20 +59,7 @@ public sealed partial class CompositeActorVisualValidator
         }
 
         var layers = rig.Layers.ToDictionary(layer => layer.LayerId, StringComparer.Ordinal);
-        foreach (var (layerId, assetKey) in descriptor!.BaseLayers)
-        {
-            if (!layers.ContainsKey(layerId) || !LayerDirectories.TryGetValue(layerId, out var directory))
-            {
-                messages.Add(new ApiError($"invalid_{errorPrefix}_composite_layer", $"'{layerId}' is not a supported base layer for rig '{rig.RigId}'.", ValidationSeverity.Error, $"composite_visual.base_layers.{layerId}"));
-                continue;
-            }
-            if (!AssetKeyRegex().IsMatch(assetKey) || !ResolvesActorArt(directory, assetKey))
-            {
-                messages.Add(new ApiError($"unresolved_{errorPrefix}_composite_base_layer", $"Base layer '{layerId}' must name canonical actor art for rig '{rig.RigId}'.", ValidationSeverity.Error, $"composite_visual.base_layers.{layerId}"));
-            }
-        }
-
-        foreach (var (layerId, itemId) in descriptor.CosmeticItemIds)
+        foreach (var (layerId, itemId) in descriptor!.CosmeticItemIds)
         {
             if (!layers.ContainsKey(layerId))
             {
@@ -114,25 +88,6 @@ public sealed partial class CompositeActorVisualValidator
             }
         }
     }
-
-    private bool ResolvesActorArt(string directory, string assetKey)
-    {
-        foreach (var direction in new[] { "N", "E", "S", "W" })
-        {
-            foreach (var frame in new[] { 1, 2, 3, 4 })
-            {
-                var result = _assetService.ResolveGameAssetPng($"res://assets/actors/player/{directory}/{assetKey}-F{frame}-{direction}.png", "composite base layer");
-                if (result.Exists)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    [GeneratedRegex("^[a-z0-9]+(?:_[a-z0-9]+)*$")]
-    private static partial Regex AssetKeyRegex();
 
     [GeneratedRegex("^[a-z0-9]+(?:_[a-z0-9]+)*$")]
     private static partial Regex StableItemIdRegex();

@@ -343,7 +343,7 @@ public sealed class MobAuthoringService
             request.GuaranteedDrops) with
         {
             VisualMode = MobDomainRules.NormalizeVisualMode(request.VisualMode),
-            CompositeVisual = request.CompositeVisual?.Clone()
+            CompositeVisual = CompositeActorVisualDescriptor.Normalize(request.CompositeVisual)
         };
 
     public static NormalizedMobDraft Normalize(MobPreviewRequest request) =>
@@ -375,7 +375,7 @@ public sealed class MobAuthoringService
             request.GuaranteedDrops) with
         {
             VisualMode = MobDomainRules.NormalizeVisualMode(request.VisualMode),
-            CompositeVisual = request.CompositeVisual?.Clone()
+            CompositeVisual = CompositeActorVisualDescriptor.Normalize(request.CompositeVisual)
         };
 
     public static NormalizedMobDraft Normalize(
