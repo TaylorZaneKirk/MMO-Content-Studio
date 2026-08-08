@@ -119,12 +119,14 @@ var _appearance_zoom_in: Button
 var _appearance_fit: Button
 var _appearance_grip_x: SpinBox
 var _appearance_grip_y: SpinBox
+var _appearance_visible_in_pose: CheckBox
 var _appearance_flip_x: CheckBox
 var _appearance_clear_pose: Button
 var _appearance_copy_previous: Button
 var _appearance_copy_next: Button
 var _equipped_visual_grip_anchors: Dictionary = {}
 var _equipped_visual_flip_x: Dictionary = {}
+var _equipped_visual_hidden_poses: Dictionary = {}
 var _appearance_updating := false
 
 
@@ -338,6 +340,11 @@ func _build_ui() -> void:
 	_appearance_grip_y.value_changed.connect(_on_grip_spin_changed.unbind(1))
 	grip_row.add_child(_appearance_grip_y)
 	doll_controls.add_child(grip_row)
+	_appearance_visible_in_pose = CheckBox.new()
+	_appearance_visible_in_pose.text = "Visible in this pose"
+	_appearance_visible_in_pose.button_pressed = true
+	_appearance_visible_in_pose.toggled.connect(_on_appearance_visible_in_pose_toggled)
+	doll_controls.add_child(_appearance_visible_in_pose)
 	_appearance_flip_x = CheckBox.new()
 	_appearance_flip_x.text = "Flip horizontally"
 	_appearance_flip_x.toggled.connect(_on_appearance_flip_x_toggled)
@@ -857,12 +864,13 @@ func _weapon_profile_payload() -> Variant:
 func _equipped_visual_payload() -> Variant:
 	if not _appearance_enabled.button_pressed:
 		return null
+	var binding_type := _selected_metadata(_appearance_binding)
 	var payload := {
 		"asset_key": _optional_payload(_appearance_asset_key.text),
 		"rig_id": _selected_metadata(_appearance_rig),
-		"binding_type": _selected_metadata(_appearance_binding),
+		"binding_type": binding_type,
 		"render_layer_id": _selected_metadata(_appearance_render_layer),
-		"socket_id": _optional_payload(_selected_metadata(_appearance_socket)),
+		"socket_id": _optional_payload(_selected_metadata(_appearance_socket)) if binding_type == "socket" else null,
 		"secondary_socket_id": null,
 		"nudge": {
 			"x": int(_appearance_nudge_x.value),
@@ -870,6 +878,7 @@ func _equipped_visual_payload() -> Variant:
 		},
 		"grip_anchors": _copy_grip_anchor_payload(),
 		"flip_x": _copy_flip_x_payload(),
+		"hidden_poses": _copy_hidden_pose_payload(),
 	}
 	return payload
 
@@ -914,10 +923,28 @@ func _copy_flip_x_payload() -> Dictionary:
 	return copied
 
 
+func _copy_hidden_pose_payload() -> Dictionary:
+	var copied: Dictionary = {}
+	for direction_variant: Variant in _equipped_visual_hidden_poses.keys():
+		var direction := str(direction_variant)
+		var frames_variant: Variant = _equipped_visual_hidden_poses.get(direction, {})
+		if not (frames_variant is Dictionary):
+			continue
+		var copied_frames: Dictionary = {}
+		for frame_variant: Variant in (frames_variant as Dictionary).keys():
+			var frame := str(frame_variant)
+			if bool((frames_variant as Dictionary).get(frame, false)):
+				copied_frames[frame] = true
+		if not copied_frames.is_empty():
+			copied[direction] = copied_frames
+	return copied
+
+
 func _apply_equipped_visual(value: Variant) -> void:
 	_cancel_paper_doll_drag()
 	_equipped_visual_grip_anchors.clear()
 	_equipped_visual_flip_x.clear()
+	_equipped_visual_hidden_poses.clear()
 	var has_visual := value is Dictionary
 	var equipped_visual := value as Dictionary if has_visual else {}
 	_has_persisted_equipped_visual = has_visual
@@ -944,6 +971,12 @@ func _apply_equipped_visual(value: Variant) -> void:
 		var frames_variant: Variant = flip_x_by_pose.get(direction, {})
 		if frames_variant is Dictionary:
 			_equipped_visual_flip_x[direction] = (frames_variant as Dictionary).duplicate(true)
+	var hidden_poses := equipped_visual.get("hidden_poses", {}) as Dictionary
+	for direction_variant: Variant in hidden_poses.keys():
+		var direction := str(direction_variant)
+		var frames_variant: Variant = hidden_poses.get(direction, {})
+		if frames_variant is Dictionary:
+			_equipped_visual_hidden_poses[direction] = (frames_variant as Dictionary).duplicate(true)
 	_update_grip_pose_controls()
 
 
@@ -1091,6 +1124,8 @@ func _on_appearance_binding_changed() -> void:
 	_cancel_paper_doll_drag()
 	if _selected_metadata(_appearance_binding) == "socket":
 		_select_option(_appearance_socket, _default_socket_id_for_equipment_slot(_selected_metadata(_equipment_slot)))
+	else:
+		_appearance_socket.visible = false
 	_update_contextual_sections()
 	_on_form_changed()
 
@@ -1120,6 +1155,17 @@ func _on_appearance_flip_x_toggled(_enabled: bool) -> void:
 	if _is_loading or _appearance_updating or not _appearance_enabled.button_pressed:
 		return
 	_set_current_pose_flip_x(_appearance_flip_x.button_pressed)
+	_on_form_changed()
+
+
+func _on_appearance_visible_in_pose_toggled(_visible: bool) -> void:
+	if _is_loading or _appearance_updating or not _appearance_enabled.button_pressed:
+		return
+	_cancel_paper_doll_drag()
+	_set_current_pose_hidden(not _appearance_visible_in_pose.button_pressed)
+	_update_grip_pose_controls()
+	_update_contextual_sections()
+	_update_paper_doll_preview()
 	_on_form_changed()
 
 
@@ -1160,8 +1206,28 @@ func _set_current_pose_flip_x(flip_x: bool) -> void:
 		_equipped_visual_flip_x[direction] = frames
 
 
+func _set_current_pose_hidden(hidden: bool) -> void:
+	var direction := _selected_metadata(_preview_direction)
+	var frame_key := str(int(_preview_frame.value))
+	var frames_variant: Variant = _equipped_visual_hidden_poses.get(direction, {})
+	var frames: Dictionary = frames_variant as Dictionary if frames_variant is Dictionary else {}
+	if hidden:
+		frames[frame_key] = true
+	else:
+		frames.erase(frame_key)
+	if frames.is_empty():
+		_equipped_visual_hidden_poses.erase(direction)
+	else:
+		_equipped_visual_hidden_poses[direction] = frames
+
+
 func _get_current_pose_flip_x() -> bool:
 	var frames_variant: Variant = _equipped_visual_flip_x.get(_selected_metadata(_preview_direction), {})
+	return bool((frames_variant as Dictionary).get(str(int(_preview_frame.value)), false)) if frames_variant is Dictionary else false
+
+
+func _get_current_pose_hidden() -> bool:
+	var frames_variant: Variant = _equipped_visual_hidden_poses.get(_selected_metadata(_preview_direction), {})
 	return bool((frames_variant as Dictionary).get(str(int(_preview_frame.value)), false)) if frames_variant is Dictionary else false
 
 
@@ -1247,6 +1313,7 @@ func _update_grip_pose_controls() -> void:
 	var anchor = _get_current_pose_anchor()
 	_appearance_grip_x.value = float(anchor.x if anchor != null else 0)
 	_appearance_grip_y.value = float(anchor.y if anchor != null else 0)
+	_appearance_visible_in_pose.button_pressed = not _get_current_pose_hidden()
 	_appearance_flip_x.button_pressed = _get_current_pose_flip_x()
 	_appearance_updating = false
 
@@ -1633,10 +1700,12 @@ func _set_weapon_controls_enabled(enabled: bool) -> void:
 
 func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: bool, socket_binding: bool) -> void:
 	var catalog_available := _actor_rig_catalog_available()
+	var pose_visible := not _get_current_pose_hidden()
 	_appearance_enabled.disabled = not equipment_enabled
 	_appearance_rig.disabled = not authored_visual or not catalog_available
 	_appearance_binding.disabled = not authored_visual or not catalog_available
 	_appearance_render_layer.disabled = not authored_visual or not catalog_available
+	_appearance_socket.visible = socket_binding
 	_appearance_socket.disabled = not socket_binding or not catalog_available
 	_appearance_asset_key.editable = authored_visual and catalog_available
 	_appearance_nudge_x.editable = authored_visual and catalog_available
@@ -1646,12 +1715,13 @@ func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: 
 	_appearance_zoom_in.disabled = not equipment_enabled or not catalog_available or not _paper_doll_preview.can_zoom_in()
 	_appearance_fit.disabled = not equipment_enabled or not catalog_available
 	_appearance_zoom_label.modulate = Color(0.7, 0.73, 0.79, 1) if equipment_enabled and catalog_available else Color(0.45, 0.48, 0.54, 1)
-	_appearance_grip_x.editable = socket_binding and catalog_available
-	_appearance_grip_y.editable = socket_binding and catalog_available
-	_appearance_flip_x.disabled = not authored_visual or not catalog_available
-	_appearance_clear_pose.disabled = not socket_binding or not catalog_available
-	_appearance_copy_previous.disabled = not socket_binding or not catalog_available
-	_appearance_copy_next.disabled = not socket_binding or not catalog_available
+	_appearance_grip_x.editable = socket_binding and pose_visible and catalog_available
+	_appearance_grip_y.editable = socket_binding and pose_visible and catalog_available
+	_appearance_visible_in_pose.disabled = not authored_visual or not catalog_available
+	_appearance_flip_x.disabled = not authored_visual or not pose_visible or not catalog_available
+	_appearance_clear_pose.disabled = not socket_binding or not pose_visible or not catalog_available
+	_appearance_copy_previous.disabled = not socket_binding or not pose_visible or not catalog_available
+	_appearance_copy_next.disabled = not socket_binding or not pose_visible or not catalog_available
 	_refresh_preview_zoom_controls()
 
 
@@ -1982,9 +2052,9 @@ func _initialize_authored_appearance_defaults() -> void:
 	if not rig_id.is_empty():
 		_select_option(_appearance_rig, rig_id)
 	_rebuild_actor_rig_controls()
-	if slot_id == "right_hand":
+	if slot_id == "right_hand" or slot_id == "left_hand":
 		_select_option(_appearance_binding, "socket")
-		_select_option(_appearance_render_layer, "right_hand")
+		_select_option(_appearance_render_layer, slot_id)
 		_select_option(_appearance_socket, _default_socket_id_for_equipment_slot(slot_id))
 	else:
 		_select_option(_appearance_binding, "rig_layer")

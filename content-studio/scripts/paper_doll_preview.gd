@@ -354,6 +354,8 @@ func _resolve_loaded_layers(
 				selected_visual = false
 			elif not legacy_visual_key.is_empty() and slot_id == layer_id:
 				selected_visual = true
+		if selected_visual and _resolve_pose_hidden(equipped_visual, direction, frame):
+			continue
 		if asset_key.is_empty():
 			continue
 		var load_result := _load_texture(layer_id, asset_key, frame, direction)
@@ -440,6 +442,14 @@ func _resolve_pose_flip_x(equipped_visual: Dictionary, direction: String, frame:
 	if not (flip_x_by_pose is Dictionary):
 		return false
 	var direction_variant: Variant = (flip_x_by_pose as Dictionary).get(direction, null)
+	return bool((direction_variant as Dictionary).get(str(clampi(frame, 1, 4)), false)) if direction_variant is Dictionary else false
+
+
+func _resolve_pose_hidden(equipped_visual: Dictionary, direction: String, frame: int) -> bool:
+	var hidden_poses: Variant = equipped_visual.get("hidden_poses", null)
+	if not (hidden_poses is Dictionary):
+		return false
+	var direction_variant: Variant = (hidden_poses as Dictionary).get(direction, null)
 	return bool((direction_variant as Dictionary).get(str(clampi(frame, 1, 4)), false)) if direction_variant is Dictionary else false
 
 

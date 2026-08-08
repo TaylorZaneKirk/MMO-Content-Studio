@@ -54,6 +54,11 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                       "binding_type": "rig_layer",
                       "default_render_plane": "body",
                       "z_index_by_direction": { "N": 30, "E": 30, "S": 30, "W": 0 }
+                    },
+                    "left_hand": {
+                      "binding_type": "rig_layer",
+                      "default_render_plane": "body",
+                      "z_index_by_direction": { "N": 30, "E": 30, "S": 30, "W": 0 }
                     }
                   },
                   "sockets": {
@@ -75,6 +80,32 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                         "2": { "x": 82, "y": 86 },
                         "3": { "x": 82, "y": 86 },
                         "4": { "x": 82, "y": 86 }
+                      },
+                      "W": {
+                        "1": { "x": 76, "y": 78 },
+                        "2": { "x": 76, "y": 78 },
+                        "3": { "x": 76, "y": 78 },
+                        "4": { "x": 76, "y": 78 }
+                      }
+                    },
+                    "left_hand_primary": {
+                      "N": {
+                        "1": { "x": 52, "y": 84 },
+                        "2": { "x": 52, "y": 84 },
+                        "3": { "x": 52, "y": 84 },
+                        "4": { "x": 52, "y": 84 }
+                      },
+                      "E": {
+                        "1": { "x": 108, "y": 80 },
+                        "2": { "x": 108, "y": 80 },
+                        "3": { "x": 108, "y": 80 },
+                        "4": { "x": 108, "y": 80 }
+                      },
+                      "S": {
+                        "1": { "x": 120, "y": 84 },
+                        "2": { "x": 120, "y": 84 },
+                        "3": { "x": 120, "y": 84 },
+                        "4": { "x": 120, "y": 84 }
                       },
                       "W": {
                         "1": { "x": 76, "y": 78 },
@@ -546,6 +577,79 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             TestContext.Current.CancellationToken);
         Assert.False(publish.Succeeded);
         Assert.Contains(publish.Errors, error => error.Code == "missing_grip_anchor_direction");
+    }
+
+    [Fact]
+    public async Task PublishAllowsExplicitlyHiddenChampionShieldEastPosesButRejectsMissingVisibleNorthAnchor()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+        var gripAnchors = EquippedVisualDraft().GripAnchors!
+            .Where(pair => pair.Key != "E")
+            .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        var hiddenPoses = new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal)
+        {
+            ["E"] = new Dictionary<string, bool>(StringComparer.Ordinal)
+            {
+                ["1"] = true,
+                ["2"] = true,
+                ["3"] = true,
+                ["4"] = true
+            }
+        };
+        var request = UnifiedSaveRequest(null) with
+        {
+            Equipment = EquipmentDraft() with
+            {
+                EquipmentSlotId = "left_hand",
+                WeaponProfile = null,
+                EquippedVisual = EquippedVisualDraft() with
+                {
+                    AssetKey = "champions_shield",
+                    RenderLayerId = "left_hand",
+                    SocketId = "left_hand_primary",
+                    GripAnchors = gripAnchors,
+                    HiddenPoses = hiddenPoses
+                }
+            }
+        };
+
+        var save = await SaveDraftWithPreviewAsync(service, ItemId, request);
+        AssertSucceeded(save);
+        Assert.True(repository.Records[ItemId].EquippedVisual!.HiddenPoses!["E"]["4"]);
+        Assert.False(repository.Records[ItemId].EquippedVisual!.GripAnchors.ContainsKey("E"));
+
+        var publish = await service.PublishAsync(
+            ItemId,
+            new ItemPublicationRequest(repository.Records[ItemId].UpdatedAtUtc, null),
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(publish);
+
+        var missingVisibleNorthAnchor = request with
+        {
+            ExpectedUpdatedAtUtc = repository.Records[ItemId].UpdatedAtUtc,
+            Equipment = request.Equipment! with
+            {
+                EquippedVisual = request.Equipment.EquippedVisual! with
+                {
+                    GripAnchors = gripAnchors.ToDictionary(
+                        pair => pair.Key,
+                        pair => (IReadOnlyDictionary<string, SourcePixelPointDefinition>)pair.Value
+                            .Where(frame => frame.Key != "1" || pair.Key != "N")
+                            .ToDictionary(frame => frame.Key, frame => frame.Value, StringComparer.Ordinal),
+                        StringComparer.Ordinal)
+                }
+            }
+        };
+        var invalidSave = await SaveDraftWithPreviewAsync(service, ItemId, missingVisibleNorthAnchor);
+        AssertSucceeded(invalidSave);
+
+        var invalidPublish = await service.PublishAsync(
+            ItemId,
+            new ItemPublicationRequest(repository.Records[ItemId].UpdatedAtUtc, null),
+            TestContext.Current.CancellationToken);
+        Assert.False(invalidPublish.Succeeded);
+        Assert.Contains(invalidPublish.Errors, error => error.Code == "missing_grip_anchor_frame");
     }
 
     [Fact]
@@ -1022,7 +1126,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                             draft.Equipment.EquippedVisual.SecondarySocketId,
                             draft.Equipment.EquippedVisual.Nudge,
                             draft.Equipment.EquippedVisual.GripAnchors,
-                            draft.Equipment.EquippedVisual.FlipXByPose)),
+                            draft.Equipment.EquippedVisual.FlipXByPose,
+                            draft.Equipment.EquippedVisual.HiddenPoses)),
             draft.ToolCapabilities,
             expected,
             null);
@@ -1371,7 +1476,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                         equipment.EquippedVisual.SecondarySocketId,
                         equipment.EquippedVisual.Nudge,
                         equipment.EquippedVisual.GripAnchors,
-                        equipment.EquippedVisual.FlipXByPose),
+                        equipment.EquippedVisual.FlipXByPose,
+                        equipment.EquippedVisual.HiddenPoses),
                 draft.ToolCapabilities
                     .Select((value, index) => new ItemToolCapabilityDefinition(
                         value.CapabilityId,

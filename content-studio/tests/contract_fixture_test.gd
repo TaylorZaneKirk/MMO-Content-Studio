@@ -203,16 +203,14 @@ func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void
 	items._update_contextual_sections()
 	items._appearance_enabled.button_pressed = true
 	items._on_appearance_enabled_toggled(true)
-	if items._selected_metadata(items._appearance_binding) != "rig_layer":
-		_fail("New left-hand authored appearance should preserve the rig_layer default")
+	if items._selected_metadata(items._appearance_binding) != "socket":
+		_fail("New left-hand authored appearance should default to socket binding")
 		return
 	if items._selected_metadata(items._appearance_render_layer) != "left_hand":
 		_fail("New left-hand authored appearance should default render_layer_id to left_hand")
 		return
-	items._select_option(items._appearance_binding, "socket")
-	items._on_appearance_binding_changed()
 	if items._selected_metadata(items._appearance_socket) != "left_hand_primary":
-		_fail("Left-hand socket authoring should default to left_hand_primary when selected")
+		_fail("New left-hand authored appearance should default socket_id to left_hand_primary")
 		return
 
 	items._start_new()
@@ -421,6 +419,23 @@ func _verify_per_pose_flip_payload_and_preview_math(main_scene: PackedScene) -> 
 	var shield_flip_x := shield_payload.get("flip_x", {}) as Dictionary
 	if not bool((shield_flip_x.get("W", {}) as Dictionary).get("4", false)):
 		_fail("Rig-layer visuals must persist selected pose flip metadata without a socket anchor")
+		return
+	items._select_option(items._appearance_binding, "socket")
+	items._on_appearance_binding_changed()
+	items._appearance_visible_in_pose.button_pressed = false
+	items._on_appearance_visible_in_pose_toggled(false)
+	var hidden_payload: Dictionary = (items._equipped_visual_payload() as Dictionary)
+	var hidden_poses := hidden_payload.get("hidden_poses", {}) as Dictionary
+	if not bool((hidden_poses.get("W", {}) as Dictionary).get("4", false)):
+		_fail("Visible in this pose must persist only explicitly hidden poses")
+		return
+	if items._appearance_grip_x.editable or not items._appearance_flip_x.disabled:
+		_fail("Hidden poses must disable attachment and flip editing")
+		return
+	items._appearance_visible_in_pose.button_pressed = true
+	items._on_appearance_visible_in_pose_toggled(true)
+	if not items._appearance_grip_x.editable or items._appearance_flip_x.disabled:
+		_fail("Revealing a pose must restore normal pose editing")
 		return
 
 	scene.queue_free()

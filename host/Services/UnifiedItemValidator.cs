@@ -657,6 +657,7 @@ public sealed class UnifiedItemValidator
                     "equipment.equipped_visual.grip_anchors"));
             }
             ValidateFlipXByPose(equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
+            ValidateHiddenPoses(equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
             return;
         }
 
@@ -671,8 +672,13 @@ public sealed class UnifiedItemValidator
                 "equipment.equipped_visual.socket_id"));
         }
 
-        ValidateGripAnchors(equippedVisual.GripAnchors, forPublication, messages);
+        ValidateGripAnchors(
+            equippedVisual.GripAnchors,
+            equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal),
+            forPublication,
+            messages);
         ValidateFlipXByPose(equippedVisual.FlipXByPose ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
+        ValidateHiddenPoses(equippedVisual.HiddenPoses ?? new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal), messages);
     }
 
     private static void ValidateFlipXByPose(
@@ -710,6 +716,7 @@ public sealed class UnifiedItemValidator
 
     private static void ValidateGripAnchors(
         IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> gripAnchors,
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> hiddenPoses,
         bool forPublication,
         ICollection<ApiError> messages)
     {
@@ -748,18 +755,26 @@ public sealed class UnifiedItemValidator
 
         foreach (var direction in expectedDirections)
         {
-            if (!gripAnchors.TryGetValue(direction, out var frames))
-            {
-                messages.Add(new ApiError(
-                    "missing_grip_anchor_direction",
-                    $"Socket-bound equipped visuals must define all four directions; '{direction}' is missing.",
-                    ValidationSeverity.Error,
-                    $"equipment.equipped_visual.grip_anchors.{direction}"));
-                continue;
-            }
-
             foreach (var frame in expectedFrames)
             {
+                var hidden = hiddenPoses.TryGetValue(direction, out var hiddenFrames)
+                    && hiddenFrames.TryGetValue(frame, out var isHidden)
+                    && isHidden;
+                if (hidden)
+                {
+                    continue;
+                }
+
+                if (!gripAnchors.TryGetValue(direction, out var frames))
+                {
+                    messages.Add(new ApiError(
+                        "missing_grip_anchor_direction",
+                        $"Socket-bound equipped visuals must define all four directions; '{direction}' is missing.",
+                        ValidationSeverity.Error,
+                        $"equipment.equipped_visual.grip_anchors.{direction}"));
+                    break;
+                }
+
                 if (!frames.ContainsKey(frame))
                 {
                     messages.Add(new ApiError(
@@ -767,6 +782,39 @@ public sealed class UnifiedItemValidator
                         $"Socket-bound equipped visuals must define frame {frame} for direction {direction}.",
                         ValidationSeverity.Error,
                         $"equipment.equipped_visual.grip_anchors.{direction}.{frame}"));
+                }
+            }
+        }
+    }
+
+    private static void ValidateHiddenPoses(
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> hiddenPoses,
+        ICollection<ApiError> messages)
+    {
+        var expectedDirections = new HashSet<string>(["N", "E", "S", "W"], StringComparer.Ordinal);
+        var expectedFrames = new HashSet<string>(["1", "2", "3", "4"], StringComparer.Ordinal);
+
+        foreach (var direction in hiddenPoses.Keys)
+        {
+            if (!expectedDirections.Contains(direction))
+            {
+                messages.Add(new ApiError(
+                    "invalid_equipped_visual_hidden_pose_direction",
+                    $"Hidden pose direction '{direction}' is not supported.",
+                    ValidationSeverity.Error,
+                    $"equipment.equipped_visual.hidden_poses.{direction}"));
+                continue;
+            }
+
+            foreach (var frame in hiddenPoses[direction].Keys)
+            {
+                if (!expectedFrames.Contains(frame))
+                {
+                    messages.Add(new ApiError(
+                        "invalid_equipped_visual_hidden_pose_frame",
+                        $"Hidden pose frame '{frame}' is not supported.",
+                        ValidationSeverity.Error,
+                        $"equipment.equipped_visual.hidden_poses.{direction}.{frame}"));
                 }
             }
         }
