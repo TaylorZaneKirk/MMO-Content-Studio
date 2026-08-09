@@ -23,7 +23,8 @@ public sealed record ActorRigDefinition(
     [property: JsonPropertyName("schema_version")] int SchemaVersion,
     [property: JsonPropertyName("layers")] IReadOnlyList<ActorRigLayerDefinition> Layers,
     [property: JsonPropertyName("sockets")] IReadOnlyList<ActorRigSocketDefinition> Sockets,
-    [property: JsonPropertyName("foreground_overlays")] IReadOnlyList<ActorRigForegroundOverlayDefinition> ForegroundOverlays);
+    [property: JsonPropertyName("foreground_overlays")] IReadOnlyList<ActorRigForegroundOverlayDefinition> ForegroundOverlays,
+    [property: JsonPropertyName("solid_sprite_base_layer_id")] string? SolidSpriteBaseLayerId = null);
 
 public sealed record ActorRigLayerDefinition(
     [property: JsonPropertyName("layer_id")] string LayerId,
@@ -51,10 +52,50 @@ public sealed record ActorRiggedSpriteCatalogDefinition(
 
 public sealed record ActorRigCalibrationDefinition(
     string CalibrationId,
-    string RigId);
+    string RigId,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>>? SocketOverrides = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition>>>? ForegroundOverlayOverrides = null);
 
 public sealed record PublishedEquippedVisualDefinition(
     string ItemId,
     string RigId,
     string BindingType,
-    string RenderLayerId);
+    string RenderLayerId,
+    string? AssetKey = null,
+    string? SocketId = null,
+    SourcePixelPointDefinition? Nudge = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? GripAnchors = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipPoses = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? HiddenPoses = null,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? ItemOverGripPoses = null);
+
+public sealed record ActorAppearanceOptionsDefinition(
+    [property: JsonPropertyName("available")] bool Available,
+    [property: JsonPropertyName("message")] string? Message,
+    [property: JsonPropertyName("visual_modes")] IReadOnlyList<AuthoringOption> VisualModes,
+    [property: JsonPropertyName("rigs")] IReadOnlyList<ActorRigDefinition> Rigs,
+    [property: JsonPropertyName("calibrations")] IReadOnlyList<ActorRigCalibrationDefinition> Calibrations,
+    [property: JsonPropertyName("equipped_visuals")] IReadOnlyList<PublishedEquippedVisualDefinition> EquippedVisuals);
+
+public sealed record RiggedSpritePreviewDefinition(
+    [property: JsonPropertyName("base_file_path")] string BaseFilePath,
+    [property: JsonPropertyName("source_width")] int SourceWidth,
+    [property: JsonPropertyName("source_height")] int SourceHeight,
+    [property: JsonPropertyName("direction")] string Direction,
+    [property: JsonPropertyName("frame")] int Frame,
+    [property: JsonPropertyName("cosmetics")] IReadOnlyList<RiggedSpritePreviewCosmeticDefinition> Cosmetics,
+    [property: JsonPropertyName("foreground_overlays")] IReadOnlyList<RiggedSpritePreviewOverlayDefinition> ForegroundOverlays);
+
+public sealed record RiggedSpritePreviewCosmeticDefinition(
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("file_path")] string FilePath,
+    [property: JsonPropertyName("x")] int X,
+    [property: JsonPropertyName("y")] int Y,
+    [property: JsonPropertyName("z_index")] int ZIndex,
+    [property: JsonPropertyName("flip_x")] bool FlipX);
+
+public sealed record RiggedSpritePreviewOverlayDefinition(
+    [property: JsonPropertyName("source_rect")] SourcePixelRectangleDefinition SourceRect,
+    [property: JsonPropertyName("x")] int X,
+    [property: JsonPropertyName("y")] int Y,
+    [property: JsonPropertyName("z_index")] int ZIndex);

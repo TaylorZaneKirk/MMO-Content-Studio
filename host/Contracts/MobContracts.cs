@@ -138,7 +138,9 @@ public sealed record MobPreviewRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("target_operation")] string TargetOperation,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
+    [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null);
 
 public sealed record MobPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
@@ -151,7 +153,8 @@ public sealed record MobValidationResponse(
     [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages,
     [property: JsonPropertyName("changes")] IReadOnlyList<AuthoringChange> Changes,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
-    [property: JsonPropertyName("preview_signature")] string PreviewSignature);
+    [property: JsonPropertyName("preview_signature")] string PreviewSignature,
+    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null);
 
 public sealed record MobMutationResponse(
     [property: JsonPropertyName("operation")] string Operation,
@@ -172,7 +175,8 @@ public sealed record MobAuthoringOptionsResponse(
     [property: JsonPropertyName("factions")] IReadOnlyList<MobFactionOption> Factions,
     [property: JsonPropertyName("published_drop_items")] IReadOnlyList<MobDropItemOption> PublishedDropItems,
     [property: JsonPropertyName("visual_assets")] MobVisualAssetOptions VisualAssets,
-    [property: JsonPropertyName("defaults")] MobAuthoringDefaults Defaults);
+    [property: JsonPropertyName("defaults")] MobAuthoringDefaults Defaults,
+    [property: JsonPropertyName("actor_appearance")] ActorAppearanceOptionsDefinition? ActorAppearance = null);
 
 public sealed record MobFactionOption(
     [property: JsonPropertyName("faction_id")] string FactionId,

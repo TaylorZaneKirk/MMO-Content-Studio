@@ -15,6 +15,8 @@ public sealed class MobAuthoringService
     private readonly MobDefinitionValidator _validator;
     private readonly MobAuthoringRegistry _registry;
     private readonly ItemAssetService _assetService;
+    private readonly ActorAppearanceCatalogService _actorAppearanceCatalogService;
+    private readonly RiggedSpritePreviewResolver _riggedSpritePreviewResolver;
     private readonly IRuntimeCatalogPublisher? _runtimeCatalogPublisher;
     private readonly ILogger<MobAuthoringService> _logger;
 
@@ -23,6 +25,8 @@ public sealed class MobAuthoringService
         MobDefinitionValidator validator,
         MobAuthoringRegistry registry,
         ItemAssetService assetService,
+        ActorAppearanceCatalogService actorAppearanceCatalogService,
+        RiggedSpritePreviewResolver riggedSpritePreviewResolver,
         ILogger<MobAuthoringService> logger,
         IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
@@ -30,6 +34,8 @@ public sealed class MobAuthoringService
         _validator = validator;
         _registry = registry;
         _assetService = assetService;
+        _actorAppearanceCatalogService = actorAppearanceCatalogService;
+        _riggedSpritePreviewResolver = riggedSpritePreviewResolver;
         _runtimeCatalogPublisher = runtimeCatalogPublisher;
         _logger = logger;
     }
@@ -66,7 +72,8 @@ public sealed class MobAuthoringService
                         _assetService.GetGameAssetsRoot() is not null,
                         MobVisualResourcePrefix,
                         _assetService.GetGameAssetsRoot()),
-                    _registry.Defaults));
+                    _registry.Defaults,
+                    _actorAppearanceCatalogService.LoadOptions()));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -177,7 +184,14 @@ public sealed class MobAuthoringService
                         stableId,
                         operation,
                         effective,
-                        request.ExpectedUpdatedAtUtc)));
+                        request.ExpectedUpdatedAtUtc),
+                    _riggedSpritePreviewResolver.Resolve(
+                        validation.AssetPreviewFilePath ?? string.Empty,
+                        effective.SourceWidth,
+                        effective.SourceHeight,
+                        effective.CompositeVisual,
+                        request.PreviewDirection,
+                        request.PreviewFrame)));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {

@@ -92,7 +92,9 @@ public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("target_operation")] string TargetOperation,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
+    [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null);
 
 public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -134,7 +136,8 @@ public sealed record NpcPreviewResponse(
     [property: JsonPropertyName("changes")] IReadOnlyList<AuthoringChange> Changes,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("reference_summary")] NpcReferenceSummary ReferenceSummary,
-    [property: JsonPropertyName("preview_signature")] string PreviewSignature);
+    [property: JsonPropertyName("preview_signature")] string PreviewSignature,
+    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null);
 
 public sealed record NpcMutationResponse(
     [property: JsonPropertyName("operation")] string Operation,
@@ -155,7 +158,8 @@ public sealed record NpcOptionsResponse(
     [property: JsonPropertyName("supported_limits")] NpcSupportedLimits SupportedLimits,
     [property: JsonPropertyName("visual_assets")] NpcVisualAssetOptions VisualAssets,
     [property: JsonPropertyName("capabilities")] NpcOperationCapabilities Capabilities,
-    [property: JsonPropertyName("defaults")] NpcAuthoringDefaults Defaults);
+    [property: JsonPropertyName("defaults")] NpcAuthoringDefaults Defaults,
+    [property: JsonPropertyName("actor_appearance")] ActorAppearanceOptionsDefinition? ActorAppearance = null);
 
 public sealed record NpcOperationCapabilities(
     [property: JsonPropertyName("supports_runtime_npc_catalog")] bool SupportsRuntimeNpcCatalog,

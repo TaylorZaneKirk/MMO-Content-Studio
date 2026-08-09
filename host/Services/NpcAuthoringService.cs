@@ -17,6 +17,8 @@ public sealed class NpcAuthoringService
     private readonly NpcAuthoringRegistry _registry;
     private readonly NpcDialogueReferenceProvider _dialogueReferences;
     private readonly ItemAssetService _assetService;
+    private readonly ActorAppearanceCatalogService _actorAppearanceCatalogService;
+    private readonly RiggedSpritePreviewResolver _riggedSpritePreviewResolver;
     private readonly IRuntimeCatalogPublisher? _runtimeCatalogPublisher;
     private readonly ILogger<NpcAuthoringService> _logger;
 
@@ -26,6 +28,8 @@ public sealed class NpcAuthoringService
         NpcAuthoringRegistry registry,
         NpcDialogueReferenceProvider dialogueReferences,
         ItemAssetService assetService,
+        ActorAppearanceCatalogService actorAppearanceCatalogService,
+        RiggedSpritePreviewResolver riggedSpritePreviewResolver,
         ILogger<NpcAuthoringService> logger,
         IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
     {
@@ -34,6 +38,8 @@ public sealed class NpcAuthoringService
         _registry = registry;
         _dialogueReferences = dialogueReferences;
         _assetService = assetService;
+        _actorAppearanceCatalogService = actorAppearanceCatalogService;
+        _riggedSpritePreviewResolver = riggedSpritePreviewResolver;
         _runtimeCatalogPublisher = runtimeCatalogPublisher;
         _logger = logger;
     }
@@ -59,7 +65,8 @@ public sealed class NpcAuthoringService
                     dialogueReferences.Complete,
                     false,
                     false),
-                _registry.Defaults));
+                _registry.Defaults,
+                _actorAppearanceCatalogService.LoadOptions()));
     }
 
     public async Task<AuthoringOperationResult<NpcCatalogResponse>> ListAsync(
@@ -165,7 +172,14 @@ public sealed class NpcAuthoringService
                         stableId,
                         operation,
                         effective,
-                        request.ExpectedUpdatedAtUtc)));
+                        request.ExpectedUpdatedAtUtc),
+                    _riggedSpritePreviewResolver.Resolve(
+                        validation.AssetPreviewFilePath ?? string.Empty,
+                        effective.SourceWidth,
+                        effective.SourceHeight,
+                        effective.CompositeVisual,
+                        request.PreviewDirection,
+                        request.PreviewFrame)));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {

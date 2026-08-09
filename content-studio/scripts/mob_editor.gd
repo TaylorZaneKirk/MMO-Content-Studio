@@ -29,6 +29,8 @@ class MobVisualPreview:
 	var render_scale := 1.0
 	var footprint_tiles := Vector2i.ONE
 	var status_text := "No mob visual selected."
+	var rigged_sprite_preview: Dictionary = {}
+	var rigged_cosmetics: Array = []
 
 	func _ready() -> void:
 		custom_minimum_size = Vector2(240, 220)
@@ -53,6 +55,18 @@ class MobVisualPreview:
 		status_text = next_status
 		queue_redraw()
 
+	func set_rigged_sprite_preview(next_preview: Dictionary) -> void:
+		rigged_sprite_preview = next_preview
+		rigged_cosmetics.clear()
+		for cosmetic_variant in next_preview.get("cosmetics", []) as Array:
+			var cosmetic := cosmetic_variant as Dictionary
+			var image := Image.load_from_file(str(cosmetic.get("file_path", "")))
+			if image != null and not image.is_empty():
+				var resolved := cosmetic.duplicate()
+				resolved["texture"] = ImageTexture.create_from_image(image)
+				rigged_cosmetics.append(resolved)
+		queue_redraw()
+
 	func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.045, 0.052, 0.065), true)
 		draw_rect(Rect2(Vector2.ZERO, size), Color(0.19, 0.22, 0.28), false, 1.0)
@@ -72,7 +86,20 @@ class MobVisualPreview:
 		draw_line(origin + Vector2(0, -7), origin + Vector2(0, 7), Color(0.95, 0.82, 0.36), 2.0)
 		var anchor := origin + anchor_offset
 		draw_circle(anchor, 4.0, Color(0.96, 0.45, 0.43))
-		if texture != null:
+		if not rigged_sprite_preview.is_empty() and texture != null:
+			var scaled_size := texture.get_size() * render_scale
+			var base_destination := Rect2(anchor - (scaled_size * 0.5), scaled_size)
+			draw_texture_rect(texture, base_destination, false)
+			for cosmetic_variant in rigged_cosmetics:
+				var cosmetic := cosmetic_variant as Dictionary
+				var cosmetic_texture := cosmetic.get("texture") as Texture2D
+				if cosmetic_texture == null:
+					continue
+				var destination := Rect2(base_destination.position + Vector2(float(cosmetic.get("x", 0)), float(cosmetic.get("y", 0))) * render_scale, cosmetic_texture.get_size() * render_scale)
+				draw_set_transform(destination.position + destination.size * 0.5, 0.0, Vector2(-1, 1) if bool(cosmetic.get("flip_x", false)) else Vector2.ONE)
+				draw_texture_rect(cosmetic_texture, Rect2(-destination.size * 0.5, destination.size), false)
+				draw_set_transform(Vector2.ZERO)
+		elif texture != null:
 			var scaled_size := texture.get_size() * render_scale
 			var destination := Rect2(anchor - (scaled_size * 0.5), scaled_size)
 			draw_texture_rect(texture, destination, false)
@@ -146,6 +173,15 @@ var _changes: VBoxContainer
 var _validation: VBoxContainer
 var _visual_preview: MobVisualPreview
 var _visual_status: Label
+var _visual_mode: OptionButton
+var _rig_id: OptionButton
+var _calibration_id: OptionButton
+var _pose_policy: OptionButton
+var _fixed_direction: OptionButton
+var _fixed_frame: OptionButton
+var _rigged_controls: VBoxContainer
+var _composite_visual: Dictionary = {}
+var _cosmetic_selectors: Dictionary = {}
 
 
 func _ready() -> void:
@@ -276,6 +312,8 @@ func _add_identity_section(parent: VBoxContainer) -> void:
 func _add_visual_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "Visuals and Footprint", 18)
 	var grid := _grid(parent)
+	_visual_mode = _option_field(grid, "Visual type")
+	_visual_mode.item_selected.connect(_on_visual_mode_changed.unbind(1))
 	_visual_path = _line_field(grid, "Texture path", "res://assets/maps/objects/mobs/slime.png")
 	_visual_path.text_changed.connect(_on_visual_path_changed)
 	_source_width = _spin_field(grid, "Source width", 1, 2048, 32, 1)
@@ -285,6 +323,19 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_render_scale = _spin_field(grid, "Render scale", 0.01, 8, 0.25, 0.01)
 	_footprint_width = _spin_field(grid, "Footprint width tiles", 1, 16, 1, 1)
 	_footprint_height = _spin_field(grid, "Footprint height tiles", 1, 16, 1, 1)
+	_rigged_controls = VBoxContainer.new()
+	parent.add_child(_rigged_controls)
+	var rig_grid := _grid(_rigged_controls)
+	_rig_id = _option_field(rig_grid, "Rig")
+	_rig_id.item_selected.connect(_on_rig_changed.unbind(1))
+	_calibration_id = _option_field(rig_grid, "Calibration")
+	_pose_policy = _option_field(rig_grid, "Pose policy")
+	_fixed_direction = _option_field(rig_grid, "Fixed direction")
+	_fixed_frame = _option_field(rig_grid, "Fixed frame")
+	_calibration_id.item_selected.connect(_on_rigged_changed.unbind(1))
+	_pose_policy.item_selected.connect(_on_rigged_changed.unbind(1))
+	_fixed_direction.item_selected.connect(_on_rigged_changed.unbind(1))
+	_fixed_frame.item_selected.connect(_on_rigged_changed.unbind(1))
 
 
 func _add_stats_section(parent: VBoxContainer) -> void:
@@ -367,6 +418,8 @@ func _add_drops_section(parent: VBoxContainer) -> void:
 func _on_mob_options_received(payload: Dictionary) -> void:
 	_schema_available = true
 	_options = payload
+	var visual_assets := _options.get("visual_assets", {}) as Dictionary
+	_game_client_assets_root = str(visual_assets.get("game_assets_root", _game_client_assets_root))
 	_apply_options()
 	_set_form_enabled(not _current_mob.is_empty() or _is_new)
 	if _current_mob.is_empty() and not _is_new:
@@ -411,6 +464,8 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
 	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
 	_asset_preview_file_path = str(payload.get("asset_preview_file_path", ""))
+	_visual_preview.set_rigged_sprite_preview(payload.get("rigged_sprite_preview", {}) as Dictionary)
+	_load_composite_visual(payload)
 	_update_visual_preview()
 	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
 
@@ -449,6 +504,7 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 
 
 func _apply_options() -> void:
+	_apply_actor_appearance_options()
 	var defaults := _options.get("defaults", {}) as Dictionary
 	var limits := _options.get("supported_limits", {}) as Dictionary
 	_attack_speed_unit_milliseconds = int(defaults.get("attack_speed_unit_milliseconds", _options.get("attack_speed_unit_milliseconds", _attack_speed_unit_milliseconds)))
@@ -589,6 +645,8 @@ func _start_new_mob() -> void:
 	_zero_bonuses()
 	_load_drops([])
 	_asset_preview_file_path = ""
+	_composite_visual = {}
+	_select_option(_visual_mode, "flat_sprite")
 	_operation.select(0)
 	_set_form_enabled(_schema_available)
 	_update_behavior_controls()
@@ -715,6 +773,8 @@ func _payload() -> Dictionary:
 		"combat_bonuses": _bonus_payload(),
 		"guaranteed_drops": _drop_payload(),
 		"expected_updated_at_utc": _current_mob.get("updated_at_utc", null),
+		"visual_mode": _selected_metadata(_visual_mode),
+		"composite_visual": _build_composite_visual(),
 	}
 
 
@@ -856,6 +916,154 @@ func _drop_items_have_duplicates() -> int:
 
 func _on_search_changed(value: String) -> void:
 	_client.load_mobs(value)
+
+
+func _apply_actor_appearance_options() -> void:
+	var appearance := _options.get("actor_appearance", {}) as Dictionary
+	_fill_authoring_options(_visual_mode, appearance.get("visual_modes", []) as Array)
+	if _visual_mode.item_count == 0:
+		_visual_mode.add_item("Flat Sprite")
+		_visual_mode.set_item_metadata(0, "flat_sprite")
+	_select_option(_visual_mode, "flat_sprite")
+	_rebuild_rigged_controls()
+
+
+func _first_rig_id() -> String:
+	var rigs := ((_options.get("actor_appearance", {}) as Dictionary).get("rigs", []) as Array)
+	return str((rigs[0] as Dictionary).get("rig_id", "")) if not rigs.is_empty() else ""
+
+
+func _load_composite_visual(payload: Dictionary) -> void:
+	var descriptor := payload.get("composite_visual", {}) as Dictionary
+	_composite_visual = descriptor.duplicate(true) if str(payload.get("visual_mode", "flat_sprite")) == "composite_rig" else {}
+	_select_option(_visual_mode, "composite_rig" if not _composite_visual.is_empty() else "flat_sprite")
+	_rebuild_rigged_controls()
+
+
+func _on_visual_mode_changed() -> void:
+	if _selected_metadata(_visual_mode) == "composite_rig" and _composite_visual.is_empty():
+		_composite_visual = {"schema_version": 1, "rig_id": _first_rig_id(), "calibration_id": null, "pose_policy": "actor_pose", "fixed_direction": null, "fixed_frame": null, "cosmetic_item_ids": {}}
+	_rebuild_rigged_controls()
+	_on_form_changed()
+
+
+func _on_rig_changed() -> void:
+	if _composite_visual.is_empty():
+		return
+	_composite_visual["rig_id"] = _selected_metadata(_rig_id)
+	_composite_visual["calibration_id"] = null
+	_composite_visual["cosmetic_item_ids"] = {}
+	_rebuild_rigged_controls()
+	_status.text = "Rig changed. Incompatible calibration and cosmetic selections were cleared."
+	_on_form_changed()
+
+
+func _on_rigged_changed() -> void:
+	if _composite_visual.is_empty():
+		return
+	var calibration_id := _selected_metadata(_calibration_id)
+	_composite_visual["calibration_id"] = calibration_id if not calibration_id.is_empty() else null
+	_composite_visual["pose_policy"] = _selected_metadata(_pose_policy)
+	if _composite_visual["pose_policy"] == "fixed":
+		_composite_visual["fixed_direction"] = _selected_metadata(_fixed_direction)
+		_composite_visual["fixed_frame"] = int(_selected_metadata(_fixed_frame))
+	else:
+		_composite_visual["fixed_direction"] = null
+		_composite_visual["fixed_frame"] = null
+	_rebuild_rigged_controls()
+	_on_form_changed()
+
+
+func _rebuild_rigged_controls() -> void:
+	if _rigged_controls == null:
+		return
+	var enabled := _selected_metadata(_visual_mode) == "composite_rig"
+	_rigged_controls.visible = enabled
+	if not enabled:
+		return
+	var appearance := _options.get("actor_appearance", {}) as Dictionary
+	_rig_id.clear()
+	for rig_variant in appearance.get("rigs", []) as Array:
+		var rig := rig_variant as Dictionary
+		var rig_id := str(rig.get("rig_id", ""))
+		_rig_id.add_item(rig_id)
+		_rig_id.set_item_metadata(_rig_id.item_count - 1, rig_id)
+	_select_option(_rig_id, str(_composite_visual.get("rig_id", _first_rig_id())))
+	_fill_authoring_options(_calibration_id, [{"id":"", "display_name":"Default"}])
+	for calibration_variant in appearance.get("calibrations", []) as Array:
+		var calibration := calibration_variant as Dictionary
+		if str(calibration.get("rig_id", "")) == _selected_metadata(_rig_id):
+			var id := str(calibration.get("calibration_id", ""))
+			_calibration_id.add_item(id)
+			_calibration_id.set_item_metadata(_calibration_id.item_count - 1, id)
+	_select_option(_calibration_id, str(_composite_visual.get("calibration_id", "")))
+	_fill_authoring_options(_pose_policy, [{"id":"actor_pose", "display_name":"Actor Pose"}, {"id":"fixed", "display_name":"Fixed Pose"}])
+	_fill_authoring_options(_fixed_direction, [{"id":"N", "display_name":"N"}, {"id":"E", "display_name":"E"}, {"id":"S", "display_name":"S"}, {"id":"W", "display_name":"W"}])
+	_fill_authoring_options(_fixed_frame, [{"id":"1", "display_name":"F1"}, {"id":"2", "display_name":"F2"}, {"id":"3", "display_name":"F3"}, {"id":"4", "display_name":"F4"}])
+	_select_option(_pose_policy, str(_composite_visual.get("pose_policy", "actor_pose")))
+	_select_option(_fixed_direction, str(_composite_visual.get("fixed_direction", "S")))
+	_select_option(_fixed_frame, str(_composite_visual.get("fixed_frame", 1)))
+	var fixed := _selected_metadata(_pose_policy) == "fixed"
+	_fixed_direction.visible = fixed
+	_fixed_frame.visible = fixed
+	_rebuild_cosmetic_selectors()
+
+
+func _rebuild_cosmetic_selectors() -> void:
+	for selector_variant in _cosmetic_selectors.values():
+		(selector_variant as OptionButton).get_parent().queue_free()
+	_cosmetic_selectors.clear()
+	var rig_id := _selected_metadata(_rig_id)
+	var cosmetics := _composite_visual.get("cosmetic_item_ids", {}) as Dictionary
+	var rig_layers: Array = []
+	for rig_variant in ((_options.get("actor_appearance", {}) as Dictionary).get("rigs", []) as Array):
+		var rig := rig_variant as Dictionary
+		if str(rig.get("rig_id", "")) == rig_id:
+			rig_layers = rig.get("layers", []) as Array
+	for layer_variant in rig_layers:
+		var layer := layer_variant as Dictionary
+		var layer_id := str(layer.get("layer_id", ""))
+		var choices: Array = []
+		for visual_variant in ((_options.get("actor_appearance", {}) as Dictionary).get("equipped_visuals", []) as Array):
+			var visual := visual_variant as Dictionary
+			if str(visual.get("rig_id", "")) == rig_id and str(visual.get("render_layer_id", "")) == layer_id and str(visual.get("binding_type", "")) == "socket":
+				choices.append(visual)
+		if choices.is_empty():
+			continue
+		var row := HBoxContainer.new()
+		row.add_child(_label(layer_id.replace("_", " ").capitalize()))
+		var selector := OptionButton.new()
+		selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		selector.add_item("None")
+		selector.set_item_metadata(0, "")
+		for choice_variant in choices:
+			var choice := choice_variant as Dictionary
+			var item_id := str(choice.get("item_id", ""))
+			selector.add_item(item_id)
+			selector.set_item_metadata(selector.item_count - 1, item_id)
+		_select_option(selector, str(cosmetics.get(layer_id, "")))
+		selector.item_selected.connect(_on_cosmetic_changed.bind(layer_id, selector).unbind(1))
+		row.add_child(selector)
+		_rigged_controls.add_child(row)
+		_cosmetic_selectors[layer_id] = selector
+
+
+func _on_cosmetic_changed(layer_id: String, selector: OptionButton) -> void:
+	var cosmetics := _composite_visual.get("cosmetic_item_ids", {}) as Dictionary
+	var item_id := _selected_metadata(selector)
+	if item_id.is_empty():
+		cosmetics.erase(layer_id)
+	else:
+		cosmetics[layer_id] = item_id
+	_composite_visual["cosmetic_item_ids"] = cosmetics
+	_on_form_changed()
+
+
+func _build_composite_visual() -> Variant:
+	if _selected_metadata(_visual_mode) != "composite_rig":
+		return null
+	_on_rigged_changed()
+	return _composite_visual
 
 
 func _on_form_changed(_value: Variant = null) -> void:

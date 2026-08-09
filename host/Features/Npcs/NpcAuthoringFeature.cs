@@ -12,6 +12,7 @@ public static class NpcAuthoringFeature
     public static IServiceCollection AddNpcAuthoring(this IServiceCollection services)
     {
         services.AddSingleton<ActorAppearanceCatalogService>();
+        services.AddSingleton<RiggedSpritePreviewResolver>();
         services.AddSingleton<INpcRepository, NpcRepository>();
         services.AddSingleton<NpcAuthoringRegistry>();
         services.AddSingleton<NpcDialogueReferenceProvider>();

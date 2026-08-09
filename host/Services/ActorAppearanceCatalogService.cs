@@ -183,6 +183,21 @@ public sealed class ActorAppearanceCatalogService
         }
     }
 
+    public ActorAppearanceOptionsDefinition LoadOptions()
+    {
+        var catalog = LoadRiggedSpriteCatalog();
+        return new ActorAppearanceOptionsDefinition(
+            catalog.Available,
+            catalog.Message,
+            [
+                new AuthoringOption(ActorVisualModes.FlatSprite, "Flat Sprite"),
+                new AuthoringOption(ActorVisualModes.CompositeRig, "Rigged Sprite")
+            ],
+            catalog.Rigs,
+            catalog.Calibrations,
+            catalog.EquippedVisuals.Where(visual => visual.BindingType == "socket").ToArray());
+    }
+
     private string? ResolveCatalogPath(string relativePath)
     {
         if (!_options.Roots.TryGetValue("game_client_assets", out var configured)
@@ -249,7 +264,13 @@ public sealed class ActorAppearanceCatalogService
                 return false;
             }
 
-            parsed.Add(new ActorRigCalibrationDefinition(calibrationId, rigId));
+            if (!TryReadSparseSocketOverrides(entry, out var socketOverrides) ||
+                !TryReadSparseDirectionalRectangles(entry, "foreground_overlays", out var overlayOverrides))
+            {
+                return false;
+            }
+
+            parsed.Add(new ActorRigCalibrationDefinition(calibrationId, rigId, socketOverrides, overlayOverrides));
         }
 
         calibrations = parsed;
@@ -270,12 +291,21 @@ public sealed class ActorAppearanceCatalogService
             if (!TryReadRequiredString(entry, "item_id", out var itemId) ||
                 !TryReadRequiredString(entry, "rig_id", out var rigId) ||
                 !TryReadRequiredString(entry, "binding_type", out var bindingType) ||
-                !TryReadRequiredString(entry, "render_layer_id", out var renderLayerId))
+                !TryReadRequiredString(entry, "render_layer_id", out var renderLayerId) ||
+                !TryReadOptionalString(entry, "asset_key", out var assetKey) ||
+                !TryReadOptionalString(entry, "socket_id", out var socketId) ||
+                !TryReadOptionalPoint(entry, "nudge", out var nudge) ||
+                !TryReadSparseDirectionalPoints(entry, "grip_anchors", out var gripAnchors) ||
+                !TryReadSparseDirectionalBooleans(entry, "flip_poses", out var flipPoses) ||
+                !TryReadSparseDirectionalBooleans(entry, "hidden_poses", out var hiddenPoses) ||
+                !TryReadSparseDirectionalBooleans(entry, "item_over_grip_poses", out var itemOverGripPoses))
             {
                 return false;
             }
 
-            parsed.Add(new PublishedEquippedVisualDefinition(itemId, rigId, bindingType, renderLayerId));
+            parsed.Add(new PublishedEquippedVisualDefinition(
+                itemId, rigId, bindingType, renderLayerId, assetKey, socketId, nudge,
+                gripAnchors, flipPoses, hiddenPoses, itemOverGripPoses));
         }
 
         equippedVisuals = parsed;
@@ -343,7 +373,8 @@ public sealed class ActorAppearanceCatalogService
             return null;
         }
 
-        return new ActorRigDefinition(rigId, schemaVersion, layers, sockets, foregroundOverlays);
+        TryReadOptionalString(rigElement, "solid_sprite_base_layer_id", out var solidSpriteBaseLayerId);
+        return new ActorRigDefinition(rigId, schemaVersion, layers, sockets, foregroundOverlays, solidSpriteBaseLayerId);
     }
 
     private static bool TryReadForegroundOverlays(
@@ -527,6 +558,191 @@ public sealed class ActorAppearanceCatalogService
         return TryReadRequiredInt(element, "x", out var x)
             && TryReadRequiredInt(element, "y", out var y)
             && (point = new SourcePixelPointDefinition(x, y)) is not null;
+    }
+
+    private static bool TryReadOptionalPoint(JsonElement element, string propertyName, out SourcePixelPointDefinition? point)
+    {
+        point = null;
+        if (!element.TryGetProperty(propertyName, out var value) || value.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (!TryReadPoint(value, out var parsed))
+        {
+            return false;
+        }
+
+        point = parsed;
+        return true;
+    }
+
+    private static bool TryReadOptionalString(JsonElement element, string propertyName, out string? value)
+    {
+        value = null;
+        if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (property.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        value = property.GetString()?.Trim();
+        return !string.IsNullOrWhiteSpace(value);
+    }
+
+    private static bool TryReadSparseDirectionalPoints(
+        JsonElement element,
+        string propertyName,
+        out IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>> values)
+    {
+        var parsed = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>(StringComparer.Ordinal);
+		values = parsed;
+        var root = element;
+        if (!string.IsNullOrEmpty(propertyName) && !element.TryGetProperty(propertyName, out root))
+        {
+            return true;
+        }
+        if (root.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        foreach (var direction in root.EnumerateObject())
+        {
+            if (direction.Value.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+
+            var frames = new Dictionary<string, SourcePixelPointDefinition>(StringComparer.Ordinal);
+            foreach (var frame in direction.Value.EnumerateObject())
+            {
+                if (!TryReadPoint(frame.Value, out var point))
+                {
+                    return false;
+                }
+                frames[frame.Name] = point;
+            }
+            parsed[direction.Name] = frames;
+        }
+        values = parsed;
+        return true;
+    }
+
+    private static bool TryReadSparseSocketOverrides(
+        JsonElement element,
+        out IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>> values)
+    {
+        var parsed = new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>>(StringComparer.Ordinal);
+		values = parsed;
+        if (!element.TryGetProperty("sockets", out var root) || root.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+        foreach (var socket in root.EnumerateObject())
+        {
+            if (!TryReadSparseDirectionalPoints(socket.Value, string.Empty, out var directions))
+            {
+                return false;
+            }
+            parsed[socket.Name] = directions;
+        }
+        values = parsed;
+        return true;
+    }
+
+    private static bool TryReadSparseDirectionalRectangles(
+        JsonElement element,
+        string propertyName,
+        out IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition>>> values)
+    {
+        var parsed = new Dictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition>>>(StringComparer.Ordinal);
+		values = parsed;
+        if (!element.TryGetProperty(propertyName, out var root) || root.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+        foreach (var overlay in root.EnumerateObject())
+        {
+            if (!overlay.Value.TryGetProperty("source_rect_by_direction", out var directions) || directions.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+            var parsedDirections = new Dictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition>>(StringComparer.Ordinal);
+            foreach (var direction in directions.EnumerateObject())
+            {
+                if (direction.Value.ValueKind != JsonValueKind.Object)
+                {
+                    return false;
+                }
+                var frames = new Dictionary<string, SourcePixelRectangleDefinition>(StringComparer.Ordinal);
+                foreach (var frame in direction.Value.EnumerateObject())
+                {
+                    if (!TryReadRectangle(frame.Value, out var rect))
+                    {
+                        return false;
+                    }
+                    frames[frame.Name] = rect;
+                }
+                parsedDirections[direction.Name] = frames;
+            }
+            parsed[overlay.Name] = parsedDirections;
+        }
+        values = parsed;
+        return true;
+    }
+
+    private static bool TryReadSparseDirectionalBooleans(
+        JsonElement element,
+        string propertyName,
+        out IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>> values)
+    {
+        var parsed = new Dictionary<string, IReadOnlyDictionary<string, bool>>(StringComparer.Ordinal);
+		values = parsed;
+        if (!element.TryGetProperty(propertyName, out var root) || root.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+        foreach (var direction in root.EnumerateObject())
+        {
+            if (direction.Value.ValueKind != JsonValueKind.Object)
+            {
+                return false;
+            }
+            var frames = new Dictionary<string, bool>(StringComparer.Ordinal);
+            foreach (var frame in direction.Value.EnumerateObject())
+            {
+                if (frame.Value.ValueKind is not JsonValueKind.True and not JsonValueKind.False)
+                {
+                    return false;
+                }
+                frames[frame.Name] = frame.Value.GetBoolean();
+            }
+            parsed[direction.Name] = frames;
+        }
+        values = parsed;
+        return true;
     }
 
     private static bool TryReadRectangle(JsonElement element, out SourcePixelRectangleDefinition rectangle)

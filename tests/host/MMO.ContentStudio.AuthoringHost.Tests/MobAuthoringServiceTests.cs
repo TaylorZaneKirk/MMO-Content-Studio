@@ -635,12 +635,21 @@ public sealed class MobAuthoringServiceTests
                 ["game_client_assets"] = assetsRoot
             }
         }));
-        var validator = new MobDefinitionValidator(repository, assetService);
+        var catalogService = new ActorAppearanceCatalogService(Options.Create(new AssetRootsOptions
+        {
+            Roots = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["game_client_assets"] = assetsRoot
+            }
+        }));
+        var validator = new MobDefinitionValidator(repository, assetService, catalogService);
         return new MobAuthoringService(
             repository,
             validator,
             new MobAuthoringRegistry(),
             assetService,
+            catalogService,
+            new RiggedSpritePreviewResolver(catalogService, assetService),
             NullLogger<MobAuthoringService>.Instance,
             runtimeCatalogPublisher);
     }

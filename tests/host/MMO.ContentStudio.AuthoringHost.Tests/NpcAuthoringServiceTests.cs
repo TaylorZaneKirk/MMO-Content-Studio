@@ -461,15 +461,18 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         });
         var assetService = new ItemAssetService(options);
         var dialogueProvider = new NpcDialogueReferenceProvider(options);
+        var actorAppearanceCatalogService = new ActorAppearanceCatalogService(options);
         return new NpcAuthoringService(
             repository,
             new NpcDefinitionValidator(
                 assetService,
                 dialogueProvider,
-                new ActorAppearanceCatalogService(options)),
+                actorAppearanceCatalogService),
             new NpcAuthoringRegistry(),
             dialogueProvider,
             assetService,
+            actorAppearanceCatalogService,
+            new RiggedSpritePreviewResolver(actorAppearanceCatalogService, assetService),
             NullLogger<NpcAuthoringService>.Instance,
             runtimeCatalogPublisher);
     }
