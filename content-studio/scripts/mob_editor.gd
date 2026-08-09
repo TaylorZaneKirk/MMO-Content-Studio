@@ -934,8 +934,8 @@ func _first_rig_id() -> String:
 
 
 func _load_composite_visual(payload: Dictionary) -> void:
-	var descriptor := payload.get("composite_visual", {}) as Dictionary
-	_composite_visual = descriptor.duplicate(true) if str(payload.get("visual_mode", "flat_sprite")) == "composite_rig" else {}
+	var descriptor_variant: Variant = payload.get("composite_visual", {})
+	_composite_visual = (descriptor_variant as Dictionary).duplicate(true) if str(payload.get("visual_mode", "flat_sprite")) == "composite_rig" and descriptor_variant is Dictionary else {}
 	_select_option(_visual_mode, "composite_rig" if not _composite_visual.is_empty() else "flat_sprite")
 	_rebuild_rigged_controls()
 
