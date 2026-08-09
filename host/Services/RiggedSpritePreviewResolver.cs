@@ -142,8 +142,35 @@ public sealed class RiggedSpritePreviewResolver
         return null;
     }
 
-    private static string ResolveBaseFrame(string baseAssetFilePath, string direction, int frame)
+    public static string ResolveBaseFrame(string baseAssetFilePath, string direction, int frame)
     {
+        var fileName = Path.GetFileName(baseAssetFilePath);
+        var charsMatch = Regex.Match(
+            fileName,
+            "^Chars_\\d+_([^-]+)-F[1-4]-[NESW]\\.png$",
+            RegexOptions.CultureInvariant);
+        if (charsMatch.Success)
+        {
+            var spriteGroup = charsMatch.Groups[1].Value;
+            var charsCandidate = Path.Combine(
+                Path.GetDirectoryName(baseAssetFilePath) ?? string.Empty,
+                $"Chars_{CharsFramePrefix(direction, frame)}_{spriteGroup}-F{frame}-{direction}.png");
+            if (File.Exists(charsCandidate))
+            {
+                return charsCandidate;
+            }
+
+            var fallbackCandidate = Path.Combine(
+                Path.GetDirectoryName(baseAssetFilePath) ?? string.Empty,
+                $"Chars_{CharsFramePrefix(direction, 1)}_{spriteGroup}-F1-{direction}.png");
+            if (File.Exists(fallbackCandidate))
+            {
+                return fallbackCandidate;
+            }
+
+            return baseAssetFilePath;
+        }
+
         var match = Regex.Match(baseAssetFilePath, "-F[1-4]-[NESW]\\.png$", RegexOptions.CultureInvariant);
         if (!match.Success)
         {
@@ -151,8 +178,22 @@ public sealed class RiggedSpritePreviewResolver
         }
 
         var candidate = baseAssetFilePath[..match.Index] + $"-F{frame}-{direction}.png";
-        return File.Exists(candidate) ? candidate : baseAssetFilePath;
+        if (File.Exists(candidate))
+        {
+            return candidate;
+        }
+
+        var genericFallbackCandidate = baseAssetFilePath[..match.Index] + $"-F1-{direction}.png";
+        return File.Exists(genericFallbackCandidate) ? genericFallbackCandidate : baseAssetFilePath;
     }
+
+    private static int CharsFramePrefix(string direction, int frame) => direction switch
+    {
+        "E" => 128 + frame,
+        "W" => 131 + frame,
+        "N" => 134 + frame,
+        _ => 137 + frame
+    };
 
     private static IEnumerable<int> FrameCandidates(string direction, int frame)
     {

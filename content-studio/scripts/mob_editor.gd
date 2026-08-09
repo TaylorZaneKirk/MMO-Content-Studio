@@ -511,7 +511,6 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 	if not rigged_preview.is_empty():
 		_asset_preview_file_path = str(rigged_preview.get("base_file_path", _asset_preview_file_path))
 	_visual_preview.set_rigged_sprite_preview(rigged_preview)
-	_load_composite_visual(payload)
 	_update_visual_preview()
 	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
 

@@ -87,6 +87,7 @@ func _run_fixture() -> void:
 	await _verify_grip_anchor_payload_normalization(main_scene)
 	await _verify_per_pose_flip_payload_and_preview_math(main_scene)
 	await _verify_post_save_reload_uses_fresh_item_version(main_scene)
+	await _verify_mob_preview_preserves_unsaved_rigged_state(main_scene)
 	_verify_non_json_transport_failure()
 	_verify_mutation_transport_timeout_policy()
 	await _verify_paper_doll_preview_layers()
@@ -119,6 +120,50 @@ func _verify_rigged_sprite_preview_layout() -> void:
 	var scale := RiggedSpritePreviewLayout.fit_scale(Vector2(128, 160), Vector2(280, 220))
 	if not is_equal_approx(scale, min(248.0 / 128.0, 188.0 / 160.0)):
 		_fail("Rigged preview fit must use one uniform source-art scale")
+
+
+func _verify_mob_preview_preserves_unsaved_rigged_state(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var mobs = scene.get_node("Margin/Root/Tabs/Mobs")
+	if mobs == null:
+		_fail("Rigged mob fixture could not locate the Mob workspace")
+		return
+	mobs._on_mob_options_received(_mob_rigged_options())
+	mobs._start_new_mob()
+	mobs._load_composite_visual({
+		"visual_mode": "composite_rig",
+		"composite_visual": {
+			"schema_version": 1,
+			"rig_id": "humanoid_v1",
+			"calibration_id": "orc_v1",
+			"pose_policy": "fixed",
+			"fixed_direction": "S",
+			"fixed_frame": 1,
+			"cosmetic_item_ids": {"right_hand": "inventory_154_axe"},
+		},
+	})
+	mobs._on_mob_preview_received({
+		"target_operation": "save_draft",
+		"valid_for_draft": true,
+		"valid_for_publication": true,
+		"messages": [],
+		"changes": [],
+		"asset_preview_file_path": "",
+		"preview_signature": "fixture",
+		"rigged_sprite_preview": {"base_file_path": "", "source_width": 32, "source_height": 32, "direction": "S", "frame": 1, "cosmetics": [], "foreground_overlays": []},
+	})
+	var descriptor := mobs._composite_visual as Dictionary
+	if mobs._selected_metadata(mobs._visual_mode) != "composite_rig" or str(descriptor.get("rig_id", "")) != "humanoid_v1" or str(descriptor.get("calibration_id", "")) != "orc_v1" or str((descriptor.get("cosmetic_item_ids", {}) as Dictionary).get("right_hand", "")) != "inventory_154_axe":
+		_fail("Mob preview response must not replace unsaved rigged authoring state")
+		return
+	var payload: Dictionary = mobs._payload()
+	var serialized: Dictionary = payload.get("composite_visual", {}) as Dictionary
+	if str(serialized.get("rig_id", "")) != "humanoid_v1" or str(serialized.get("calibration_id", "")) != "orc_v1" or str((serialized.get("cosmetic_item_ids", {}) as Dictionary).get("right_hand", "")) != "inventory_154_axe":
+		_fail("Mob payload must preserve the rigged descriptor after preview")
+	scene.queue_free()
+	await process_frame
 
 
 func _verify_item_editor_rig_catalog_behavior(main_scene: PackedScene) -> void:
@@ -1286,6 +1331,30 @@ func _available_rig_catalog() -> Dictionary:
 					],
 				},
 			],
+		},
+	}
+
+
+func _mob_rigged_options() -> Dictionary:
+	return {
+		"defaults": {},
+		"supported_limits": {},
+		"publication_states": [],
+		"attack_types": [],
+		"accuracy_styles": [],
+		"movement_behaviors": [],
+		"aggression_modes": [],
+		"return_home_behaviors": [],
+		"faction_dispositions": [],
+		"combat_bonus_fields": [],
+		"factions": [],
+		"published_drop_items": [],
+		"visual_assets": {},
+		"actor_appearance": {
+			"visual_modes": [{"id": "flat_sprite", "display_name": "Flat Sprite"}, {"id": "composite_rig", "display_name": "Rigged Sprite"}],
+			"rigs": [{"rig_id": "humanoid_v1", "layers": [{"layer_id": "right_hand"}]}],
+			"calibrations": [{"calibration_id": "orc_v1", "rig_id": "humanoid_v1"}],
+			"equipped_visuals": [{"item_id": "inventory_154_axe", "rig_id": "humanoid_v1", "binding_type": "socket", "render_layer_id": "right_hand"}],
 		},
 	}
 
