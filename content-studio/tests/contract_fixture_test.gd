@@ -4,6 +4,7 @@ const EXPECTED_API_VERSION := "1"
 const AuthoringWorkspaceSupport = preload("res://scripts/authoring_workspace_support.gd")
 const AuthoringHttpTransport = preload("res://scripts/http_json_client.gd")
 const PaperDollPreview = preload("res://scripts/paper_doll_preview.gd")
+const RiggedSpritePreviewLayout = preload("res://scripts/rigged_sprite_preview_layout.gd")
 
 
 class FixtureAuthoringHostClient extends AuthoringHostClient:
@@ -92,10 +93,32 @@ func _run_fixture() -> void:
 	await _verify_paper_doll_preview_interactions()
 	await _verify_paper_doll_preview_camera_and_zoom()
 	await _verify_paper_doll_foreground_overlays()
+	_verify_rigged_sprite_preview_layout()
 	await _verify_live_runtime_catalog_if_configured()
 
 	print("[content-studio-contract-fixture] passed")
 	quit(0)
+
+
+func _verify_rigged_sprite_preview_layout() -> void:
+	var manifest := {
+		"source_width": 128,
+		"source_height": 160,
+		"cosmetics": [
+			{"item_id": "behind", "z_index": -1},
+			{"item_id": "over_grip", "z_index": 11},
+		],
+		"foreground_overlays": [
+			{"overlay_id": "right_hand_primary_grip", "z_index": 10, "source_rect": {"x": 24, "y": 104, "width": 24, "height": 20}},
+		],
+	}
+	var draw_list := RiggedSpritePreviewLayout.build_draw_list(manifest)
+	if draw_list.size() != 4 or str((draw_list[0] as Dictionary).get("id", "")) != "behind" or str((draw_list[1] as Dictionary).get("kind", "")) != "base" or str((draw_list[2] as Dictionary).get("kind", "")) != "overlay" or str((draw_list[3] as Dictionary).get("id", "")) != "over_grip":
+		_fail("Rigged preview draw order must support behind-base, grip, and item-over-grip depth")
+		return
+	var scale := RiggedSpritePreviewLayout.fit_scale(Vector2(128, 160), Vector2(280, 220))
+	if not is_equal_approx(scale, min(248.0 / 128.0, 188.0 / 160.0)):
+		_fail("Rigged preview fit must use one uniform source-art scale")
 
 
 func _verify_item_editor_rig_catalog_behavior(main_scene: PackedScene) -> void:

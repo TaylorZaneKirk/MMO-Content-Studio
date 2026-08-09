@@ -4,6 +4,7 @@ class_name NpcEditor
 signal workspace_open_requested(workspace_id: String, resource_id: String)
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
+const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
 const GAME_ASSET_PREFIX := "res://assets/"
 
 class NpcVisualPreview:
@@ -19,6 +20,7 @@ class NpcVisualPreview:
 	var status_text := "No NPC visual selected."
 	var rigged_sprite_preview: Dictionary = {}
 	var rigged_cosmetics: Array = []
+	var rigged_draw_list: Array = []
 
 	func _ready() -> void:
 		custom_minimum_size = Vector2(280, 220)
@@ -48,6 +50,7 @@ class NpcVisualPreview:
 	func set_rigged_sprite_preview(next_preview: Dictionary) -> void:
 		rigged_sprite_preview = next_preview
 		rigged_cosmetics.clear()
+		rigged_draw_list.clear()
 		for cosmetic_variant in next_preview.get("cosmetics", []) as Array:
 			var cosmetic := cosmetic_variant as Dictionary
 			var image := Image.load_from_file(str(cosmetic.get("file_path", "")))
@@ -55,6 +58,7 @@ class NpcVisualPreview:
 				var resolved := cosmetic.duplicate()
 				resolved["texture"] = ImageTexture.create_from_image(image)
 				rigged_cosmetics.append(resolved)
+		rigged_draw_list = RIGGED_PREVIEW_LAYOUT.build_draw_list(rigged_sprite_preview)
 		queue_redraw()
 
 	func _draw() -> void:
@@ -71,22 +75,43 @@ class NpcVisualPreview:
 		var anchor := origin + anchor_offset
 		draw_circle(anchor, 4.0, Color(0.96, 0.45, 0.43))
 		if not rigged_sprite_preview.is_empty() and texture != null:
-			var scaled_size := texture.get_size() * render_scale
-			var base_destination := Rect2(anchor - (scaled_size * 0.5), scaled_size)
-			draw_texture_rect(texture, base_destination, false)
-			for cosmetic_variant in rigged_cosmetics:
-				var cosmetic := cosmetic_variant as Dictionary
-				var cosmetic_texture := cosmetic.get("texture") as Texture2D
-				if cosmetic_texture == null:
-					continue
-				var destination := Rect2(base_destination.position + Vector2(float(cosmetic.get("x", 0)), float(cosmetic.get("y", 0))) * render_scale, cosmetic_texture.get_size() * render_scale)
-				draw_set_transform(destination.position + destination.size * 0.5, 0.0, Vector2(-1, 1) if bool(cosmetic.get("flip_x", false)) else Vector2.ONE)
-				draw_texture_rect(cosmetic_texture, Rect2(-destination.size * 0.5, destination.size), false)
-				draw_set_transform(Vector2.ZERO)
+			_draw_rigged_preview(texture)
 		elif texture != null:
 			var scaled_size := texture.get_size() * render_scale
 			var destination := Rect2(anchor - (scaled_size * 0.5), scaled_size)
 			draw_texture_rect(texture, destination, false)
+
+	func _draw_rigged_preview(base_texture: Texture2D) -> void:
+		var canvas_size := Vector2(float(rigged_sprite_preview.get("source_width", base_texture.get_width())), float(rigged_sprite_preview.get("source_height", base_texture.get_height())))
+		var scale := RIGGED_PREVIEW_LAYOUT.fit_scale(canvas_size, size)
+		var origin := (size - canvas_size * scale) * 0.5
+		for entry_variant in rigged_draw_list:
+			var entry := entry_variant as Dictionary
+			match str(entry.get("kind", "")):
+				"base":
+					draw_texture_rect(base_texture, Rect2(origin, canvas_size * scale), false)
+				"cosmetic":
+					var payload := entry.get("payload", {}) as Dictionary
+					var cosmetic := _loaded_cosmetic(str(payload.get("item_id", "")))
+					var cosmetic_texture := cosmetic.get("texture") as Texture2D
+					if cosmetic_texture == null:
+						continue
+					var destination := Rect2(origin + Vector2(float(payload.get("x", 0)), float(payload.get("y", 0))) * scale, cosmetic_texture.get_size() * scale)
+					draw_set_transform(destination.get_center(), 0.0, Vector2(-1, 1) if bool(payload.get("flip_x", false)) else Vector2.ONE)
+					draw_texture_rect(cosmetic_texture, Rect2(-destination.size * 0.5, destination.size), false)
+					draw_set_transform(Vector2.ZERO)
+				"overlay":
+					var payload := entry.get("payload", {}) as Dictionary
+					var source_rect := payload.get("source_rect", {}) as Dictionary
+					var source := Rect2(float(source_rect.get("x", 0)), float(source_rect.get("y", 0)), float(source_rect.get("width", 0)), float(source_rect.get("height", 0)))
+					draw_texture_rect_region(base_texture, Rect2(origin + Vector2(float(payload.get("x", 0)), float(payload.get("y", 0))) * scale, source.size * scale), source)
+
+	func _loaded_cosmetic(item_id: String) -> Dictionary:
+		for cosmetic_variant in rigged_cosmetics:
+			var cosmetic := cosmetic_variant as Dictionary
+			if str(cosmetic.get("item_id", "")) == item_id:
+				return cosmetic
+		return {}
 
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
 
@@ -462,7 +487,10 @@ func _on_npc_preview_received(payload: Dictionary) -> void:
 	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
 	_render_reference_summary(payload.get("reference_summary", {}) as Dictionary)
 	_asset_preview_file_path = str(payload.get("asset_preview_file_path", ""))
-	_visual_preview.set_rigged_sprite_preview(payload.get("rigged_sprite_preview", {}) as Dictionary)
+	var rigged_preview: Dictionary = payload.get("rigged_sprite_preview", {}) as Dictionary
+	if not rigged_preview.is_empty():
+		_asset_preview_file_path = str(rigged_preview.get("base_file_path", _asset_preview_file_path))
+	_visual_preview.set_rigged_sprite_preview(rigged_preview)
 	_update_visual_preview()
 	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
 
@@ -740,6 +768,7 @@ func _refresh_catalog() -> void:
 func _on_form_changed(_value: Variant = null) -> void:
 	if _is_loading:
 		return
+	_visual_preview.set_rigged_sprite_preview({})
 	_clear_preview()
 	_update_visual_preview()
 	_update_dialogue_workspace_button()
@@ -749,6 +778,7 @@ func _on_visual_path_changed(_value: String) -> void:
 	if _is_loading:
 		return
 	_asset_preview_file_path = ""
+	_visual_preview.set_rigged_sprite_preview({})
 	_clear_preview()
 	_update_visual_preview()
 
@@ -758,7 +788,11 @@ func _on_operation_changed() -> void:
 
 
 func _on_preview_facing_changed() -> void:
-	_update_visual_preview()
+	if _selected_metadata(_visual_mode) == "composite_rig" and not _npc_id.text.strip_edges().is_empty():
+		_visual_preview.set_rigged_sprite_preview({})
+		_preview()
+	else:
+		_update_visual_preview()
 
 
 func _on_visual_mode_changed() -> void:
@@ -1117,6 +1151,7 @@ func _set_form_enabled(enabled: bool) -> void:
 
 
 func _clear_preview() -> void:
+	_visual_preview.set_rigged_sprite_preview({})
 	_workspace_support.clear_preview(_apply_button, _changes, _validation)
 	_render_reference_summary({})
 

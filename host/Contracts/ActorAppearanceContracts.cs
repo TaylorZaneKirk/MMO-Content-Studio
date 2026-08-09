@@ -95,6 +95,7 @@ public sealed record RiggedSpritePreviewCosmeticDefinition(
     [property: JsonPropertyName("flip_x")] bool FlipX);
 
 public sealed record RiggedSpritePreviewOverlayDefinition(
+    [property: JsonPropertyName("overlay_id")] string OverlayId,
     [property: JsonPropertyName("source_rect")] SourcePixelRectangleDefinition SourceRect,
     [property: JsonPropertyName("x")] int X,
     [property: JsonPropertyName("y")] int Y,

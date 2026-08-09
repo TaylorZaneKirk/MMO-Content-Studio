@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
@@ -108,6 +109,7 @@ public sealed class RiggedSpritePreviewResolver
             if (overlayRect is not null && activeOverlay is not null)
             {
                 overlays.Add(new RiggedSpritePreviewOverlayDefinition(
+                    activeOverlay.OverlayId,
                     overlayRect,
                     overlayRect.X,
                     overlayRect.Y,
@@ -116,7 +118,7 @@ public sealed class RiggedSpritePreviewResolver
         }
 
         return new RiggedSpritePreviewDefinition(
-            baseAssetFilePath,
+            ResolveBaseFrame(baseAssetFilePath, direction, frame.Value),
             sourceWidth,
             sourceHeight,
             direction,
@@ -138,6 +140,18 @@ public sealed class RiggedSpritePreviewResolver
             }
         }
         return null;
+    }
+
+    private static string ResolveBaseFrame(string baseAssetFilePath, string direction, int frame)
+    {
+        var match = Regex.Match(baseAssetFilePath, "-F[1-4]-[NESW]\\.png$", RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            return baseAssetFilePath;
+        }
+
+        var candidate = baseAssetFilePath[..match.Index] + $"-F{frame}-{direction}.png";
+        return File.Exists(candidate) ? candidate : baseAssetFilePath;
     }
 
     private static IEnumerable<int> FrameCandidates(string direction, int frame)
