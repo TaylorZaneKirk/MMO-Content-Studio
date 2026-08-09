@@ -2,6 +2,7 @@ using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
 using NpgsqlTypes;
+using System.Text.Json;
 
 namespace MMO.ContentStudio.AuthoringHost.Persistence;
 
@@ -58,6 +59,8 @@ public sealed class MobRepository : IMobRepository
                 m.display_name,
                 m.publication_state,
                 m.visual_texture_path,
+                m.visual_mode,
+                m.composite_visual,
                 m.source_width,
                 m.source_height,
                 m.visual_anchor_offset_x,
@@ -287,6 +290,8 @@ public sealed class MobRepository : IMobRepository
                 m.display_name,
                 m.publication_state,
                 m.visual_texture_path,
+                m.visual_mode,
+                m.composite_visual,
                 m.source_width,
                 m.source_height,
                 m.visual_anchor_offset_x,
@@ -440,6 +445,8 @@ public sealed class MobRepository : IMobRepository
                 display_name,
                 publication_state,
                 visual_texture_path,
+                visual_mode,
+                composite_visual,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -467,6 +474,8 @@ public sealed class MobRepository : IMobRepository
                 @display_name,
                 @publication_state,
                 @visual_texture_path,
+                @visual_mode,
+                @composite_visual,
                 @source_width,
                 @source_height,
                 @visual_anchor_offset_x,
@@ -509,6 +518,8 @@ public sealed class MobRepository : IMobRepository
             set display_name = @display_name,
                 publication_state = @publication_state,
                 visual_texture_path = @visual_texture_path,
+                visual_mode = @visual_mode,
+                composite_visual = @composite_visual,
                 source_width = @source_width,
                 source_height = @source_height,
                 visual_anchor_offset_x = @visual_anchor_offset_x,
@@ -709,6 +720,10 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("display_name", draft.DisplayName);
         command.Parameters.AddWithValue("publication_state", publicationState);
         command.Parameters.AddWithValue("visual_texture_path", draft.VisualTexturePath);
+        command.Parameters.AddWithValue("visual_mode", draft.VisualMode);
+        command.Parameters.Add("composite_visual", NpgsqlDbType.Jsonb).Value = draft.CompositeVisual is null
+            ? DBNull.Value
+            : JsonSerializer.Serialize(draft.CompositeVisual);
         command.Parameters.AddWithValue("source_width", draft.SourceWidth);
         command.Parameters.AddWithValue("source_height", draft.SourceHeight);
         command.Parameters.AddWithValue("visual_anchor_offset_x", draft.VisualAnchorOffsetX);
@@ -760,6 +775,7 @@ public sealed class MobRepository : IMobRepository
     {
         var factionOrdinal = reader.GetOrdinal("combat_faction_id");
         var factionDisplayOrdinal = reader.GetOrdinal("combat_faction_display_name");
+        var compositeVisualOrdinal = reader.GetOrdinal("composite_visual");
         return new MobDefinitionRecord(
             reader.GetString(reader.GetOrdinal("mob_definition_id")),
             reader.GetString(reader.GetOrdinal("display_name")),
@@ -791,7 +807,11 @@ public sealed class MobRepository : IMobRepository
             drops,
             hasCombatProfile,
             reader.GetInt32(reader.GetOrdinal("guaranteed_drop_count")),
-            ReadUtc(reader, "updated_at"));
+            ReadUtc(reader, "updated_at"),
+            reader.GetString(reader.GetOrdinal("visual_mode")),
+            reader.IsDBNull(compositeVisualOrdinal)
+                ? null
+                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -851,7 +871,9 @@ public sealed record MobDefinitionRecord(
     IReadOnlyList<MobDropDefinition> GuaranteedDrops,
     bool HasCombatProfile,
     int GuaranteedDropCount,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string VisualMode = ActorVisualModes.FlatSprite,
+    RiggedSpriteVisualDescriptor? CompositeVisual = null);
 
 public sealed record MobFactionRecord(string FactionId, string DisplayName);
 

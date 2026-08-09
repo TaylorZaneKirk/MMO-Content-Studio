@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
@@ -19,12 +20,30 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         _root = Path.Combine(Path.GetTempPath(), $"npc-service-{Guid.NewGuid():N}");
         _assetRoot = Path.Combine(_root, "prototype", "client", "assets");
         Directory.CreateDirectory(Path.Combine(_assetRoot, "actors", "npcs"));
+        Directory.CreateDirectory(Path.Combine(_assetRoot, "actors", "appearance", "data", "rigs"));
+        Directory.CreateDirectory(Path.Combine(_assetRoot, "actors", "appearance", "data", "rig_calibrations"));
+        Directory.CreateDirectory(Path.Combine(_assetRoot, "actors", "appearance", "data", "equipped_visuals"));
         Directory.CreateDirectory(Path.Combine(_root, "prototype", "shared", "dialogues"));
         WritePng(Path.Combine(_assetRoot, "actors", "npcs", "test_npc.png"), 32, 32);
         File.WriteAllText(
             Path.Combine(_root, "prototype", "shared", "dialogues", "catalog.json"),
             """
             { "schema_version": 1, "dialogues": [ { "dialogue_id": "test_npc_greeting" } ] }
+            """);
+        File.WriteAllText(
+            Path.Combine(_assetRoot, "actors", "appearance", "data", "rigs", "catalog_v1.json"),
+            """
+            { "schema_version": 1, "rigs": [ { "schema_version": 1, "rig_id": "humanoid_v1", "layers": { "right_hand": { "binding_type": "socket", "default_render_plane": "front", "z_index_by_direction": { "N": 1, "E": 1, "S": 1, "W": 1 } } }, "sockets": {} } ] }
+            """);
+        File.WriteAllText(
+            Path.Combine(_assetRoot, "actors", "appearance", "data", "rig_calibrations", "catalog_v1.json"),
+            """
+            { "schema_version": 1, "calibrations": [] }
+            """);
+        File.WriteAllText(
+            Path.Combine(_assetRoot, "actors", "appearance", "data", "equipped_visuals", "published_catalog_v1.json"),
+            """
+            { "schema_version": 1, "equipped_visuals": [ { "item_id": "inventory_154_axe", "rig_id": "humanoid_v1", "binding_type": "socket", "render_layer_id": "right_hand" } ] }
             """);
     }
 
@@ -95,6 +114,51 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         AssertSucceeded(updated);
         Assert.Equal("Renamed NPC", updated.Value!.Npc.DisplayName);
         Assert.True(updated.Value.Npc.UpdatedAtUtc > createdAt);
+        Assert.Equal(ActorVisualModes.FlatSprite, updated.Value.Npc.VisualMode);
+        Assert.Null(updated.Value.Npc.CompositeVisual);
+    }
+
+    [Fact]
+    public async Task CompositeRigSavePreviewAndReloadRoundTripUsesCanonicalDescriptor()
+    {
+        var repository = new InMemoryNpcRepository();
+        var service = CreateService(repository);
+        var descriptor = new RiggedSpriteVisualDescriptor(
+            9,
+            " humanoid_v1 ",
+            null,
+            " ACTOR_POSE ",
+            "S",
+            4,
+            new Dictionary<string, string> { ["right_hand"] = " inventory_154_axe " });
+        var request = ValidSaveRequest(null) with
+        {
+            VisualMode = " COMPOSITE_RIG ",
+            CompositeVisual = descriptor
+        };
+
+        var preview = await service.PreviewAsync(
+            NpcId,
+            ToPreviewRequest(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+        AssertSucceeded(preview);
+
+        var saved = await service.SaveDraftAsync(
+            NpcId,
+            request with { PreviewSignature = preview.Value!.PreviewSignature },
+            TestContext.Current.CancellationToken);
+        var reloaded = await service.LoadAsync(NpcId, TestContext.Current.CancellationToken);
+
+        AssertSucceeded(saved);
+        AssertSucceeded(reloaded);
+        Assert.Equal(ActorVisualModes.CompositeRig, reloaded.Value!.VisualMode);
+        Assert.True(RiggedSpriteVisualDescriptorNormalizer.Equivalent(
+            saved.Value!.Npc.CompositeVisual,
+            reloaded.Value.CompositeVisual));
+        Assert.Equal("actor_pose", reloaded.Value.CompositeVisual!.PosePolicy);
+        Assert.Null(reloaded.Value.CompositeVisual.FixedDirection);
+        Assert.Null(reloaded.Value.CompositeVisual.FixedFrame);
+        Assert.Equal("inventory_154_axe", reloaded.Value.CompositeVisual.CosmeticItemIds["right_hand"]);
     }
 
     [Fact]
@@ -399,7 +463,10 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         var dialogueProvider = new NpcDialogueReferenceProvider(options);
         return new NpcAuthoringService(
             repository,
-            new NpcDefinitionValidator(assetService, dialogueProvider),
+            new NpcDefinitionValidator(
+                assetService,
+                dialogueProvider,
+                new ActorAppearanceCatalogService(options)),
             new NpcAuthoringRegistry(),
             dialogueProvider,
             assetService,
@@ -460,9 +527,11 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         request.InteractionRangeTiles,
         request.DefaultInteraction,
         request.DefaultDialogueId,
-        request.Notes,
-        request.ExpectedUpdatedAtUtc,
-        operation);
+            request.Notes,
+            request.ExpectedUpdatedAtUtc,
+            operation,
+            request.VisualMode,
+            request.CompositeVisual);
 
     private static NpcDefinitionRecord Record(
         string npcDefinitionId,
@@ -654,7 +723,9 @@ public sealed class NpcAuthoringServiceTests : IDisposable
                 draft.DefaultDialogueId,
                 draft.Notes,
                 existing?.CreatedAtUtc ?? timestamp,
-                timestamp);
+                timestamp,
+                draft.VisualMode,
+                CloneCompositeVisual(draft.CompositeVisual));
             Records[npcDefinitionId] = saved;
             _corruptNextLoad = CorruptNextReloadAfterSave;
             return Task.FromResult(saved);
@@ -731,5 +802,11 @@ public sealed class NpcAuthoringServiceTests : IDisposable
                 throw new NpcDefinitionConcurrencyException(npcDefinitionId, existing.UpdatedAtUtc);
             }
         }
+
+        private static RiggedSpriteVisualDescriptor? CloneCompositeVisual(
+            RiggedSpriteVisualDescriptor? compositeVisual) =>
+            compositeVisual is null
+                ? null
+                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(JsonSerializer.Serialize(compositeVisual));
     }
 }

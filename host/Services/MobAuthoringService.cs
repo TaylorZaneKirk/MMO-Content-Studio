@@ -340,7 +340,9 @@ public sealed class MobAuthoringService
             request.MobTargetScanCandidateLimit,
             request.PrimaryCombatProfile,
             request.CombatBonuses,
-            request.GuaranteedDrops);
+            request.GuaranteedDrops,
+            request.VisualMode,
+            request.CompositeVisual);
 
     public static NormalizedMobDraft Normalize(MobPreviewRequest request) =>
         Normalize(
@@ -368,7 +370,9 @@ public sealed class MobAuthoringService
             request.MobTargetScanCandidateLimit,
             request.PrimaryCombatProfile,
             request.CombatBonuses,
-            request.GuaranteedDrops);
+            request.GuaranteedDrops,
+            request.VisualMode,
+            request.CompositeVisual);
 
     public static NormalizedMobDraft Normalize(
         string displayName,
@@ -395,9 +399,12 @@ public sealed class MobAuthoringService
         int mobTargetScanCandidateLimit,
         MobCombatProfileDefinition? primaryCombatProfile,
         EquipmentCombatBonusDefinition? combatBonuses,
-        IReadOnlyList<MobDropDraft>? guaranteedDrops)
+        IReadOnlyList<MobDropDraft>? guaranteedDrops,
+        string? visualMode = ActorVisualModes.FlatSprite,
+        RiggedSpriteVisualDescriptor? compositeVisual = null)
     {
         var proactive = canProactivelyTargetHostileMobs;
+        var presentation = RiggedSpriteVisualDescriptorNormalizer.Normalize(visualMode, compositeVisual);
         return new NormalizedMobDraft(
             MobDomainRules.NormalizeRequired(displayName),
             MobDomainRules.NormalizeRequired(visualTexturePath),
@@ -433,7 +440,9 @@ public sealed class MobAuthoringService
                     primaryCombatProfile.StrengthLevel,
                     primaryCombatProfile.DefenceLevel),
             combatBonuses ?? EquipmentCombatBonusDefinition.Zero,
-            MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops));
+            MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
+            presentation.VisualMode,
+            presentation.CompositeVisual);
     }
 
     public static NormalizedMobDraft FromRecord(MobDefinitionRecord record) =>
@@ -467,7 +476,9 @@ public sealed class MobAuthoringService
                     drop.DropOrder,
                     drop.ItemId,
                     drop.StackCount))
-                .ToArray());
+                .ToArray(),
+            record.VisualMode,
+            record.CompositeVisual);
 
     public static string ComputePreviewSignature(
         string mobDefinitionId,
@@ -522,7 +533,9 @@ public sealed class MobAuthoringService
         && record.MobTargetScanCandidateLimit == draft.MobTargetScanCandidateLimit
         && record.PrimaryCombatProfile == draft.PrimaryCombatProfile
         && (record.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == draft.CombatBonuses
-        && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops);
+        && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops)
+        && record.VisualMode == draft.VisualMode
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual);
 
     public static bool Equivalent(MobDefinitionRecord left, MobDefinitionRecord right) =>
         left.MobDefinitionId == right.MobDefinitionId
@@ -551,7 +564,9 @@ public sealed class MobAuthoringService
         && left.MobTargetScanCandidateLimit == right.MobTargetScanCandidateLimit
         && left.PrimaryCombatProfile == right.PrimaryCombatProfile
         && (left.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == (right.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero)
-        && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops);
+        && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops)
+        && left.VisualMode == right.VisualMode
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual);
 
     private async Task<AuthoringOperationResult<MobMutationResponse>> SetPublicationAsync(
         string mobDefinitionId,
@@ -675,7 +690,9 @@ public sealed class MobAuthoringService
             record.CombatBonuses,
             record.GuaranteedDrops,
             record.UpdatedAtUtc,
-            asset.FilePath);
+            asset.FilePath,
+            record.VisualMode,
+            record.CompositeVisual);
     }
 
     private static MobDefinitionSummary ToSummary(MobDefinitionRecord record) =>
@@ -692,7 +709,9 @@ public sealed class MobAuthoringService
             record.PrimaryCombatProfile is not null || record.HasCombatProfile,
             record.GuaranteedDropCount,
             true,
-            record.UpdatedAtUtc);
+            record.UpdatedAtUtc,
+            record.VisualMode,
+            record.CompositeVisual);
 
     private static IReadOnlyList<AuthoringChange> CalculateChanges(
         string mobDefinitionId,
@@ -704,6 +723,8 @@ public sealed class MobAuthoringService
         AddChange(changes, "mob_definition_id", existing?.MobDefinitionId, mobDefinitionId);
         AddChange(changes, "display_name", existing?.DisplayName, requested.DisplayName);
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
+        AddChange(changes, "visual_mode", existing?.VisualMode, requested.VisualMode);
+        AddChange(changes, "composite_visual", SerializeCompositeVisual(existing?.CompositeVisual), SerializeCompositeVisual(requested.CompositeVisual));
         AddChange(changes, "source_width", existing?.SourceWidth.ToString(), requested.SourceWidth.ToString());
         AddChange(changes, "source_height", existing?.SourceHeight.ToString(), requested.SourceHeight.ToString());
         AddChange(changes, "visual_anchor_offset_x", existing?.VisualAnchorOffsetX.ToString("R"), requested.VisualAnchorOffsetX.ToString("R"));
@@ -743,6 +764,9 @@ public sealed class MobAuthoringService
             drop.DropOrder,
             drop.ItemId,
             drop.StackCount)));
+
+    private static string? SerializeCompositeVisual(RiggedSpriteVisualDescriptor? descriptor) =>
+        descriptor is null ? null : JsonSerializer.Serialize(descriptor);
 
     private static void AddChange(
         ICollection<AuthoringChange> changes,

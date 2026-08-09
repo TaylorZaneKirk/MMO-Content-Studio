@@ -13,6 +13,7 @@ public sealed partial class NpcDefinitionValidator
         "npc_invalid_visual_dimensions",
         "npc_invalid_visual_anchor",
         "npc_invalid_visual_render_scale",
+        "npc_invalid_composite_visual",
         "npc_unsupported_footprint",
         "npc_unsupported_movement_behavior",
         "npc_invalid_wander_radius",
@@ -26,13 +27,19 @@ public sealed partial class NpcDefinitionValidator
 
     private readonly ItemAssetService _assetService;
     private readonly NpcDialogueReferenceProvider _dialogueReferences;
+    private readonly ActorAppearanceCatalogService? _actorAppearanceCatalogService;
+    private readonly IUnifiedItemRepository? _itemRepository;
 
     public NpcDefinitionValidator(
         ItemAssetService assetService,
-        NpcDialogueReferenceProvider dialogueReferences)
+        NpcDialogueReferenceProvider dialogueReferences,
+        ActorAppearanceCatalogService? actorAppearanceCatalogService = null,
+        IUnifiedItemRepository? itemRepository = null)
     {
         _assetService = assetService;
         _dialogueReferences = dialogueReferences;
+        _actorAppearanceCatalogService = actorAppearanceCatalogService;
+        _itemRepository = itemRepository;
     }
 
     public async Task<NpcValidationOutcome> ValidateAsync(
@@ -48,6 +55,7 @@ public sealed partial class NpcDefinitionValidator
         ValidateMovement(draft, messages);
         await ValidateInteractionAsync(draft, messages, forPublication, cancellationToken);
         ValidateNotes(draft, messages);
+        await ValidateRiggedSpriteVisualAsync(draft, messages, cancellationToken);
 
         if (existing is not null && existing.PublicationState == "Published" && !forPublication)
         {
@@ -71,6 +79,27 @@ public sealed partial class NpcDefinitionValidator
     public static bool IsDraftBlocking(ApiError message) =>
         message.Severity == ValidationSeverity.Error
         && DraftBlockingValidationCodes.Contains(message.Code);
+
+    private async Task ValidateRiggedSpriteVisualAsync(
+        NpcDraft draft,
+        ICollection<ApiError> messages,
+        CancellationToken cancellationToken)
+    {
+        var catalog = _actorAppearanceCatalogService?.LoadRiggedSpriteCatalog()
+            ?? new ActorRiggedSpriteCatalogDefinition(false, "Canonical rigged-sprite catalogs are unavailable.", [], [], []);
+        var itemIds = _itemRepository is null
+            ? catalog.EquippedVisuals.Select(visual => visual.ItemId).ToHashSet(StringComparer.Ordinal)
+            : (await _itemRepository.LoadPublishedItemOptionsAsync(cancellationToken))
+                .Select(option => option.Id)
+                .ToHashSet(StringComparer.Ordinal);
+        RiggedSpriteVisualDescriptorValidator.Validate(
+            draft.VisualMode,
+            draft.CompositeVisual,
+            catalog,
+            itemIds,
+            "npc",
+            messages);
+    }
 
     public static void ValidateIdentity(
         string npcDefinitionId,

@@ -19,7 +19,9 @@ public sealed record MobDefinitionSummary(
     [property: JsonPropertyName("has_combat_profile")] bool HasCombatProfile,
     [property: JsonPropertyName("guaranteed_drop_count")] int GuaranteedDropCount,
     [property: JsonPropertyName("editable_in_mobs")] bool EditableInMobs,
-    [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc);
+    [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
+    [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
 
 public sealed record MobDefinition(
     [property: JsonPropertyName("mob_definition_id")] string MobDefinitionId,
@@ -51,7 +53,9 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("guaranteed_drops")] IReadOnlyList<MobDropDefinition> GuaranteedDrops,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
-    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath);
+    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
+    [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
 
 public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_type")] string AttackType,
@@ -101,7 +105,9 @@ public sealed record SaveMobDraftRequest(
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("guaranteed_drops")] IReadOnlyList<MobDropDraft>? GuaranteedDrops,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("preview_signature")] string? PreviewSignature);
+    [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
+    [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
 
 public sealed record MobPreviewRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -130,7 +136,9 @@ public sealed record MobPreviewRequest(
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("guaranteed_drops")] IReadOnlyList<MobDropDraft>? GuaranteedDrops,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("target_operation")] string TargetOperation);
+    [property: JsonPropertyName("target_operation")] string TargetOperation,
+    [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
 
 public sealed record MobPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,

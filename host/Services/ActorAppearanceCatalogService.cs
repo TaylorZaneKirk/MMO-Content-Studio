@@ -10,6 +10,8 @@ public sealed class ActorAppearanceCatalogService
 {
     private const int SupportedSchemaVersion = 1;
     private const string RigCatalogRelativePath = "actors/appearance/data/rigs/catalog_v1.json";
+    private const string RigCalibrationCatalogRelativePath = "actors/appearance/data/rig_calibrations/catalog_v1.json";
+    private const string EquippedVisualCatalogRelativePath = "actors/appearance/data/equipped_visuals/published_catalog_v1.json";
     private readonly AssetRootsOptions _options;
 
     public ActorAppearanceCatalogService(IOptions<AssetRootsOptions> options)
@@ -128,10 +130,79 @@ public sealed class ActorAppearanceCatalogService
         return RigCatalogCandidates(configuredRoot).FirstOrDefault();
     }
 
+    public ActorRiggedSpriteCatalogDefinition LoadRiggedSpriteCatalog()
+    {
+        var rigCatalog = LoadRigCatalog();
+        if (!rigCatalog.Available)
+        {
+            return new ActorRiggedSpriteCatalogDefinition(false, rigCatalog.Message, [], [], []);
+        }
+
+        var calibrationPath = ResolveCatalogPath(RigCalibrationCatalogRelativePath);
+        var equippedVisualPath = ResolveCatalogPath(EquippedVisualCatalogRelativePath);
+        if (calibrationPath is null || equippedVisualPath is null ||
+            !File.Exists(calibrationPath) || !File.Exists(equippedVisualPath))
+        {
+            return new ActorRiggedSpriteCatalogDefinition(
+                false,
+                "The canonical MMO Project rig calibration or published equipped-visual catalog is unavailable.",
+                [],
+                [],
+                []);
+        }
+
+        try
+        {
+            using var calibrationDocument = JsonDocument.Parse(File.ReadAllText(calibrationPath));
+            using var equippedVisualDocument = JsonDocument.Parse(File.ReadAllText(equippedVisualPath));
+            if (!TryReadCalibrations(calibrationDocument.RootElement, out var calibrations) ||
+                !TryReadEquippedVisuals(equippedVisualDocument.RootElement, out var equippedVisuals))
+            {
+                return new ActorRiggedSpriteCatalogDefinition(
+                    false,
+                    "The canonical MMO Project rig calibration or published equipped-visual catalog is invalid.",
+                    [],
+                    [],
+                    []);
+            }
+
+            return new ActorRiggedSpriteCatalogDefinition(
+                true,
+                null,
+                rigCatalog.Rigs,
+                calibrations,
+                equippedVisuals);
+        }
+        catch (JsonException)
+        {
+            return new ActorRiggedSpriteCatalogDefinition(false, "Canonical actor appearance catalog JSON could not be parsed.", [], [], []);
+        }
+        catch (IOException)
+        {
+            return new ActorRiggedSpriteCatalogDefinition(false, "Canonical actor appearance catalog could not be read from disk.", [], [], []);
+        }
+    }
+
+    private string? ResolveCatalogPath(string relativePath)
+    {
+        if (!_options.Roots.TryGetValue("game_client_assets", out var configured)
+            || string.IsNullOrWhiteSpace(configured))
+        {
+            return null;
+        }
+
+        var configuredRoot = Path.GetFullPath(configured);
+        return CatalogCandidates(configuredRoot, relativePath).FirstOrDefault(File.Exists)
+            ?? CatalogCandidates(configuredRoot, relativePath).FirstOrDefault();
+    }
+
     private static IReadOnlyList<string> RigCatalogCandidates(string configuredRoot)
+        => CatalogCandidates(configuredRoot, RigCatalogRelativePath);
+
+    private static IReadOnlyList<string> CatalogCandidates(string configuredRoot, string relativePath)
     {
         var candidates = new List<string>();
-        var normalizedRelativePath = RigCatalogRelativePath.Replace('/', Path.DirectorySeparatorChar);
+        var normalizedRelativePath = relativePath.Replace('/', Path.DirectorySeparatorChar);
 
         void AddCandidate(string basePath)
         {
@@ -160,6 +231,63 @@ public sealed class ActorAppearanceCatalogService
 
         return candidates;
     }
+
+    private static bool TryReadCalibrations(JsonElement root, out IReadOnlyList<ActorRigCalibrationDefinition> calibrations)
+    {
+        calibrations = [];
+        if (!HasSupportedSchemaVersion(root) || !root.TryGetProperty("calibrations", out var entries) || entries.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var parsed = new List<ActorRigCalibrationDefinition>();
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (!TryReadRequiredString(entry, "calibration_id", out var calibrationId) ||
+                !TryReadRequiredString(entry, "rig_id", out var rigId))
+            {
+                return false;
+            }
+
+            parsed.Add(new ActorRigCalibrationDefinition(calibrationId, rigId));
+        }
+
+        calibrations = parsed;
+        return true;
+    }
+
+    private static bool TryReadEquippedVisuals(JsonElement root, out IReadOnlyList<PublishedEquippedVisualDefinition> equippedVisuals)
+    {
+        equippedVisuals = [];
+        if (!HasSupportedSchemaVersion(root) || !root.TryGetProperty("equipped_visuals", out var entries) || entries.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var parsed = new List<PublishedEquippedVisualDefinition>();
+        foreach (var entry in entries.EnumerateArray())
+        {
+            if (!TryReadRequiredString(entry, "item_id", out var itemId) ||
+                !TryReadRequiredString(entry, "rig_id", out var rigId) ||
+                !TryReadRequiredString(entry, "binding_type", out var bindingType) ||
+                !TryReadRequiredString(entry, "render_layer_id", out var renderLayerId))
+            {
+                return false;
+            }
+
+            parsed.Add(new PublishedEquippedVisualDefinition(itemId, rigId, bindingType, renderLayerId));
+        }
+
+        equippedVisuals = parsed;
+        return true;
+    }
+
+    private static bool HasSupportedSchemaVersion(JsonElement root) =>
+        root.ValueKind == JsonValueKind.Object &&
+        root.TryGetProperty("schema_version", out var schemaVersion) &&
+        schemaVersion.ValueKind == JsonValueKind.Number &&
+        schemaVersion.TryGetInt32(out var value) &&
+        value == SupportedSchemaVersion;
 
     private static ActorRigDefinition? ParseRig(JsonElement rigElement)
     {

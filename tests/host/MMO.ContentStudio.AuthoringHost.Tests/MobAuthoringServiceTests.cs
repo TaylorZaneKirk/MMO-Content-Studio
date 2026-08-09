@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
@@ -444,6 +445,31 @@ public sealed class MobAuthoringServiceTests
     }
 
     [Fact]
+    public void CompositeRigRecordRoundTripPreservesCanonicalActorPoseDescriptor()
+    {
+        var descriptor = new RiggedSpriteVisualDescriptor(
+            1,
+            "humanoid_v1",
+            null,
+            "actor_pose",
+            null,
+            null,
+            new Dictionary<string, string> { ["right_hand"] = "inventory_154_axe" });
+        var persisted = JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(JsonSerializer.Serialize(descriptor));
+
+        var roundTripped = MobAuthoringService.FromRecord(Record() with
+        {
+            VisualMode = ActorVisualModes.CompositeRig,
+            CompositeVisual = persisted
+        });
+
+        Assert.Equal(ActorVisualModes.CompositeRig, roundTripped.VisualMode);
+        Assert.True(RiggedSpriteVisualDescriptorNormalizer.Equivalent(descriptor, roundTripped.CompositeVisual));
+        Assert.Null(roundTripped.CompositeVisual!.FixedDirection);
+        Assert.Null(roundTripped.CompositeVisual.FixedFrame);
+    }
+
+    [Fact]
     public async Task PublishTriggersMobRuntimeCatalogRefreshOnly()
     {
         var assetsRoot = Path.Combine(
@@ -778,8 +804,16 @@ public sealed class MobAuthoringServiceTests
                 dropDefinitions,
                 draft.PrimaryCombatProfile is not null,
                 dropDefinitions.Length,
-                updatedAtUtc);
+                updatedAtUtc,
+                draft.VisualMode,
+                CloneCompositeVisual(draft.CompositeVisual));
         }
+
+        private static RiggedSpriteVisualDescriptor? CloneCompositeVisual(
+            RiggedSpriteVisualDescriptor? compositeVisual) =>
+            compositeVisual is null
+                ? null
+                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(JsonSerializer.Serialize(compositeVisual));
     }
 
     private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher

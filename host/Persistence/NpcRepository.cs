@@ -2,6 +2,7 @@ using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
 using NpgsqlTypes;
+using System.Text.Json;
 
 namespace MMO.ContentStudio.AuthoringHost.Persistence;
 
@@ -60,6 +61,8 @@ public sealed class NpcRepository : INpcRepository
                 display_name,
                 publication_state,
                 visual_texture_path,
+                visual_mode,
+                composite_visual,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -264,6 +267,8 @@ public sealed class NpcRepository : INpcRepository
                 display_name,
                 publication_state,
                 visual_texture_path,
+                visual_mode,
+                composite_visual,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -305,6 +310,8 @@ public sealed class NpcRepository : INpcRepository
                 display_name,
                 publication_state,
                 visual_texture_path,
+                visual_mode,
+                composite_visual,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -328,6 +335,8 @@ public sealed class NpcRepository : INpcRepository
                 @display_name,
                 'Draft',
                 @visual_texture_path,
+                @visual_mode,
+                @composite_visual,
                 @source_width,
                 @source_height,
                 @visual_anchor_offset_x,
@@ -365,6 +374,8 @@ public sealed class NpcRepository : INpcRepository
             set display_name = @display_name,
                 publication_state = 'Draft',
                 visual_texture_path = @visual_texture_path,
+                visual_mode = @visual_mode,
+                composite_visual = @composite_visual,
                 source_width = @source_width,
                 source_height = @source_height,
                 visual_anchor_offset_x = @visual_anchor_offset_x,
@@ -401,6 +412,10 @@ public sealed class NpcRepository : INpcRepository
         command.Parameters.AddWithValue("npc_definition_id", npcDefinitionId);
         command.Parameters.AddWithValue("display_name", draft.DisplayName);
         command.Parameters.AddWithValue("visual_texture_path", draft.VisualTexturePath);
+        command.Parameters.AddWithValue("visual_mode", draft.VisualMode);
+        command.Parameters.Add("composite_visual", NpgsqlDbType.Jsonb).Value = draft.CompositeVisual is null
+            ? DBNull.Value
+            : JsonSerializer.Serialize(draft.CompositeVisual);
         command.Parameters.AddWithValue("source_width", draft.SourceWidth);
         command.Parameters.AddWithValue("source_height", draft.SourceHeight);
         command.Parameters.AddWithValue("visual_anchor_offset_x", draft.VisualAnchorOffsetX);
@@ -425,6 +440,7 @@ public sealed class NpcRepository : INpcRepository
     {
         var dialogueOrdinal = reader.GetOrdinal("default_dialogue_id");
         var notesOrdinal = reader.GetOrdinal("notes");
+        var compositeVisualOrdinal = reader.GetOrdinal("composite_visual");
         return new NpcDefinitionRecord(
             reader.GetString(reader.GetOrdinal("npc_definition_id")),
             reader.GetString(reader.GetOrdinal("display_name")),
@@ -447,7 +463,11 @@ public sealed class NpcRepository : INpcRepository
             reader.IsDBNull(dialogueOrdinal) ? null : reader.GetString(dialogueOrdinal),
             reader.IsDBNull(notesOrdinal) ? null : reader.GetString(notesOrdinal),
             ReadUtc(reader, "created_at_utc"),
-            ReadUtc(reader, "updated_at_utc"));
+            ReadUtc(reader, "updated_at_utc"),
+            reader.GetString(reader.GetOrdinal("visual_mode")),
+            reader.IsDBNull(compositeVisualOrdinal)
+                ? null
+                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -498,7 +518,9 @@ public sealed record NpcDefinitionRecord(
     string? DefaultDialogueId,
     string? Notes,
     DateTimeOffset CreatedAtUtc,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    string VisualMode = ActorVisualModes.FlatSprite,
+    RiggedSpriteVisualDescriptor? CompositeVisual = null);
 
 public sealed record NpcReferenceSummaryRecord(
     string NpcDefinitionId,

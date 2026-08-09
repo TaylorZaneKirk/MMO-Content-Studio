@@ -15,6 +15,7 @@ public sealed partial class MobDefinitionValidator
         "invalid_mob_visual_dimensions",
         "invalid_mob_visual_anchor",
         "invalid_mob_visual_render_scale",
+        "mob_invalid_composite_visual",
         "invalid_mob_footprint",
         "invalid_mob_max_health",
         "invalid_mob_movement_speed",
@@ -42,13 +43,16 @@ public sealed partial class MobDefinitionValidator
 
     private readonly IMobRepository _repository;
     private readonly ItemAssetService _assetService;
+    private readonly ActorAppearanceCatalogService? _actorAppearanceCatalogService;
 
     public MobDefinitionValidator(
         IMobRepository repository,
-        ItemAssetService assetService)
+        ItemAssetService assetService,
+        ActorAppearanceCatalogService? actorAppearanceCatalogService = null)
     {
         _repository = repository;
         _assetService = assetService;
+        _actorAppearanceCatalogService = actorAppearanceCatalogService;
     }
 
     public async Task<MobValidationOutcome> ValidateAsync(
@@ -73,6 +77,7 @@ public sealed partial class MobDefinitionValidator
         var dropItems = await _repository.LoadDropItemsAsync(cancellationToken);
         var dropItemLookup = dropItems.ToDictionary(item => item.ItemId, StringComparer.Ordinal);
         ValidateGuaranteedDrops(draft, dropItemLookup, messages, forPublication);
+        ValidateRiggedSpriteVisual(draft, dropItems, messages);
 
         if (existing is not null && existing.PublicationState == "Published" && !forPublication)
         {
@@ -96,6 +101,22 @@ public sealed partial class MobDefinitionValidator
     public static bool IsDraftBlocking(ApiError message) =>
         message.Severity == ValidationSeverity.Error
         && DraftBlockingValidationCodes.Contains(message.Code);
+
+    private void ValidateRiggedSpriteVisual(
+        NormalizedMobDraft draft,
+        IReadOnlyList<MobDropItemRecord> items,
+        ICollection<ApiError> messages)
+    {
+        var catalog = _actorAppearanceCatalogService?.LoadRiggedSpriteCatalog()
+            ?? new ActorRiggedSpriteCatalogDefinition(false, "Canonical rigged-sprite catalogs are unavailable.", [], [], []);
+        RiggedSpriteVisualDescriptorValidator.Validate(
+            draft.VisualMode,
+            draft.CompositeVisual,
+            catalog,
+            items.Where(item => item.RuntimeEnabled).Select(item => item.ItemId).ToHashSet(StringComparer.Ordinal),
+            "mob",
+            messages);
+    }
 
     public static void ValidateIdentity(
         string mobDefinitionId,
@@ -570,7 +591,9 @@ public sealed record NormalizedMobDraft(
     int MobTargetScanCandidateLimit,
     MobCombatProfileDefinition? PrimaryCombatProfile,
     EquipmentCombatBonusDefinition CombatBonuses,
-    IReadOnlyList<MobDropDraft> GuaranteedDrops);
+    IReadOnlyList<MobDropDraft> GuaranteedDrops,
+    string VisualMode,
+    RiggedSpriteVisualDescriptor? CompositeVisual);
 
 public sealed record MobValidationOutcome(
     bool ValidForDraft,

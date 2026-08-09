@@ -41,3 +41,20 @@ public sealed record ActorRigForegroundOverlayDefinition(
     [property: JsonPropertyName("source_layer_id")] string SourceLayerId,
     [property: JsonPropertyName("z_index_by_direction")] IReadOnlyDictionary<string, int> ZIndexByDirection,
     [property: JsonPropertyName("source_rect_by_direction")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition?>> SourceRectByDirection);
+
+public sealed record ActorRiggedSpriteCatalogDefinition(
+    bool Available,
+    string? Message,
+    IReadOnlyList<ActorRigDefinition> Rigs,
+    IReadOnlyList<ActorRigCalibrationDefinition> Calibrations,
+    IReadOnlyList<PublishedEquippedVisualDefinition> EquippedVisuals);
+
+public sealed record ActorRigCalibrationDefinition(
+    string CalibrationId,
+    string RigId);
+
+public sealed record PublishedEquippedVisualDefinition(
+    string ItemId,
+    string RigId,
+    string BindingType,
+    string RenderLayerId);

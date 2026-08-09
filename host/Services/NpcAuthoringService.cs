@@ -333,7 +333,9 @@ public sealed class NpcAuthoringService
             request.DefaultDialogueId,
             request.Notes,
             request.ExpectedUpdatedAtUtc,
-            request.PreviewSignature);
+            request.PreviewSignature,
+            request.VisualMode,
+            request.CompositeVisual);
 
     public static NpcDraft Normalize(PreviewNpcRequest request) =>
         Normalize(
@@ -356,7 +358,9 @@ public sealed class NpcAuthoringService
             request.DefaultDialogueId,
             request.Notes,
             request.ExpectedUpdatedAtUtc,
-            null);
+            null,
+            request.VisualMode,
+            request.CompositeVisual);
 
     public static NpcDraft Normalize(
         string displayName,
@@ -378,10 +382,13 @@ public sealed class NpcAuthoringService
         string? defaultDialogueId,
         string? notes,
         DateTimeOffset? expectedUpdatedAtUtc,
-        string? previewSignature)
+        string? previewSignature,
+        string? visualMode = ActorVisualModes.FlatSprite,
+        RiggedSpriteVisualDescriptor? compositeVisual = null)
     {
         var movement = NpcDomainRules.NormalizeMovementBehavior(movementBehavior);
         var interaction = interactionEnabled;
+        var presentation = RiggedSpriteVisualDescriptorNormalizer.Normalize(visualMode, compositeVisual);
         return new NpcDraft(
             NpcDomainRules.NormalizeRequired(displayName),
             NpcDomainRules.NormalizeRequired(visualTexturePath),
@@ -402,7 +409,9 @@ public sealed class NpcAuthoringService
             interaction ? NpcDomainRules.NormalizeOptional(defaultDialogueId) : null,
             NpcDomainRules.NormalizeOptional(notes),
             expectedUpdatedAtUtc,
-            previewSignature);
+            previewSignature,
+            presentation.VisualMode,
+            presentation.CompositeVisual);
     }
 
     public static NpcDraft FromRecord(NpcDefinitionRecord record) =>
@@ -426,7 +435,9 @@ public sealed class NpcAuthoringService
             record.DefaultDialogueId,
             record.Notes,
             null,
-            null);
+            null,
+            record.VisualMode,
+            record.CompositeVisual);
 
     public static string ComputePreviewSignature(
         string npcDefinitionId,
@@ -474,7 +485,9 @@ public sealed class NpcAuthoringService
         && record.InteractionRangeTiles == draft.InteractionRangeTiles
         && record.DefaultInteraction == draft.DefaultInteraction
         && string.Equals(record.DefaultDialogueId, draft.DefaultDialogueId, StringComparison.Ordinal)
-        && string.Equals(record.Notes, draft.Notes, StringComparison.Ordinal);
+        && string.Equals(record.Notes, draft.Notes, StringComparison.Ordinal)
+        && string.Equals(record.VisualMode, draft.VisualMode, StringComparison.Ordinal)
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual);
 
     public static bool Equivalent(NpcDefinitionRecord left, NpcDefinitionRecord right) =>
         left.NpcDefinitionId == right.NpcDefinitionId
@@ -496,7 +509,9 @@ public sealed class NpcAuthoringService
         && left.InteractionRangeTiles == right.InteractionRangeTiles
         && left.DefaultInteraction == right.DefaultInteraction
         && left.DefaultDialogueId == right.DefaultDialogueId
-        && left.Notes == right.Notes;
+        && left.Notes == right.Notes
+        && left.VisualMode == right.VisualMode
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual);
 
     private async Task<AuthoringOperationResult<NpcMutationResponse>> SetPublicationAsync(
         string npcDefinitionId,
@@ -610,7 +625,9 @@ public sealed class NpcAuthoringService
             record.Notes,
             record.CreatedAtUtc,
             record.UpdatedAtUtc,
-            asset.FilePath);
+            asset.FilePath,
+            record.VisualMode,
+            record.CompositeVisual);
     }
 
     private static NpcDefinitionSummary ToSummary(NpcDefinitionRecord record) =>
@@ -623,7 +640,9 @@ public sealed class NpcAuthoringService
             record.InteractionEnabled,
             record.DefaultDialogueId,
             true,
-            record.UpdatedAtUtc);
+            record.UpdatedAtUtc,
+            record.VisualMode,
+            record.CompositeVisual);
 
     private static IReadOnlyList<AuthoringChange> CalculateChanges(
         string npcDefinitionId,
@@ -635,6 +654,8 @@ public sealed class NpcAuthoringService
         AddChange(changes, "npc_definition_id", existing?.NpcDefinitionId, npcDefinitionId);
         AddChange(changes, "display_name", existing?.DisplayName, requested.DisplayName);
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
+        AddChange(changes, "visual_mode", existing?.VisualMode, requested.VisualMode);
+        AddChange(changes, "composite_visual", SerializeCompositeVisual(existing?.CompositeVisual), SerializeCompositeVisual(requested.CompositeVisual));
         AddChange(changes, "source_width", existing?.SourceWidth.ToString(), requested.SourceWidth.ToString());
         AddChange(changes, "source_height", existing?.SourceHeight.ToString(), requested.SourceHeight.ToString());
         AddChange(changes, "visual_anchor_offset_x", existing?.VisualAnchorOffsetX.ToString("R"), requested.VisualAnchorOffsetX.ToString("R"));
@@ -982,8 +1003,13 @@ public sealed class NpcAuthoringService
         draft.InteractionRangeTiles,
         draft.DefaultInteraction,
         draft.DefaultDialogueId,
-        draft.Notes
+        draft.Notes,
+        draft.VisualMode,
+        draft.CompositeVisual
     };
+
+    private static string? SerializeCompositeVisual(RiggedSpriteVisualDescriptor? descriptor) =>
+        descriptor is null ? null : JsonSerializer.Serialize(descriptor);
 
     private static string? NormalizePreviewOperation(string? value)
     {
