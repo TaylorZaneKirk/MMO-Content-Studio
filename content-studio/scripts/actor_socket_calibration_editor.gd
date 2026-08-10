@@ -258,6 +258,7 @@ func _ensure_ui() -> void:
 	_alignment_scroll.custom_minimum_size = Vector2(0, 360)
 	_alignment_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_alignment_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_alignment_scroll.resized.connect(_on_alignment_viewport_resized)
 	_content.add_child(_alignment_scroll)
 	_alignment_canvas = ALIGNMENT_CANVAS_SCRIPT.new()
 	_alignment_canvas.socket_dragged.connect(_on_alignment_socket_dragged)
@@ -270,6 +271,7 @@ func _ensure_ui() -> void:
 	_canvas_scroll.custom_minimum_size = Vector2(0, 360)
 	_canvas_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_canvas_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_canvas_scroll.resized.connect(_on_calibration_viewport_resized)
 	_content.add_child(_canvas_scroll)
 	_canvas = CANVAS_SCRIPT.new()
 	_canvas.marker_dragged.connect(_on_marker_dragged)
@@ -473,6 +475,14 @@ func _on_calibration_id_changed(_value: String) -> void:
 
 func _on_selection_changed() -> void:
 	_refresh_view()
+
+
+func _on_calibration_viewport_resized() -> void:
+	_refresh_fit_zoom()
+
+
+func _on_alignment_viewport_resized() -> void:
+	_refresh_fit_zoom()
 
 
 func _on_coordinate_changed() -> void:
@@ -953,14 +963,24 @@ func _open_item_save_workflow() -> void:
 	_alignment_status.text = "Item grip edits were handed to the Item workspace. Validate and save the item there; calibration data was not changed."
 
 
-func _refresh_canvas_zoom() -> void:
+func _refresh_fit_zoom() -> void:
+	if float(_selected_metadata(_zoom)) <= 0.0:
+		_refresh_canvas_zoom()
+
+
+func _refresh_canvas_zoom(defer_unlaid_out: bool = true) -> void:
 	if _canvas == null:
 		return
 	var requested := float(_selected_metadata(_zoom))
 	if requested <= 0.0:
 		var frame := _selected_frame_payload()
 		var source_size := Vector2(float(frame.get("source_width", 1)), float(frame.get("source_height", 1)))
-		requested = RIGGED_PREVIEW_LAYOUT.fit_scale(source_size + Vector2(128.0, 128.0), _canvas_scroll.size, 0.0)
+		_canvas.set_zoom_scale(RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(source_size + Vector2(128.0, 128.0), _canvas_scroll.size, 0.0))
+		if _alignment_canvas != null:
+			_alignment_canvas.set_zoom_scale(RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(_alignment_canvas.fit_content_size(), _alignment_scroll.size, _alignment_canvas.fit_padding()))
+		if defer_unlaid_out and (_canvas_scroll.size.x < 32.0 or _canvas_scroll.size.y < 32.0 or _alignment_scroll.size.x < 32.0 or _alignment_scroll.size.y < 32.0):
+			call_deferred("_refresh_canvas_zoom", false)
+		return
 	_canvas.set_zoom_scale(requested)
 	if _alignment_canvas != null:
 		_alignment_canvas.set_zoom_scale(requested)

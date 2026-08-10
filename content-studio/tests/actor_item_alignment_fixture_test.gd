@@ -2,6 +2,7 @@ extends SceneTree
 
 const ALIGNMENT := preload("res://scripts/actor_attachment_alignment.gd")
 const CANVAS := preload("res://scripts/actor_item_alignment_canvas.gd")
+const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
 
 
 func _initialize() -> void:
@@ -10,6 +11,7 @@ func _initialize() -> void:
 
 func _run_fixture() -> void:
 	_verify_alignment_math()
+	_verify_fit_scale()
 	await _verify_canvas_composition_and_dragging()
 	print("[actor-item-alignment-fixture] passed")
 	quit(0)
@@ -25,6 +27,18 @@ func _verify_alignment_math() -> void:
 	_expect(item_position + effective_grip == Vector2i(38, 75), "Resolved item grip must land on the nudged actor socket")
 	_expect(ALIGNMENT.resolve_authored_grip_anchor(effective_grip, 24, true) == authored_grip, "Flipped grip conversion must round trip without subpixels")
 	_expect(ALIGNMENT.mirror_effective_point(Vector2i(7, 8), 30) == Vector2i(22, 8), "Explicit mirroring must use the selected target texture width")
+
+
+func _verify_fit_scale() -> void:
+	var normal := RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(Vector2(200, 100), Vector2(600, 400), 64.0)
+	_expect(normal > 1.0, "A normal combined viewport must produce a useful positive Fit scale")
+	var unlaid_out := RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(Vector2(200, 100), Vector2.ZERO, 64.0)
+	_expect(is_equal_approx(unlaid_out, 1.0), "An unlaid-out viewport must retain the native-scale Fit fallback")
+	var actor_only := RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(Vector2(20, 16), Vector2(400, 250), 64.0)
+	var combined := RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(Vector2(60, 16), Vector2(400, 250), 64.0)
+	_expect(combined < actor_only, "Combined Fit must use the full actor and item composition rather than actor bounds alone")
+	var resized := RIGGED_PREVIEW_LAYOUT.fit_scale_or_default(Vector2(60, 16), Vector2(800, 250), 64.0)
+	_expect(resized > combined, "Fit must recalculate from the current viewport dimensions after a resize")
 
 
 func _verify_canvas_composition_and_dragging() -> void:
@@ -51,6 +65,7 @@ func _verify_canvas_composition_and_dragging() -> void:
 		true)
 	_expect(canvas._composition_bounds.position == Vector2(-4, 0), "Combined canvas must retain item art extending west of the actor")
 	_expect(canvas._composition_bounds.size == Vector2(24, 16), "Combined canvas must cover both actor and item source bounds")
+	_expect(canvas.fit_content_size() == Vector2(24, 16), "Combined Fit must use composition bounds without turning display padding into scaled source art")
 
 	var socket_dragged: Array = []
 	canvas.socket_dragged.connect(func(point: Vector2i) -> void: socket_dragged.append(point))
@@ -78,6 +93,7 @@ func _verify_canvas_composition_and_dragging() -> void:
 		"grip",
 		true)
 	canvas.set_zoom_scale(4.0)
+	_expect(is_equal_approx(canvas._zoom_scale, 4.0), "Explicit zoom must not depend on viewport dimensions")
 	var grip_dragged: Array = []
 	canvas.grip_anchor_dragged.connect(func(point: Vector2i) -> void: grip_dragged.append(point))
 	press.position = canvas.source_to_preview(Vector2(-2, 5))

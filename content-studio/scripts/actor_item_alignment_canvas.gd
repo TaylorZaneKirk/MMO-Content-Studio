@@ -75,6 +75,14 @@ func actor_source_bounds() -> Rect2:
 	return Rect2(Vector2.ZERO, Vector2(_actor_size))
 
 
+func fit_content_size() -> Vector2:
+	return _composition_bounds.size
+
+
+func fit_padding() -> float:
+	return PADDING
+
+
 func source_to_preview(source_point: Vector2) -> Vector2:
 	return _preview_origin() + (source_point - _composition_bounds.position) * _zoom_scale
 
@@ -198,8 +206,7 @@ func _preview_origin() -> Vector2:
 
 
 func _update_canvas_size() -> void:
-	var content_size := _composition_bounds.size * _zoom_scale
-	custom_minimum_size = content_size + Vector2(PADDING * 2.0, PADDING * 2.0)
+	custom_minimum_size = fit_content_size() * _zoom_scale + Vector2(PADDING * 2.0, PADDING * 2.0)
 	size = custom_minimum_size
 
 

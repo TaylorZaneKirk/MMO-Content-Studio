@@ -21,6 +21,8 @@ class CombinedAlignmentWorkspaceTests(unittest.TestCase):
             "signal socket_dragged",
             "signal grip_anchor_dragged",
             "_composition_bounds = _composition_bounds.merge",
+            "fit_content_size",
+            "fit_padding",
             "_item_z_index < 0",
             "_draw_markers()",
             "source_to_preview",
@@ -55,6 +57,10 @@ class CombinedAlignmentWorkspaceTests(unittest.TestCase):
             "_copy_current_value_to_target",
             "_mirror_current_value_to_target",
             "exact source widths and pose flip metadata",
+            "_on_calibration_viewport_resized",
+            "_on_alignment_viewport_resized",
+            "_canvas_scroll.size",
+            "_alignment_scroll.size",
         ):
             self.assertIn(token, source)
 

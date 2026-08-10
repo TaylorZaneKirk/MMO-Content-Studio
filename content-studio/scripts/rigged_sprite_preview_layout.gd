@@ -20,6 +20,19 @@ static func fit_scale(canvas_size: Vector2, pane_size: Vector2, padding: float =
 	return min(available.x / max(1.0, canvas_size.x), available.y / max(1.0, canvas_size.y))
 
 
+static func fit_scale_or_default(
+	canvas_size: Vector2,
+	pane_size: Vector2,
+	padding: float = 16.0,
+	fallback_scale: float = 1.0,
+	minimum_viewport_size: Vector2 = Vector2(32.0, 32.0)
+) -> float:
+	var minimum := minimum_viewport_size.max(Vector2(padding, padding) * 2.0 + Vector2.ONE)
+	if pane_size.x < minimum.x or pane_size.y < minimum.y:
+		return fallback_scale
+	return fit_scale(canvas_size, pane_size, padding)
+
+
 static func preview_transform(canvas_size: Vector2, pane_size: Vector2, padding: float = 16.0) -> Dictionary:
 	var scale := fit_scale(canvas_size, pane_size, padding)
 	return {
