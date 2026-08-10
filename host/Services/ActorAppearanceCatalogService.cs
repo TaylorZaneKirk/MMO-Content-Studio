@@ -138,52 +138,43 @@ public sealed class ActorAppearanceCatalogService
         var rigCatalog = LoadRigCatalog();
         if (!rigCatalog.Available)
         {
-            return new ActorRiggedSpriteCatalogDefinition(false, rigCatalog.Message, [], [], []);
+            return new ActorRiggedSpriteCatalogDefinition(
+                false,
+                rigCatalog.Message,
+                [],
+                [],
+                [],
+                false,
+                rigCatalog.Message,
+                rigCatalog.SourcePath);
         }
 
         var calibrationPath = ResolveCatalogPath(RigCalibrationCatalogRelativePath);
         var equippedVisualPath = ResolveCatalogPath(EquippedVisualCatalogRelativePath);
-        if (calibrationPath is null || equippedVisualPath is null ||
-            !File.Exists(calibrationPath) || !File.Exists(equippedVisualPath))
-        {
-            return new ActorRiggedSpriteCatalogDefinition(
-                false,
-                "The canonical MMO Project rig calibration or published equipped-visual catalog is unavailable.",
-                [],
-                [],
-                []);
-        }
+        var calibrations = LoadCatalog<ActorRigCalibrationDefinition>(
+            calibrationPath,
+            "rig calibration",
+            TryReadCalibrations);
+        var equippedVisuals = LoadCatalog<PublishedEquippedVisualDefinition>(
+            equippedVisualPath,
+            "published equipped-visual",
+            TryReadEquippedVisuals);
 
-        try
-        {
-            using var calibrationDocument = JsonDocument.Parse(File.ReadAllText(calibrationPath));
-            using var equippedVisualDocument = JsonDocument.Parse(File.ReadAllText(equippedVisualPath));
-            if (!TryReadCalibrations(calibrationDocument.RootElement, out var calibrations) ||
-                !TryReadEquippedVisuals(equippedVisualDocument.RootElement, out var equippedVisuals))
-            {
-                return new ActorRiggedSpriteCatalogDefinition(
-                    false,
-                    "The canonical MMO Project rig calibration or published equipped-visual catalog is invalid.",
-                    [],
-                    [],
-                    []);
-            }
-
-            return new ActorRiggedSpriteCatalogDefinition(
-                true,
-                null,
-                rigCatalog.Rigs,
-                calibrations,
-                equippedVisuals);
-        }
-        catch (JsonException)
-        {
-            return new ActorRiggedSpriteCatalogDefinition(false, "Canonical actor appearance catalog JSON could not be parsed.", [], [], []);
-        }
-        catch (IOException)
-        {
-            return new ActorRiggedSpriteCatalogDefinition(false, "Canonical actor appearance catalog could not be read from disk.", [], [], []);
-        }
+        return new ActorRiggedSpriteCatalogDefinition(
+            true,
+            null,
+            rigCatalog.Rigs,
+            calibrations.Entries,
+            equippedVisuals.Entries,
+            true,
+            null,
+            rigCatalog.SourcePath,
+            calibrations.Available,
+            calibrations.Message,
+            calibrationPath,
+            equippedVisuals.Available,
+            equippedVisuals.Message,
+            equippedVisualPath);
     }
 
     public ActorAppearanceOptionsDefinition LoadOptions()
@@ -198,8 +189,51 @@ public sealed class ActorAppearanceCatalogService
             ],
             catalog.Rigs,
             catalog.Calibrations,
-            catalog.EquippedVisuals.Where(visual => visual.BindingType == "socket").ToArray());
+            catalog.EquippedVisuals.Where(visual => visual.BindingType == "socket").ToArray(),
+            catalog.RigsAvailable,
+            catalog.RigMessage,
+            catalog.RigCatalogPath,
+            catalog.CalibrationsAvailable,
+            catalog.CalibrationMessage,
+            catalog.CalibrationCatalogPath,
+            catalog.EquippedVisualsAvailable,
+            catalog.EquippedVisualMessage,
+            catalog.EquippedVisualCatalogPath);
     }
+
+    private static CatalogLoadResult<T> LoadCatalog<T>(
+        string? path,
+        string catalogName,
+        TryReadCatalog<T> reader)
+    {
+        if (path is null || !File.Exists(path))
+        {
+            return new CatalogLoadResult<T>(
+                false,
+                $"The canonical MMO Project {catalogName} catalog is unavailable.",
+                []);
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path));
+            return reader(document.RootElement, out var entries)
+                ? new CatalogLoadResult<T>(true, null, entries)
+                : new CatalogLoadResult<T>(false, $"The canonical MMO Project {catalogName} catalog is invalid.", []);
+        }
+        catch (JsonException)
+        {
+            return new CatalogLoadResult<T>(false, $"The canonical MMO Project {catalogName} catalog JSON could not be parsed.", []);
+        }
+        catch (IOException)
+        {
+            return new CatalogLoadResult<T>(false, $"The canonical MMO Project {catalogName} catalog could not be read from disk.", []);
+        }
+    }
+
+    private delegate bool TryReadCatalog<T>(JsonElement root, out IReadOnlyList<T> entries);
+
+    private sealed record CatalogLoadResult<T>(bool Available, string? Message, IReadOnlyList<T> Entries);
 
     private string? ResolveCatalogPath(string relativePath)
     {

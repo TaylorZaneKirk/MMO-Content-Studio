@@ -5,6 +5,8 @@ const COORDINATE_LIMIT := 4096
 
 var rig: Dictionary = {}
 var calibration_id := ""
+var target_calibration_id := ""
+var loaded_calibration_id := ""
 var catalog_hash := ""
 var exists := false
 var socket_overrides: Dictionary = {}
@@ -13,7 +15,22 @@ var _saved_socket_overrides: Dictionary = {}
 
 func configure(next_rig: Dictionary, next_calibration_id: String) -> void:
 	rig = next_rig.duplicate(true)
-	calibration_id = next_calibration_id.strip_edges()
+	target_calibration_id = next_calibration_id.strip_edges()
+	calibration_id = target_calibration_id
+
+
+func clear_loaded_state() -> void:
+	loaded_calibration_id = ""
+	catalog_hash = ""
+	exists = false
+	socket_overrides = {}
+	_saved_socket_overrides = {}
+
+
+func begin_load(next_calibration_id: String) -> void:
+	target_calibration_id = next_calibration_id.strip_edges()
+	calibration_id = target_calibration_id
+	clear_loaded_state()
 
 
 func load_response(payload: Dictionary) -> void:
@@ -21,11 +38,20 @@ func load_response(payload: Dictionary) -> void:
 	catalog_hash = str(payload.get("catalog_hash", ""))
 	var calibration := payload.get("calibration", {}) as Dictionary
 	if exists and not calibration.is_empty():
-		calibration_id = str(calibration.get("calibration_id", calibration_id)).strip_edges()
+		loaded_calibration_id = str(calibration.get("calibration_id", target_calibration_id)).strip_edges()
+		calibration_id = loaded_calibration_id
 		socket_overrides = (calibration.get("sockets", {}) as Dictionary).duplicate(true)
 	else:
+		loaded_calibration_id = target_calibration_id
+		calibration_id = target_calibration_id
 		socket_overrides = {}
 	_saved_socket_overrides = socket_overrides.duplicate(true)
+
+
+func is_loaded_target(target: String) -> bool:
+	return not loaded_calibration_id.is_empty() \
+		and loaded_calibration_id == target.strip_edges() \
+		and not catalog_hash.is_empty()
 
 
 func is_dirty() -> bool:

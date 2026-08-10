@@ -290,7 +290,7 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_rigged_controls = VBoxContainer.new()
 	parent.add_child(_rigged_controls)
 	var rig_grid := _grid(_rigged_controls)
-	_rig_id = _option_field(rig_grid, "Rig")
+	_rig_id = _option_field(rig_grid, "Rig / Attachment Layout")
 	_rig_id.item_selected.connect(_on_rig_changed.unbind(1))
 	_calibration_id = _option_field(rig_grid, "Calibration")
 	_calibration_id.item_selected.connect(_on_rigged_form_changed.unbind(1))
@@ -863,6 +863,12 @@ func _apply_actor_appearance_options() -> void:
 		_visual_mode.add_item("Flat Sprite")
 		_visual_mode.set_item_metadata(0, "flat_sprite")
 	_select_option(_visual_mode, "flat_sprite")
+	if not bool(appearance.get("rigs_available", not (appearance.get("rigs", []) as Array).is_empty())):
+		_status.text = "Rig catalog unavailable: %s" % str(appearance.get("rig_message", appearance.get("message", "The actor rig catalog could not be loaded.")))
+	elif not bool(appearance.get("calibrations_available", true)):
+		_status.text = "Calibration catalog unavailable: %s" % str(appearance.get("calibration_message", "The actor calibration catalog could not be loaded."))
+	elif not bool(appearance.get("equipped_visuals_available", true)):
+		_status.text = "Equipped visual catalog unavailable: %s" % str(appearance.get("equipped_visual_message", "The equipped visual catalog could not be loaded."))
 	_rebuild_rigged_controls()
 
 
@@ -1001,6 +1007,8 @@ func _refresh_socket_calibration_editor() -> void:
 		"calibration_id": _current_calibration_id(),
 		"rig": rig,
 		"composite": _selected_metadata(_visual_mode) == "composite_rig",
+		"calibrations_available": bool((_options.get("actor_appearance", {}) as Dictionary).get("calibrations_available", true)),
+		"calibration_message": str((_options.get("actor_appearance", {}) as Dictionary).get("calibration_message", "")),
 	})
 
 

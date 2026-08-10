@@ -11,6 +11,19 @@ namespace MMO.ContentStudio.AuthoringHost.Tests;
 
 public sealed class NpcAuthoringServiceTests : IDisposable
 {
+    [Fact]
+    public async Task LoadOptionsIncludesRiggedSpriteAppearanceWhenCanonicalRigDataIsAvailable()
+    {
+        var result = await CreateService(
+            new InMemoryNpcRepository(),
+            assetsRoot: FindProjectClientAssetsRoot()).LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.Value!.ActorAppearance);
+        Assert.Contains(result.Value.ActorAppearance!.VisualModes, mode => mode.Id == "composite_rig");
+        Assert.Contains(result.Value.ActorAppearance.Rigs, rig => rig.RigId == "humanoid_v1");
+    }
+
     private const string NpcId = "test_npc";
     private readonly string _root;
     private readonly string _assetRoot;
@@ -450,13 +463,14 @@ public sealed class NpcAuthoringServiceTests : IDisposable
 
     private NpcAuthoringService CreateService(
         InMemoryNpcRepository repository,
-        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null)
+        IRuntimeCatalogPublisher? runtimeCatalogPublisher = null,
+        string? assetsRoot = null)
     {
         var options = Options.Create(new AssetRootsOptions
         {
             Roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ["game_client_assets"] = _assetRoot
+                ["game_client_assets"] = assetsRoot ?? _assetRoot
             }
         });
         var assetService = new ItemAssetService(options);
@@ -475,6 +489,20 @@ public sealed class NpcAuthoringServiceTests : IDisposable
             new RiggedSpritePreviewResolver(actorAppearanceCatalogService, assetService),
             NullLogger<NpcAuthoringService>.Instance,
             runtimeCatalogPublisher);
+    }
+
+    private static string FindProjectClientAssetsRoot()
+    {
+        for (var current = new DirectoryInfo(Directory.GetCurrentDirectory()); current is not null; current = current.Parent)
+        {
+            var assetsRoot = Path.Combine(current.FullName, "prototype", "client", "assets");
+            if (Directory.Exists(assetsRoot))
+            {
+                return assetsRoot;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the MMO Project client assets directory.");
     }
 
     private sealed class TestRuntimeCatalogPublisher : IRuntimeCatalogPublisher

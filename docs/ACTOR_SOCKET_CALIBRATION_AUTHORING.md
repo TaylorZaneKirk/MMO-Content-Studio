@@ -16,6 +16,13 @@ Content Studio resolves that file below the configured `game_client_assets`
 root. The local .NET authoring host is the only Content Studio component that
 mutates it. Godot UI code never writes the catalog directly.
 
+Actor appearance discovery is deliberately partial: a usable rig catalog keeps
+Rigged Sprite and its rig selector available even when the calibration or
+published equipped-visual catalog is unavailable. The options response reports
+each catalog's availability, resolved path, and diagnostic message separately.
+Calibration saving/loading needs both the rig and calibration catalogs; an
+equipped-visual catalog is not required for socket inspection or calibration.
+
 The shared rig catalog owns base sockets. A calibration such as `orc_v1`
 contains sparse actor-specific overrides, so editing it never changes
 `humanoid_v1` for other actors.
@@ -63,6 +70,15 @@ editor. The editor requests the exact frame list from the host and draws only
 the selected returned PNG. This is intentionally separate from the ordinary
 actor preview, which answers a different presentation question.
 
+The editor owns a small single-flight request sequence because the shared HTTP
+transport permits one request at a time. Existing calibrations load first and
+then request exact frames; actors without a calibration request only frames.
+Load/Create requests made while a calibration request is active are queued.
+The editor tracks the typed target ID separately from the successfully loaded
+ID, so changing text never retargets loaded socket overrides. Save and canvas
+mutation require a loaded matching target, a catalog hash, no conflict, and no
+active request.
+
 The editor resolves each selected socket pose with the same precedence as
 runtime: an actor calibration override wins; otherwise the canonical rig socket
 is shown as inherited. Inherited markers are hollow and actor overrides are
@@ -77,9 +93,10 @@ Out-of-frame numeric coordinates remain valid but the marker is clipped with a
 status message.
 
 The art view provides Fit, 100%, 200%, 400%, and 800% zoom. A scrollable
-canvas provides transparent padding around every image edge, uses nearest
-display, and draws a source-pixel grid at high zoom. An unavailable exact pose
-does not display a fallback and disables coordinate mutation and dragging.
+canvas provides 64 source pixels of transparent padding around every image
+edge, uses nearest display, and draws a source-pixel grid at high zoom. Fit
+includes that same padding. An unavailable exact pose does not display a
+fallback and disables coordinate mutation and dragging.
 
 Calibration state is independent of the NPC/Mob preview-and-apply workflow.
 The editor retains the complete loaded `sockets` dictionary locally, so editing

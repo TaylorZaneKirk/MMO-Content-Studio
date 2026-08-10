@@ -49,26 +49,35 @@ public sealed record ActorRiggedSpriteCatalogDefinition(
     string? Message,
     IReadOnlyList<ActorRigDefinition> Rigs,
     IReadOnlyList<ActorRigCalibrationDefinition> Calibrations,
-    IReadOnlyList<PublishedEquippedVisualDefinition> EquippedVisuals);
+    IReadOnlyList<PublishedEquippedVisualDefinition> EquippedVisuals,
+    bool RigsAvailable = false,
+    string? RigMessage = null,
+    string? RigCatalogPath = null,
+    bool CalibrationsAvailable = false,
+    string? CalibrationMessage = null,
+    string? CalibrationCatalogPath = null,
+    bool EquippedVisualsAvailable = false,
+    string? EquippedVisualMessage = null,
+    string? EquippedVisualCatalogPath = null);
 
 public sealed record ActorRigCalibrationDefinition(
-    string CalibrationId,
-    string RigId,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>>? SocketOverrides = null,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition>>>? ForegroundOverlayOverrides = null);
+    [property: JsonPropertyName("calibration_id")] string CalibrationId,
+    [property: JsonPropertyName("rig_id")] string RigId,
+    [property: JsonPropertyName("socket_overrides")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>>? SocketOverrides = null,
+    [property: JsonPropertyName("foreground_overlay_overrides")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelRectangleDefinition>>>? ForegroundOverlayOverrides = null);
 
 public sealed record PublishedEquippedVisualDefinition(
-    string ItemId,
-    string RigId,
-    string BindingType,
-    string RenderLayerId,
-    string? AssetKey = null,
-    string? SocketId = null,
-    SourcePixelPointDefinition? Nudge = null,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? GripAnchors = null,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipPoses = null,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? HiddenPoses = null,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? ItemOverGripPoses = null);
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("rig_id")] string RigId,
+    [property: JsonPropertyName("binding_type")] string BindingType,
+    [property: JsonPropertyName("render_layer_id")] string RenderLayerId,
+    [property: JsonPropertyName("asset_key")] string? AssetKey = null,
+    [property: JsonPropertyName("socket_id")] string? SocketId = null,
+    [property: JsonPropertyName("nudge")] SourcePixelPointDefinition? Nudge = null,
+    [property: JsonPropertyName("grip_anchors")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, SourcePixelPointDefinition>>? GripAnchors = null,
+    [property: JsonPropertyName("flip_poses")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? FlipPoses = null,
+    [property: JsonPropertyName("hidden_poses")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? HiddenPoses = null,
+    [property: JsonPropertyName("item_over_grip_poses")] IReadOnlyDictionary<string, IReadOnlyDictionary<string, bool>>? ItemOverGripPoses = null);
 
 public sealed record ActorAppearanceOptionsDefinition(
     [property: JsonPropertyName("available")] bool Available,
@@ -76,7 +85,16 @@ public sealed record ActorAppearanceOptionsDefinition(
     [property: JsonPropertyName("visual_modes")] IReadOnlyList<AuthoringOption> VisualModes,
     [property: JsonPropertyName("rigs")] IReadOnlyList<ActorRigDefinition> Rigs,
     [property: JsonPropertyName("calibrations")] IReadOnlyList<ActorRigCalibrationDefinition> Calibrations,
-    [property: JsonPropertyName("equipped_visuals")] IReadOnlyList<PublishedEquippedVisualDefinition> EquippedVisuals);
+    [property: JsonPropertyName("equipped_visuals")] IReadOnlyList<PublishedEquippedVisualDefinition> EquippedVisuals,
+    [property: JsonPropertyName("rigs_available")] bool RigsAvailable = false,
+    [property: JsonPropertyName("rig_message")] string? RigMessage = null,
+    [property: JsonPropertyName("rig_catalog_path")] string? RigCatalogPath = null,
+    [property: JsonPropertyName("calibrations_available")] bool CalibrationsAvailable = false,
+    [property: JsonPropertyName("calibration_message")] string? CalibrationMessage = null,
+    [property: JsonPropertyName("calibration_catalog_path")] string? CalibrationCatalogPath = null,
+    [property: JsonPropertyName("equipped_visuals_available")] bool EquippedVisualsAvailable = false,
+    [property: JsonPropertyName("equipped_visual_message")] string? EquippedVisualMessage = null,
+    [property: JsonPropertyName("equipped_visual_catalog_path")] string? EquippedVisualCatalogPath = null);
 
 public sealed record RiggedSpritePreviewDefinition(
     [property: JsonPropertyName("base_file_path")] string BaseFilePath,

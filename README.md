@@ -177,7 +177,7 @@ The default API address is `http://127.0.0.1:5187`.
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
 8. **D1-D5 — Dialogue Studio** — non-quest authoring, runtime export, equivalence, and reference safety implemented
-9. **R4D.1B — Draggable actor socket calibration editor** — implemented
+9. **R4D.1B.1 — Actor appearance discovery and socket editor loading repair** — implemented
 10. **T6 — Interactable world objects foundation**
 11. **T7 — Gathering resources and processing stations**
 12. **MMO Project quest foundations**

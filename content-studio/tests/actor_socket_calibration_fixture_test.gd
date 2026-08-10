@@ -7,6 +7,7 @@ const Editor = preload("res://scripts/actor_socket_calibration_editor.gd")
 
 class FixtureAuthoringHostClient extends AuthoringHostClient:
 	var requests: Array = []
+	var active_operation := ""
 
 	func _request(
 		operation: String,
@@ -14,7 +15,19 @@ class FixtureAuthoringHostClient extends AuthoringHostClient:
 		method: int = HTTPClient.METHOD_GET,
 		payload: Dictionary = {}
 	) -> void:
+		if not active_operation.is_empty():
+			request_failed.emit(operation, "Another host request is still in progress.", [])
+			return
+		active_operation = operation
 		requests.append({"operation": operation, "path": path, "method": method, "payload": payload.duplicate(true)})
+
+	func complete_calibration(payload: Dictionary) -> void:
+		active_operation = ""
+		actor_calibration_received.emit(payload)
+
+	func complete_frames(payload: Dictionary) -> void:
+		active_operation = ""
+		actor_calibration_frames_received.emit(payload)
 
 
 func _initialize() -> void:
@@ -122,30 +135,54 @@ func _verify_editor() -> void:
 	root.add_child(editor)
 	await process_frame
 	editor.configure_context(_context("orc_v1"))
-	if client.requests.size() != 2 or str((client.requests[0] as Dictionary).get("operation", "")) != "actor_calibration_frames" or str((client.requests[1] as Dictionary).get("operation", "")) != "actor_calibration":
-		_fail("Composite actor context must load exact frames and the referenced calibration")
+	if client.requests.size() != 1 or str((client.requests[0] as Dictionary).get("operation", "")) != "actor_calibration":
+		_fail("Composite actor context must load the referenced calibration before requesting exact frames")
 		return
-	client.actor_calibration_frames_received.emit(_frames_response())
-	client.actor_calibration_received.emit({
+	client.complete_calibration({
 		"exists": true,
 		"catalog_hash": "before",
 		"calibration": {"calibration_id": "orc_v1", "rig_id": "humanoid_v1", "sockets": {"right_hand_primary": {"S": {"1": {"x": 25, "y": 135}, "2": {"x": 31, "y": 136}}}}},
 	})
+	if client.requests.size() != 2 or str((client.requests[1] as Dictionary).get("operation", "")) != "actor_calibration_frames":
+		_fail("Exact frames must be requested only after the calibration request completes")
+		return
+	client.complete_frames(_frames_response())
+	if editor._state.loaded_calibration_id != "orc_v1" or not editor._state.is_loaded_target("orc_v1"):
+		_fail("The editor must retain an explicit successfully loaded calibration target")
+		return
 	editor._state.set_override("right_hand_primary", "S", 1, Vector2i(26, 136))
 	editor._refresh_view()
 	if not editor._state.is_dirty() or int((editor._state.save_payload().get("socket_overrides", {}) as Dictionary).get("right_hand_primary", {}) .get("S", {}) .get("2", {}) .get("x", 0)) != 31:
 		_fail("Editor save payload must preserve unselected loaded socket poses")
 		return
 	editor._awaiting_save = true
+	editor._active_operation = "save"
 	editor._on_request_failed("actor_calibration_save", "conflict", [{"code": "actor_calibration_catalog_conflict"}])
 	if not editor._conflicted or not editor._state.is_dirty() or not editor._save_button.disabled:
 		_fail("Calibration conflict must preserve local edits and block automatic overwrite")
 		return
-	var assigned := ""
-	editor.use_calibration_for_actor.connect(func(calibration_id: String) -> void: assigned = calibration_id)
-	editor._use_calibration_for_actor()
-	if assigned != "orc_v1":
-		_fail("Calibration assignment must remain an explicit editor signal")
+	editor._reload_calibration()
+	editor._reload_calibration()
+	if client.requests.size() != 3 or str((client.requests[2] as Dictionary).get("operation", "")) != "actor_calibration":
+		_fail("Conflict reload must issue a fresh calibration request")
+		return
+	client.complete_calibration({
+		"exists": true,
+		"catalog_hash": "after",
+		"calibration": {"calibration_id": "orc_v1", "rig_id": "humanoid_v1", "sockets": {"right_hand_primary": {"S": {"1": {"x": 25, "y": 135}}}}},
+	})
+	if editor._conflicted or editor._state.catalog_hash != "after" or not editor._state.is_loaded_target("orc_v1"):
+		_fail("A successful conflict reload must restore editability against the new catalog hash")
+		return
+	client.complete_frames(_frames_response())
+	editor._state.set_override("right_hand_primary", "S", 1, Vector2i(26, 136))
+	editor._calibration_id.text = "new_actor"
+	if editor._can_save():
+		_fail("Typing a different calibration ID must not retarget the loaded socket dictionary")
+		return
+	editor._load_calibration()
+	if client.requests.size() != 3:
+		_fail("Dirty calibration target changes must not issue a new request")
 		return
 	editor.queue_free()
 	await process_frame

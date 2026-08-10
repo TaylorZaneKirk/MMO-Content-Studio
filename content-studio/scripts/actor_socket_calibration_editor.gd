@@ -19,6 +19,9 @@ var _awaiting_save := false
 var _awaiting_frames := false
 var _conflicted := false
 var _reload_confirm_pending := false
+var _active_operation := ""
+var _frames_after_load := false
+var _queued_load := false
 var _syncing := false
 var _displayed_frame_key := ""
 
@@ -58,6 +61,10 @@ func configure_client(client: AuthoringHostClient) -> void:
 
 func configure_context(context: Dictionary) -> void:
 	_ensure_ui()
+	if not _active_operation.is_empty():
+		_pending_context = context.duplicate(true)
+		_status.text = "Waiting for the active calibration request before changing calibration context."
+		return
 	if _state.is_dirty() and not _same_context(context, _context):
 		_pending_context = context.duplicate(true)
 		_status.text = "Unsaved calibration changes. Discard Calibration Changes before changing calibration context."
@@ -193,6 +200,9 @@ func _apply_context(context: Dictionary) -> void:
 	_awaiting_load = false
 	_awaiting_save = false
 	_awaiting_frames = false
+	_active_operation = ""
+	_frames_after_load = false
+	_queued_load = false
 	_frames.clear()
 	_displayed_frame_key = ""
 	var rig := _context.get("rig", {}) as Dictionary
@@ -208,16 +218,20 @@ func _apply_context(context: Dictionary) -> void:
 	_calibration_id.text = _state.calibration_id
 	_populate_sockets()
 	_syncing = false
-	_request_frames()
-	if not _state.calibration_id.is_empty():
-		_load_calibration()
+	if not bool(_context.get("calibrations_available", true)):
+		_state.clear_loaded_state()
+		_status.text = "Actor calibration catalog unavailable: %s" % str(_context.get("calibration_message", "The catalog could not be loaded."))
+		_refresh_view()
+	elif not _state.target_calibration_id.is_empty():
+		_frames_after_load = true
+		_begin_calibration_load(_state.target_calibration_id)
 	else:
 		_state.load_response({"exists": false, "catalog_hash": "", "calibration": {}})
-		_refresh_view()
+		_request_frames()
 
 
 func _request_frames() -> void:
-	if _client == null:
+	if _client == null or not _active_operation.is_empty():
 		return
 	var visual_texture_path := str(_context.get("visual_texture_path", ""))
 	if visual_texture_path.is_empty():
@@ -225,6 +239,7 @@ func _request_frames() -> void:
 		_refresh_view()
 		return
 	_awaiting_frames = true
+	_active_operation = "frames"
 	_client.load_actor_calibration_frames({
 		"actor_kind": str(_context.get("actor_kind", "")),
 		"visual_texture_path": visual_texture_path,
@@ -237,10 +252,28 @@ func _load_calibration() -> void:
 		_status.text = "Calibration ID must use lowercase letters, digits, and underscores."
 		_refresh_view()
 		return
+	if not bool(_context.get("calibrations_available", true)):
+		_status.text = "Actor calibration catalog unavailable: %s" % str(_context.get("calibration_message", "The catalog could not be loaded."))
+		_refresh_view()
+		return
+	if _state.is_dirty() and calibration_id != _state.loaded_calibration_id:
+		_status.text = "Unsaved calibration changes. Discard them before changing calibration target."
+		_refresh_view()
+		return
+	if not _active_operation.is_empty():
+		_queued_load = true
+		_status.text = "Load / Create Calibration is queued until the active request completes."
+		_refresh_view()
+		return
+	_begin_calibration_load(calibration_id)
+
+
+func _begin_calibration_load(calibration_id: String) -> void:
 	if _client == null:
 		return
-	_state.configure(_context.get("rig", {}) as Dictionary, calibration_id)
+	_state.begin_load(calibration_id)
 	_awaiting_load = true
+	_active_operation = "load"
 	_client.load_actor_calibration(calibration_id)
 	_status.text = "Loading calibration..."
 	_refresh_view()
@@ -250,8 +283,18 @@ func _on_calibration_received(payload: Dictionary) -> void:
 	if not _awaiting_load:
 		return
 	_awaiting_load = false
+	_active_operation = ""
+	_conflicted = false
 	_state.load_response(payload)
 	_status.text = "Calibration loaded." if _state.exists else "Calibration will be created on its first saved override."
+	if _frames_after_load:
+		_frames_after_load = false
+		if not _pending_context.is_empty():
+			_process_queued_request()
+		else:
+			_request_frames()
+	else:
+		_process_queued_request()
 	_refresh_view()
 
 
@@ -259,10 +302,12 @@ func _on_calibration_saved(payload: Dictionary) -> void:
 	if not _awaiting_save:
 		return
 	_awaiting_save = false
+	_active_operation = ""
 	_conflicted = false
 	_state.apply_saved_response(payload)
 	_status.text = "Calibration saved."
 	calibration_saved.emit(_state.calibration_id, str(_state.rig.get("rig_id", "")))
+	_process_queued_request()
 	_refresh_view()
 
 
@@ -272,26 +317,32 @@ func _on_frames_received(payload: Dictionary) -> void:
 	if str(payload.get("actor_kind", "")) != str(_context.get("actor_kind", "")) or str(payload.get("visual_texture_path", "")) != str(_context.get("visual_texture_path", "")):
 		return
 	_awaiting_frames = false
+	_active_operation = ""
 	_frames.clear()
 	for frame_variant in payload.get("frames", []) as Array:
 		var frame := frame_variant as Dictionary
 		_frames[_frame_key(str(frame.get("direction", "")), int(frame.get("frame", 0)))] = frame.duplicate(true)
+	_process_queued_request()
 	_refresh_view()
 
 
 func _on_request_failed(operation: String, message: String, errors: Array) -> void:
 	if operation == "actor_calibration" and _awaiting_load:
 		_awaiting_load = false
+		_active_operation = ""
 		_status.text = "Calibration load failed: %s" % message
 	elif operation == "actor_calibration_save" and _awaiting_save:
 		_awaiting_save = false
+		_active_operation = ""
 		_conflicted = _has_error_code(errors, "actor_calibration_catalog_conflict")
 		_status.text = "Calibration changed on disk. Reload before saving." if _conflicted else "Calibration save failed: %s" % message
 	elif operation == "actor_calibration_frames" and _awaiting_frames:
 		_awaiting_frames = false
+		_active_operation = ""
 		_status.text = "Exact calibration frames could not be loaded: %s" % message
 	else:
 		return
+	_process_queued_request()
 	_refresh_view()
 
 
@@ -305,15 +356,15 @@ func _on_selection_changed() -> void:
 	_refresh_view()
 
 
-func _on_coordinate_changed(_value: float) -> void:
-	if _syncing or not _selected_frame_available():
+func _on_coordinate_changed() -> void:
+	if _syncing or not _can_mutate_selected_pose():
 		return
 	_state.set_override(_selected_socket_id(), _selected_direction(), _selected_frame(), Vector2i(int(_socket_x.value), int(_socket_y.value)))
 	_refresh_view()
 
 
 func _on_marker_dragged(point: Vector2i) -> void:
-	if not _selected_frame_available():
+	if not _can_mutate_selected_pose():
 		return
 	_state.set_override(_selected_socket_id(), _selected_direction(), _selected_frame(), point)
 	_refresh_view()
@@ -324,7 +375,7 @@ func _on_zoom_changed() -> void:
 
 
 func _revert_current_pose() -> void:
-	if _state.revert_override(_selected_socket_id(), _selected_direction(), _selected_frame()):
+	if _can_mutate_selected_pose() and _state.revert_override(_selected_socket_id(), _selected_direction(), _selected_frame()):
 		_status.text = "Current pose override removed."
 	_refresh_view()
 
@@ -333,6 +384,7 @@ func _save_calibration() -> void:
 	if not _can_save() or _client == null:
 		return
 	_awaiting_save = true
+	_active_operation = "save"
 	_client.save_actor_calibration(_calibration_id.text.strip_edges(), _state.save_payload())
 	_status.text = "Saving calibration..."
 	_refresh_view()
@@ -345,7 +397,12 @@ func _reload_calibration() -> void:
 		_refresh_view()
 		return
 	_reload_confirm_pending = false
-	_load_calibration()
+	if _active_operation.is_empty():
+		_load_calibration()
+	else:
+		_queued_load = true
+		_status.text = "Reload Calibration is queued until the active request completes."
+		_refresh_view()
 
 
 func _discard_changes() -> void:
@@ -383,15 +440,15 @@ func _refresh_view() -> void:
 		_source.text = "No coordinate for this pose"
 	_syncing = false
 	_update_canvas(frame, available, has_coordinate, effective)
-	var editable := available and not _awaiting_save and not _conflicted
+	var editable := _can_mutate_selected_pose()
 	_socket_x.editable = editable
 	_socket_y.editable = editable
 	_revert_button.disabled = not editable or not _state.has_override(_selected_socket_id(), _selected_direction(), _selected_frame())
-	_load_button.disabled = _awaiting_load or not _is_valid_calibration_id(_calibration_id.text.strip_edges())
-	_use_button.disabled = not _state.exists or _state.calibration_id != _calibration_id.text.strip_edges() or _state.calibration_id == str(_context.get("calibration_id", ""))
+	_load_button.disabled = not bool(_context.get("calibrations_available", true)) or not _is_valid_calibration_id(_calibration_id.text.strip_edges())
+	_use_button.disabled = not _state.exists or not _state.is_loaded_target(_calibration_id.text.strip_edges()) or _state.calibration_id == str(_context.get("calibration_id", ""))
 	_save_button.disabled = not _can_save()
-	_reload_button.disabled = _awaiting_load or not _is_valid_calibration_id(_calibration_id.text.strip_edges())
-	_discard_button.disabled = not _state.is_dirty()
+	_reload_button.disabled = not bool(_context.get("calibrations_available", true)) or not _is_valid_calibration_id(_calibration_id.text.strip_edges())
+	_discard_button.disabled = not _state.is_dirty() or _awaiting_save
 	_dirty.text = "Unsaved calibration changes" if _state.is_dirty() else "Saved"
 	if not available:
 		_status.text = "Selected exact pose is unavailable. No compatibility frame is used."
@@ -412,7 +469,7 @@ func _update_canvas(frame: Dictionary, available: bool, has_coordinate: bool, ef
 		_displayed_frame_key = ""
 	if available and has_coordinate:
 		var point := effective.get("point", {}) as Dictionary
-		_canvas.set_marker(Vector2i(int(point.get("x", 0)), int(point.get("y", 0))), bool(effective.get("is_override", false)), true)
+		_canvas.set_marker(Vector2i(int(point.get("x", 0)), int(point.get("y", 0))), bool(effective.get("is_override", false)), _can_mutate_selected_pose())
 	else:
 		_canvas.clear_marker(false)
 
@@ -424,7 +481,7 @@ func _refresh_canvas_zoom() -> void:
 	if requested <= 0.0:
 		var frame := _selected_frame_payload()
 		var source_size := Vector2(float(frame.get("source_width", 1)), float(frame.get("source_height", 1)))
-		requested = RIGGED_PREVIEW_LAYOUT.fit_scale(source_size, _canvas_scroll.size, 32.0)
+		requested = RIGGED_PREVIEW_LAYOUT.fit_scale(source_size + Vector2(128.0, 128.0), _canvas_scroll.size, 0.0)
 	_canvas.set_zoom_scale(requested)
 
 
@@ -458,7 +515,30 @@ func _selected_frame() -> int:
 
 
 func _can_save() -> bool:
-	return _state.is_dirty() and not _awaiting_save and not _conflicted and _selected_frame_available() and _is_valid_calibration_id(_calibration_id.text.strip_edges()) and not str(_state.rig.get("rig_id", "")).is_empty()
+	return _state.is_dirty() and _can_mutate_selected_pose() and _state.is_loaded_target(_calibration_id.text.strip_edges()) and _is_valid_calibration_id(_calibration_id.text.strip_edges()) and not str(_state.rig.get("rig_id", "")).is_empty()
+
+
+func _can_mutate_selected_pose() -> bool:
+	return _selected_frame_available() \
+		and bool(_context.get("calibrations_available", true)) \
+		and _active_operation.is_empty() \
+		and not _awaiting_load \
+		and not _awaiting_save \
+		and not _conflicted \
+		and _state.is_loaded_target(_calibration_id.text.strip_edges())
+
+
+func _process_queued_request() -> void:
+	if not _active_operation.is_empty():
+		return
+	if not _pending_context.is_empty():
+		var pending := _pending_context.duplicate(true)
+		_pending_context = {}
+		_apply_context(pending)
+		return
+	if _queued_load:
+		_queued_load = false
+		_load_calibration()
 
 
 func _set_enabled(enabled: bool) -> void:

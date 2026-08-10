@@ -12,6 +12,19 @@ namespace MMO.ContentStudio.AuthoringHost.Tests;
 public sealed class MobAuthoringServiceTests
 {
     [Fact]
+    public async Task LoadOptionsIncludesRiggedSpriteAppearanceWhenCanonicalRigDataIsAvailable()
+    {
+        var result = await CreateService(
+            new InMemoryMobRepository(),
+            FindProjectClientAssetsRoot()).LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.NotNull(result.Value!.ActorAppearance);
+        Assert.Contains(result.Value.ActorAppearance!.VisualModes, mode => mode.Id == "composite_rig");
+        Assert.Contains(result.Value.ActorAppearance.Rigs, rig => rig.RigId == "humanoid_v1");
+    }
+
+    [Fact]
     public void NormalizeDraftTrimsValuesAndZeroesDisabledTargeting()
     {
         var draft = MobAuthoringService.Normalize(
@@ -652,6 +665,20 @@ public sealed class MobAuthoringServiceTests
             new RiggedSpritePreviewResolver(catalogService, assetService),
             NullLogger<MobAuthoringService>.Instance,
             runtimeCatalogPublisher);
+    }
+
+    private static string FindProjectClientAssetsRoot()
+    {
+        for (var current = new DirectoryInfo(Directory.GetCurrentDirectory()); current is not null; current = current.Parent)
+        {
+            var assetsRoot = Path.Combine(current.FullName, "prototype", "client", "assets");
+            if (Directory.Exists(assetsRoot))
+            {
+                return assetsRoot;
+            }
+        }
+
+        throw new DirectoryNotFoundException("Could not locate the MMO Project client assets directory.");
     }
 
     private static void AssertSucceeded<T>(AuthoringOperationResult<T> result) =>

@@ -137,6 +137,8 @@ func _timeout_seconds_for_operation(operation: String) -> float:
 
 
 func _is_mutation_operation(operation: String) -> bool:
+	if operation == "actor_calibration_save":
+		return true
 	return operation.ends_with("_save_draft") \
 		or operation.ends_with("_publish") \
 		or operation.ends_with("_disable") \

@@ -103,6 +103,7 @@ func _run_fixture() -> void:
 	await _verify_per_pose_flip_payload_and_preview_math(main_scene)
 	await _verify_post_save_reload_uses_fresh_item_version(main_scene)
 	await _verify_mob_preview_preserves_unsaved_rigged_state(main_scene)
+	await _verify_actor_appearance_selectors(main_scene)
 	_verify_non_json_transport_failure()
 	_verify_mutation_transport_timeout_policy()
 	await _verify_paper_doll_preview_layers()
@@ -188,6 +189,8 @@ func _verify_mob_preview_preserves_unsaved_rigged_state(main_scene: PackedScene)
 	var scene := main_scene.instantiate()
 	root.add_child(scene)
 	await process_frame
+
+
 	var mobs = scene.get_node("Margin/Root/Tabs/Mobs")
 	if mobs == null:
 		_fail("Rigged mob fixture could not locate the Mob workspace")
@@ -224,6 +227,29 @@ func _verify_mob_preview_preserves_unsaved_rigged_state(main_scene: PackedScene)
 	var serialized: Dictionary = payload.get("composite_visual", {}) as Dictionary
 	if str(serialized.get("rig_id", "")) != "humanoid_v1" or str(serialized.get("calibration_id", "")) != "orc_v1" or str((serialized.get("cosmetic_item_ids", {}) as Dictionary).get("right_hand", "")) != "inventory_154_axe":
 		_fail("Mob payload must preserve the rigged descriptor after preview")
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_actor_appearance_selectors(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var mobs = scene.get_node("Margin/Root/Tabs/Mobs")
+	var npcs = scene.get_node("Margin/Root/Tabs/NPCs")
+	if mobs == null or npcs == null:
+		_fail("Actor appearance selector fixture could not locate the NPC and Mob workspaces")
+		return
+	mobs._on_mob_options_received(_mob_rigged_options())
+	mobs._load_composite_visual({"visual_mode": "composite_rig", "composite_visual": {"schema_version": 1, "rig_id": "humanoid_v1", "calibration_id": "orc_v1", "pose_policy": "fixed", "fixed_direction": "S", "fixed_frame": 1, "cosmetic_item_ids": {}}})
+	if mobs._visual_mode.item_count != 2 or mobs._selected_metadata(mobs._visual_mode) != "composite_rig" or mobs._selected_metadata(mobs._rig_id) != "humanoid_v1" or mobs._selected_metadata(mobs._calibration_id) != "orc_v1":
+		_fail("Live-shaped Orc data must expose Rigged Sprite, humanoid_v1, and orc_v1")
+		return
+	npcs._on_npc_options_received(_npc_rigged_options())
+	npcs._load_composite_visual({"visual_mode": "composite_rig", "composite_visual": {"schema_version": 1, "rig_id": "humanoid_v1", "calibration_id": null, "pose_policy": "actor_pose", "fixed_direction": null, "fixed_frame": null, "cosmetic_item_ids": {}}})
+	if npcs._visual_mode.item_count != 2 or npcs._selected_metadata(npcs._visual_mode) != "composite_rig" or npcs._selected_metadata(npcs._rig_id) != "humanoid_v1" or npcs._selected_metadata(npcs._calibration_id) != "":
+		_fail("Live-shaped Test NPC data must expose Rigged Sprite, humanoid_v1, and Default calibration")
+		return
 	scene.queue_free()
 	await process_frame
 
@@ -1418,6 +1444,19 @@ func _mob_rigged_options() -> Dictionary:
 			"calibrations": [{"calibration_id": "orc_v1", "rig_id": "humanoid_v1"}],
 			"equipped_visuals": [{"item_id": "inventory_154_axe", "rig_id": "humanoid_v1", "binding_type": "socket", "render_layer_id": "right_hand"}],
 		},
+	}
+
+
+func _npc_rigged_options() -> Dictionary:
+	return {
+		"defaults": {},
+		"supported_limits": {},
+		"publication_states": [],
+		"movement_behaviors": [],
+		"interaction_types": [],
+		"dialogue_references": [],
+		"visual_assets": {},
+		"actor_appearance": _mob_rigged_options().get("actor_appearance", {}),
 	}
 
 
