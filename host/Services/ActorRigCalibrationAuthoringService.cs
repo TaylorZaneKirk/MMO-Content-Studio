@@ -21,11 +21,15 @@ public sealed class ActorRigCalibrationAuthoringService
     private static readonly string[] Frames = ["1", "2", "3", "4"];
 
     private readonly ActorAppearanceCatalogService _catalogService;
+    private readonly Action<string>? _beforeReplace;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
-    public ActorRigCalibrationAuthoringService(ActorAppearanceCatalogService catalogService)
+    public ActorRigCalibrationAuthoringService(
+        ActorAppearanceCatalogService catalogService,
+        Action<string>? beforeReplace = null)
     {
         _catalogService = catalogService;
+        _beforeReplace = beforeReplace;
     }
 
     public async Task<AuthoringOperationResult<ActorCalibrationLoadResponse>> LoadAsync(
@@ -33,13 +37,18 @@ public sealed class ActorRigCalibrationAuthoringService
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        var normalizedId = calibrationId?.Trim();
+        if (!IsValidCalibrationId(normalizedId))
+        {
+            return Failure("invalid_actor_calibration_id", "Calibration ID must use lowercase letters, digits, and underscores.", "calibration_id");
+        }
+
         var catalog = ReadCatalog();
         if (!catalog.Succeeded || catalog.Value is null)
         {
             return AuthoringOperationResult<ActorCalibrationLoadResponse>.Failure(catalog.Errors);
         }
 
-        var normalizedId = calibrationId?.Trim();
         var entry = FindCalibration(catalog.Value.Calibrations, normalizedId);
         return await Task.FromResult(AuthoringOperationResult<ActorCalibrationLoadResponse>.Success(
             new ActorCalibrationLoadResponse(
@@ -141,7 +150,34 @@ public sealed class ActorRigCalibrationAuthoringService
             }
 
             var updatedBytes = SerializeCanonical(updatedRoot);
-            WriteAtomically(catalog.Value.Path, updatedBytes);
+            var temporaryPath = WriteTemporaryFile(catalog.Value.Path, updatedBytes);
+            try
+            {
+                _beforeReplace?.Invoke(catalog.Value.Path);
+                var finalBytes = ReadCurrentCatalogBytes(catalog.Value.Path);
+                if (!finalBytes.Succeeded || finalBytes.Value is null)
+                {
+                    return AuthoringOperationResult<ActorCalibrationLoadResponse>.Failure(finalBytes.Errors);
+                }
+
+                if (!string.Equals(ComputeHash(finalBytes.Value), catalog.Value.Hash, StringComparison.Ordinal))
+                {
+                    return Failure(
+                        "actor_calibration_catalog_conflict",
+                        "The actor calibration catalog changed before this save could be applied.",
+                        "expected_catalog_hash");
+                }
+
+                File.Move(temporaryPath, catalog.Value.Path, true);
+            }
+            finally
+            {
+                if (File.Exists(temporaryPath))
+                {
+                    File.Delete(temporaryPath);
+                }
+            }
+
             var newHash = ComputeHash(updatedBytes);
             var savedEntry = FindCalibration((JsonArray)updatedRoot["calibrations"]!, normalizedId)!;
             return AuthoringOperationResult<ActorCalibrationLoadResponse>.Success(
@@ -476,32 +512,35 @@ public sealed class ActorRigCalibrationAuthoringService
     private static byte[] SerializeCanonical(JsonObject root) =>
         Encoding.UTF8.GetBytes(root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
 
-    private static void WriteAtomically(string path, byte[] bytes)
+    private static string WriteTemporaryFile(string path, byte[] bytes)
     {
         var directory = Path.GetDirectoryName(path) ?? throw new IOException("Calibration catalog directory is unavailable.");
         var temporaryPath = Path.Combine(directory, $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+        using (var stream = new FileStream(
+            temporaryPath,
+            FileMode.CreateNew,
+            FileAccess.Write,
+            FileShare.None,
+            4096,
+            FileOptions.WriteThrough))
+        {
+            stream.Write(bytes);
+            stream.Flush(flushToDisk: true);
+        }
+
+        return temporaryPath;
+    }
+
+    private static AuthoringOperationResult<byte[]> ReadCurrentCatalogBytes(string path)
+    {
         try
         {
-            using (var stream = new FileStream(
-                temporaryPath,
-                FileMode.CreateNew,
-                FileAccess.Write,
-                FileShare.None,
-                4096,
-                FileOptions.WriteThrough))
-            {
-                stream.Write(bytes);
-                stream.Flush(flushToDisk: true);
-            }
-
-            File.Move(temporaryPath, path, true);
+            return AuthoringOperationResult<byte[]>.Success(File.ReadAllBytes(path));
         }
-        finally
+        catch (IOException)
         {
-            if (File.Exists(temporaryPath))
-            {
-                File.Delete(temporaryPath);
-            }
+            return AuthoringOperationResult<byte[]>.Failure(
+                new ApiError("actor_calibration_catalog_unavailable", "The actor calibration catalog could not be read.", ValidationSeverity.Error));
         }
     }
 

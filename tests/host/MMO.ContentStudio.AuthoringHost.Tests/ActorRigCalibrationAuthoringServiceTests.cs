@@ -13,6 +13,7 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"actor-calibration-{Guid.NewGuid():N}");
     private readonly string _assetsRoot;
     private readonly string _catalogPath;
+    private readonly ActorAppearanceCatalogService _catalogService;
     private readonly ActorRigCalibrationAuthoringService _service;
 
     public ActorRigCalibrationAuthoringServiceTests()
@@ -28,7 +29,8 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
                 ["game_client_assets"] = _assetsRoot
             }
         });
-        _service = new ActorRigCalibrationAuthoringService(new ActorAppearanceCatalogService(options));
+        _catalogService = new ActorAppearanceCatalogService(options);
+        _service = new ActorRigCalibrationAuthoringService(_catalogService);
     }
 
     [Fact]
@@ -44,6 +46,19 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
         Assert.False(missing.Value!.Exists);
         Assert.Equal(existing.Value.CatalogHash, missing.Value.CatalogHash);
         Assert.Null(missing.Value.Calibration);
+    }
+
+    [Theory]
+    [InlineData("ORC")]
+    [InlineData("orc-v1")]
+    [InlineData("../orc")]
+    [InlineData(" ")]
+    public async Task LoadRejectsInvalidCalibrationIds(string calibrationId)
+    {
+        var result = await _service.LoadAsync(calibrationId, TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "invalid_actor_calibration_id");
     }
 
     [Fact]
@@ -141,6 +156,43 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
         Assert.True(text.IndexOf("\"N\"", StringComparison.Ordinal) < text.IndexOf("\"W\"", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task ExternalEditBeforeReplacementReturnsConflictAndPreservesTheExternalBytes()
+    {
+        var loaded = await _service.LoadAsync("orc_v1", TestContext.Current.CancellationToken);
+        var externalBytes = Encoding.UTF8.GetBytes(ExternalCatalog());
+        var service = CreateService(_ => File.WriteAllBytes(_catalogPath, externalBytes));
+
+        var result = await service.SaveAsync("orc_v1", Request(loaded.Value!.CatalogHash, "humanoid_v1", """
+            { "right_hand_primary": { "S": { "1": { "x": 23, "y": 136 } } } }
+            """), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "actor_calibration_catalog_conflict");
+        Assert.Equal(externalBytes, File.ReadAllBytes(_catalogPath));
+        Assert.Empty(TemporaryCatalogFiles());
+
+        var reloaded = await _service.LoadAsync("orc_v1", TestContext.Current.CancellationToken);
+        Assert.True(reloaded.Succeeded);
+        Assert.Equal(Hash(externalBytes), reloaded.Value!.CatalogHash);
+    }
+
+    [Fact]
+    public async Task FileDisappearanceBeforeReplacementFailsWithoutLeavingTheCandidateTempFile()
+    {
+        var loaded = await _service.LoadAsync("orc_v1", TestContext.Current.CancellationToken);
+        var service = CreateService(File.Delete);
+
+        var result = await service.SaveAsync("orc_v1", Request(loaded.Value!.CatalogHash, "humanoid_v1", """
+            { "right_hand_primary": { "S": { "1": { "x": 23, "y": 136 } } } }
+            """), TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "actor_calibration_catalog_unavailable");
+        Assert.False(File.Exists(_catalogPath));
+        Assert.Empty(TemporaryCatalogFiles());
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))
@@ -154,6 +206,15 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
         using var document = JsonDocument.Parse(socketOverrides);
         return new SaveActorCalibrationRequest(expectedHash, rigId, document.RootElement.Clone());
     }
+
+    private ActorRigCalibrationAuthoringService CreateService(Action<string> beforeReplace) =>
+        new(_catalogService, beforeReplace);
+
+    private IReadOnlyList<string> TemporaryCatalogFiles() =>
+        Directory.GetFiles(Path.GetDirectoryName(_catalogPath)!, $".{Path.GetFileName(_catalogPath)}.*.tmp");
+
+    private static string Hash(byte[] bytes) =>
+        Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
 
     private void WriteRigCatalog()
     {
@@ -209,6 +270,26 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
                 }
               },
               "future_field": { "mode": "preserve" }
+            }
+          ]
+        }
+        """ + "\n";
+
+    private static string ExternalCatalog() => """
+        {
+          "schema_version": 1,
+          "calibrations": [
+            {
+              "schema_version": 1,
+              "calibration_id": "orc_v1",
+              "rig_id": "humanoid_v1",
+              "sockets": {
+                "right_hand_primary": {
+                  "S": {
+                    "1": { "x": 91, "y": 92 }
+                  }
+                }
+              }
             }
           ]
         }

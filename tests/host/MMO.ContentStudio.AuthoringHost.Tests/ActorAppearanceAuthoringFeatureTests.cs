@@ -58,6 +58,13 @@ public sealed class ActorAppearanceAuthoringFeatureTests : IAsyncLifetime
         var hash = missing.GetProperty("data").GetProperty("catalog_hash").GetString();
         Assert.False(string.IsNullOrWhiteSpace(hash));
 
+        using var invalidLoadResponse = await _client!.GetAsync(
+            "/api/v1/actor-appearance/calibrations/ORC",
+            TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.BadRequest, invalidLoadResponse.StatusCode);
+        using var invalidLoadDocument = JsonDocument.Parse(await invalidLoadResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("invalid_actor_calibration_id", invalidLoadDocument.RootElement.GetProperty("errors")[0].GetProperty("code").GetString());
+
         var saveResponse = await _client!.PutAsJsonAsync(
             "/api/v1/actor-appearance/calibrations/new_actor",
             new

@@ -38,9 +38,11 @@ The host validates the rig and socket against the canonical rig catalog,
 directions `N/E/S/W`, frames `1` through `4`, and signed integer source pixels
 from `-4096` through `4096`. Rig IDs are immutable for existing calibrations.
 
-Writes validate the resulting catalog in memory, flush a temporary file beside
-the canonical catalog, and then atomically replace the canonical file. Output
-uses deterministic ordering, UTF-8 without BOM, and one trailing newline.
+Writes validate the resulting catalog in memory and flush a temporary file
+beside the canonical catalog. Immediately before replacement, the host rereads
+and rehashes the canonical file; a manual or external change returns a conflict
+and removes the candidate temp file. Output uses deterministic ordering, UTF-8
+without BOM, and one trailing newline.
 
 ## Calibration Frames
 

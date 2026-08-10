@@ -37,9 +37,10 @@ class ActorSocketCalibrationAuthoringTests(unittest.TestCase):
             "CoordinateLimit = 4096",
             "IntegerJsonPattern",
             "TryParseSocketOverrides",
-            "WriteAtomically",
+            "WriteTemporaryFile",
+            "ReadCurrentCatalogBytes",
             "FileOptions.WriteThrough",
-            "File.Move(temporaryPath, path, true)",
+            "File.Move(temporaryPath, catalog.Value.Path, true)",
             "CanonicalizeSockets",
             "CalibrationIdPattern",
         ):

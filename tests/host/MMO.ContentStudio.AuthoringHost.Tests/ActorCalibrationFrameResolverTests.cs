@@ -39,9 +39,18 @@ public sealed class ActorCalibrationFrameResolverTests : IDisposable
     }
 
     [Fact]
-    public void CurrentOrcUsesAllSixteenNormalizedActorFramesInsteadOfItsStaticFallback()
+    public void OrcUsesAllSixteenNormalizedActorFramesInsteadOfItsStaticFallback()
     {
-        var assets = FindCurrentProjectAssets();
+        var assets = CreateAssetsRoot();
+        WritePng(Path.Combine(assets, "maps", "objects", "mobs", "orc.png"), 160, 192);
+        foreach (var direction in new[] { "N", "E", "S", "W" })
+        {
+            foreach (var frame in new[] { 1, 2, 3, 4 })
+            {
+                WritePng(Path.Combine(assets, "actors", "mobs", $"orc-F{frame}-{direction}.png"), 160, 200);
+            }
+        }
+
         var result = CreateResolver(assets).Resolve(new CalibrationFrameRequest(
             "mob",
             "res://assets/maps/objects/mobs/orc.png"));
@@ -116,20 +125,4 @@ public sealed class ActorCalibrationFrameResolverTests : IDisposable
         File.WriteAllBytes(path, bytes);
     }
 
-    private static string FindCurrentProjectAssets()
-    {
-        var current = new DirectoryInfo(AppContext.BaseDirectory);
-        while (current is not null)
-        {
-            var candidate = Path.Combine(current.FullName, "prototype", "client", "assets");
-            if (File.Exists(Path.Combine(candidate, "maps", "objects", "mobs", "orc.png")))
-            {
-                return candidate;
-            }
-
-            current = current.Parent;
-        }
-
-        throw new DirectoryNotFoundException("The MMO Project client assets could not be found for Orc frame verification.");
-    }
 }
