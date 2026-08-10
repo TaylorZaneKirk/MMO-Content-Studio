@@ -5,6 +5,7 @@ signal workspace_open_requested(workspace_id: String, resource_id: String)
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
+const ACTOR_SOCKET_CALIBRATION_EDITOR := preload("res://scripts/actor_socket_calibration_editor.gd")
 const GAME_ASSET_PREFIX := "res://assets/"
 
 class NpcVisualPreview:
@@ -182,6 +183,7 @@ var _fixed_frame: OptionButton
 var _rigged_controls: VBoxContainer
 var _cosmetic_controls: Dictionary = {}
 var _composite_visual: Dictionary = {}
+var _socket_calibration_editor: ActorSocketCalibrationEditor
 
 
 func _ready() -> void:
@@ -397,6 +399,12 @@ func _add_preview_section(parent: VBoxContainer) -> void:
 	_preview_frame.item_selected.connect(_on_preview_facing_changed.unbind(1))
 	facing_row.add_child(_preview_frame)
 	parent.add_child(facing_row)
+	_add_heading(parent, "Actor Socket Calibration", 16)
+	_socket_calibration_editor = ACTOR_SOCKET_CALIBRATION_EDITOR.new()
+	_socket_calibration_editor.configure_client(_client)
+	_socket_calibration_editor.use_calibration_for_actor.connect(_on_use_socket_calibration_for_actor)
+	_socket_calibration_editor.calibration_saved.connect(_on_socket_calibration_saved)
+	parent.add_child(_socket_calibration_editor)
 	_add_heading(parent, "Operation", 16)
 	_operation = OptionButton.new()
 	_add_operation("Save as Draft", "save_draft")
@@ -667,6 +675,7 @@ func _start_new_npc() -> void:
 	_asset_preview_file_path = ""
 	_composite_visual = {}
 	_select_option(_visual_mode, "flat_sprite")
+	_refresh_socket_calibration_editor()
 	_select_option(_operation, "save_draft")
 	_set_form_enabled(_schema_available)
 	_update_movement_controls()
@@ -781,6 +790,7 @@ func _on_visual_path_changed(_value: String) -> void:
 	_visual_preview.set_rigged_sprite_preview({})
 	_clear_preview()
 	_update_visual_preview()
+	_refresh_socket_calibration_editor()
 
 
 func _on_operation_changed() -> void:
@@ -840,6 +850,7 @@ func _on_rigged_form_changed() -> void:
 	if _composite_visual.get("pose_policy") == "fixed":
 		_composite_visual["fixed_direction"] = _selected_metadata(_fixed_direction)
 		_composite_visual["fixed_frame"] = int(_selected_metadata(_fixed_frame))
+	_refresh_socket_calibration_editor()
 	_on_form_changed()
 
 
@@ -869,6 +880,7 @@ func _load_composite_visual(payload: Dictionary) -> void:
 		_composite_visual = (descriptor_variant as Dictionary).duplicate(true) if descriptor_variant is Dictionary else {}
 	_select_option(_visual_mode, "composite_rig" if not _composite_visual.is_empty() else "flat_sprite")
 	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
 
 
 func _rebuild_rigged_controls() -> void:
@@ -970,6 +982,58 @@ func _on_cosmetic_changed(layer_id: String, selector: OptionButton) -> void:
 		cosmetics[layer_id] = item_id
 	_composite_visual["cosmetic_item_ids"] = cosmetics
 	_on_form_changed()
+
+
+func _refresh_socket_calibration_editor() -> void:
+	if _socket_calibration_editor == null:
+		return
+	var rig_id := _selected_metadata(_rig_id)
+	var rig: Dictionary = {}
+	for rig_variant in (_options.get("actor_appearance", {}) as Dictionary).get("rigs", []) as Array:
+		var candidate := rig_variant as Dictionary
+		if str(candidate.get("rig_id", "")) == rig_id:
+			rig = candidate
+			break
+	_socket_calibration_editor.configure_context({
+		"actor_kind": "npc",
+		"visual_texture_path": _visual_path.text.strip_edges(),
+		"rig_id": rig_id,
+		"calibration_id": _current_calibration_id(),
+		"rig": rig,
+		"composite": _selected_metadata(_visual_mode) == "composite_rig",
+	})
+
+
+func _current_calibration_id() -> String:
+	var calibration_id: Variant = _composite_visual.get("calibration_id", null)
+	return calibration_id.strip_edges() if calibration_id is String else ""
+
+
+func _on_use_socket_calibration_for_actor(calibration_id: String) -> void:
+	if _composite_visual.is_empty():
+		return
+	_composite_visual["calibration_id"] = calibration_id
+	_add_local_calibration_option(calibration_id, _selected_metadata(_rig_id))
+	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
+	_status.text = "Calibration assigned to this unsaved NPC form. Validate and apply the NPC operation separately."
+	_on_form_changed()
+
+
+func _on_socket_calibration_saved(calibration_id: String, rig_id: String) -> void:
+	_add_local_calibration_option(calibration_id, rig_id)
+
+
+func _add_local_calibration_option(calibration_id: String, rig_id: String) -> void:
+	var appearance := _options.get("actor_appearance", {}) as Dictionary
+	var calibrations := appearance.get("calibrations", []) as Array
+	for calibration_variant in calibrations:
+		var calibration := calibration_variant as Dictionary
+		if str(calibration.get("calibration_id", "")) == calibration_id:
+			return
+	calibrations.append({"calibration_id": calibration_id, "rig_id": rig_id})
+	appearance["calibrations"] = calibrations
+	_options["actor_appearance"] = appearance
 
 
 func _build_composite_visual() -> Variant:

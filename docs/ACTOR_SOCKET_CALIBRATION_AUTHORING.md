@@ -1,7 +1,8 @@
 # Actor Socket Calibration Authoring
 
 R4D.1A establishes the file-backed authoring boundary for actor-specific rig
-socket calibration. It does not add editor controls yet.
+socket calibration. R4D.1B adds one shared draggable calibration editor to the
+NPC and Mob workspaces without changing runtime actor content or rendering.
 
 ## Ownership
 
@@ -54,8 +55,49 @@ basename and look only for `actors/mobs/<key>-F<frame>-<direction>.png`.
 Missing exact poses are reported unavailable. This authoring path never uses
 runtime directional-F1, static-image, or other compatibility fallbacks.
 
+## Shared Editor Workflow
+
+The NPC and Mob workspaces pass their current unsaved composite descriptor,
+selected rig, actor kind, and visual texture path to one shared calibration
+editor. The editor requests the exact frame list from the host and draws only
+the selected returned PNG. This is intentionally separate from the ordinary
+actor preview, which answers a different presentation question.
+
+The editor resolves each selected socket pose with the same precedence as
+runtime: an actor calibration override wins; otherwise the canonical rig socket
+is shown as inherited. Inherited markers are hollow and actor overrides are
+solid, with accessible source text beside the canvas. Dragging or changing the
+integer X/Y fields creates only the selected sparse override. Reverting removes
+only that pose and cleans empty sparse containers.
+
+Mouse drags are clamped to the visible exact source image and quantized to
+integer source pixels. Numeric X/Y controls remain available across the full
+signed `-4096..4096` range so intentional virtual coordinates are preserved.
+Out-of-frame numeric coordinates remain valid but the marker is clipped with a
+status message.
+
+The art view provides Fit, 100%, 200%, 400%, and 800% zoom. A scrollable
+canvas provides transparent padding around every image edge, uses nearest
+display, and draws a source-pixel grid at high zoom. An unavailable exact pose
+does not display a fallback and disables coordinate mutation and dragging.
+
+Calibration state is independent of the NPC/Mob preview-and-apply workflow.
+The editor retains the complete loaded `sockets` dictionary locally, so editing
+one pose cannot erase other overrides when the complete dictionary is saved.
+Unsaved calibration edits are visibly tracked and block a calibration context
+switch until discarded. Reload requires a second confirmation when edits are
+dirty. A catalog conflict preserves local edits, disables save, and requires an
+explicit reload; it never retries or overwrites the newer catalog.
+
+Typing or loading a valid missing calibration ID does not create a catalog entry.
+The first saved override creates it. Linking that calibration to an NPC or Mob
+is a separate explicit action that updates only the current unsaved composite
+descriptor; the normal workspace validation and apply operation remains solely
+responsible for saving or publishing actor content.
+
 ## Follow-up Boundaries
 
-R4D.1B will add the draggable socket workflow using the host API and shared
-preview geometry. R4D.2 owns equipped-item grip anchors. R4D.3 owns foreground
-overlay rectangles. Neither is edited by R4D.1A.
+R4D.2 owns equipped-item grip anchors. R4D.3 owns foreground-overlay rectangle
+editing. R4D.4 owns combined actor-and-item alignment, and R4D.5 owns full
+production pose calibration. R4D.1B does not edit grip anchors or foreground
+overlays and does not change MMO runtime behavior.

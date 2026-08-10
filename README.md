@@ -45,6 +45,7 @@ The repository now contains:
   stats, faction/aggression, one primary combat profile, combat bonuses, and
   ordered guaranteed drops
 - a shared directional paper-doll preview that now reads canonical MMO Project rig metadata for layer depth, sockets, attachment math, and optional foreground hand/grip overlays
+- a shared NPC/Mob actor socket calibration editor with exact-pose art, sparse inherited/override socket editing, drag and integer coordinates, zoom/grid/scroll inspection, conflict-safe file-backed save, and explicit descriptor assignment
 - an explicit Equippable / Not equippable control that removes stale equipment metadata atomically
 - portions/empty-container transformations through result items
 - exact validation and logical-change previews
@@ -176,11 +177,12 @@ The default API address is `http://127.0.0.1:5187`.
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
 8. **D1-D5 — Dialogue Studio** — non-quest authoring, runtime export, equivalence, and reference safety implemented
-9. **T6 — Interactable world objects foundation**
-10. **T7 — Gathering resources and processing stations**
-11. **MMO Project quest foundations**
-12. **Dialogue Studio quest integration**
-13. **Quest Studio**
+9. **R4D.1B — Draggable actor socket calibration editor** — implemented
+10. **T6 — Interactable world objects foundation**
+11. **T7 — Gathering resources and processing stations**
+12. **MMO Project quest foundations**
+13. **Dialogue Studio quest integration**
+14. **Quest Studio**
 
 The current vertical slices author ordinary items, declarative consumables,
 wearable equipment, and hand-held weapons/tools.

@@ -3,6 +3,7 @@ class_name MobEditor
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
+const ACTOR_SOCKET_CALIBRATION_EDITOR := preload("res://scripts/actor_socket_calibration_editor.gd")
 const DEFAULT_BONUS_FIELDS := [
 	"attack_thrust",
 	"attack_slash",
@@ -209,6 +210,7 @@ var _fixed_frame: OptionButton
 var _rigged_controls: VBoxContainer
 var _composite_visual: Dictionary = {}
 var _cosmetic_selectors: Dictionary = {}
+var _socket_calibration_editor: ActorSocketCalibrationEditor
 
 
 func _ready() -> void:
@@ -306,6 +308,12 @@ func _build_ui() -> void:
 	_preview_frame.item_selected.connect(_on_preview_pose_changed.unbind(1))
 	facing_row.add_child(_preview_frame)
 	preview_content.add_child(facing_row)
+	_add_heading(preview_content, "Actor Socket Calibration", 16)
+	_socket_calibration_editor = ACTOR_SOCKET_CALIBRATION_EDITOR.new()
+	_socket_calibration_editor.configure_client(_client)
+	_socket_calibration_editor.use_calibration_for_actor.connect(_on_use_socket_calibration_for_actor)
+	_socket_calibration_editor.calibration_saved.connect(_on_socket_calibration_saved)
+	preview_content.add_child(_socket_calibration_editor)
 	_add_heading(preview_content, "Operation", 16)
 	_operation = OptionButton.new()
 	_add_operation("Save as Draft", "save_draft")
@@ -612,6 +620,7 @@ func _load_mob(payload: Dictionary) -> void:
 	_publication.text = str(payload.get("publication_state", "Unknown"))
 	_updated.text = str(payload.get("updated_at_utc", "Unknown"))
 	_visual_path.text = str(payload.get("visual_texture_path", ""))
+	_load_composite_visual(payload)
 	_source_width.value = int(payload.get("source_width", 32))
 	_source_height.value = int(payload.get("source_height", 32))
 	_anchor_x.value = float(payload.get("visual_anchor_offset_x", 0.0))
@@ -692,6 +701,7 @@ func _start_new_mob() -> void:
 	_asset_preview_file_path = ""
 	_composite_visual = {}
 	_select_option(_visual_mode, "flat_sprite")
+	_refresh_socket_calibration_editor()
 	_operation.select(0)
 	_set_form_enabled(_schema_available)
 	_update_behavior_controls()
@@ -985,12 +995,14 @@ func _load_composite_visual(payload: Dictionary) -> void:
 	_composite_visual = (descriptor_variant as Dictionary).duplicate(true) if str(payload.get("visual_mode", "flat_sprite")) == "composite_rig" and descriptor_variant is Dictionary else {}
 	_select_option(_visual_mode, "composite_rig" if not _composite_visual.is_empty() else "flat_sprite")
 	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
 
 
 func _on_visual_mode_changed() -> void:
 	if _selected_metadata(_visual_mode) == "composite_rig" and _composite_visual.is_empty():
 		_composite_visual = {"schema_version": 1, "rig_id": _first_rig_id(), "calibration_id": null, "pose_policy": "actor_pose", "fixed_direction": null, "fixed_frame": null, "cosmetic_item_ids": {}}
 	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
 	_on_form_changed()
 
 
@@ -1001,6 +1013,7 @@ func _on_rig_changed() -> void:
 	_composite_visual["calibration_id"] = null
 	_composite_visual["cosmetic_item_ids"] = {}
 	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
 	_status.text = "Rig changed. Incompatible calibration and cosmetic selections were cleared."
 	_on_form_changed()
 
@@ -1018,6 +1031,7 @@ func _on_rigged_changed() -> void:
 		_composite_visual["fixed_direction"] = null
 		_composite_visual["fixed_frame"] = null
 	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
 	_on_form_changed()
 
 
@@ -1106,6 +1120,58 @@ func _on_cosmetic_changed(layer_id: String, selector: OptionButton) -> void:
 	_on_form_changed()
 
 
+func _refresh_socket_calibration_editor() -> void:
+	if _socket_calibration_editor == null:
+		return
+	var rig_id := _selected_metadata(_rig_id)
+	var rig: Dictionary = {}
+	for rig_variant in (_options.get("actor_appearance", {}) as Dictionary).get("rigs", []) as Array:
+		var candidate := rig_variant as Dictionary
+		if str(candidate.get("rig_id", "")) == rig_id:
+			rig = candidate
+			break
+	_socket_calibration_editor.configure_context({
+		"actor_kind": "mob",
+		"visual_texture_path": _visual_path.text.strip_edges(),
+		"rig_id": rig_id,
+		"calibration_id": _current_calibration_id(),
+		"rig": rig,
+		"composite": _selected_metadata(_visual_mode) == "composite_rig",
+	})
+
+
+func _current_calibration_id() -> String:
+	var calibration_id: Variant = _composite_visual.get("calibration_id", null)
+	return calibration_id.strip_edges() if calibration_id is String else ""
+
+
+func _on_use_socket_calibration_for_actor(calibration_id: String) -> void:
+	if _composite_visual.is_empty():
+		return
+	_composite_visual["calibration_id"] = calibration_id
+	_add_local_calibration_option(calibration_id, _selected_metadata(_rig_id))
+	_rebuild_rigged_controls()
+	_refresh_socket_calibration_editor()
+	_status.text = "Calibration assigned to this unsaved Mob form. Validate and apply the Mob operation separately."
+	_on_form_changed()
+
+
+func _on_socket_calibration_saved(calibration_id: String, rig_id: String) -> void:
+	_add_local_calibration_option(calibration_id, rig_id)
+
+
+func _add_local_calibration_option(calibration_id: String, rig_id: String) -> void:
+	var appearance := _options.get("actor_appearance", {}) as Dictionary
+	var calibrations := appearance.get("calibrations", []) as Array
+	for calibration_variant in calibrations:
+		var calibration := calibration_variant as Dictionary
+		if str(calibration.get("calibration_id", "")) == calibration_id:
+			return
+	calibrations.append({"calibration_id": calibration_id, "rig_id": rig_id})
+	appearance["calibrations"] = calibrations
+	_options["actor_appearance"] = appearance
+
+
 func _build_composite_visual() -> Variant:
 	if _selected_metadata(_visual_mode) != "composite_rig":
 		return null
@@ -1128,6 +1194,7 @@ func _on_visual_path_changed(_value: String) -> void:
 	_visual_preview.set_rigged_sprite_preview({})
 	_clear_preview()
 	_update_visual_preview()
+	_refresh_socket_calibration_editor()
 
 
 func _on_option_changed() -> void:

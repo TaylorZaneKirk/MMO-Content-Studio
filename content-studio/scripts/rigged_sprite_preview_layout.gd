@@ -35,6 +35,14 @@ static func source_to_preview(source_point: Vector2, canvas_size: Vector2, pane_
 
 static func preview_to_source(preview_point: Vector2, canvas_size: Vector2, pane_size: Vector2, padding: float = 16.0) -> Vector2:
 	var transform := preview_transform(canvas_size, pane_size, padding)
+	return preview_to_source_with_transform(preview_point, transform)
+
+
+static func source_to_preview_with_transform(source_point: Vector2, transform: Dictionary) -> Vector2:
+	return transform.get("origin", Vector2.ZERO) + source_point * float(transform.get("scale", 1.0))
+
+
+static func preview_to_source_with_transform(preview_point: Vector2, transform: Dictionary) -> Vector2:
 	var scale := float(transform.get("scale", 1.0))
 	return (preview_point - transform.get("origin", Vector2.ZERO)) / maxf(scale, 0.000001)
 
