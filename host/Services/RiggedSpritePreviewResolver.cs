@@ -97,6 +97,11 @@ public sealed class RiggedSpritePreviewResolver
             {
                 itemZ = activeOverlay.ZIndexByDirection.GetValueOrDefault(direction) - baseZ + 1;
             }
+            else if (direction == "N")
+            {
+                // Solid actor previews use the rear-facing held-item convention.
+                itemZ = Math.Min(itemZ, -1);
+            }
 
             cosmetics.Add(new RiggedSpritePreviewCosmeticDefinition(
                 visual.ItemId,

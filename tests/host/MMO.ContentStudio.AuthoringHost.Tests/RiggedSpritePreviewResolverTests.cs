@@ -142,6 +142,44 @@ public sealed class RiggedSpritePreviewResolverTests : IDisposable
         Assert.Equal(204, result.SourceHeight);
     }
 
+    [Theory]
+    [InlineData("N", -1)]
+    [InlineData("S", 10)]
+    [InlineData("E", 10)]
+    [InlineData("W", -20)]
+    public void SolidActorHeldItemDepthUsesDirectionalPresentation(string direction, int expectedZ)
+    {
+        var assetsRoot = FindCanonicalAssetsRoot();
+        var options = Options.Create(new AssetRootsOptions
+        {
+            Roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["game_client_assets"] = assetsRoot
+            }
+        });
+        var resolver = new RiggedSpritePreviewResolver(
+            new ActorAppearanceCatalogService(options),
+            new ItemAssetService(options));
+
+        var result = resolver.Resolve(
+            Path.Combine(assetsRoot, "maps", "objects", "mobs", "orc.png"),
+            160,
+            192,
+            new RiggedSpriteVisualDescriptor(
+                1,
+                "humanoid_v1",
+                "orc_v1",
+                "fixed",
+                direction,
+                1,
+                new Dictionary<string, string> { ["right_hand"] = "inventory_154_axe" }),
+            "S",
+            1);
+
+        Assert.NotNull(result);
+        Assert.Equal(expectedZ, Assert.Single(result!.Cosmetics).ZIndex);
+    }
+
     private static string FindCanonicalAssetsRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
