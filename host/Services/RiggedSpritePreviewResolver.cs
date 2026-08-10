@@ -172,6 +172,12 @@ public sealed class RiggedSpritePreviewResolver
         var match = Regex.Match(baseAssetFilePath, "-F[1-4]-[NESW]\\.png$", RegexOptions.CultureInvariant);
         if (!match.Success)
         {
+            var normalizedMobFrame = ResolveNormalizedMobFrame(baseAssetFilePath, direction, frame);
+            if (normalizedMobFrame is not null)
+            {
+                return normalizedMobFrame;
+            }
+
             return baseAssetFilePath;
         }
 
@@ -183,6 +189,31 @@ public sealed class RiggedSpritePreviewResolver
 
         var genericFallbackCandidate = baseAssetFilePath[..match.Index] + $"-F1-{direction}.png";
         return File.Exists(genericFallbackCandidate) ? genericFallbackCandidate : baseAssetFilePath;
+    }
+
+    private static string? ResolveNormalizedMobFrame(string baseAssetFilePath, string direction, int frame)
+    {
+        var directory = new DirectoryInfo(Path.GetDirectoryName(baseAssetFilePath) ?? string.Empty);
+        if (!string.Equals(directory.Name, "mobs", StringComparison.Ordinal)
+            || !string.Equals(directory.Parent?.Name, "objects", StringComparison.Ordinal)
+            || !string.Equals(directory.Parent?.Parent?.Name, "maps", StringComparison.Ordinal)
+            || !string.Equals(directory.Parent?.Parent?.Parent?.Name, "assets", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var assetKey = Path.GetFileNameWithoutExtension(baseAssetFilePath);
+        if (!Regex.IsMatch(assetKey, "^[a-z0-9_]+$", RegexOptions.CultureInvariant))
+        {
+            return null;
+        }
+
+        var candidate = Path.Combine(
+            directory.Parent!.Parent!.Parent!.FullName,
+            "actors",
+            "mobs",
+            $"{assetKey}-F{frame}-{direction}.png");
+        return File.Exists(candidate) ? candidate : null;
     }
 
     public static string? ResolveExactCharsFrame(string baseAssetFilePath, string direction, int frame)

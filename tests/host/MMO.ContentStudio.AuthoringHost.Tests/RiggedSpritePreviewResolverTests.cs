@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Options;
+using MMO.ContentStudio.AuthoringHost.Configuration;
+using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Xunit;
 
@@ -55,6 +58,63 @@ public sealed class RiggedSpritePreviewResolverTests : IDisposable
 
         Assert.Equal(normalizedTarget, RiggedSpritePreviewResolver.ResolveBaseFrame(normalizedSeed, "N", 1));
         Assert.Equal(singleImage, RiggedSpritePreviewResolver.ResolveBaseFrame(singleImage, "W", 3));
+    }
+
+    [Fact]
+    public void CanonicalOrcPreviewResolvesItsFixedPoseAndAxeAttachment()
+    {
+        var assetsRoot = FindCanonicalAssetsRoot();
+        var options = Options.Create(new AssetRootsOptions
+        {
+            Roots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["game_client_assets"] = assetsRoot
+            }
+        });
+        var catalogService = new ActorAppearanceCatalogService(options);
+        var resolver = new RiggedSpritePreviewResolver(catalogService, new ItemAssetService(options));
+        var basePath = Path.Combine(assetsRoot, "maps", "objects", "mobs", "orc.png");
+
+        var result = resolver.Resolve(
+            basePath,
+            160,
+            192,
+            new RiggedSpriteVisualDescriptor(
+                1,
+                "humanoid_v1",
+                "orc_v1",
+                "fixed",
+                "S",
+                1,
+                new Dictionary<string, string> { ["right_hand"] = "inventory_154_axe" }),
+            "N",
+            2);
+
+        Assert.NotNull(result);
+        Assert.EndsWith("actors/mobs/orc-F1-S.png", result!.BaseFilePath.Replace('\\', '/'), StringComparison.Ordinal);
+        var cosmetic = Assert.Single(result.Cosmetics);
+        Assert.Equal("inventory_154_axe", cosmetic.ItemId);
+        Assert.EndsWith("actors/player/right_hand/axe-F1-S.png", cosmetic.FilePath.Replace('\\', '/'), StringComparison.Ordinal);
+        Assert.Equal(-26, cosmetic.X);
+        Assert.Equal(45, cosmetic.Y);
+        var overlay = Assert.Single(result.ForegroundOverlays);
+        Assert.Equal("right_hand_primary_grip", overlay.OverlayId);
+        Assert.Equal(24, overlay.SourceRect.X);
+        Assert.Equal(104, overlay.SourceRect.Y);
+    }
+
+    private static string FindCanonicalAssetsRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "prototype", "client", "assets");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new DirectoryNotFoundException("The canonical MMO Project client assets are unavailable for this integration test.");
     }
 
     private string Write(string fileName)

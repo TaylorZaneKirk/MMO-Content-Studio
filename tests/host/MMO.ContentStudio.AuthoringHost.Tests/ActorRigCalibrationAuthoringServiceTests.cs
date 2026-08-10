@@ -103,6 +103,21 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task IntegralJsonCoordinatesAreAcceptedAndCanonicalizedAsIntegerTokens()
+    {
+        var loaded = await _service.LoadAsync("orc_v1", TestContext.Current.CancellationToken);
+        var saved = await _service.SaveAsync("orc_v1", Request(loaded.Value!.CatalogHash, "humanoid_v1", """
+            { "right_hand_primary": { "S": { "1": { "x": 25.0, "y": 135.0 } } } }
+            """), TestContext.Current.CancellationToken);
+
+        Assert.True(saved.Succeeded);
+        Assert.Equal(25, saved.Value!.Calibration!.Value.GetProperty("sockets").GetProperty("right_hand_primary").GetProperty("S").GetProperty("1").GetProperty("x").GetInt32());
+        var text = File.ReadAllText(_catalogPath);
+        Assert.DoesNotContain("25.0", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("135.0", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StaleHashAndRigChangesAreRejected()
     {
         var loaded = await _service.LoadAsync("orc_v1", TestContext.Current.CancellationToken);
@@ -119,7 +134,8 @@ public sealed class ActorRigCalibrationAuthoringServiceTests : IDisposable
     [InlineData("unknown socket", "{\"unknown\": {\"S\": {\"1\": {\"x\": 1, \"y\": 2}}}}", "invalid_actor_socket_id")]
     [InlineData("invalid direction", "{\"right_hand_primary\": {\"south\": {\"1\": {\"x\": 1, \"y\": 2}}}}", "invalid_socket_direction")]
     [InlineData("invalid frame", "{\"right_hand_primary\": {\"S\": {\"F1\": {\"x\": 1, \"y\": 2}}}}", "invalid_socket_frame")]
-    [InlineData("noninteger coordinate", "{\"right_hand_primary\": {\"S\": {\"1\": {\"x\": 1.5, \"y\": 2}}}}", "invalid_socket_coordinate")]
+    [InlineData("fractional x coordinate", "{\"right_hand_primary\": {\"S\": {\"1\": {\"x\": 1.5, \"y\": 2}}}}", "invalid_socket_coordinate")]
+    [InlineData("fractional y coordinate", "{\"right_hand_primary\": {\"S\": {\"1\": {\"x\": 1, \"y\": 2.25}}}}", "invalid_socket_coordinate")]
     [InlineData("string coordinate", "{\"right_hand_primary\": {\"S\": {\"1\": {\"x\": \"1\", \"y\": 2}}}}", "invalid_socket_coordinate")]
     [InlineData("out of range coordinate", "{\"right_hand_primary\": {\"S\": {\"1\": {\"x\": 4097, \"y\": 2}}}}", "socket_coordinate_out_of_range")]
     public async Task InvalidSocketMutationsAreRejectedWithoutChangingTheOriginalFile(string _, string socketOverrides, string errorCode)

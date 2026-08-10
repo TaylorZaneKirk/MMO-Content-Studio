@@ -14,9 +14,6 @@ public sealed class ActorRigCalibrationAuthoringService
     private static readonly Regex CalibrationIdPattern = new(
         "^[a-z0-9][a-z0-9_]{0,63}$",
         RegexOptions.CultureInvariant);
-    private static readonly Regex IntegerJsonPattern = new(
-        "^-?(0|[1-9][0-9]*)$",
-        RegexOptions.CultureInvariant);
     private static readonly string[] Directions = ["N", "E", "S", "W"];
     private static readonly string[] Frames = ["1", "2", "3", "4"];
 
@@ -417,9 +414,17 @@ public sealed class ActorRigCalibrationAuthoringService
     private static bool TryReadCoordinate(JsonElement value, out int coordinate)
     {
         coordinate = 0;
-        return value.ValueKind == JsonValueKind.Number
-            && IntegerJsonPattern.IsMatch(value.GetRawText())
-            && value.TryGetInt32(out coordinate);
+        if (value.ValueKind != JsonValueKind.Number
+            || !value.TryGetDecimal(out var numericValue)
+            || decimal.Truncate(numericValue) != numericValue
+            || numericValue < int.MinValue
+            || numericValue > int.MaxValue)
+        {
+            return false;
+        }
+
+        coordinate = decimal.ToInt32(numericValue);
+        return true;
     }
 
     private static JsonObject CreateCanonicalCatalog(JsonObject source, IEnumerable<JsonObject> entries)

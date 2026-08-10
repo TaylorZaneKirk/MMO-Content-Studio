@@ -69,6 +69,21 @@ public sealed class ActorCalibrationFrameResolverTests : IDisposable
     }
 
     [Fact]
+    public void CanonicalOrcAssetsExposeAllNormalizedCalibrationFrames()
+    {
+        var assets = FindCanonicalAssetsRoot();
+
+        var result = CreateResolver(assets).Resolve(new CalibrationFrameRequest(
+            "mob",
+            "res://assets/maps/objects/mobs/orc.png"));
+
+        Assert.True(result.Succeeded);
+        Assert.All(result.Value!.Frames, frame => Assert.True(frame.Available));
+        Assert.True(Frame(result, "S", 1).Available);
+        Assert.True(Frame(result, "N", 2).Available);
+    }
+
+    [Fact]
     public void IncompleteStaticMobReportsUnavailableFramesWithoutCompatibilityFallback()
     {
         var assets = CreateAssetsRoot();
@@ -104,6 +119,20 @@ public sealed class ActorCalibrationFrameResolverTests : IDisposable
         var assets = Path.Combine(_root, "assets");
         Directory.CreateDirectory(assets);
         return assets;
+    }
+
+    private static string FindCanonicalAssetsRoot()
+    {
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
+        {
+            var candidate = Path.Combine(directory.FullName, "prototype", "client", "assets");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        throw new DirectoryNotFoundException("The canonical MMO Project client assets are unavailable for this integration test.");
     }
 
     private static ActorCalibrationFrameDefinition Frame(

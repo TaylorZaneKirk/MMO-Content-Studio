@@ -700,8 +700,8 @@ func _preview() -> void:
 	payload["target_operation"] = _selected_metadata(_operation)
 	payload["preview_direction"] = _selected_metadata(_preview_facing).to_upper().left(1)
 	payload["preview_frame"] = int(_selected_metadata(_preview_frame))
-	_client.preview_npc(npc_definition_id, payload)
 	_status.text = "Calculating validation and exact logical changes..."
+	_client.preview_npc(npc_definition_id, payload)
 
 
 func _preview_delete() -> void:
@@ -1049,8 +1049,7 @@ func _add_local_calibration_option(calibration_id: String, rig_id: String) -> vo
 func _build_composite_visual() -> Variant:
 	if _selected_metadata(_visual_mode) != "composite_rig":
 		return null
-	_on_rigged_form_changed()
-	return _composite_visual
+	return _composite_visual.duplicate(true)
 
 
 func _on_movement_changed() -> void:

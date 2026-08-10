@@ -4,11 +4,13 @@ const State = preload("res://scripts/actor_socket_calibration_state.gd")
 const Canvas = preload("res://scripts/actor_socket_calibration_canvas.gd")
 const Editor = preload("res://scripts/actor_socket_calibration_editor.gd")
 const MobEditor = preload("res://scripts/mob_editor.gd")
+const NpcEditor = preload("res://scripts/npc_editor.gd")
 
 
 class FixtureAuthoringHostClient extends AuthoringHostClient:
 	var requests: Array = []
 	var active_operation := ""
+	var reject_requests := false
 
 	func _request(
 		operation: String,
@@ -16,6 +18,9 @@ class FixtureAuthoringHostClient extends AuthoringHostClient:
 		method: int = HTTPClient.METHOD_GET,
 		payload: Dictionary = {}
 	) -> void:
+		if reject_requests:
+			request_failed.emit(operation, "Another host request is still in progress.", [])
+			return
 		if not active_operation.is_empty():
 			request_failed.emit(operation, "Another host request is still in progress.", [])
 			return
@@ -31,6 +36,16 @@ class FixtureAuthoringHostClient extends AuthoringHostClient:
 		actor_calibration_frames_received.emit(payload)
 
 
+class FixtureMobEditor extends MobEditor:
+	func _payload() -> Dictionary:
+		return {"composite_visual": _build_composite_visual()}
+
+
+class FixtureNpcEditor extends NpcEditor:
+	func _payload() -> Dictionary:
+		return {"composite_visual": _build_composite_visual(), "preview_signature": null}
+
+
 func _initialize() -> void:
 	call_deferred("_run")
 
@@ -40,6 +55,7 @@ func _run() -> void:
 	await _verify_canvas()
 	await _verify_editor()
 	await _verify_rigged_mob_preview()
+	_verify_composite_preview_requests()
 	print("[actor-socket-calibration-fixture] passed")
 	quit(0)
 
@@ -164,6 +180,10 @@ func _verify_editor() -> void:
 	if editor._status.text == "Selected exact pose is unavailable. No compatibility frame is used.":
 		_fail("The exact-pose unavailable status must clear once the requested frame is available")
 		return
+	editor.configure_context(_context("orc_v1"))
+	if client.requests.size() != 2:
+		_fail("Reapplying an identical calibration context must not reload calibration or exact frames")
+		return
 	editor._state.set_override("right_hand_primary", "S", 1, Vector2i(26, 136))
 	editor._refresh_view()
 	if not editor._state.is_dirty() or int((editor._state.save_payload().get("socket_overrides", {}) as Dictionary).get("right_hand_primary", {}) .get("S", {}) .get("2", {}) .get("x", 0)) != 31:
@@ -200,6 +220,78 @@ func _verify_editor() -> void:
 		return
 	editor.queue_free()
 	await process_frame
+
+
+func _verify_composite_preview_requests() -> void:
+	var descriptor := {
+		"schema_version": 1,
+		"rig_id": "humanoid_v1",
+		"calibration_id": "orc_v1",
+		"pose_policy": "fixed",
+		"fixed_direction": "S",
+		"fixed_frame": 1,
+		"cosmetic_item_ids": {"right_hand": "inventory_154_axe"},
+	}
+	var client := FixtureAuthoringHostClient.new()
+	var mob := FixtureMobEditor.new()
+	mob._client = client
+	mob._mob_id = LineEdit.new()
+	mob._mob_id.text = "orc_001"
+	mob._operation = _option("save_draft")
+	mob._preview_facing = _option("N")
+	mob._preview_frame = _option(2)
+	mob._visual_mode = _option("composite_rig")
+	mob._composite_visual = descriptor.duplicate(true)
+	mob._status = Label.new()
+	client.request_failed.connect(mob._on_request_failed)
+	mob._preview()
+	if client.requests.size() != 1 or str((client.requests[0] as Dictionary).get("operation", "")) != "mob_preview":
+		_fail("Mob preview payload construction must issue only its mob_preview request")
+		return
+	var mob_payload := ((client.requests[0] as Dictionary).get("payload", {}) as Dictionary).get("composite_visual", {}) as Dictionary
+	if mob_payload != descriptor or mob_payload == mob._composite_visual:
+		_fail("Mob composite payload must be a detached authored descriptor without UI side effects")
+		return
+
+	var npc := FixtureNpcEditor.new()
+	npc._client = client
+	npc._npc_id = LineEdit.new()
+	npc._npc_id.text = "test_npc"
+	npc._operation = _option("save_draft")
+	npc._preview_facing = _option("south")
+	npc._preview_frame = _option(2)
+	npc._visual_mode = _option("composite_rig")
+	npc._composite_visual = descriptor.duplicate(true)
+	npc._status = Label.new()
+	npc._preview()
+	if client.requests.size() != 2 or str((client.requests[1] as Dictionary).get("operation", "")) != "npc_preview":
+		_fail("NPC preview payload construction must issue only its npc_preview request")
+		return
+
+	var rejecting_client := FixtureAuthoringHostClient.new()
+	rejecting_client.reject_requests = true
+	var rejecting_mob := FixtureMobEditor.new()
+	rejecting_mob._client = rejecting_client
+	rejecting_mob._mob_id = LineEdit.new()
+	rejecting_mob._mob_id.text = "orc_001"
+	rejecting_mob._operation = _option("save_draft")
+	rejecting_mob._preview_facing = _option("N")
+	rejecting_mob._preview_frame = _option(2)
+	rejecting_mob._visual_mode = _option("composite_rig")
+	rejecting_mob._composite_visual = descriptor.duplicate(true)
+	rejecting_mob._status = Label.new()
+	rejecting_client.request_failed.connect(rejecting_mob._on_request_failed)
+	rejecting_mob._preview()
+	if rejecting_mob._status.text != "Another host request is still in progress.":
+		_fail("A synchronous Mob preview failure must not be overwritten by calculating status")
+
+
+func _option(metadata: Variant) -> OptionButton:
+	var option := OptionButton.new()
+	option.add_item(str(metadata))
+	option.set_item_metadata(0, metadata)
+	option.select(0)
+	return option
 
 
 func _verify_rigged_mob_preview() -> void:

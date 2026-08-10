@@ -61,6 +61,8 @@ func configure_client(client: AuthoringHostClient) -> void:
 
 func configure_context(context: Dictionary) -> void:
 	_ensure_ui()
+	if _same_context(context, _context):
+		return
 	if not _active_operation.is_empty():
 		_pending_context = context.duplicate(true)
 		_status.text = "Waiting for the active calibration request before changing calibration context."
@@ -548,7 +550,7 @@ func _set_enabled(enabled: bool) -> void:
 
 
 func _same_context(left: Dictionary, right: Dictionary) -> bool:
-	return str(left.get("actor_kind", "")) == str(right.get("actor_kind", "")) and str(left.get("visual_texture_path", "")) == str(right.get("visual_texture_path", "")) and str(left.get("rig_id", "")) == str(right.get("rig_id", "")) and str(left.get("calibration_id", "")) == str(right.get("calibration_id", ""))
+	return str(left.get("actor_kind", "")) == str(right.get("actor_kind", "")) and str(left.get("visual_texture_path", "")) == str(right.get("visual_texture_path", "")) and str(left.get("rig_id", "")) == str(right.get("rig_id", "")) and str(left.get("calibration_id", "")) == str(right.get("calibration_id", "")) and bool(left.get("calibrations_available", true)) == bool(right.get("calibrations_available", true))
 
 
 func _frame_key(direction: String, frame: int) -> String:
