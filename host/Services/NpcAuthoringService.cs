@@ -641,8 +641,25 @@ public sealed class NpcAuthoringService
             record.UpdatedAtUtc,
             asset.FilePath,
             record.VisualMode,
-            record.CompositeVisual);
+            record.CompositeVisual,
+            ResolvePersistedRiggedSpritePreview(record, asset));
     }
+
+    private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
+        NpcDefinitionRecord record,
+        ItemAssetResolution asset) =>
+        record.VisualMode == ActorVisualModes.CompositeRig
+        && record.CompositeVisual is not null
+        && asset.Exists
+        && asset.FilePath is not null
+            ? _riggedSpritePreviewResolver.Resolve(
+                asset.FilePath,
+                record.SourceWidth,
+                record.SourceHeight,
+                record.CompositeVisual,
+                null,
+                null)
+            : null;
 
     private static NpcDefinitionSummary ToSummary(NpcDefinitionRecord record) =>
         new(

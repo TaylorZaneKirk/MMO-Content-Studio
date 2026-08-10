@@ -58,6 +58,7 @@ func _run() -> void:
 	await _verify_rigged_mob_preview()
 	_verify_composite_visual_payload()
 	_verify_composite_preview_requests()
+	_verify_persisted_composite_previews()
 	print("[actor-socket-calibration-fixture] passed")
 	quit(0)
 
@@ -437,6 +438,102 @@ func _verify_composite_visual_payload() -> void:
 	})
 	if int(payload.get("schema_version", 0)) != 1 or str(payload.get("fixed_direction", "")) != "S" or int(payload.get("fixed_frame", 0)) != 1:
 		_fail("Fixed descriptors must serialize typed fixed pose values")
+
+
+func _verify_persisted_composite_previews() -> void:
+	var temporary_root := ProjectSettings.globalize_path("user://persisted-composite-preview-fixture")
+	DirAccess.make_dir_recursive_absolute(temporary_root)
+	var base_path := temporary_root.path_join("orc.png")
+	var cosmetic_path := temporary_root.path_join("axe.png")
+	_write_fixture_png(base_path, Vector2i(160, 192), Color(0.2, 0.4, 0.6, 1))
+	_write_fixture_png(cosmetic_path, Vector2i(24, 32), Color(1.0, 0.75, 0.15, 1))
+	var rigged_preview := {
+		"base_file_path": base_path,
+		"source_width": 160,
+		"source_height": 192,
+		"direction": "S",
+		"frame": 1,
+		"cosmetics": [{
+			"item_id": "inventory_154_axe",
+			"file_path": cosmetic_path,
+			"x": 25,
+			"y": 135,
+			"z_index": 10,
+			"flip_x": false,
+		}],
+		"foreground_overlays": [],
+	}
+	var fixed_descriptor := {
+		"schema_version": 1,
+		"rig_id": "humanoid_v1",
+		"calibration_id": "orc_v1",
+		"pose_policy": "fixed",
+		"fixed_direction": "S",
+		"fixed_frame": 1,
+		"cosmetic_item_ids": {"right_hand": "inventory_154_axe"},
+	}
+	var mob_client := FixtureAuthoringHostClient.new()
+	var mob := FixtureMobEditor.new()
+	mob._client = mob_client
+	mob._visual_preview = MobEditor.MobVisualPreview.new()
+	mob._presentation_semantics = Label.new()
+	mob._visual_path = LineEdit.new()
+	mob._visual_path.text = "res://assets/maps/objects/mobs/orc.png"
+	mob._visual_mode = _option("composite_rig")
+	mob._preview_facing = _option("S")
+	mob._preview_frame = _option(1)
+	mob._fixed_direction_label = Label.new()
+	mob._fixed_frame_label = Label.new()
+	mob._composite_visual = fixed_descriptor.duplicate(true)
+	mob._apply_button = Button.new()
+	mob._apply_button.disabled = true
+	mob._apply_persisted_rigged_preview({"rigged_sprite_preview": rigged_preview})
+	mob._update_presentation_semantics()
+	if not mob._has_persisted_rigged_preview or mob._visual_preview.rigged_cosmetics.size() != 1 or mob._visual_preview.rigged_draw_list.filter(func(entry: Dictionary) -> bool: return str(entry.get("kind", "")) == "cosmetic").size() != 1:
+		_fail("Loaded Mob presentation must immediately retain and draw the saved Axe manifest")
+		return
+	if not mob_client.requests.is_empty() or not mob._apply_button.disabled:
+		_fail("Loading persisted Mob presentation must not run a mutation preview or enable Apply")
+		return
+	if not mob._presentation_semantics.text.contains("Static base presentation") or not mob._presentation_semantics.text.contains("Attachment pose: South / F1") or mob._fixed_direction_label.text != "Attachment direction":
+		_fail("Static fixed Mob UI must distinguish the base image from its attachment pose")
+		return
+	mob._clear_rigged_preview_for_unsaved_change()
+	mob._update_presentation_semantics()
+	if not mob._visual_preview.rigged_sprite_preview.is_empty() or not mob._presentation_semantics.text.contains("Validate changes to preview the unsaved composition"):
+		_fail("Unsaved Mob appearance changes must clear the saved composite manifest")
+		return
+
+	var npc_client := FixtureAuthoringHostClient.new()
+	var npc := FixtureNpcEditor.new()
+	npc._client = npc_client
+	npc._visual_preview = NpcEditor.NpcVisualPreview.new()
+	npc._presentation_semantics = Label.new()
+	npc._visual_path = LineEdit.new()
+	npc._visual_path.text = "res://assets/actors/npcs/Chars_139_200-F2-S.png"
+	npc._visual_mode = _option("composite_rig")
+	npc._preview_facing = _direction_option("north")
+	npc._preview_frame = _option(2)
+	npc._fixed_direction_label = Label.new()
+	npc._fixed_frame_label = Label.new()
+	npc._composite_visual = {
+		"schema_version": 1,
+		"rig_id": "humanoid_v1",
+		"calibration_id": null,
+		"pose_policy": "actor_pose",
+		"fixed_direction": null,
+		"fixed_frame": null,
+		"cosmetic_item_ids": {"right_hand": "inventory_154_axe"},
+	}
+	npc._apply_button = Button.new()
+	npc._apply_button.disabled = true
+	npc._apply_persisted_rigged_preview({"rigged_sprite_preview": rigged_preview})
+	npc._update_presentation_semantics()
+	if not npc._has_persisted_rigged_preview or npc._visual_preview.rigged_cosmetics.size() != 1 or _selected_metadata(npc._preview_facing) != "south" or int(_selected_metadata(npc._preview_frame)) != 1:
+		_fail("Loaded actor-pose NPC presentation must immediately retain the saved Axe manifest and effective S/F1 pose")
+		return
+	if not npc_client.requests.is_empty() or not npc._apply_button.disabled or npc._presentation_semantics.text.contains("Static base presentation") or not npc._presentation_semantics.text.contains("Actor-pose presentation"):
+		_fail("Actor-pose NPC presentation must remain literal without a static-base explanation or mutation preview")
 
 
 func _verify_fixed_pose_rows(mob: FixtureMobEditor, npc: FixtureNpcEditor) -> void:

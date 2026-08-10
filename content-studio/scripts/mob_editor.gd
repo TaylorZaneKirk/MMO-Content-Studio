@@ -201,6 +201,7 @@ var _changes: VBoxContainer
 var _validation: VBoxContainer
 var _visual_preview: MobVisualPreview
 var _visual_status: Label
+var _presentation_semantics: Label
 var _preview_facing: OptionButton
 var _preview_frame: OptionButton
 var _visual_mode: OptionButton
@@ -215,6 +216,8 @@ var _rigged_controls: VBoxContainer
 var _composite_visual: Dictionary = {}
 var _cosmetic_selectors: Dictionary = {}
 var _socket_calibration_editor: ActorSocketCalibrationEditor
+var _has_persisted_rigged_preview := false
+var _has_rigged_preview := false
 
 
 func _ready() -> void:
@@ -313,6 +316,8 @@ func _build_ui() -> void:
 	_preview_frame.item_selected.connect(_on_preview_pose_changed.unbind(1))
 	facing_row.add_child(_preview_frame)
 	preview_content.add_child(facing_row)
+	_presentation_semantics = _wrapped_label("")
+	preview_content.add_child(_presentation_semantics)
 	_add_heading(preview_content, "Actor Socket Calibration", 16)
 	_socket_calibration_editor = ACTOR_SOCKET_CALIBRATION_EDITOR.new()
 	_socket_calibration_editor.configure_client(_client)
@@ -532,9 +537,12 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 	_asset_preview_file_path = str(payload.get("asset_preview_file_path", ""))
 	var rigged_preview: Dictionary = payload.get("rigged_sprite_preview", {}) as Dictionary
 	if not rigged_preview.is_empty():
+		_has_persisted_rigged_preview = false
+		_has_rigged_preview = true
 		_asset_preview_file_path = str(rigged_preview.get("base_file_path", _asset_preview_file_path))
-	_visual_preview.set_rigged_sprite_preview(rigged_preview)
+		_visual_preview.set_rigged_sprite_preview(rigged_preview)
 	_update_visual_preview()
+	_update_presentation_semantics()
 	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
 
 
@@ -665,8 +673,10 @@ func _load_mob(payload: Dictionary) -> void:
 	_update_behavior_controls()
 	_update_targeting_controls()
 	_update_attack_controls()
-	_update_visual_preview()
 	_clear_preview()
+	_apply_persisted_rigged_preview(payload)
+	_update_visual_preview()
+	_update_presentation_semantics()
 	_status.text = "Loaded %s." % _mob_id.text
 	_is_loading = false
 
@@ -1020,6 +1030,72 @@ func _load_composite_visual(payload: Dictionary) -> void:
 	_refresh_socket_calibration_editor()
 
 
+func _apply_persisted_rigged_preview(payload: Dictionary) -> void:
+	var rigged_preview: Dictionary = payload.get("rigged_sprite_preview", {}) as Dictionary
+	_has_persisted_rigged_preview = not rigged_preview.is_empty()
+	_has_rigged_preview = _has_persisted_rigged_preview
+	if rigged_preview.is_empty():
+		return
+	_asset_preview_file_path = str(rigged_preview.get("base_file_path", _asset_preview_file_path))
+	_visual_preview.set_rigged_sprite_preview(rigged_preview)
+	if str(_composite_visual.get("pose_policy", "")) == "actor_pose":
+		_select_option(_preview_facing, str(rigged_preview.get("direction", "S")))
+		_select_option(_preview_frame, str(int(rigged_preview.get("frame", 1))))
+
+
+func _update_presentation_semantics() -> void:
+	if _presentation_semantics == null:
+		return
+	if _selected_metadata(_visual_mode) != "composite_rig":
+		_presentation_semantics.text = ""
+		return
+	var fixed := str(_composite_visual.get("pose_policy", "")) == "fixed"
+	var static_base := fixed and _is_static_fixed_base_texture()
+	if static_base:
+		_fixed_direction_label.text = "Attachment direction"
+		_fixed_frame_label.text = "Attachment frame"
+		_presentation_semantics.text = "Static base presentation\nAttachment pose: %s / F%d\nFixed single-image actors keep their authored base PNG. Direction/frame select the attachment profile used for sockets, held-item art, and overlays." % [_direction_display_name(str(_composite_visual.get("fixed_direction", "S"))), int(_composite_visual.get("fixed_frame", 1))]
+	elif fixed:
+		_fixed_direction_label.text = "Fixed direction"
+		_fixed_frame_label.text = "Fixed frame"
+		_presentation_semantics.text = "Fixed pose presentation."
+	else:
+		_fixed_direction_label.text = "Fixed direction"
+		_fixed_frame_label.text = "Fixed frame"
+		_presentation_semantics.text = "Actor-pose presentation. Preview direction and frame select literal normalized actor art."
+	if _has_persisted_rigged_preview:
+		_presentation_semantics.text += "\nShowing saved presentation."
+	elif _has_rigged_preview:
+		_presentation_semantics.text += "\nShowing previewed unsaved composition."
+	else:
+		_presentation_semantics.text += "\nValidate changes to preview the unsaved composition."
+
+
+func _is_static_fixed_base_texture() -> bool:
+	var pattern := RegEx.new()
+	pattern.compile("-F[1-4]-[NESW]\\.png$")
+	return pattern.search(_visual_path.text.strip_edges().get_file()) == null
+
+
+func _direction_display_name(direction: String) -> String:
+	match direction.to_upper():
+		"N":
+			return "North"
+		"E":
+			return "East"
+		"S":
+			return "South"
+		"W":
+			return "West"
+	return direction
+
+
+func _clear_rigged_preview_for_unsaved_change() -> void:
+	_has_persisted_rigged_preview = false
+	_has_rigged_preview = false
+	_visual_preview.set_rigged_sprite_preview({})
+
+
 func _on_visual_mode_changed() -> void:
 	if _selected_metadata(_visual_mode) == "composite_rig" and _composite_visual.is_empty():
 		_composite_visual = {"schema_version": 1, "rig_id": _first_rig_id(), "calibration_id": null, "pose_policy": "actor_pose", "fixed_direction": null, "fixed_frame": null, "cosmetic_item_ids": {}}
@@ -1235,18 +1311,20 @@ func _set_fixed_pose_rows_visible(visible: bool) -> void:
 func _on_form_changed(_value: Variant = null) -> void:
 	if _is_loading:
 		return
-	_visual_preview.set_rigged_sprite_preview({})
+	_clear_rigged_preview_for_unsaved_change()
 	_clear_preview()
 	_update_visual_preview()
+	_update_presentation_semantics()
 
 
 func _on_visual_path_changed(_value: String) -> void:
 	if _is_loading:
 		return
+	_clear_rigged_preview_for_unsaved_change()
 	_asset_preview_file_path = ""
-	_visual_preview.set_rigged_sprite_preview({})
 	_clear_preview()
 	_update_visual_preview()
+	_update_presentation_semantics()
 	_refresh_socket_calibration_editor()
 
 

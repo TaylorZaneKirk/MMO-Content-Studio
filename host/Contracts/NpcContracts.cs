@@ -44,7 +44,8 @@ public sealed record NpcDefinition(
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null);
 
 public sealed record NpcDraft(
     [property: JsonPropertyName("display_name")] string DisplayName,

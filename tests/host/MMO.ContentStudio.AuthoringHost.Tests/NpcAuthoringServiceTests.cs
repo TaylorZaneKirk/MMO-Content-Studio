@@ -12,6 +12,37 @@ namespace MMO.ContentStudio.AuthoringHost.Tests;
 public sealed class NpcAuthoringServiceTests : IDisposable
 {
     [Fact]
+    public async Task LoadPersistedCompositeNpcIncludesRiggedPresentation()
+    {
+        var repository = new InMemoryNpcRepository();
+        repository.Put(Record("test_npc", "Test NPC", "Published") with
+        {
+            VisualTexturePath = "res://assets/actors/npcs/Chars_139_200-F2-S.png",
+            SourceWidth = 184,
+            SourceHeight = 180,
+            VisualMode = ActorVisualModes.CompositeRig,
+            CompositeVisual = new RiggedSpriteVisualDescriptor(
+                1,
+                "humanoid_v1",
+                null,
+                "actor_pose",
+                null,
+                null,
+                new Dictionary<string, string> { ["right_hand"] = "inventory_154_axe" })
+        });
+        var service = CreateService(repository, assetsRoot: FindProjectClientAssetsRoot());
+
+        var loaded = await service.LoadAsync("test_npc", TestContext.Current.CancellationToken);
+
+        AssertSucceeded(loaded);
+        var preview = Assert.IsType<RiggedSpritePreviewDefinition>(loaded.Value!.RiggedSpritePreview);
+        Assert.EndsWith("actors/npcs/Chars_138_200-F1-S.png", preview.BaseFilePath.Replace('\\', '/'), StringComparison.Ordinal);
+        Assert.Equal("S", preview.Direction);
+        Assert.Equal(1, preview.Frame);
+        Assert.Equal("inventory_154_axe", Assert.Single(preview.Cosmetics).ItemId);
+    }
+
+    [Fact]
     public async Task LoadOptionsIncludesRiggedSpriteAppearanceWhenCanonicalRigDataIsAvailable()
     {
         var result = await CreateService(
@@ -92,6 +123,7 @@ public sealed class NpcAuthoringServiceTests : IDisposable
         AssertSucceeded(loaded);
         Assert.Equal("test_npc_greeting", loaded.Value!.DefaultDialogueId);
         Assert.Equal("notes", loaded.Value.Notes);
+        Assert.Null(loaded.Value.RiggedSpritePreview);
     }
 
     [Fact]

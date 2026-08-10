@@ -706,8 +706,25 @@ public sealed class MobAuthoringService
             record.UpdatedAtUtc,
             asset.FilePath,
             record.VisualMode,
-            record.CompositeVisual);
+            record.CompositeVisual,
+            ResolvePersistedRiggedSpritePreview(record, asset));
     }
+
+    private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
+        MobDefinitionRecord record,
+        ItemAssetResolution asset) =>
+        record.VisualMode == ActorVisualModes.CompositeRig
+        && record.CompositeVisual is not null
+        && asset.Exists
+        && asset.FilePath is not null
+            ? _riggedSpritePreviewResolver.Resolve(
+                asset.FilePath,
+                record.SourceWidth,
+                record.SourceHeight,
+                record.CompositeVisual,
+                null,
+                null)
+            : null;
 
     private static MobDefinitionSummary ToSummary(MobDefinitionRecord record) =>
         new(

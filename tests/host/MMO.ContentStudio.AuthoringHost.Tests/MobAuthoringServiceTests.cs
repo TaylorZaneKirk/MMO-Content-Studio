@@ -12,6 +12,55 @@ namespace MMO.ContentStudio.AuthoringHost.Tests;
 public sealed class MobAuthoringServiceTests
 {
     [Fact]
+    public async Task LoadFlatSpriteDoesNotIncludeRiggedPresentation()
+    {
+        var repository = new InMemoryMobRepository();
+        repository.Put(Record());
+        var service = CreateService(repository, FindProjectClientAssetsRoot());
+
+        var loaded = await service.LoadAsync("slime", TestContext.Current.CancellationToken);
+
+        AssertSucceeded(loaded);
+        Assert.Null(loaded.Value!.RiggedSpritePreview);
+    }
+
+    [Fact]
+    public async Task LoadPersistedCompositeOrcIncludesStaticRiggedPresentation()
+    {
+        var repository = new InMemoryMobRepository();
+        repository.Put(Record() with
+        {
+            MobDefinitionId = "orc_001",
+            DisplayName = "Orc",
+            VisualTexturePath = "res://assets/maps/objects/mobs/orc.png",
+            SourceWidth = 160,
+            SourceHeight = 192,
+            VisualMode = ActorVisualModes.CompositeRig,
+            CompositeVisual = new RiggedSpriteVisualDescriptor(
+                1,
+                "humanoid_v1",
+                "orc_v1",
+                "fixed",
+                "S",
+                1,
+                new Dictionary<string, string> { ["right_hand"] = "inventory_154_axe" })
+        });
+        var service = CreateService(repository, FindProjectClientAssetsRoot());
+
+        var loaded = await service.LoadAsync("orc_001", TestContext.Current.CancellationToken);
+
+        AssertSucceeded(loaded);
+        var preview = Assert.IsType<RiggedSpritePreviewDefinition>(loaded.Value!.RiggedSpritePreview);
+        Assert.EndsWith("maps/objects/mobs/orc.png", preview.BaseFilePath.Replace('\\', '/'), StringComparison.Ordinal);
+        Assert.Equal(160, preview.SourceWidth);
+        Assert.Equal(192, preview.SourceHeight);
+        Assert.Equal("S", preview.Direction);
+        Assert.Equal(1, preview.Frame);
+        Assert.Equal("inventory_154_axe", Assert.Single(preview.Cosmetics).ItemId);
+        Assert.Equal("right_hand_primary_grip", Assert.Single(preview.ForegroundOverlays).OverlayId);
+    }
+
+    [Fact]
     public async Task LoadOptionsIncludesRiggedSpriteAppearanceWhenCanonicalRigDataIsAvailable()
     {
         var result = await CreateService(
