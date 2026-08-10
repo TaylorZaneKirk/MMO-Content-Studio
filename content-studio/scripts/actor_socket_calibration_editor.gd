@@ -322,6 +322,7 @@ func _on_frames_received(payload: Dictionary) -> void:
 	for frame_variant in payload.get("frames", []) as Array:
 		var frame := frame_variant as Dictionary
 		_frames[_frame_key(str(frame.get("direction", "")), int(frame.get("frame", 0)))] = frame.duplicate(true)
+	_status.text = ""
 	_process_queued_request()
 	_refresh_view()
 

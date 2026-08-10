@@ -40,7 +40,7 @@ func load_response(payload: Dictionary) -> void:
 	if exists and not calibration.is_empty():
 		loaded_calibration_id = str(calibration.get("calibration_id", target_calibration_id)).strip_edges()
 		calibration_id = loaded_calibration_id
-		socket_overrides = (calibration.get("sockets", {}) as Dictionary).duplicate(true)
+		socket_overrides = _normalize_socket_overrides(calibration.get("sockets", {}) as Dictionary)
 	else:
 		loaded_calibration_id = target_calibration_id
 		calibration_id = target_calibration_id
@@ -121,6 +121,30 @@ func apply_saved_response(payload: Dictionary) -> void:
 
 func discard_changes() -> void:
 	socket_overrides = _saved_socket_overrides.duplicate(true)
+
+
+func _normalize_socket_overrides(value: Dictionary) -> Dictionary:
+	var normalized := value.duplicate(true)
+	for socket_id_variant in normalized.keys():
+		var directions := normalized.get(socket_id_variant, {}) as Dictionary
+		for direction_variant in directions.keys():
+			var frames := directions.get(direction_variant, {}) as Dictionary
+			for frame_variant in frames.keys():
+				var point := frames.get(frame_variant, {}) as Dictionary
+				if point.has("x"):
+					point["x"] = _normalize_coordinate(point.get("x"))
+				if point.has("y"):
+					point["y"] = _normalize_coordinate(point.get("y"))
+				frames[frame_variant] = point
+			directions[direction_variant] = frames
+		normalized[socket_id_variant] = directions
+	return normalized
+
+
+func _normalize_coordinate(value: Variant) -> Variant:
+	if value is float and is_equal_approx(value, round(value)):
+		return int(value)
+	return value
 
 
 func _read_base_point(socket_id: String, direction: String, frame: int) -> Dictionary:

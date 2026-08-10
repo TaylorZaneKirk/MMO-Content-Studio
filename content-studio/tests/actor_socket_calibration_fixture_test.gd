@@ -3,6 +3,7 @@ extends SceneTree
 const State = preload("res://scripts/actor_socket_calibration_state.gd")
 const Canvas = preload("res://scripts/actor_socket_calibration_canvas.gd")
 const Editor = preload("res://scripts/actor_socket_calibration_editor.gd")
+const MobEditor = preload("res://scripts/mob_editor.gd")
 
 
 class FixtureAuthoringHostClient extends AuthoringHostClient:
@@ -38,6 +39,7 @@ func _run() -> void:
 	_verify_state()
 	await _verify_canvas()
 	await _verify_editor()
+	await _verify_rigged_mob_preview()
 	print("[actor-socket-calibration-fixture] passed")
 	quit(0)
 
@@ -45,19 +47,25 @@ func _run() -> void:
 func _verify_state() -> void:
 	var state = State.new()
 	state.configure(_rig(), "orc_v1")
-	state.load_response({
-		"exists": true,
-		"catalog_hash": "before",
-		"calibration": {
-			"calibration_id": "orc_v1",
-			"rig_id": "humanoid_v1",
-			"sockets": {
-				"right_hand_primary": {
-					"S": {"1": {"x": 25, "y": 135}, "2": {"x": 31, "y": 136}},
-				},
-			},
-		},
-	})
+	var parsed := JSON.new()
+	if parsed.parse('''
+		{
+			"exists": true,
+			"catalog_hash": "before",
+			"calibration": {
+				"calibration_id": "orc_v1",
+				"rig_id": "humanoid_v1",
+				"sockets": {
+					"right_hand_primary": {
+						"S": {"1": {"x": 25, "y": 135}, "2": {"x": 31, "y": 136}}
+					}
+				}
+			}
+		}
+	''') != OK:
+		_fail("Fixture calibration JSON must parse")
+		return
+	state.load_response(parsed.data as Dictionary)
 	var overridden := state.resolve_effective_point("right_hand_primary", "S", 1)
 	if not bool(overridden.get("is_override", false)) or int((overridden.get("point", {}) as Dictionary).get("x", 0)) != 25:
 		_fail("Actor override must take precedence over the rig socket")
@@ -72,6 +80,9 @@ func _verify_state() -> void:
 	var sockets := payload.get("socket_overrides", {}) as Dictionary
 	if int((((sockets.get("right_hand_primary", {}) as Dictionary).get("S", {}) as Dictionary).get("1", {}) as Dictionary).get("x", 0)) != 25 or not ((sockets.get("left_hand_primary", {}) as Dictionary).has("S")):
 		_fail("Saving one pose must retain the complete socket override dictionary")
+		return
+	if JSON.stringify(payload).contains("25.0") or JSON.stringify(payload).contains("135.0"):
+		_fail("Loaded integral socket coordinates must remain integer JSON values when resaved")
 		return
 	if int((state.resolve_effective_point("left_hand_primary", "S", 1).get("point", {}) as Dictionary).get("y", 0)) != 500:
 		_fail("Numeric fields must retain signed outside-image coordinates")
@@ -150,6 +161,9 @@ func _verify_editor() -> void:
 	if editor._state.loaded_calibration_id != "orc_v1" or not editor._state.is_loaded_target("orc_v1"):
 		_fail("The editor must retain an explicit successfully loaded calibration target")
 		return
+	if editor._status.text == "Selected exact pose is unavailable. No compatibility frame is used.":
+		_fail("The exact-pose unavailable status must clear once the requested frame is available")
+		return
 	editor._state.set_override("right_hand_primary", "S", 1, Vector2i(26, 136))
 	editor._refresh_view()
 	if not editor._state.is_dirty() or int((editor._state.save_payload().get("socket_overrides", {}) as Dictionary).get("right_hand_primary", {}) .get("S", {}) .get("2", {}) .get("x", 0)) != 31:
@@ -188,6 +202,63 @@ func _verify_editor() -> void:
 	await process_frame
 
 
+func _verify_rigged_mob_preview() -> void:
+	var temporary_root := ProjectSettings.globalize_path("user://actor-socket-calibration-preview-fixture")
+	DirAccess.make_dir_recursive_absolute(temporary_root)
+	var base_path := temporary_root.path_join("base.png")
+	var cosmetic_path := temporary_root.path_join("axe.png")
+	_write_fixture_png(base_path, Vector2i(160, 192), Color(0.2, 0.4, 0.6, 1))
+	_write_fixture_png(cosmetic_path, Vector2i(24, 32), Color(1.0, 0.75, 0.15, 1))
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(240, 220)
+	viewport.transparent_bg = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(viewport)
+	var preview = MobEditor.MobVisualPreview.new()
+	preview.size = Vector2(240, 220)
+	viewport.add_child(preview)
+	preview.set_rigged_sprite_preview({
+		"source_width": 160,
+		"source_height": 192,
+		"cosmetics": [{
+			"item_id": "inventory_154_axe",
+			"file_path": cosmetic_path,
+			"x": 25,
+			"y": 135,
+			"z_index": 10,
+			"flip_x": false,
+		}],
+		"foreground_overlays": [],
+	})
+	if preview.rigged_cosmetics.size() != 1:
+		_fail("A rigged Mob preview must load the host-resolved socket cosmetic")
+		return
+	if preview.rigged_draw_list.filter(func(entry: Dictionary) -> bool: return str(entry.get("kind", "")) == "cosmetic").size() != 1:
+		_fail("A rigged Mob preview must retain the socket cosmetic in its ordered draw list")
+		return
+	var base_image := Image.load_from_file(base_path)
+	preview.set_payload(
+		ImageTexture.create_from_image(base_image),
+		160,
+		192,
+		0.0,
+		0.0,
+		0.25,
+		1,
+		1,
+		"fixture"
+	)
+	await RenderingServer.frame_post_draw
+	var rendered := viewport.get_texture().get_image()
+	var expected := Vector2i(65, 153)
+	if rendered.get_pixelv(expected).r < 0.9 or rendered.get_pixelv(expected).g < 0.6:
+		_fail("A rigged Mob preview must draw the socket cosmetic above its base actor")
+		return
+	preview.queue_free()
+	viewport.queue_free()
+	await process_frame
+
+
 func _context(calibration_id: String) -> Dictionary:
 	return {
 		"actor_kind": "mob",
@@ -205,6 +276,12 @@ func _frames_response() -> Dictionary:
 		for frame in [1, 2, 3, 4]:
 			frames.append({"direction": direction, "frame": frame, "available": true, "file_path": "", "source_width": 160, "source_height": 200})
 	return {"actor_kind": "mob", "visual_texture_path": "res://assets/maps/objects/mobs/orc.png", "frames": frames}
+
+
+func _write_fixture_png(path: String, size: Vector2i, color: Color) -> void:
+	var image := Image.create(size.x, size.y, false, Image.FORMAT_RGBA8)
+	image.fill(color)
+	image.save_png(path)
 
 
 func _rig() -> Dictionary:
