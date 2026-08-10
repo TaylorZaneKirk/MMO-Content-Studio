@@ -180,11 +180,12 @@ The default API address is `http://127.0.0.1:5187`.
 9. **R4D.1B.1 — Actor appearance discovery and socket editor loading repair** — implemented
 10. **R4D.2 — Equipment grip anchor editor hardening** — implemented
 11. **R4D.3 — Foreground grip overlay editor** — implemented
-12. **T6 — Interactable world objects foundation**
-13. **T7 — Gathering resources and processing stations**
-14. **MMO Project quest foundations**
-15. **Dialogue Studio quest integration**
-16. **Quest Studio**
+12. **R4D.4 — Combined actor and item alignment workspace** — implemented
+13. **T6 — Interactable world objects foundation**
+14. **T7 — Gathering resources and processing stations**
+15. **MMO Project quest foundations**
+16. **Dialogue Studio quest integration**
+17. **Quest Studio**
 
 The current vertical slices author ordinary items, declarative consumables,
 wearable equipment, and hand-held weapons/tools.

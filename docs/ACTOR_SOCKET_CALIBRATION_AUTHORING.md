@@ -117,9 +117,43 @@ responsible for saving or publishing actor content.
 R4D.3 adds actor-owned foreground grip rectangle authoring to this same shared
 calibration lifecycle. See [FOREGROUND_GRIP_OVERLAY_AUTHORING.md](FOREGROUND_GRIP_OVERLAY_AUTHORING.md).
 
+## Combined Actor and Item Alignment
+
+R4D.4 adds a combined source-pixel workspace to the NPC and Mob calibration
+editor. It renders the exact selected actor frame, the selected socket-bound
+item frame, the relevant rig-owned foreground overlay, and both attachment
+markers at once. Gold is the actor socket; pink is the effective item grip.
+Their placement always uses:
+
+```text
+item position = actor socket - item grip anchor + item nudge
+```
+
+The workspace uses the same exact-frame requirement as calibration. It never
+substitutes a compatibility actor or item frame, and its composition bounds
+include transparent padding on every side so an item may extend west, north,
+east, or south of the actor without clipping. Fit and manual zoom retain the
+same source registration.
+
+The editor has explicit ownership modes:
+
+- **Socket** edits only the sparse actor-calibration socket override and saves
+  only through the calibration catalog lifecycle.
+- **Item Grip Anchor** edits only an in-memory copy of the selected item's
+  per-pose anchor data. **Open Item Save Workflow** transfers that copy to the
+  existing Items workspace, where normal validation and Save Draft/Publish is
+  the sole persistence path. It never writes actor calibration data.
+- **Foreground Grip Overlay** remains the separate actor-owned rectangle editor
+  from R4D.3. It never creates or changes item grip metadata.
+
+Copy and mirror require an explicit target direction and frame. Mirroring is
+enabled only when both exact source frames are present; it uses the selected
+target frame width and each pose's explicit flip metadata. No implicit east /
+west relationship is assumed.
+
 ## Follow-up Boundaries
 
-R4D.2 owns equipped-item grip anchors. R4D.3 foreground-overlay rectangle
-editing is implemented. R4D.4 owns combined actor-and-item alignment, and
-R4D.5 owns full production pose calibration. The calibration editor does not
-change MMO runtime behavior.
+R4D.2 owns equipped-item grip persistence. R4D.3 foreground-overlay rectangle
+editing and R4D.4 combined actor-and-item alignment are implemented. R4D.5
+owns full production pose calibration. The calibration editor does not change
+MMO runtime behavior.

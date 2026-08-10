@@ -46,6 +46,23 @@ Rig-layer visuals are not socket attachments. Their normal preview settings
 remain available, while Grip Anchor X/Y, marker legend, and grip actions are
 hidden so the editor cannot fabricate socket data.
 
+## Combined Actor Alignment Handoff
+
+The NPC/Mob calibration workspace also provides an **Item Grip Anchor** mode
+when its current composite cosmetic selects a socket-bound item. That view
+combines the exact actor and item source frames with the rig-owned hand overlay
+to calibrate their visible alignment. Its pink marker edits a local copy only.
+
+Choosing **Open Item Save Workflow** opens the selected item through the
+existing unified Items workspace and transfers that local per-pose anchor map.
+The developer must use the existing Validate and Save Draft/Publish flow there
+to persist it. This handoff never writes a rig calibration file and never
+persists preview-only changes automatically.
+
+The combined workspace supports explicit copy and mirror to a selected target
+pose. Mirror requires both exact source frames and uses the target width plus
+the source and target `flip_x` metadata; it does not infer directional pairs.
+
 ## Local Host Note
 
 `./mmo-content-studio` reuses a reachable authoring host. Health checks do not

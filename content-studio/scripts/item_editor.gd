@@ -136,6 +136,7 @@ var _equipped_visual_hidden_poses: Dictionary = {}
 var _equipped_visual_item_over_grip: Dictionary = {}
 var _appearance_updating := false
 var _grip_pose_art_available := false
+var _pending_grip_anchor_handoff: Dictionary = {}
 
 
 func _ready() -> void:
@@ -160,6 +161,18 @@ func _connect_client() -> void:
 	_client.item_mutation_completed.connect(_on_mutation_completed)
 	_client.item_delete_completed.connect(_on_delete_completed)
 	_client.request_failed.connect(_on_request_failed)
+
+
+func open_resource(item_id: String) -> void:
+	_client.load_item_definition(item_id)
+
+
+func stage_grip_anchor_handoff(item_id: String, grip_anchors: Dictionary) -> void:
+	_pending_grip_anchor_handoff = {
+		"item_id": item_id,
+		"grip_anchors": grip_anchors.duplicate(true),
+	}
+	_client.load_item_definition(item_id)
 
 
 func _build_ui() -> void:
@@ -626,7 +639,25 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_is_loading = false
 	_update_contextual_sections()
 	_clear_preview()
+	if _apply_pending_grip_anchor_handoff():
+		return
 	_status.text = "Loaded %s." % _item_id.text
+
+
+func _apply_pending_grip_anchor_handoff() -> bool:
+	if str(_pending_grip_anchor_handoff.get("item_id", "")) != _item_id.text:
+		return false
+	var anchors_variant: Variant = _pending_grip_anchor_handoff.get("grip_anchors", {})
+	_pending_grip_anchor_handoff = {}
+	if not _appearance_enabled.button_pressed or _selected_metadata(_appearance_binding) != "socket" or not (anchors_variant is Dictionary):
+		_status.text = "The alignment workspace handoff could not be applied because this item no longer has a socket-bound equipped visual."
+		return true
+	_equipped_visual_grip_anchors = (anchors_variant as Dictionary).duplicate(true)
+	_update_grip_pose_controls()
+	_update_paper_doll_preview()
+	_on_form_changed()
+	_status.text = "Loaded grip-anchor edits from the alignment workspace. Validate and save this complete item draft to persist them."
+	return true
 
 
 func _on_preview_received(payload: Dictionary) -> void:

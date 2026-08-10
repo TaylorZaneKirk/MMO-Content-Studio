@@ -2,6 +2,7 @@ extends HBoxContainer
 class_name NpcEditor
 
 signal workspace_open_requested(workspace_id: String, resource_id: String)
+signal item_grip_handoff_requested(item_id: String, grip_anchors: Dictionary)
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
@@ -424,6 +425,7 @@ func _add_preview_section(parent: VBoxContainer) -> void:
 	_socket_calibration_editor.configure_client(_client)
 	_socket_calibration_editor.use_calibration_for_actor.connect(_on_use_socket_calibration_for_actor)
 	_socket_calibration_editor.calibration_saved.connect(_on_socket_calibration_saved)
+	_socket_calibration_editor.item_grip_handoff_requested.connect(_on_item_grip_handoff_requested)
 	parent.add_child(_socket_calibration_editor)
 	_add_heading(parent, "Operation", 16)
 	_operation = OptionButton.new()
@@ -1081,6 +1083,7 @@ func _on_cosmetic_changed(layer_id: String, selector: OptionButton) -> void:
 	else:
 		cosmetics[layer_id] = item_id
 	_composite_visual["cosmetic_item_ids"] = cosmetics
+	_refresh_socket_calibration_editor()
 	_on_form_changed()
 
 
@@ -1103,6 +1106,9 @@ func _refresh_socket_calibration_editor() -> void:
 		"composite": _selected_metadata(_visual_mode) == "composite_rig",
 		"calibrations_available": bool((_options.get("actor_appearance", {}) as Dictionary).get("calibrations_available", true)),
 		"calibration_message": str((_options.get("actor_appearance", {}) as Dictionary).get("calibration_message", "")),
+		"game_client_assets_root": _game_client_assets_root,
+		"equipped_visuals": (_options.get("actor_appearance", {}) as Dictionary).get("equipped_visuals", []) as Array,
+		"cosmetic_item_ids": _composite_visual.get("cosmetic_item_ids", {}) as Dictionary,
 	})
 
 
@@ -1124,6 +1130,10 @@ func _on_use_socket_calibration_for_actor(calibration_id: String) -> void:
 
 func _on_socket_calibration_saved(calibration_id: String, rig_id: String) -> void:
 	_add_local_calibration_option(calibration_id, rig_id)
+
+
+func _on_item_grip_handoff_requested(item_id: String, grip_anchors: Dictionary) -> void:
+	item_grip_handoff_requested.emit(item_id, grip_anchors.duplicate(true))
 
 
 func _add_local_calibration_option(calibration_id: String, rig_id: String) -> void:

@@ -13,6 +13,8 @@ const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
 @onready var catalog_list: VBoxContainer = %CatalogList
 @onready var authoring_host_client: AuthoringHostClient = %AuthoringHostClient
 @onready var tabs: TabContainer = %Tabs
+@onready var item_editor = %Items
+@onready var mob_editor = %Mobs
 @onready var npc_editor = %NPCs
 @onready var dialogue_editor = %Dialogue
 
@@ -27,6 +29,8 @@ func _ready() -> void:
 	authoring_host_client.health_received.connect(_on_health_received)
 	authoring_host_client.catalog_received.connect(_on_catalog_received)
 	npc_editor.workspace_open_requested.connect(_on_workspace_open_requested)
+	npc_editor.item_grip_handoff_requested.connect(_on_item_grip_handoff_requested)
+	mob_editor.item_grip_handoff_requested.connect(_on_item_grip_handoff_requested)
 	dialogue_editor.workspace_open_requested.connect(_on_workspace_open_requested)
 	retry_button.pressed.connect(authoring_host_client.retry)
 	CONTENT_STUDIO_LOGGER.info("Content Studio startup requested")
@@ -136,12 +140,20 @@ func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> 
 		"workspace": workspace_id,
 	})
 	match workspace_id:
+		"items":
+			_open_tab(item_editor)
+			item_editor.open_resource(resource_id)
 		"dialogue":
 			_open_tab(dialogue_editor)
 			dialogue_editor.open_resource(resource_id)
 		"npcs":
 			_open_tab(npc_editor)
 			npc_editor.open_resource(resource_id)
+
+
+func _on_item_grip_handoff_requested(item_id: String, grip_anchors: Dictionary) -> void:
+	_open_tab(item_editor)
+	item_editor.stage_grip_anchor_handoff(item_id, grip_anchors)
 
 
 func _open_tab(control: Control) -> void:

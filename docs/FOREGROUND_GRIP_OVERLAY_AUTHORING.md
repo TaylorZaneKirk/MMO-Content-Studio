@@ -33,8 +33,9 @@ or editing fields creates one. Revert removes only the selected sparse
 rectangle. A pose with no rig rectangle may create a local 16x16 override near
 its associated effective socket, clamped to the exact frame.
 
-## Follow-up boundary
+## Combined-workspace boundary
 
-R4D.4 will provide the combined actor-and-item alignment workspace. R4D.3 edits
-only actor-art crop geometry; it does not render or edit equipped item art in
-the calibration canvas.
+R4D.4 provides a combined actor-and-item alignment workspace for inspecting a
+socket-bound item beneath this actor-owned crop. Overlay editing remains here:
+its rectangle is still the separate actor-calibration operation and does not
+edit or persist equipped-item grip anchors.

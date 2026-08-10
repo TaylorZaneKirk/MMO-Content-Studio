@@ -1,6 +1,8 @@
 extends RefCounted
 class_name PaperDollPreview
 
+const ATTACHMENT_ALIGNMENT := preload("res://scripts/actor_attachment_alignment.gd")
+
 signal grip_anchor_changed(direction: String, frame: int, x: int, y: int)
 
 const DEFAULT_VISUAL_KEYS := {"head": "head1", "body": "defbod", "legs": "defbod"}
@@ -328,15 +330,11 @@ func normalize_visual_key(value: String) -> String:
 
 
 func resolve_effective_grip_anchor(grip_anchor: Vector2i, texture_width: int, flip_x: bool) -> Vector2i:
-	if not flip_x:
-		return grip_anchor
-	return Vector2i((texture_width - 1) - grip_anchor.x, grip_anchor.y)
+	return ATTACHMENT_ALIGNMENT.resolve_effective_grip_anchor(grip_anchor, texture_width, flip_x)
 
 
 func resolve_source_pixel_offset(socket_position: Vector2i, grip_anchor: Vector2i, nudge: Vector2i = Vector2i.ZERO) -> Vector2:
-	return Vector2(
-		socket_position.x - grip_anchor.x + nudge.x,
-		socket_position.y - grip_anchor.y + nudge.y)
+	return Vector2(ATTACHMENT_ALIGNMENT.resolve_item_position(socket_position, grip_anchor, nudge))
 
 
 func _resolve_loaded_layers(
