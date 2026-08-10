@@ -419,7 +419,7 @@ func _add_preview_section(parent: VBoxContainer) -> void:
 	parent.add_child(facing_row)
 	_presentation_semantics = _wrapped_label("")
 	parent.add_child(_presentation_semantics)
-	_add_heading(parent, "Actor Socket Calibration", 16)
+	_add_heading(parent, "Actor Attachment Calibration", 16)
 	_socket_calibration_editor = ACTOR_SOCKET_CALIBRATION_EDITOR.new()
 	_socket_calibration_editor.configure_client(_client)
 	_socket_calibration_editor.use_calibration_for_actor.connect(_on_use_socket_calibration_for_actor)

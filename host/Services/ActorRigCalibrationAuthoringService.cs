@@ -18,14 +18,17 @@ public sealed class ActorRigCalibrationAuthoringService
     private static readonly string[] Frames = ["1", "2", "3", "4"];
 
     private readonly ActorAppearanceCatalogService _catalogService;
+    private readonly ActorCalibrationFrameResolver? _frameResolver;
     private readonly Action<string>? _beforeReplace;
     private readonly SemaphoreSlim _writeGate = new(1, 1);
 
     public ActorRigCalibrationAuthoringService(
         ActorAppearanceCatalogService catalogService,
+        ActorCalibrationFrameResolver? frameResolver = null,
         Action<string>? beforeReplace = null)
     {
         _catalogService = catalogService;
+        _frameResolver = frameResolver;
         _beforeReplace = beforeReplace;
     }
 
@@ -118,7 +121,26 @@ public sealed class ActorRigCalibrationAuthoringService
                 return AuthoringOperationResult<ActorCalibrationLoadResponse>.Failure(socketError!);
             }
 
-            if (existing is not null && JsonNode.DeepEquals(existing["sockets"], socketOverrides))
+            JsonObject? foregroundOverlays = null;
+            if (request.ForegroundOverlayOverrides is JsonElement requestedOverlays)
+            {
+                if (!TryParseForegroundOverlayOverrides(
+                        requestedOverlays,
+                        rig,
+                        request.ActorKind,
+                        request.VisualTexturePath,
+                        out var overlayOverrides,
+                        out var overlayError))
+                {
+                    return AuthoringOperationResult<ActorCalibrationLoadResponse>.Failure(overlayError!);
+                }
+
+                foregroundOverlays = MergeForegroundOverlayOverrides(existing?["foreground_overlays"] as JsonObject, rig, overlayOverrides);
+            }
+
+            if (existing is not null
+                && JsonNode.DeepEquals(existing["sockets"], socketOverrides)
+                && (foregroundOverlays is null || JsonNode.DeepEquals(existing["foreground_overlays"], foregroundOverlays)))
             {
                 return AuthoringOperationResult<ActorCalibrationLoadResponse>.Success(
                     new ActorCalibrationLoadResponse(true, catalog.Value.Hash, ToJsonElement(existing)));
@@ -133,6 +155,17 @@ public sealed class ActorRigCalibrationAuthoringService
                 }
                 : (JsonObject)existing.DeepClone();
             updatedEntry["sockets"] = socketOverrides;
+            if (foregroundOverlays is not null)
+            {
+                if (foregroundOverlays.Count == 0)
+                {
+                    updatedEntry.Remove("foreground_overlays");
+                }
+                else
+                {
+                    updatedEntry["foreground_overlays"] = foregroundOverlays;
+                }
+            }
 
             var updatedEntries = catalog.Value.Calibrations.OfType<JsonObject>()
                 .Where(entry => !string.Equals(ReadCalibrationId(entry), normalizedId, StringComparison.Ordinal))
@@ -263,7 +296,9 @@ public sealed class ActorRigCalibrationAuthoringService
             }
 
             var rig = rigCatalog.Rigs.SingleOrDefault(candidate => candidate.RigId == rigId);
-            if (rig is null || !TryValidateExistingSocketOverrides(entry["sockets"], rig, out error))
+            if (rig is null
+                || !TryValidateExistingSocketOverrides(entry["sockets"], rig, out error)
+                || !TryValidateExistingForegroundOverlayOverrides(entry["foreground_overlays"], rig, out error))
             {
                 error ??= new ApiError("invalid_actor_calibration_catalog", "The actor calibration catalog references an unavailable rig.", ValidationSeverity.Error);
                 return false;
@@ -289,6 +324,44 @@ public sealed class ActorRigCalibrationAuthoringService
 
         error = new ApiError("invalid_actor_calibration_catalog", "The actor calibration catalog contains invalid socket overrides.", ValidationSeverity.Error);
         return false;
+    }
+
+    private static bool TryValidateExistingForegroundOverlayOverrides(JsonNode? node, ActorRigDefinition rig, out ApiError? error)
+    {
+        error = null;
+        if (node is null)
+        {
+            return true;
+        }
+
+        if (node is not JsonObject overlays)
+        {
+            error = new ApiError("invalid_actor_calibration_catalog", "The actor calibration catalog contains invalid foreground overlay overrides.", ValidationSeverity.Error);
+            return false;
+        }
+
+        var knownOverlayIds = rig.ForegroundOverlays.Select(overlay => overlay.OverlayId).ToHashSet(StringComparer.Ordinal);
+        foreach (var overlay in overlays)
+        {
+            if (!knownOverlayIds.Contains(overlay.Key) || overlay.Value is not JsonObject overlayObject)
+            {
+                continue;
+            }
+
+            if (overlayObject["source_rect_by_direction"] is not JsonObject directions)
+            {
+                continue;
+            }
+
+            using var document = JsonDocument.Parse($"{{\"{overlay.Key}\":{directions.ToJsonString()}}}");
+            if (!TryParseForegroundOverlayShape(document.RootElement, rig, out _, out _))
+            {
+                error = new ApiError("invalid_actor_calibration_catalog", "The actor calibration catalog contains invalid foreground overlay overrides.", ValidationSeverity.Error);
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool TryParseSocketOverrides(
@@ -377,6 +450,204 @@ public sealed class ActorRigCalibrationAuthoringService
         return true;
     }
 
+    private bool TryParseForegroundOverlayOverrides(
+        JsonElement value,
+        ActorRigDefinition rig,
+        string? actorKind,
+        string? visualTexturePath,
+        out JsonObject overlays,
+        out ApiError? error)
+    {
+        if (!TryParseForegroundOverlayShape(value, rig, out overlays, out error))
+        {
+            return false;
+        }
+
+        if (_frameResolver is null)
+        {
+            error = new ApiError("actor_calibration_frame_validation_unavailable", "Exact actor frames are unavailable for foreground overlay validation.", ValidationSeverity.Error, "foreground_overlay_overrides");
+            return false;
+        }
+
+        var frames = _frameResolver.Resolve(new CalibrationFrameRequest(actorKind ?? string.Empty, visualTexturePath ?? string.Empty));
+        if (!frames.Succeeded || frames.Value is null)
+        {
+            error = frames.Errors.FirstOrDefault() ?? new ApiError("actor_calibration_frame_validation_unavailable", "Exact actor frames are unavailable for foreground overlay validation.", ValidationSeverity.Error, "foreground_overlay_overrides");
+            return false;
+        }
+
+        foreach (var overlay in overlays)
+        {
+            var directions = overlay.Value as JsonObject ?? new JsonObject();
+            foreach (var direction in directions)
+            {
+                var poses = direction.Value as JsonObject ?? new JsonObject();
+                foreach (var pose in poses)
+                {
+                    var frame = frames.Value.Frames.Single(candidate => candidate.Direction == direction.Key && candidate.Frame.ToString() == pose.Key);
+                    if (!frame.Available || frame.SourceWidth is null || frame.SourceHeight is null)
+                    {
+                        error = new ApiError("unavailable_actor_calibration_frame", "Foreground overlay overrides require an available exact actor frame.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                        return false;
+                    }
+
+                    var rectangle = pose.Value as JsonObject ?? new JsonObject();
+                    var x = rectangle["x"]!.GetValue<int>();
+                    var y = rectangle["y"]!.GetValue<int>();
+                    var width = rectangle["width"]!.GetValue<int>();
+                    var height = rectangle["height"]!.GetValue<int>();
+                    if (x + width > frame.SourceWidth || y + height > frame.SourceHeight)
+                    {
+                        error = new ApiError("foreground_overlay_rectangle_out_of_bounds", "Foreground overlay rectangles must fit within the exact actor source frame.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    private static bool TryParseForegroundOverlayShape(
+        JsonElement value,
+        ActorRigDefinition rig,
+        out JsonObject overlays,
+        out ApiError? error)
+    {
+        overlays = new JsonObject();
+        error = null;
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            error = new ApiError("invalid_foreground_overlay_overrides", "Foreground overlay overrides must be an object.", ValidationSeverity.Error, "foreground_overlay_overrides");
+            return false;
+        }
+
+        var rigOverlayIds = rig.ForegroundOverlays.Select(overlay => overlay.OverlayId).ToHashSet(StringComparer.Ordinal);
+        foreach (var overlay in value.EnumerateObject().OrderBy(property => property.Name, StringComparer.Ordinal))
+        {
+            if (!rigOverlayIds.Contains(overlay.Name))
+            {
+                error = new ApiError("invalid_foreground_overlay_id", "Foreground overlay overrides must reference an overlay in the selected rig.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                return false;
+            }
+
+            if (overlay.Value.ValueKind != JsonValueKind.Object)
+            {
+                error = new ApiError("invalid_foreground_overlay_overrides", "Each foreground overlay override must be an object.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                return false;
+            }
+
+            var directions = new JsonObject();
+            foreach (var direction in Directions)
+            {
+                if (!overlay.Value.TryGetProperty(direction, out var directionValue))
+                {
+                    continue;
+                }
+
+                if (directionValue.ValueKind != JsonValueKind.Object)
+                {
+                    error = new ApiError("invalid_foreground_overlay_direction", "Foreground overlay directions must contain frame objects.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                    return false;
+                }
+
+                var frames = new JsonObject();
+                foreach (var frame in Frames)
+                {
+                    if (!directionValue.TryGetProperty(frame, out var rectangleValue))
+                    {
+                        continue;
+                    }
+
+                    if (!TryReadSourceRectangle(rectangleValue, out var rectangle, out error))
+                    {
+                        return false;
+                    }
+
+                    frames[frame] = rectangle;
+                }
+
+                if (directionValue.EnumerateObject().Any(property => !Frames.Contains(property.Name, StringComparer.Ordinal)))
+                {
+                    error = new ApiError("invalid_foreground_overlay_frame", "Foreground overlay overrides may only use frames 1 through 4.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                    return false;
+                }
+
+                directions[direction] = frames;
+            }
+
+            if (overlay.Value.EnumerateObject().Any(property => !Directions.Contains(property.Name, StringComparer.Ordinal)))
+            {
+                error = new ApiError("invalid_foreground_overlay_direction", "Foreground overlay overrides may only use N, E, S, or W directions.", ValidationSeverity.Error, "foreground_overlay_overrides");
+                return false;
+            }
+
+            overlays[overlay.Name] = directions;
+        }
+
+        return true;
+    }
+
+    private static bool TryReadSourceRectangle(JsonElement value, out JsonObject rectangle, out ApiError? error)
+    {
+        rectangle = new JsonObject();
+        error = null;
+        if (value.ValueKind != JsonValueKind.Object
+            || !value.TryGetProperty("x", out var xValue)
+            || !value.TryGetProperty("y", out var yValue)
+            || !value.TryGetProperty("width", out var widthValue)
+            || !value.TryGetProperty("height", out var heightValue)
+            || !TryReadCoordinate(xValue, out var x)
+            || !TryReadCoordinate(yValue, out var y)
+            || !TryReadCoordinate(widthValue, out var width)
+            || !TryReadCoordinate(heightValue, out var height)
+            || value.EnumerateObject().Any(property => property.Name is not ("x" or "y" or "width" or "height")))
+        {
+            error = new ApiError("invalid_foreground_overlay_rectangle", "Foreground overlay rectangles must define integer x, y, width, and height source pixels.", ValidationSeverity.Error, "foreground_overlay_overrides");
+            return false;
+        }
+
+        if (x is < 0 or > CoordinateLimit || y is < 0 or > CoordinateLimit || width is < 1 or > CoordinateLimit || height is < 1 or > CoordinateLimit)
+        {
+            error = new ApiError("foreground_overlay_rectangle_out_of_range", "Foreground overlay rectangles must use nonnegative positions and positive dimensions within supported limits.", ValidationSeverity.Error, "foreground_overlay_overrides");
+            return false;
+        }
+
+        rectangle["x"] = x;
+        rectangle["y"] = y;
+        rectangle["width"] = width;
+        rectangle["height"] = height;
+        return true;
+    }
+
+    private static JsonObject MergeForegroundOverlayOverrides(JsonObject? existing, ActorRigDefinition rig, JsonObject overrides)
+    {
+        var merged = existing is null ? new JsonObject() : (JsonObject)existing.DeepClone();
+        var rigOverlayIds = rig.ForegroundOverlays.Select(overlay => overlay.OverlayId).ToHashSet(StringComparer.Ordinal);
+        foreach (var overlayId in rigOverlayIds)
+        {
+            var overrideDirections = overrides[overlayId] as JsonObject;
+            if (overrideDirections is null || overrideDirections.Count == 0)
+            {
+                if (merged[overlayId] is JsonObject current)
+                {
+                    current.Remove("source_rect_by_direction");
+                    if (current.Count == 0)
+                    {
+                        merged.Remove(overlayId);
+                    }
+                }
+                continue;
+            }
+
+            var overlay = merged[overlayId] as JsonObject ?? new JsonObject();
+            overlay["source_rect_by_direction"] = overrideDirections.DeepClone();
+            merged[overlayId] = overlay;
+        }
+
+        return merged;
+    }
+
     private static bool TryReadCoordinatePoint(JsonElement value, out JsonObject point, out ApiError? error)
     {
         point = new JsonObject();
@@ -440,7 +711,12 @@ public sealed class ActorRigCalibrationAuthoringService
                 ["sockets"] = CanonicalizeSockets(entry["sockets"] as JsonObject)
             };
 
-            foreach (var property in entry.Where(property => property.Key is not ("schema_version" or "calibration_id" or "rig_id" or "sockets")).OrderBy(property => property.Key, StringComparer.Ordinal))
+            if (entry["foreground_overlays"] is JsonObject foregroundOverlays)
+            {
+                canonicalEntry["foreground_overlays"] = CanonicalizeForegroundOverlays(foregroundOverlays);
+            }
+
+            foreach (var property in entry.Where(property => property.Key is not ("schema_version" or "calibration_id" or "rig_id" or "sockets" or "foreground_overlays")).OrderBy(property => property.Key, StringComparer.Ordinal))
             {
                 canonicalEntry[property.Key] = CanonicalizeNode(property.Value);
             }
@@ -503,6 +779,60 @@ public sealed class ActorRigCalibrationAuthoringService
         }
 
         return canonicalSockets;
+    }
+
+    private static JsonObject CanonicalizeForegroundOverlays(JsonObject overlays)
+    {
+        var canonicalOverlays = new JsonObject();
+        foreach (var overlay in overlays.OrderBy(property => property.Key, StringComparer.Ordinal))
+        {
+            if (overlay.Value is not JsonObject overlayObject)
+            {
+                canonicalOverlays[overlay.Key] = CanonicalizeNode(overlay.Value);
+                continue;
+            }
+
+            var canonicalOverlay = new JsonObject();
+            if (overlayObject["source_rect_by_direction"] is JsonObject directions)
+            {
+                var canonicalDirections = new JsonObject();
+                foreach (var direction in Directions)
+                {
+                    if (directions[direction] is not JsonObject frames)
+                    {
+                        continue;
+                    }
+
+                    var canonicalFrames = new JsonObject();
+                    foreach (var frame in Frames)
+                    {
+                        if (frames[frame] is JsonObject rectangle)
+                        {
+                            canonicalFrames[frame] = new JsonObject
+                            {
+                                ["x"] = rectangle["x"]?.DeepClone(),
+                                ["y"] = rectangle["y"]?.DeepClone(),
+                                ["width"] = rectangle["width"]?.DeepClone(),
+                                ["height"] = rectangle["height"]?.DeepClone()
+                            };
+                        }
+                    }
+
+                    canonicalDirections[direction] = canonicalFrames;
+                }
+
+                canonicalOverlay["source_rect_by_direction"] = canonicalDirections;
+            }
+
+            foreach (var property in overlayObject.Where(property => property.Key != "source_rect_by_direction").OrderBy(property => property.Key, StringComparer.Ordinal))
+            {
+                canonicalOverlay[property.Key] = CanonicalizeNode(property.Value);
+            }
+
+            canonicalOverlays[overlay.Key] = canonicalOverlay;
+        }
+
+        return canonicalOverlays;
     }
 
     private static JsonNode? CanonicalizeNode(JsonNode? node) => node switch

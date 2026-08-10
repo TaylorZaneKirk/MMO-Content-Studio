@@ -128,7 +128,10 @@ public sealed record ActorCalibrationLoadResponse(
 public sealed record SaveActorCalibrationRequest(
     [property: JsonPropertyName("expected_catalog_hash")] string ExpectedCatalogHash,
     [property: JsonPropertyName("rig_id")] string RigId,
-    [property: JsonPropertyName("socket_overrides")] JsonElement SocketOverrides);
+    [property: JsonPropertyName("socket_overrides")] JsonElement SocketOverrides,
+    [property: JsonPropertyName("foreground_overlay_overrides")] JsonElement? ForegroundOverlayOverrides = null,
+    [property: JsonPropertyName("actor_kind")] string? ActorKind = null,
+    [property: JsonPropertyName("visual_texture_path")] string? VisualTexturePath = null);
 
 public sealed record CalibrationFrameRequest(
     [property: JsonPropertyName("actor_kind")] string ActorKind,

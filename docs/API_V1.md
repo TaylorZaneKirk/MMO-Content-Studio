@@ -65,9 +65,12 @@ present. A missing calibration is a successful response with `exists = false`.
 
 Replaces the complete socket override set after validating an
 `expected_catalog_hash`, immutable `rig_id`, canonical socket/direction/frame
-IDs, and signed integer source-pixel coordinates. Stale hashes return
-`actor_calibration_catalog_conflict`. Foreground-overlay overrides are
-preserved rather than owned by this endpoint.
+IDs, and signed integer source-pixel coordinates. An optional complete
+`foreground_overlay_overrides` map uses the same catalog hash and requires
+`actor_kind` plus `visual_texture_path`; every rectangle is validated against
+its exact source frame. Omitting that optional map preserves existing raw
+foreground-overlay data for socket-only backward compatibility. Stale hashes
+return `actor_calibration_catalog_conflict`.
 
 ### `POST /api/v1/actor-appearance/calibration-frames`
 

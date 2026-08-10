@@ -31,12 +31,19 @@ var _rig_value: Label
 var _calibration_id: LineEdit
 var _load_button: Button
 var _use_button: Button
+var _mode: OptionButton
 var _socket: OptionButton
+var _overlay: OptionButton
 var _direction: OptionButton
 var _frame: OptionButton
 var _source: Label
 var _socket_x: SpinBox
 var _socket_y: SpinBox
+var _overlay_x: SpinBox
+var _overlay_y: SpinBox
+var _overlay_width: SpinBox
+var _overlay_height: SpinBox
+var _create_override_button: Button
 var _revert_button: Button
 var _zoom: OptionButton
 var _canvas_scroll: ScrollContainer
@@ -83,7 +90,7 @@ func _ensure_ui() -> void:
 		return
 	add_theme_constant_override("separation", 8)
 	_disabled_message = Label.new()
-	_disabled_message.text = "Socket calibration is available for Rigged Sprite actors."
+	_disabled_message.text = "Actor attachment calibration is available for Rigged Sprite actors."
 	_disabled_message.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_disabled_message)
 	_content = VBoxContainer.new()
@@ -110,10 +117,22 @@ func _ensure_ui() -> void:
 	context_grid.add_child(_use_button)
 
 	var selection_grid := _grid(_content)
+	selection_grid.add_child(_label("Edit"))
+	_mode = OptionButton.new()
+	_mode.add_item("Socket")
+	_mode.set_item_metadata(_mode.item_count - 1, "socket")
+	_mode.add_item("Foreground Grip Overlay")
+	_mode.set_item_metadata(_mode.item_count - 1, "foreground_overlay")
+	_mode.item_selected.connect(_on_selection_changed.unbind(1))
+	selection_grid.add_child(_mode)
 	selection_grid.add_child(_label("Socket"))
 	_socket = OptionButton.new()
 	_socket.item_selected.connect(_on_selection_changed.unbind(1))
 	selection_grid.add_child(_socket)
+	selection_grid.add_child(_label("Foreground overlay"))
+	_overlay = OptionButton.new()
+	_overlay.item_selected.connect(_on_selection_changed.unbind(1))
+	selection_grid.add_child(_overlay)
 	selection_grid.add_child(_label("Direction"))
 	_direction = OptionButton.new()
 	for entry in [["N", "North"], ["E", "East"], ["S", "South"], ["W", "West"]]:
@@ -140,6 +159,27 @@ func _ensure_ui() -> void:
 	_socket_y = _coordinate_field()
 	_socket_y.value_changed.connect(_on_coordinate_changed.unbind(1))
 	selection_grid.add_child(_socket_y)
+	selection_grid.add_child(_label("Overlay X"))
+	_overlay_x = _overlay_coordinate_field()
+	_overlay_x.value_changed.connect(_on_rectangle_coordinate_changed.unbind(1))
+	selection_grid.add_child(_overlay_x)
+	selection_grid.add_child(_label("Overlay Y"))
+	_overlay_y = _overlay_coordinate_field()
+	_overlay_y.value_changed.connect(_on_rectangle_coordinate_changed.unbind(1))
+	selection_grid.add_child(_overlay_y)
+	selection_grid.add_child(_label("Overlay width"))
+	_overlay_width = _overlay_coordinate_field()
+	_overlay_width.value_changed.connect(_on_rectangle_coordinate_changed.unbind(1))
+	selection_grid.add_child(_overlay_width)
+	selection_grid.add_child(_label("Overlay height"))
+	_overlay_height = _overlay_coordinate_field()
+	_overlay_height.value_changed.connect(_on_rectangle_coordinate_changed.unbind(1))
+	selection_grid.add_child(_overlay_height)
+	selection_grid.add_child(Label.new())
+	_create_override_button = Button.new()
+	_create_override_button.text = "Create Actor Override"
+	_create_override_button.pressed.connect(_create_foreground_overlay_override)
+	selection_grid.add_child(_create_override_button)
 	selection_grid.add_child(Label.new())
 	_revert_button = Button.new()
 	_revert_button.text = "Revert to Rig Default"
@@ -162,6 +202,7 @@ func _ensure_ui() -> void:
 	_content.add_child(_canvas_scroll)
 	_canvas = CANVAS_SCRIPT.new()
 	_canvas.marker_dragged.connect(_on_marker_dragged)
+	_canvas.rectangle_changed.connect(_on_rectangle_changed)
 	_canvas_scroll.add_child(_canvas)
 
 	var actions := HBoxContainer.new()
@@ -186,6 +227,7 @@ func _ensure_ui() -> void:
 	content_add_status()
 	_select_metadata(_direction, "S")
 	_select_metadata(_frame, 1)
+	_select_metadata(_mode, "socket")
 	_select_metadata(_zoom, 0.0)
 	_set_enabled(false)
 
@@ -219,6 +261,7 @@ func _apply_context(context: Dictionary) -> void:
 	_rig_value.text = rig_id
 	_calibration_id.text = _state.calibration_id
 	_populate_sockets()
+	_populate_foreground_overlays()
 	_syncing = false
 	if not bool(_context.get("calibrations_available", true)):
 		_state.clear_loaded_state()
@@ -360,16 +403,53 @@ func _on_selection_changed() -> void:
 
 
 func _on_coordinate_changed() -> void:
-	if _syncing or not _can_mutate_selected_pose():
+	if _syncing or _selected_mode() != "socket" or not _can_mutate_selected_pose():
 		return
 	_state.set_override(_selected_socket_id(), _selected_direction(), _selected_frame(), Vector2i(int(_socket_x.value), int(_socket_y.value)))
 	_refresh_view()
 
 
 func _on_marker_dragged(point: Vector2i) -> void:
-	if not _can_mutate_selected_pose():
+	if _selected_mode() != "socket" or not _can_mutate_selected_pose():
 		return
 	_state.set_override(_selected_socket_id(), _selected_direction(), _selected_frame(), point)
+	_refresh_view()
+
+
+func _on_rectangle_changed(rectangle: Dictionary) -> void:
+	if _selected_mode() != "foreground_overlay" or not _can_mutate_selected_pose():
+		return
+	_state.set_foreground_overlay_override(_selected_overlay_id(), _selected_direction(), _selected_frame(), rectangle)
+	_refresh_view()
+
+
+func _on_rectangle_coordinate_changed() -> void:
+	if _syncing or _selected_mode() != "foreground_overlay" or not _can_mutate_selected_pose():
+		return
+	var source_size := _canvas.source_bounds().size
+	var x := clampi(int(_overlay_x.value), 0, max(0, int(source_size.x) - 1))
+	var y := clampi(int(_overlay_y.value), 0, max(0, int(source_size.y) - 1))
+	var width := clampi(int(_overlay_width.value), 1, max(1, int(source_size.x) - x))
+	var height := clampi(int(_overlay_height.value), 1, max(1, int(source_size.y) - y))
+	_state.set_foreground_overlay_override(_selected_overlay_id(), _selected_direction(), _selected_frame(), {"x": x, "y": y, "width": width, "height": height})
+	_refresh_view()
+
+
+func _create_foreground_overlay_override() -> void:
+	if _selected_mode() != "foreground_overlay" or not _can_mutate_selected_pose():
+		return
+	var source_size := _canvas.source_bounds().size
+	if source_size.x <= 0 or source_size.y <= 0:
+		return
+	var overlay := _state.get_overlay(_selected_overlay_id())
+	var socket := _state.resolve_effective_point(str(overlay.get("socket_id", "")), _selected_direction(), _selected_frame())
+	var point := socket.get("point", {}) as Dictionary
+	var width := mini(16, int(source_size.x))
+	var height := mini(16, int(source_size.y))
+	var x := clampi(int(point.get("x", 0)) - width / 2, 0, int(source_size.x) - width)
+	var y := clampi(int(point.get("y", 0)) - height / 2, 0, int(source_size.y) - height)
+	_state.set_foreground_overlay_override(_selected_overlay_id(), _selected_direction(), _selected_frame(), {"x": x, "y": y, "width": width, "height": height})
+	_status.text = "Created an unsaved actor override rectangle."
 	_refresh_view()
 
 
@@ -378,7 +458,13 @@ func _on_zoom_changed() -> void:
 
 
 func _revert_current_pose() -> void:
-	if _can_mutate_selected_pose() and _state.revert_override(_selected_socket_id(), _selected_direction(), _selected_frame()):
+	var reverted := false
+	if _can_mutate_selected_pose():
+		if _selected_mode() == "socket":
+			reverted = _state.revert_override(_selected_socket_id(), _selected_direction(), _selected_frame())
+		else:
+			reverted = _state.revert_foreground_overlay_override(_selected_overlay_id(), _selected_direction(), _selected_frame())
+	if reverted:
 		_status.text = "Current pose override removed."
 	_refresh_view()
 
@@ -388,7 +474,10 @@ func _save_calibration() -> void:
 		return
 	_awaiting_save = true
 	_active_operation = "save"
-	_client.save_actor_calibration(_calibration_id.text.strip_edges(), _state.save_payload())
+	var payload := _state.save_payload()
+	payload["actor_kind"] = str(_context.get("actor_kind", ""))
+	payload["visual_texture_path"] = str(_context.get("visual_texture_path", ""))
+	_client.save_actor_calibration(_calibration_id.text.strip_edges(), payload)
 	_status.text = "Saving calibration..."
 	_refresh_view()
 
@@ -428,25 +517,43 @@ func _refresh_view() -> void:
 		return
 	var frame := _selected_frame_payload()
 	var available := bool(frame.get("available", false))
-	var effective := _state.resolve_effective_point(_selected_socket_id(), _selected_direction(), _selected_frame())
+	var socket_mode := _selected_mode() == "socket"
+	var effective := _state.resolve_effective_point(_selected_socket_id(), _selected_direction(), _selected_frame()) if socket_mode else _state.resolve_effective_rectangle(_selected_overlay_id(), _selected_direction(), _selected_frame())
 	var has_coordinate := bool(effective.get("available", false))
 	var is_override := bool(effective.get("is_override", false))
 	_syncing = true
-	if has_coordinate:
+	if socket_mode and has_coordinate:
 		var point := effective.get("point", {}) as Dictionary
 		_socket_x.value = int(point.get("x", 0))
 		_socket_y.value = int(point.get("y", 0))
 		_source.text = "Actor override" if is_override else "Inherited from %s" % str(_state.rig.get("rig_id", ""))
-	else:
+	elif socket_mode:
 		_socket_x.value = 0
 		_socket_y.value = 0
 		_source.text = "No coordinate for this pose"
+	else:
+		var rectangle := effective.get("rectangle", {}) as Dictionary
+		_overlay_x.value = int(rectangle.get("x", 0))
+		_overlay_y.value = int(rectangle.get("y", 0))
+		_overlay_width.value = int(rectangle.get("width", 1))
+		_overlay_height.value = int(rectangle.get("height", 1))
+		var overlay := _state.get_overlay(_selected_overlay_id())
+		var socket_id := str(overlay.get("socket_id", ""))
+		if has_coordinate:
+			_source.text = "Actor Override" if is_override else "Inherited Rig Rectangle"
+		else:
+			_source.text = "No Rectangle for This Pose\nNo inherited rectangle for this pose. Socket: %s" % socket_id
 	_syncing = false
-	_update_canvas(frame, available, has_coordinate, effective)
+	_update_canvas(frame, available, has_coordinate, effective, socket_mode)
 	var editable := _can_mutate_selected_pose()
-	_socket_x.editable = editable
-	_socket_y.editable = editable
-	_revert_button.disabled = not editable or not _state.has_override(_selected_socket_id(), _selected_direction(), _selected_frame())
+	_socket_x.editable = editable and socket_mode
+	_socket_y.editable = editable and socket_mode
+	_overlay_x.editable = editable and not socket_mode and has_coordinate
+	_overlay_y.editable = editable and not socket_mode and has_coordinate
+	_overlay_width.editable = editable and not socket_mode and has_coordinate
+	_overlay_height.editable = editable and not socket_mode and has_coordinate
+	_create_override_button.disabled = not editable or socket_mode or has_coordinate
+	_revert_button.disabled = not editable or (_state.has_override(_selected_socket_id(), _selected_direction(), _selected_frame()) if socket_mode else _state.has_foreground_overlay_override(_selected_overlay_id(), _selected_direction(), _selected_frame()))
 	_load_button.disabled = not bool(_context.get("calibrations_available", true)) or not _is_valid_calibration_id(_calibration_id.text.strip_edges())
 	_use_button.disabled = not _state.exists or not _state.is_loaded_target(_calibration_id.text.strip_edges()) or _state.calibration_id == str(_context.get("calibration_id", ""))
 	_save_button.disabled = not _can_save()
@@ -455,14 +562,14 @@ func _refresh_view() -> void:
 	_dirty.text = "Unsaved calibration changes" if _state.is_dirty() else "Saved"
 	if not available:
 		_status.text = "Selected exact pose is unavailable. No compatibility frame is used."
-	elif has_coordinate and not _canvas.source_bounds().has_point(Vector2(_socket_x.value, _socket_y.value)):
+	elif socket_mode and has_coordinate and not _canvas.source_bounds().has_point(Vector2(_socket_x.value, _socket_y.value)):
 		_status.text = "Socket is outside this source frame."
 	elif _status.text.is_empty():
-		_status.text = "Drag the marker or edit integer source coordinates."
+		_status.text = "Drag the marker or edit integer source coordinates." if socket_mode else "Drag or resize the foreground rectangle using integer source pixels."
 	_refresh_canvas_zoom()
 
 
-func _update_canvas(frame: Dictionary, available: bool, has_coordinate: bool, effective: Dictionary) -> void:
+func _update_canvas(frame: Dictionary, available: bool, has_coordinate: bool, effective: Dictionary, socket_mode: bool) -> void:
 	var key := _frame_key(_selected_direction(), _selected_frame())
 	if available and key != _displayed_frame_key:
 		_canvas.set_frame(frame)
@@ -470,11 +577,23 @@ func _update_canvas(frame: Dictionary, available: bool, has_coordinate: bool, ef
 	elif not available:
 		_canvas.set_frame({})
 		_displayed_frame_key = ""
-	if available and has_coordinate:
+	if socket_mode and available and has_coordinate:
 		var point := effective.get("point", {}) as Dictionary
 		_canvas.set_marker(Vector2i(int(point.get("x", 0)), int(point.get("y", 0))), bool(effective.get("is_override", false)), _can_mutate_selected_pose())
 	else:
 		_canvas.clear_marker(false)
+	if socket_mode:
+		_canvas.clear_rectangle()
+		return
+	var overlay := _state.get_overlay(_selected_overlay_id())
+	var socket := _state.resolve_effective_point(str(overlay.get("socket_id", "")), _selected_direction(), _selected_frame())
+	if available and bool(socket.get("available", false)):
+		var point := socket.get("point", {}) as Dictionary
+		_canvas.set_marker(Vector2i(int(point.get("x", 0)), int(point.get("y", 0))), bool(socket.get("is_override", false)), false)
+	if available and has_coordinate:
+		_canvas.set_rectangle(effective.get("rectangle", {}) as Dictionary, bool(effective.get("is_override", false)), _can_mutate_selected_pose())
+	else:
+		_canvas.clear_rectangle()
 
 
 func _refresh_canvas_zoom() -> void:
@@ -497,6 +616,19 @@ func _populate_sockets() -> void:
 	_select_metadata(_socket, selected if not selected.is_empty() else "right_hand_primary")
 
 
+func _populate_foreground_overlays() -> void:
+	var selected := _selected_overlay_id()
+	_overlay.clear()
+	for overlay_variant in _state.get_foreground_overlays():
+		var overlay := overlay_variant as Dictionary
+		var overlay_id := str(overlay.get("overlay_id", ""))
+		if overlay_id.is_empty():
+			continue
+		_overlay.add_item(overlay_id.replace("_", " ").capitalize())
+		_overlay.set_item_metadata(_overlay.item_count - 1, overlay_id)
+	_select_metadata(_overlay, selected if not selected.is_empty() else "right_hand_primary_grip")
+
+
 func _selected_frame_payload() -> Dictionary:
 	return _frames.get(_frame_key(_selected_direction(), _selected_frame()), {}) as Dictionary
 
@@ -507,6 +639,14 @@ func _selected_frame_available() -> bool:
 
 func _selected_socket_id() -> String:
 	return str(_selected_metadata(_socket))
+
+
+func _selected_mode() -> String:
+	return str(_selected_metadata(_mode))
+
+
+func _selected_overlay_id() -> String:
+	return str(_selected_metadata(_overlay))
 
 
 func _selected_direction() -> String:
@@ -572,6 +712,17 @@ func _has_error_code(errors: Array, code: String) -> bool:
 func _coordinate_field() -> SpinBox:
 	var field := SpinBox.new()
 	field.min_value = -4096
+	field.max_value = 4096
+	field.step = 1
+	field.allow_greater = false
+	field.allow_lesser = false
+	field.rounded = true
+	return field
+
+
+func _overlay_coordinate_field() -> SpinBox:
+	var field := SpinBox.new()
+	field.min_value = 0
 	field.max_value = 4096
 	field.step = 1
 	field.allow_greater = false

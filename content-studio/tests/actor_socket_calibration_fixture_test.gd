@@ -54,6 +54,7 @@ func _initialize() -> void:
 func _run() -> void:
 	_verify_state()
 	await _verify_canvas()
+	await _verify_overlay_canvas()
 	await _verify_editor()
 	await _verify_rigged_mob_preview()
 	_verify_composite_visual_payload()
@@ -77,6 +78,11 @@ func _verify_state() -> void:
 				"sockets": {
 					"right_hand_primary": {
 						"S": {"1": {"x": 25, "y": 135}, "2": {"x": 31, "y": 136}}
+					}
+				},
+				"foreground_overlays": {
+					"right_hand_primary_grip": {
+						"source_rect_by_direction": {"S": {"1": {"x": 24.0, "y": 104.0, "width": 24.0, "height": 20.0}}}
 					}
 				}
 			}
@@ -113,6 +119,26 @@ func _verify_state() -> void:
 	state.revert_override("left_hand_primary", "S", 1)
 	if (state.socket_overrides.get("left_hand_primary", {}) as Dictionary).size() != 0:
 		_fail("Revert must clean empty sparse override containers")
+		return
+	var overlay_override := state.resolve_effective_rectangle("right_hand_primary_grip", "S", 1)
+	if not bool(overlay_override.get("is_override", false)) or int((overlay_override.get("rectangle", {}) as Dictionary).get("width", 0)) != 24:
+		_fail("Loaded foreground overlay rectangle must normalize integral JSON values and take precedence")
+		return
+	var inherited_overlay := state.resolve_effective_rectangle("left_hand_primary_grip", "S", 1)
+	if bool(inherited_overlay.get("is_override", true)) or int((inherited_overlay.get("rectangle", {}) as Dictionary).get("x", -1)) != 10:
+		_fail("Missing foreground override must inherit the rig rectangle without becoming dirty")
+		return
+	state.set_foreground_overlay_override("left_hand_primary_grip", "N", 3, {"x": 1, "y": 2, "width": 3, "height": 4})
+	if not state.is_dirty() or not state.has_foreground_overlay_override("left_hand_primary_grip", "N", 3):
+		_fail("Foreground overlay edits must participate in shared dirty state")
+		return
+	state.revert_foreground_overlay_override("left_hand_primary_grip", "N", 3)
+	if state.has_foreground_overlay_override("left_hand_primary_grip", "N", 3):
+		_fail("Foreground overlay revert must remove only the selected sparse rectangle")
+		return
+	state.discard_changes()
+	if state.is_dirty():
+		_fail("Discard must restore both socket and foreground overlay baselines")
 
 
 func _verify_canvas() -> void:
@@ -154,6 +180,45 @@ func _verify_canvas() -> void:
 		_fail("Unavailable poses must not allow marker dragging")
 	canvas.set_frame({})
 	image = null
+	canvas.queue_free()
+	await process_frame
+
+
+func _verify_overlay_canvas() -> void:
+	var temporary_root := ProjectSettings.globalize_path("user://actor-overlay-calibration-fixture")
+	DirAccess.make_dir_recursive_absolute(temporary_root)
+	var image_path := temporary_root.path_join("actor.png")
+	var image: Image = Image.create(20, 12, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.4, 0.7, 0.9, 1))
+	image.save_png(image_path)
+	var canvas = Canvas.new()
+	root.add_child(canvas)
+	canvas.set_frame({"file_path": image_path, "source_width": 20, "source_height": 12})
+	canvas.set_zoom_scale(8.0)
+	canvas.set_marker(Vector2i(10, 6), false, false)
+	canvas.set_rectangle({"x": 2, "y": 3, "width": 4, "height": 5}, false, true)
+	var changed: Array = []
+	canvas.rectangle_changed.connect(func(rectangle: Dictionary) -> void: changed.append(rectangle))
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.position = canvas.source_to_preview(Vector2(3, 4))
+	canvas._gui_input(press)
+	var move := InputEventMouseMotion.new()
+	move.button_mask = MOUSE_BUTTON_MASK_LEFT
+	move.position = canvas.source_to_preview(Vector2(99, 99))
+	canvas._gui_input(move)
+	if changed.is_empty() or int((changed.back() as Dictionary).get("x", 0)) != 16 or int((changed.back() as Dictionary).get("y", 0)) != 7:
+		_fail("Foreground rectangle body drag must preserve its size and clamp to image edges")
+		return
+	canvas.set_rectangle({"x": 2, "y": 3, "width": 4, "height": 5}, false, true)
+	press.position = canvas.source_to_preview(Vector2(6, 8))
+	canvas._gui_input(press)
+	move.position = canvas.source_to_preview(Vector2(20, 12))
+	canvas._gui_input(move)
+	if changed.is_empty() or int((changed.back() as Dictionary).get("width", 0)) != 18 or int((changed.back() as Dictionary).get("height", 0)) != 9:
+		_fail("Foreground rectangle corner resize must use half-open source bounds and remain in frame")
+		return
 	canvas.queue_free()
 	await process_frame
 
@@ -679,6 +744,10 @@ func _rig() -> Dictionary:
 		"sockets": [
 			{"socket_id": "right_hand_primary", "positions": positions.duplicate(true)},
 			{"socket_id": "left_hand_primary", "positions": positions.duplicate(true)},
+		],
+		"foreground_overlays": [
+			{"overlay_id": "right_hand_primary_grip", "socket_id": "right_hand_primary", "source_layer_id": "body", "source_rect_by_direction": {"S": {"1": {"x": 12, "y": 16, "width": 16, "height": 16}}}},
+			{"overlay_id": "left_hand_primary_grip", "socket_id": "left_hand_primary", "source_layer_id": "body", "source_rect_by_direction": {"S": {"1": {"x": 10, "y": 14, "width": 16, "height": 16}, "4": null}}},
 		],
 	}
 

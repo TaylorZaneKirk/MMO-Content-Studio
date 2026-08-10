@@ -1,4 +1,4 @@
-# Actor Socket Calibration Authoring
+# Actor Attachment Calibration Authoring
 
 R4D.1A establishes the file-backed authoring boundary for actor-specific rig
 socket calibration. R4D.1B adds one shared draggable calibration editor to the
@@ -112,9 +112,14 @@ is a separate explicit action that updates only the current unsaved composite
 descriptor; the normal workspace validation and apply operation remains solely
 responsible for saving or publishing actor content.
 
+## Foreground Grip Overlays
+
+R4D.3 adds actor-owned foreground grip rectangle authoring to this same shared
+calibration lifecycle. See [FOREGROUND_GRIP_OVERLAY_AUTHORING.md](FOREGROUND_GRIP_OVERLAY_AUTHORING.md).
+
 ## Follow-up Boundaries
 
-R4D.2 owns equipped-item grip anchors. R4D.3 owns foreground-overlay rectangle
-editing. R4D.4 owns combined actor-and-item alignment, and R4D.5 owns full
-production pose calibration. R4D.1B does not edit grip anchors or foreground
-overlays and does not change MMO runtime behavior.
+R4D.2 owns equipped-item grip anchors. R4D.3 foreground-overlay rectangle
+editing is implemented. R4D.4 owns combined actor-and-item alignment, and
+R4D.5 owns full production pose calibration. The calibration editor does not
+change MMO runtime behavior.

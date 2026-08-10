@@ -54,7 +54,7 @@ class ActorSocketCalibrationEditorTests(unittest.TestCase):
         for name, actor_kind in (("npc_editor.gd", "npc"), ("mob_editor.gd", "mob")):
             editor = (SCRIPTS / name).read_text()
             self.assertIn('preload("res://scripts/actor_socket_calibration_editor.gd")', editor)
-            self.assertIn("Actor Socket Calibration", editor)
+            self.assertIn("Actor Attachment Calibration", editor)
             self.assertIn("_refresh_socket_calibration_editor", editor)
             self.assertIn(f'"actor_kind": "{actor_kind}"', editor)
             self.assertIn("_on_use_socket_calibration_for_actor", editor)
@@ -70,4 +70,3 @@ class ActorSocketCalibrationEditorTests(unittest.TestCase):
         self.assertTrue(fixture.exists())
         self.assertIn("actor_socket_calibration_fixture_test.gd", test_script)
         self.assertIn("complete socket override dictionary", fixture.read_text())
-
