@@ -7,6 +7,7 @@ const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_sup
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 const ACTOR_SOCKET_CALIBRATION_EDITOR := preload("res://scripts/actor_socket_calibration_editor.gd")
+const RIGGED_SPRITE_VISUAL_PAYLOAD := preload("res://scripts/rigged_sprite_visual_payload.gd")
 const GAME_ASSET_PREFIX := "res://assets/"
 
 class NpcVisualPreview:
@@ -179,7 +180,9 @@ var _visual_mode: OptionButton
 var _rig_id: OptionButton
 var _calibration_id: OptionButton
 var _pose_policy: OptionButton
+var _fixed_direction_label: Label
 var _fixed_direction: OptionButton
+var _fixed_frame_label: Label
 var _fixed_frame: OptionButton
 var _rigged_controls: VBoxContainer
 var _cosmetic_controls: Dictionary = {}
@@ -298,8 +301,18 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_calibration_id.item_selected.connect(_on_rigged_form_changed.unbind(1))
 	_pose_policy = _option_field(rig_grid, "Pose policy")
 	_pose_policy.item_selected.connect(_on_pose_policy_changed.unbind(1))
-	_fixed_direction = _option_field(rig_grid, "Fixed direction")
-	_fixed_frame = _option_field(rig_grid, "Fixed frame")
+	_fixed_direction_label = _label("Fixed direction")
+	rig_grid.add_child(_fixed_direction_label)
+	_fixed_direction = OptionButton.new()
+	_fixed_direction.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_register_control(_fixed_direction)
+	rig_grid.add_child(_fixed_direction)
+	_fixed_frame_label = _label("Fixed frame")
+	rig_grid.add_child(_fixed_frame_label)
+	_fixed_frame = OptionButton.new()
+	_fixed_frame.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_register_control(_fixed_frame)
+	rig_grid.add_child(_fixed_frame)
 	_fixed_direction.item_selected.connect(_on_rigged_form_changed.unbind(1))
 	_fixed_frame.item_selected.connect(_on_rigged_form_changed.unbind(1))
 	parent.add_child(_wrapped_label("Initial T5 NPC runtime support uses a 1x1 logical footprint. Facing is placement-owned in Tiled."))
@@ -698,8 +711,9 @@ func _preview() -> void:
 	var payload := _payload()
 	payload.erase("preview_signature")
 	payload["target_operation"] = _selected_metadata(_operation)
-	payload["preview_direction"] = _selected_metadata(_preview_facing).to_upper().left(1)
-	payload["preview_frame"] = int(_selected_metadata(_preview_frame))
+	var effective_pose := _effective_preview_pose()
+	payload["preview_direction"] = effective_pose.direction
+	payload["preview_frame"] = effective_pose.frame
 	_status.text = "Calculating validation and exact logical changes..."
 	_client.preview_npc(npc_definition_id, payload)
 
@@ -903,8 +917,8 @@ func _rebuild_rigged_controls() -> void:
 	_fill_fixed_options()
 	_select_option(_pose_policy, str(_composite_visual.get("pose_policy", "actor_pose")))
 	var fixed := _selected_metadata(_pose_policy) == "fixed"
-	_fixed_direction.visible = fixed
-	_fixed_frame.visible = fixed
+	_set_fixed_pose_rows_visible(fixed)
+	_sync_preview_pose_controls()
 	_rebuild_cosmetic_controls()
 
 
@@ -1049,7 +1063,37 @@ func _add_local_calibration_option(calibration_id: String, rig_id: String) -> vo
 func _build_composite_visual() -> Variant:
 	if _selected_metadata(_visual_mode) != "composite_rig":
 		return null
-	return _composite_visual.duplicate(true)
+	return RIGGED_SPRITE_VISUAL_PAYLOAD.canonicalize(_composite_visual)
+
+
+func _effective_preview_pose() -> Dictionary:
+	if _selected_metadata(_visual_mode) == "composite_rig" and str(_composite_visual.get("pose_policy", "")) == "fixed":
+		return {
+			"direction": str(_composite_visual.get("fixed_direction", "S")).to_upper().left(1),
+			"frame": int(_composite_visual.get("fixed_frame", 1)),
+		}
+	return {
+		"direction": _selected_metadata(_preview_facing).to_upper().left(1),
+		"frame": int(_selected_metadata(_preview_frame)),
+	}
+
+
+func _sync_preview_pose_controls() -> void:
+	if _preview_facing == null or _preview_frame == null:
+		return
+	var fixed := _selected_metadata(_visual_mode) == "composite_rig" and str(_composite_visual.get("pose_policy", "")) == "fixed"
+	if fixed:
+		_select_option(_preview_facing, str(_composite_visual.get("fixed_direction", "S")).to_lower().left(1))
+		_select_option(_preview_frame, str(int(_composite_visual.get("fixed_frame", 1))))
+	_preview_facing.disabled = fixed or not _form_editable
+	_preview_frame.disabled = fixed or not _form_editable
+
+
+func _set_fixed_pose_rows_visible(visible: bool) -> void:
+	_fixed_direction_label.visible = visible
+	_fixed_direction.visible = visible
+	_fixed_frame_label.visible = visible
+	_fixed_frame.visible = visible
 
 
 func _on_movement_changed() -> void:
@@ -1221,6 +1265,7 @@ func _set_form_enabled(enabled: bool) -> void:
 		_apply_button.disabled = true
 	_update_movement_controls()
 	_update_interaction_controls()
+	_sync_preview_pose_controls()
 
 
 func _clear_preview() -> void:

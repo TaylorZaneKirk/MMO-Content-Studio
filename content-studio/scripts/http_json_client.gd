@@ -90,10 +90,11 @@ func _on_request_completed(
 		return
 
 	var json := JSON.new()
-	if json.parse(body.get_string_from_utf8()) != OK or typeof(json.data) != TYPE_DICTIONARY:
+	var response_text := body.get_string_from_utf8()
+	if json.parse(response_text) != OK or typeof(json.data) != TYPE_DICTIONARY:
 		_emit_request_failed(
 			completed_operation,
-			"The authoring host returned a non-JSON response (HTTP %s)." % response_code,
+			_non_json_response_message(response_code, response_text),
 			[]
 		)
 		return
@@ -170,6 +171,13 @@ func _method_name(method: int) -> String:
 			return "DELETE"
 		_:
 			return str(method)
+
+
+func _non_json_response_message(response_code: int, response_text: String) -> String:
+	var message := "The authoring host returned a non-JSON response (HTTP %s)." % response_code
+	if OS.is_debug_build() and not response_text.strip_edges().is_empty():
+		message += " Details: %s" % response_text.replace("\n", " ").replace("\r", " ").strip_edges().left(300)
+	return message
 
 
 func _timeout_seconds_for_operation(operation: String) -> float:

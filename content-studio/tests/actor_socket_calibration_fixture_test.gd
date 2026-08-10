@@ -5,6 +5,7 @@ const Canvas = preload("res://scripts/actor_socket_calibration_canvas.gd")
 const Editor = preload("res://scripts/actor_socket_calibration_editor.gd")
 const MobEditor = preload("res://scripts/mob_editor.gd")
 const NpcEditor = preload("res://scripts/npc_editor.gd")
+const RiggedSpriteVisualPayload = preload("res://scripts/rigged_sprite_visual_payload.gd")
 
 
 class FixtureAuthoringHostClient extends AuthoringHostClient:
@@ -55,6 +56,7 @@ func _run() -> void:
 	await _verify_canvas()
 	await _verify_editor()
 	await _verify_rigged_mob_preview()
+	_verify_composite_visual_payload()
 	_verify_composite_preview_requests()
 	print("[actor-socket-calibration-fixture] passed")
 	quit(0)
@@ -242,16 +244,23 @@ func _verify_composite_preview_requests() -> void:
 	mob._preview_frame = _option(2)
 	mob._visual_mode = _option("composite_rig")
 	mob._composite_visual = descriptor.duplicate(true)
+	mob._form_editable = true
 	mob._status = Label.new()
+	mob._sync_preview_pose_controls()
 	client.request_failed.connect(mob._on_request_failed)
 	mob._preview()
 	if client.requests.size() != 1 or str((client.requests[0] as Dictionary).get("operation", "")) != "mob_preview":
 		_fail("Mob preview payload construction must issue only its mob_preview request")
 		return
+	var mob_request := (client.requests[0] as Dictionary).get("payload", {}) as Dictionary
+	if str(mob_request.get("preview_direction", "")) != "S" or int(mob_request.get("preview_frame", 0)) != 1 or not mob._preview_facing.disabled or not mob._preview_frame.disabled:
+		_fail("Fixed Mob previews must synchronize and lock the effective S/F1 pose")
+		return
 	var mob_payload := ((client.requests[0] as Dictionary).get("payload", {}) as Dictionary).get("composite_visual", {}) as Dictionary
 	if mob_payload != descriptor or mob_payload == mob._composite_visual:
 		_fail("Mob composite payload must be a detached authored descriptor without UI side effects")
 		return
+	client.active_operation = ""
 
 	var npc := FixtureNpcEditor.new()
 	npc._client = client
@@ -262,11 +271,55 @@ func _verify_composite_preview_requests() -> void:
 	npc._preview_frame = _option(2)
 	npc._visual_mode = _option("composite_rig")
 	npc._composite_visual = descriptor.duplicate(true)
+	npc._form_editable = true
 	npc._status = Label.new()
+	npc._sync_preview_pose_controls()
 	npc._preview()
 	if client.requests.size() != 2 or str((client.requests[1] as Dictionary).get("operation", "")) != "npc_preview":
 		_fail("NPC preview payload construction must issue only its npc_preview request")
 		return
+	var npc_request := (client.requests[1] as Dictionary).get("payload", {}) as Dictionary
+	if str(npc_request.get("preview_direction", "")) != "S" or int(npc_request.get("preview_frame", 0)) != 1 or not npc._preview_facing.disabled or not npc._preview_frame.disabled:
+		_fail("Fixed NPC previews must synchronize and lock the effective S/F1 pose")
+		return
+	client.active_operation = ""
+
+	var actor_pose_descriptor := descriptor.duplicate(true)
+	actor_pose_descriptor["schema_version"] = 1.0
+	actor_pose_descriptor["pose_policy"] = "actor_pose"
+	actor_pose_descriptor["fixed_direction"] = "S"
+	actor_pose_descriptor["fixed_frame"] = 1.0
+	mob._composite_visual = actor_pose_descriptor
+	mob._preview_facing = _option("N")
+	mob._preview_frame = _option(2)
+	mob._sync_preview_pose_controls()
+	mob._preview()
+	var actor_pose_request := (client.requests[2] as Dictionary).get("payload", {}) as Dictionary
+	var actor_pose_payload := actor_pose_request.get("composite_visual", {}) as Dictionary
+	if JSON.stringify(actor_pose_payload).contains("\"schema_version\":1.0") or actor_pose_payload.get("fixed_direction", "not-null") != null or actor_pose_payload.get("fixed_frame", "not-null") != null or str(actor_pose_request.get("preview_direction", "")) != "N" or int(actor_pose_request.get("preview_frame", 0)) != 2:
+		_fail("Actor Pose preview payloads must use integer schema versions, null fixed fields, and user-selected preview controls")
+		return
+	if mob._preview_facing.disabled or mob._preview_frame.disabled:
+		_fail("Actor Pose Mob preview selectors must remain editable")
+		return
+	client.active_operation = ""
+
+	var npc_actor_pose := actor_pose_descriptor.duplicate(true)
+	npc._composite_visual = npc_actor_pose
+	npc._preview_facing = _option("north")
+	npc._preview_frame = _option(2)
+	npc._sync_preview_pose_controls()
+	npc._preview()
+	var npc_actor_pose_request := (client.requests[3] as Dictionary).get("payload", {}) as Dictionary
+	var npc_actor_pose_payload := npc_actor_pose_request.get("composite_visual", {}) as Dictionary
+	if JSON.stringify(npc_actor_pose_payload).contains("\"schema_version\":1.0") or npc_actor_pose_payload.get("fixed_direction", "not-null") != null or npc_actor_pose_payload.get("fixed_frame", "not-null") != null or str(npc_actor_pose_request.get("preview_direction", "")) != "N" or int(npc_actor_pose_request.get("preview_frame", 0)) != 2:
+		_fail("Actor Pose NPC previews must use canonical descriptors and user-selected preview controls")
+		return
+	if npc._preview_facing.disabled or npc._preview_frame.disabled:
+		_fail("Actor Pose NPC preview selectors must remain editable")
+		return
+
+	_verify_fixed_pose_rows(mob, npc)
 
 	var rejecting_client := FixtureAuthoringHostClient.new()
 	rejecting_client.reject_requests = true
@@ -284,6 +337,65 @@ func _verify_composite_preview_requests() -> void:
 	rejecting_mob._preview()
 	if rejecting_mob._status.text != "Another host request is still in progress.":
 		_fail("A synchronous Mob preview failure must not be overwritten by calculating status")
+
+
+func _verify_composite_visual_payload() -> void:
+	var parsed := JSON.new()
+	if parsed.parse('''
+		{
+			"schema_version": 1.0,
+			"rig_id": "humanoid_v1",
+			"calibration_id": "orc_v1",
+			"pose_policy": "actor_pose",
+			"fixed_direction": "S",
+			"fixed_frame": 1.0,
+			"cosmetic_item_ids": {"right_hand": "inventory_154_axe"}
+		}
+	''') != OK:
+		_fail("Composite visual JSON fixture must parse")
+		return
+	var payload := RiggedSpriteVisualPayload.canonicalize(parsed.data as Dictionary)
+	var serialized := JSON.stringify(payload)
+	if serialized.contains("\"schema_version\":1.0") or payload.get("fixed_direction", "not-null") != null or payload.get("fixed_frame", "not-null") != null:
+		_fail("Actor Pose descriptors must serialize integral schema_version and null fixed fields")
+		return
+	payload = RiggedSpriteVisualPayload.canonicalize({
+		"schema_version": 1.0,
+		"rig_id": "humanoid_v1",
+		"calibration_id": null,
+		"pose_policy": "fixed",
+		"fixed_direction": "S",
+		"fixed_frame": 1.0,
+		"cosmetic_item_ids": {},
+	})
+	if int(payload.get("schema_version", 0)) != 1 or str(payload.get("fixed_direction", "")) != "S" or int(payload.get("fixed_frame", 0)) != 1:
+		_fail("Fixed descriptors must serialize typed fixed pose values")
+
+
+func _verify_fixed_pose_rows(mob: FixtureMobEditor, npc: FixtureNpcEditor) -> void:
+	mob._fixed_direction_label = Label.new()
+	mob._fixed_direction = _option("S")
+	mob._fixed_frame_label = Label.new()
+	mob._fixed_frame = _option(1)
+	mob._set_fixed_pose_rows_visible(false)
+	if mob._fixed_direction_label.visible or mob._fixed_direction.visible or mob._fixed_frame_label.visible or mob._fixed_frame.visible:
+		_fail("Actor Pose Mob controls must hide both fixed-pose labels and selectors")
+		return
+	mob._set_fixed_pose_rows_visible(true)
+	if not mob._fixed_direction_label.visible or not mob._fixed_direction.visible or not mob._fixed_frame_label.visible or not mob._fixed_frame.visible:
+		_fail("Fixed Mob controls must restore both fixed-pose rows")
+		return
+	npc._fixed_direction_label = Label.new()
+	npc._fixed_direction = _option("S")
+	npc._fixed_frame_label = Label.new()
+	npc._fixed_frame = _option(1)
+	npc._set_fixed_pose_rows_visible(false)
+	if npc._fixed_direction_label.visible or npc._fixed_direction.visible or npc._fixed_frame_label.visible or npc._fixed_frame.visible:
+		_fail("Actor Pose NPC controls must hide both fixed-pose labels and selectors")
+		return
+	npc._set_fixed_pose_rows_visible(true)
+	if not npc._fixed_direction_label.visible or not npc._fixed_direction.visible or not npc._fixed_frame_label.visible or not npc._fixed_frame.visible:
+		_fail("Fixed NPC controls must restore both fixed-pose rows")
 
 
 func _option(metadata: Variant) -> OptionButton:

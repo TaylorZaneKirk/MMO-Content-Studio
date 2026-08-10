@@ -1,12 +1,15 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using MMO.ContentStudio.AuthoringHost.Configuration;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Features.ActorAppearance;
+using MMO.ContentStudio.AuthoringHost.Http;
 using Xunit;
 
 namespace MMO.ContentStudio.AuthoringHost.Tests;
@@ -30,6 +33,15 @@ public sealed class ActorAppearanceAuthoringFeatureTests : IAsyncLifetime
         builder.Services.AddActorAppearanceAuthoring();
         _app = builder.Build();
         _app.MapActorAppearanceAuthoring();
+        _app.MapPost("/mob-preview-binding", (
+            HttpContext context,
+            MobPreviewRequest request) =>
+            AuthoringHttpResults.Ok(context, new
+            {
+                schema_version = request.CompositeVisual?.SchemaVersion,
+                fixed_direction = request.CompositeVisual?.FixedDirection,
+                fixed_frame = request.CompositeVisual?.FixedFrame
+            }));
         await _app.StartAsync(TestContext.Current.CancellationToken);
         _client = new HttpClient { BaseAddress = new Uri(_app.Urls.Single()) };
     }
@@ -111,6 +123,55 @@ public sealed class ActorAppearanceAuthoringFeatureTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, frameResponse.StatusCode);
         using var frameDocument = JsonDocument.Parse(await frameResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
         Assert.Equal(16, frameDocument.RootElement.GetProperty("data").GetProperty("frames").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CanonicalActorPosePreviewPayloadBindsToTheNormalJsonEnvelope()
+    {
+        var response = await _client!.PostAsJsonAsync(
+            "/mob-preview-binding",
+            new
+            {
+                composite_visual = new
+                {
+                    schema_version = 1,
+                    rig_id = "humanoid_v1",
+                    calibration_id = "orc_v1",
+                    pose_policy = "actor_pose",
+                    fixed_direction = (string?)null,
+                    fixed_frame = (int?)null,
+                    cosmetic_item_ids = new Dictionary<string, string>
+                    {
+                        ["right_hand"] = "inventory_154_axe"
+                    }
+                }
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.True(document.RootElement.GetProperty("success").GetBoolean());
+        var data = document.RootElement.GetProperty("data");
+        Assert.Equal(1, data.GetProperty("schema_version").GetInt32());
+        Assert.Equal(JsonValueKind.Null, data.GetProperty("fixed_direction").ValueKind);
+        Assert.Equal(JsonValueKind.Null, data.GetProperty("fixed_frame").ValueKind);
+    }
+
+    [Fact]
+    public async Task FractionalActorPoseSchemaVersionIsRejectedByTheEndpointBinder()
+    {
+        using var content = new StringContent(
+            """
+            {"composite_visual":{"schema_version":1.5,"rig_id":"humanoid_v1","calibration_id":"orc_v1","pose_policy":"actor_pose","fixed_direction":null,"fixed_frame":null,"cosmetic_item_ids":{}}}
+            """,
+            Encoding.UTF8,
+            "application/json");
+        using var response = await _client!.PostAsync(
+            "/mob-preview-binding",
+            content,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     private async Task<JsonElement> GetEnvelope(string path)

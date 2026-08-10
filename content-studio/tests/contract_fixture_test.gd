@@ -735,7 +735,7 @@ func _verify_non_json_transport_failure() -> void:
 		400,
 		PackedStringArray(),
 		"Microsoft.AspNetCore.Http.BadHttpRequestException".to_utf8_buffer())
-	if emitted.size() != 2 or emitted[0] != "preview_item" or not str(emitted[1]).contains("HTTP 400"):
+	if emitted.size() != 2 or emitted[0] != "preview_item" or not str(emitted[1]).contains("HTTP 400") or not str(emitted[1]).contains("BadHttpRequestException"):
 		_fail("Non-JSON host failures must become a readable request failure")
 
 
