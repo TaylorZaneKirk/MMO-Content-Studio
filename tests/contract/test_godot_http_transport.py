@@ -27,8 +27,27 @@ class GodotHttpTransportTests(unittest.TestCase):
             "_transport_failure_message",
             "request_succeeded.emit",
             "request_failed.emit",
+            "Host request started",
+            "Host request succeeded",
+            "Host request failed",
         ):
             self.assertIn(token, transport)
+
+    def test_main_observes_authoring_actions_and_connection_lifecycle(self) -> None:
+        main = (SCRIPTS / "main.gd").read_text()
+        for token in (
+            'preload("res://scripts/content_studio_logger.gd")',
+            "get_tree().node_added.connect(_on_tree_node_added)",
+            "Authoring form value changed",
+            "User action requested",
+            "Connection state changed",
+            "Content catalog loaded",
+            "toggled.connect",
+            "item_selected.connect",
+            "value_changed.connect",
+            "text_changed.connect",
+        ):
+            self.assertIn(token, main)
 
     def test_mutation_timeout_policy_is_operation_aware(self) -> None:
         transport = (SCRIPTS / "http_json_client.gd").read_text()

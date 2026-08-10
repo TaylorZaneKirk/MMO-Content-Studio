@@ -1,5 +1,7 @@
 extends Control
 
+const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
+
 @onready var connection_badge: Label = %ConnectionBadge
 @onready var connection_message: Label = %ConnectionMessage
 @onready var retry_button: Button = %RetryButton
@@ -14,8 +16,12 @@ extends Control
 @onready var npc_editor = %NPCs
 @onready var dialogue_editor = %Dialogue
 
+var _observed_controls: Dictionary = {}
+
 
 func _ready() -> void:
+	get_tree().node_added.connect(_on_tree_node_added)
+	_observe_descendant_controls(self)
 	authoring_host_client.connection_state_changed.connect(_on_connection_state_changed)
 	authoring_host_client.handshake_received.connect(_on_handshake_received)
 	authoring_host_client.health_received.connect(_on_health_received)
@@ -23,10 +29,15 @@ func _ready() -> void:
 	npc_editor.workspace_open_requested.connect(_on_workspace_open_requested)
 	dialogue_editor.workspace_open_requested.connect(_on_workspace_open_requested)
 	retry_button.pressed.connect(authoring_host_client.retry)
+	CONTENT_STUDIO_LOGGER.info("Content Studio startup requested")
 	authoring_host_client.connect_and_load()
 
 
 func _on_connection_state_changed(state: String, message: String) -> void:
+	CONTENT_STUDIO_LOGGER.info("Connection state changed", {
+		"message": message,
+		"state": state,
+	})
 	connection_badge.text = state.to_upper()
 	connection_message.text = message
 	retry_button.visible = state == "disconnected"
@@ -41,6 +52,10 @@ func _on_connection_state_changed(state: String, message: String) -> void:
 
 
 func _on_handshake_received(payload: Dictionary) -> void:
+	CONTENT_STUDIO_LOGGER.info("Authoring host handshake loaded", {
+		"host_version": payload.get("host_version", "unknown"),
+		"service": payload.get("service", "unknown"),
+	})
 	host_value.text = "%s  •  %s" % [
 		str(payload.get("service", "Unknown host")),
 		str(payload.get("host_version", "unknown version")),
@@ -51,6 +66,10 @@ func _on_handshake_received(payload: Dictionary) -> void:
 func _on_health_received(payload: Dictionary) -> void:
 	var database := payload.get("database", {}) as Dictionary
 	var database_status := str(database.get("status", "Unknown"))
+	CONTENT_STUDIO_LOGGER.info("Authoring host health loaded", {
+		"database_status": database_status,
+		"schema_contract": payload.get("schema_contract", "unknown"),
+	})
 	database_value.text = "%s - %s" % [
 		database_status,
 		str(database.get("message", "No database status message.")),
@@ -77,8 +96,11 @@ func _on_health_received(payload: Dictionary) -> void:
 
 
 func _on_catalog_received(payload: Dictionary) -> void:
-	_clear_children(catalog_list)
 	var sections: Variant = payload.get("sections", [])
+	CONTENT_STUDIO_LOGGER.info("Content catalog loaded", {
+		"section_count": sections.size() if sections is Array else 0,
+	})
+	_clear_children(catalog_list)
 	if sections is not Array:
 		return
 
@@ -109,6 +131,10 @@ func _clear_children(container: Node) -> void:
 
 
 func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> void:
+	CONTENT_STUDIO_LOGGER.debug("Workspace open requested", {
+		"resource_id": resource_id,
+		"workspace": workspace_id,
+	})
 	match workspace_id:
 		"dialogue":
 			_open_tab(dialogue_editor)
@@ -122,3 +148,109 @@ func _open_tab(control: Control) -> void:
 	var index := tabs.get_tab_idx_from_control(control)
 	if index >= 0:
 		tabs.current_tab = index
+
+
+func _on_tree_node_added(node: Node) -> void:
+	if node is Control:
+		call_deferred("_observe_control", node)
+
+
+func _observe_descendant_controls(node: Node) -> void:
+	if node is Control:
+		_observe_control(node)
+	for child in node.get_children():
+		_observe_descendant_controls(child)
+
+
+func _observe_control(control: Control) -> void:
+	if not is_instance_valid(control):
+		return
+	var instance_id := control.get_instance_id()
+	if _observed_controls.has(instance_id):
+		return
+	_observed_controls[instance_id] = true
+
+	if control is CheckBox:
+		(control as CheckBox).toggled.connect(_on_checkbox_toggled.bind(control))
+	elif control is OptionButton:
+		(control as OptionButton).item_selected.connect(_on_option_selected.bind(control))
+	elif control is SpinBox:
+		(control as SpinBox).value_changed.connect(_on_spin_value_changed.bind(control))
+	elif control is LineEdit:
+		(control as LineEdit).text_changed.connect(_on_text_value_changed.bind(control))
+	elif control is TextEdit:
+		(control as TextEdit).text_changed.connect(_on_text_edit_changed.bind(control))
+	elif control is TabContainer:
+		(control as TabContainer).tab_changed.connect(_on_dynamic_tab_changed.bind(control))
+	elif control is Button:
+		(control as Button).pressed.connect(_on_button_pressed.bind(control))
+
+
+func _on_checkbox_toggled(pressed: bool, control: CheckBox) -> void:
+	_log_control_change(control, "toggled", pressed)
+
+
+func _on_option_selected(index: int, control: OptionButton) -> void:
+	_log_control_change(control, "selected", control.get_item_text(index))
+
+
+func _on_spin_value_changed(value: float, control: SpinBox) -> void:
+	_log_control_change(control, "set", value)
+
+
+func _on_text_value_changed(value: String, control: LineEdit) -> void:
+	_log_control_change(control, "set", value)
+
+
+func _on_text_edit_changed(control: TextEdit) -> void:
+	_log_control_change(control, "set", control.text)
+
+
+func _on_button_pressed(control: Button) -> void:
+	CONTENT_STUDIO_LOGGER.debug("User action requested", {
+		"control": _control_id(control),
+		"label": control.text,
+	})
+
+
+func _on_dynamic_tab_changed(index: int, control: TabContainer) -> void:
+	CONTENT_STUDIO_LOGGER.debug("Workspace tab changed", {
+		"tab": control.get_tab_title(index),
+		"tab_container": _control_id(control),
+	})
+
+
+func _log_control_change(control: Control, action: String, value: Variant) -> void:
+	CONTENT_STUDIO_LOGGER.debug("Authoring form value changed", {
+		"action": action,
+		"control": _control_id(control),
+		"value": value,
+	})
+
+
+func _control_id(control: Control) -> String:
+	var button := control as BaseButton
+	if button != null and not button.text.strip_edges().is_empty():
+		return button.text.strip_edges()
+	var label := _preceding_label(control)
+	if not label.is_empty():
+		return label
+	if not control.name.begins_with("@"):
+		return control.name
+	var path := str(control.get_path())
+	return path if not path.is_empty() else control.name
+
+
+func _preceding_label(control: Control) -> String:
+	var parent := control.get_parent()
+	if parent == null:
+		return ""
+	var index := control.get_index() - 1
+	while index >= 0:
+		var sibling := parent.get_child(index)
+		if sibling is Label and not (sibling as Label).text.strip_edges().is_empty():
+			return (sibling as Label).text.strip_edges()
+		if sibling is Control:
+			return ""
+		index -= 1
+	return ""

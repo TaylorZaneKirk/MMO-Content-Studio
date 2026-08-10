@@ -1,6 +1,8 @@
 extends Node
 class_name AuthoringHttpTransport
 
+const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
+
 signal request_succeeded(operation: String, payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
@@ -37,7 +39,7 @@ func request(
 	payload: Dictionary = {}
 ) -> void:
 	if is_busy():
-		request_failed.emit(operation, "Another host request is still in progress.", [])
+		_emit_request_failed(operation, "Another host request is still in progress.", [])
 		return
 
 	_operation = operation
@@ -49,6 +51,12 @@ func request(
 		"X-Request-Id: godot-%s" % str(Time.get_ticks_msec()),
 	])
 	var body := "" if method == HTTPClient.METHOD_GET else JSON.stringify(payload)
+	CONTENT_STUDIO_LOGGER.debug("Host request started", {
+		"method": _method_name(method),
+		"operation": operation,
+		"path": path,
+		"timeout_seconds": _http_request.timeout,
+	})
 	var error := _http_request.request(
 		base_url.trim_suffix("/") + path,
 		headers,
@@ -67,9 +75,14 @@ func _on_request_completed(
 ) -> void:
 	var completed_operation := _operation
 	_operation = ""
+	CONTENT_STUDIO_LOGGER.debug("Host request completed", {
+		"http_status": response_code,
+		"operation": completed_operation,
+		"result": result,
+	})
 
 	if result != HTTPRequest.RESULT_SUCCESS:
-		request_failed.emit(
+		_emit_request_failed(
 			completed_operation,
 			_transport_failure_message(completed_operation, result),
 			[]
@@ -78,7 +91,7 @@ func _on_request_completed(
 
 	var json := JSON.new()
 	if json.parse(body.get_string_from_utf8()) != OK or typeof(json.data) != TYPE_DICTIONARY:
-		request_failed.emit(
+		_emit_request_failed(
 			completed_operation,
 			"The authoring host returned a non-JSON response (HTTP %s)." % response_code,
 			[]
@@ -88,7 +101,7 @@ func _on_request_completed(
 	var envelope := json.data as Dictionary
 	var errors := envelope.get("errors", []) as Array
 	if response_code < 200 or response_code >= 300:
-		request_failed.emit(
+		_emit_request_failed(
 			completed_operation,
 			_extract_error_message(errors, response_code),
 			errors
@@ -96,7 +109,7 @@ func _on_request_completed(
 		return
 
 	if not envelope.get("success", false):
-		request_failed.emit(
+		_emit_request_failed(
 			completed_operation,
 			_extract_error_message(errors, response_code),
 			errors
@@ -104,7 +117,7 @@ func _on_request_completed(
 		return
 
 	if str(envelope.get("api_version", "")) != API_VERSION:
-		request_failed.emit(
+		_emit_request_failed(
 			completed_operation,
 			"API version mismatch. Studio expects %s but host returned %s." % [
 				API_VERSION,
@@ -116,20 +129,47 @@ func _on_request_completed(
 
 	var data: Variant = envelope.get("data", {})
 	if typeof(data) != TYPE_DICTIONARY:
-		request_failed.emit(
+		_emit_request_failed(
 			completed_operation,
 			"The authoring host response did not include an object payload.",
 			[]
 		)
 		return
 
+	CONTENT_STUDIO_LOGGER.info("Host request succeeded", {
+		"http_status": response_code,
+		"operation": completed_operation,
+	})
 	request_succeeded.emit(completed_operation, data as Dictionary)
 
 
 func _fail_current(message: String, errors: Array) -> void:
 	var failed_operation := _operation
 	_operation = ""
-	request_failed.emit(failed_operation, message, errors)
+	_emit_request_failed(failed_operation, message, errors)
+
+
+func _emit_request_failed(operation: String, message: String, errors: Array) -> void:
+	CONTENT_STUDIO_LOGGER.error("Host request failed", {
+		"error_count": errors.size(),
+		"message": message,
+		"operation": operation,
+	})
+	request_failed.emit(operation, message, errors)
+
+
+func _method_name(method: int) -> String:
+	match method:
+		HTTPClient.METHOD_GET:
+			return "GET"
+		HTTPClient.METHOD_POST:
+			return "POST"
+		HTTPClient.METHOD_PUT:
+			return "PUT"
+		HTTPClient.METHOD_DELETE:
+			return "DELETE"
+		_:
+			return str(method)
 
 
 func _timeout_seconds_for_operation(operation: String) -> float:
