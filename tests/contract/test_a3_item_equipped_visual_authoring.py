@@ -75,7 +75,7 @@ class A3ItemEquippedVisualAuthoringTests(unittest.TestCase):
             "Visual asset key",
             "Render layer",
             "Socket",
-            "Attachment X/Y",
+            "Grip Anchor X/Y",
             "Actual game scale",
             '"equipped_visual": _equipped_visual_payload()',
             "_paper_doll_preview.configure_rig_catalog",

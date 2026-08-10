@@ -21,3 +21,8 @@ Set `CONTENT_STUDIO_HOST_URL` when using a non-default loopback port. The host's
 Use `./mmo-content-studio --check` when you want the full repository checks
 before launch. Direct `tools/dev.sh`, `run-host.sh`, and `run-studio.sh`
 commands remain available for debugging the two processes independently.
+
+The launcher health check confirms only that a host is reachable; it does not
+compare the running host to the current source tree. Restart an existing host
+after modifying host code before verifying that change. A build-identity check
+is a future launcher improvement, not part of the current authoring workflow.

@@ -36,7 +36,7 @@ The repository now contains:
 - declarative consumable profiles, ordered requirements, and ordered effects
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
 - backend/API and Godot UI support for unified item aggregates, weapon profiles, and tool capabilities
-- optional equipped-visual metadata inside unified equipment aggregates, including canonical actor-rig selectors, socket/grip authoring, and per-pose grip anchors
+- optional equipped-visual metadata inside unified equipment aggregates, including canonical actor-rig selectors, exact-pose socket/grip authoring, and per-pose grip anchors
 - deterministic publication of runtime-enabled equipped visuals to the MMO Project item-ID catalog, with the current file-backed catalog retained as migration fallback
 - a T4B mob-authoring host boundary with schema handoff, repository, validation,
   options, catalog, load, preview, draft, publish, disable, concurrency, and
@@ -178,11 +178,12 @@ The default API address is `http://127.0.0.1:5187`.
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
 8. **D1-D5 — Dialogue Studio** — non-quest authoring, runtime export, equivalence, and reference safety implemented
 9. **R4D.1B.1 — Actor appearance discovery and socket editor loading repair** — implemented
-10. **T6 — Interactable world objects foundation**
-11. **T7 — Gathering resources and processing stations**
-12. **MMO Project quest foundations**
-13. **Dialogue Studio quest integration**
-14. **Quest Studio**
+10. **R4D.2 — Equipment grip anchor editor hardening** — implemented
+11. **T6 — Interactable world objects foundation**
+12. **T7 — Gathering resources and processing stations**
+13. **MMO Project quest foundations**
+14. **Dialogue Studio quest integration**
+15. **Quest Studio**
 
 The current vertical slices author ordinary items, declarative consumables,
 wearable equipment, and hand-held weapons/tools.

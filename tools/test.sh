@@ -21,16 +21,22 @@ if [[ -x "${REPO_GODOT}" ]]; then
     --script res://tests/contract_fixture_test.gd --quit
   "${REPO_GODOT}" --headless --path "${ROOT}/content-studio" \
     --script res://tests/actor_socket_calibration_fixture_test.gd --quit
+  "${REPO_GODOT}" --headless --path "${ROOT}/content-studio" \
+    --script res://tests/equipment_grip_anchor_fixture_test.gd --quit
 elif command -v godot >/dev/null 2>&1; then
   godot --headless --path "${ROOT}/content-studio" \
     --script res://tests/contract_fixture_test.gd --quit
   godot --headless --path "${ROOT}/content-studio" \
     --script res://tests/actor_socket_calibration_fixture_test.gd --quit
+  godot --headless --path "${ROOT}/content-studio" \
+    --script res://tests/equipment_grip_anchor_fixture_test.gd --quit
 elif command -v godot4 >/dev/null 2>&1; then
   godot4 --headless --path "${ROOT}/content-studio" \
     --script res://tests/contract_fixture_test.gd --quit
   godot4 --headless --path "${ROOT}/content-studio" \
     --script res://tests/actor_socket_calibration_fixture_test.gd --quit
+  godot4 --headless --path "${ROOT}/content-studio" \
+    --script res://tests/equipment_grip_anchor_fixture_test.gd --quit
 else
   echo "[skip] Godot 4 not installed; Godot fixture test skipped"
 fi

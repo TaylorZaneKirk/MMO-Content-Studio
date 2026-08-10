@@ -578,7 +578,8 @@ func _verify_per_pose_flip_payload_and_preview_math(main_scene: PackedScene) -> 
 		return
 	var dragged_anchor: Array = []
 	preview.grip_anchor_changed.connect(func(_direction: String, _frame: int, x: int, y: int) -> void:
-		dragged_anchor = [x, y])
+		dragged_anchor.clear()
+		dragged_anchor.append_array([x, y]))
 	preview._current_pose_context = {"preview_scale": 1.0}
 	preview._drag_state = {
 		"mouse_start_position": Vector2.ZERO,
@@ -619,8 +620,8 @@ func _verify_per_pose_flip_payload_and_preview_math(main_scene: PackedScene) -> 
 		return
 	items._appearance_visible_in_pose.button_pressed = true
 	items._on_appearance_visible_in_pose_toggled(true)
-	if not items._appearance_grip_x.editable or items._appearance_flip_x.disabled or items._appearance_item_over_grip.disabled:
-		_fail("Revealing a pose must restore normal pose editing")
+	if items._appearance_grip_x.editable or items._appearance_flip_x.disabled or items._appearance_item_over_grip.disabled:
+		_fail("Revealing a pose without exact item art must preserve pose editing but keep grip-anchor editing disabled")
 		return
 	items._appearance_item_over_grip.button_pressed = true
 	items._on_appearance_item_over_grip_toggled(true)

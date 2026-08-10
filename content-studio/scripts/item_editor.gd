@@ -121,6 +121,9 @@ var _appearance_zoom_in: Button
 var _appearance_fit: Button
 var _appearance_grip_x: SpinBox
 var _appearance_grip_y: SpinBox
+var _appearance_grip_row: HBoxContainer
+var _appearance_grip_actions: HBoxContainer
+var _appearance_grip_marker_legend: Label
 var _appearance_visible_in_pose: CheckBox
 var _appearance_item_over_grip: CheckBox
 var _appearance_flip_x: CheckBox
@@ -132,6 +135,7 @@ var _equipped_visual_flip_x: Dictionary = {}
 var _equipped_visual_hidden_poses: Dictionary = {}
 var _equipped_visual_item_over_grip: Dictionary = {}
 var _appearance_updating := false
+var _grip_pose_art_available := false
 
 
 func _ready() -> void:
@@ -335,16 +339,20 @@ func _build_ui() -> void:
 	_appearance_nudge_y.value_changed.connect(_on_form_changed.unbind(1))
 	nudge_row.add_child(_appearance_nudge_y)
 	doll_controls.add_child(nudge_row)
-	var grip_row := HBoxContainer.new()
-	grip_row.add_theme_constant_override("separation", 6)
-	grip_row.add_child(_field_label("Attachment X/Y"))
+	_appearance_grip_row = HBoxContainer.new()
+	_appearance_grip_row.add_theme_constant_override("separation", 6)
+	_appearance_grip_row.add_child(_field_label("Grip Anchor X/Y"))
 	_appearance_grip_x = _row_spin(-4096, 4096, 0)
 	_appearance_grip_x.value_changed.connect(_on_grip_spin_changed.unbind(1))
-	grip_row.add_child(_appearance_grip_x)
+	_appearance_grip_row.add_child(_appearance_grip_x)
 	_appearance_grip_y = _row_spin(-4096, 4096, 0)
 	_appearance_grip_y.value_changed.connect(_on_grip_spin_changed.unbind(1))
-	grip_row.add_child(_appearance_grip_y)
-	doll_controls.add_child(grip_row)
+	_appearance_grip_row.add_child(_appearance_grip_y)
+	doll_controls.add_child(_appearance_grip_row)
+	_appearance_grip_marker_legend = Label.new()
+	_appearance_grip_marker_legend.text = "Grip Anchor: source-art pixel aligned to the selected actor socket. Markers: Actor Socket (gold, read-only) | Item Grip Anchor (pink, draggable)."
+	_appearance_grip_marker_legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	doll_controls.add_child(_appearance_grip_marker_legend)
 	_appearance_visible_in_pose = CheckBox.new()
 	_appearance_visible_in_pose.text = "Visible in this pose"
 	_appearance_visible_in_pose.button_pressed = true
@@ -358,37 +366,37 @@ func _build_ui() -> void:
 	_appearance_flip_x.text = "Flip horizontally"
 	_appearance_flip_x.toggled.connect(_on_appearance_flip_x_toggled)
 	doll_controls.add_child(_appearance_flip_x)
-	var grip_actions := HBoxContainer.new()
-	grip_actions.add_theme_constant_override("separation", 6)
+	_appearance_grip_actions = HBoxContainer.new()
+	_appearance_grip_actions.add_theme_constant_override("separation", 6)
 	_appearance_copy_previous = Button.new()
 	_appearance_copy_previous.text = "Copy Prev"
 	_appearance_copy_previous.pressed.connect(_copy_previous_pose_anchor)
-	grip_actions.add_child(_appearance_copy_previous)
+	_appearance_grip_actions.add_child(_appearance_copy_previous)
 	_appearance_copy_next = Button.new()
 	_appearance_copy_next.text = "Copy Next"
 	_appearance_copy_next.pressed.connect(_copy_next_pose_anchor)
-	grip_actions.add_child(_appearance_copy_next)
+	_appearance_grip_actions.add_child(_appearance_copy_next)
 	_appearance_clear_pose = Button.new()
 	_appearance_clear_pose.text = "Clear Pose"
 	_appearance_clear_pose.pressed.connect(_clear_current_pose_anchor)
-	grip_actions.add_child(_appearance_clear_pose)
+	_appearance_grip_actions.add_child(_appearance_clear_pose)
 	var nudge_left := Button.new()
 	nudge_left.text = "X-"
 	nudge_left.pressed.connect(_nudge_current_grip_anchor.bind(-1, 0))
-	grip_actions.add_child(nudge_left)
+	_appearance_grip_actions.add_child(nudge_left)
 	var nudge_right := Button.new()
 	nudge_right.text = "X+"
 	nudge_right.pressed.connect(_nudge_current_grip_anchor.bind(1, 0))
-	grip_actions.add_child(nudge_right)
+	_appearance_grip_actions.add_child(nudge_right)
 	var nudge_up := Button.new()
 	nudge_up.text = "Y-"
 	nudge_up.pressed.connect(_nudge_current_grip_anchor.bind(0, -1))
-	grip_actions.add_child(nudge_up)
+	_appearance_grip_actions.add_child(nudge_up)
 	var nudge_down := Button.new()
 	nudge_down.text = "Y+"
 	nudge_down.pressed.connect(_nudge_current_grip_anchor.bind(0, 1))
-	grip_actions.add_child(nudge_down)
-	doll_controls.add_child(grip_actions)
+	_appearance_grip_actions.add_child(nudge_down)
+	doll_controls.add_child(_appearance_grip_actions)
 	var zoom_row := HBoxContainer.new()
 	zoom_row.add_theme_constant_override("separation", 6)
 	_appearance_zoom_out = Button.new()
@@ -1179,7 +1187,7 @@ func _on_appearance_socket_changed() -> void:
 
 
 func _on_grip_spin_changed() -> void:
-	if _is_loading or _appearance_updating or not _appearance_enabled.button_pressed:
+	if _is_loading or _appearance_updating or not _can_edit_grip_anchor():
 		return
 	_set_current_pose_anchor(Vector2i(int(_appearance_grip_x.value), int(_appearance_grip_y.value)))
 	_on_form_changed()
@@ -1211,7 +1219,7 @@ func _on_appearance_item_over_grip_toggled(_enabled: bool) -> void:
 
 
 func _on_paper_doll_grip_anchor_changed(direction: String, frame: int, x: int, y: int) -> void:
-	if not _appearance_enabled.button_pressed:
+	if not _can_edit_grip_anchor():
 		return
 	_set_pose_anchor(direction, frame, Vector2i(x, y))
 	if direction == _selected_metadata(_preview_direction) and frame == int(_preview_frame.value):
@@ -1293,6 +1301,8 @@ func _get_current_pose_item_over_grip() -> bool:
 
 
 func _copy_previous_pose_anchor() -> void:
+	if not _can_edit_grip_anchor():
+		return
 	var frame := int(_preview_frame.value)
 	if frame <= 1:
 		return
@@ -1304,6 +1314,8 @@ func _copy_previous_pose_anchor() -> void:
 
 
 func _copy_next_pose_anchor() -> void:
+	if not _can_edit_grip_anchor():
+		return
 	var frame := int(_preview_frame.value)
 	if frame >= 4:
 		return
@@ -1315,6 +1327,8 @@ func _copy_next_pose_anchor() -> void:
 
 
 func _clear_current_pose_anchor() -> void:
+	if not _can_edit_grip_anchor():
+		return
 	var direction := _selected_metadata(_preview_direction)
 	var frame_key := str(int(_preview_frame.value))
 	var frames_variant: Variant = _equipped_visual_grip_anchors.get(direction, {})
@@ -1331,6 +1345,8 @@ func _clear_current_pose_anchor() -> void:
 
 
 func _nudge_current_grip_anchor(delta_x: int, delta_y: int) -> void:
+	if not _can_edit_grip_anchor():
+		return
 	var anchor: Variant = _get_current_pose_anchor()
 	var next_anchor: Vector2i = anchor if anchor != null else Vector2i.ZERO
 	next_anchor.x += delta_x
@@ -1763,6 +1779,7 @@ func _set_weapon_controls_enabled(enabled: bool) -> void:
 func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: bool, socket_binding: bool) -> void:
 	var catalog_available := _actor_rig_catalog_available()
 	var pose_visible := not _get_current_pose_hidden()
+	var grip_editable := socket_binding and pose_visible and catalog_available and _grip_pose_art_available
 	_appearance_enabled.disabled = not equipment_enabled
 	_appearance_rig.disabled = not authored_visual or not catalog_available
 	_appearance_binding.disabled = not authored_visual or not catalog_available
@@ -1777,15 +1794,33 @@ func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: 
 	_appearance_zoom_in.disabled = not equipment_enabled or not catalog_available or not _paper_doll_preview.can_zoom_in()
 	_appearance_fit.disabled = not equipment_enabled or not catalog_available
 	_appearance_zoom_label.modulate = Color(0.7, 0.73, 0.79, 1) if equipment_enabled and catalog_available else Color(0.45, 0.48, 0.54, 1)
-	_appearance_grip_x.editable = socket_binding and pose_visible and catalog_available
-	_appearance_grip_y.editable = socket_binding and pose_visible and catalog_available
+	_appearance_grip_row.visible = socket_binding
+	_appearance_grip_actions.visible = socket_binding
+	_appearance_grip_marker_legend.visible = socket_binding
+	_appearance_grip_x.editable = grip_editable
+	_appearance_grip_y.editable = grip_editable
 	_appearance_visible_in_pose.disabled = not authored_visual or not catalog_available
 	_appearance_item_over_grip.disabled = not authored_visual or not pose_visible or not catalog_available
 	_appearance_flip_x.disabled = not authored_visual or not pose_visible or not catalog_available
-	_appearance_clear_pose.disabled = not socket_binding or not pose_visible or not catalog_available
-	_appearance_copy_previous.disabled = not socket_binding or not pose_visible or not catalog_available
-	_appearance_copy_next.disabled = not socket_binding or not pose_visible or not catalog_available
+	_appearance_clear_pose.disabled = not grip_editable
+	_appearance_copy_previous.disabled = not grip_editable
+	_appearance_copy_next.disabled = not grip_editable
+	for control in _appearance_grip_actions.get_children():
+		if control is Button:
+			(control as Button).disabled = not grip_editable
+	if not grip_editable:
+		_cancel_paper_doll_drag()
 	_refresh_preview_zoom_controls()
+
+
+func _can_edit_grip_anchor() -> bool:
+	return _appearance_enabled.button_pressed \
+		and _selected_metadata(_appearance_binding) == "socket" \
+		and _actor_rig_catalog_available() \
+		and not _selected_metadata(_appearance_rig).is_empty() \
+		and not _selected_metadata(_appearance_socket).is_empty() \
+		and not _get_current_pose_hidden() \
+		and _grip_pose_art_available
 
 
 func _set_row_enabled(row: Node, enabled: bool) -> void:
@@ -1847,6 +1882,7 @@ func _update_icon_preview(explicit_file_path: String = "") -> void:
 
 func _update_paper_doll_preview() -> void:
 	var direction := _selected_metadata(_preview_direction)
+	var socket_grip_authoring := _appearance_enabled.button_pressed and _selected_metadata(_appearance_binding) == "socket"
 	var equipped_visual_payload_variant: Variant = _equipped_visual_payload()
 	var equipped_visual_payload: Dictionary = equipped_visual_payload_variant if equipped_visual_payload_variant is Dictionary else {}
 	_paper_doll_preview.set_actual_scale_enabled(_appearance_actual_scale.button_pressed)
@@ -1858,11 +1894,21 @@ func _update_paper_doll_preview() -> void:
 		direction if not direction.is_empty() else "N",
 		int(_preview_frame.value),
 		["head", "cape", "body", "legs", "boots", "gloves", "right_hand", "left_hand"],
-		equipped_visual_payload
+		equipped_visual_payload,
+		socket_grip_authoring
 	)
+	_grip_pose_art_available = bool(preview_state.get("selected_item_pose_available", false)) if socket_grip_authoring else false
+	_update_contextual_sections()
 	var resolved_asset_path := str(preview_state.get("resolved_asset_path", ""))
 	if _appearance_enabled.button_pressed:
-		_appearance_asset_path.text = resolved_asset_path
+		if socket_grip_authoring and not _grip_pose_art_available:
+			_appearance_asset_path.text = "Item art: unavailable for %s/F%d" % [direction if not direction.is_empty() else "N", int(_preview_frame.value)]
+		elif socket_grip_authoring and bool(preview_state.get("selected_item_pose_hidden", false)):
+			_appearance_asset_path.text = "Item art: hidden for %s/F%d" % [direction if not direction.is_empty() else "N", int(_preview_frame.value)]
+		elif socket_grip_authoring:
+			_appearance_asset_path.text = "Item art: %s" % resolved_asset_path.get_file()
+		else:
+			_appearance_asset_path.text = resolved_asset_path
 	else:
 		var legacy_visual_key: String = _paper_doll_preview.normalize_visual_key(_display_name.text.strip_edges())
 		_appearance_asset_path.text = "" if legacy_visual_key.is_empty() else "Legacy preview visual: %s" % legacy_visual_key

@@ -40,6 +40,10 @@ var _drag_state: Dictionary = {}
 var _asset_resolution_diagnostics: Array = []
 var _last_resolved_asset_path := ""
 var _last_view_state: Dictionary = {}
+var _grip_anchor_authoring := false
+var _selected_item_pose_available := true
+var _selected_item_expected_path := ""
+var _selected_item_pose_hidden := false
 
 
 func bind(stage: Control, status: Label) -> void:
@@ -181,12 +185,17 @@ func update(
 	direction: String,
 	frame: int,
 	visible_slots: Array,
-	equipped_visual: Dictionary = {}
+	equipped_visual: Dictionary = {},
+	grip_anchor_authoring: bool = false
 ) -> Dictionary:
 	_last_resolved_asset_path = ""
 	_last_view_state.clear()
 	_current_pose_context.clear()
 	_asset_resolution_diagnostics.clear()
+	_grip_anchor_authoring = grip_anchor_authoring
+	_selected_item_pose_available = true
+	_selected_item_expected_path = ""
+	_selected_item_pose_hidden = false
 	_reset_layers()
 	_reset_foreground_overlays()
 	_hide_markers()
@@ -219,16 +228,26 @@ func update(
 		selected_direction,
 		selected_frame,
 		visible_slots,
-		equipped_visual)
+		equipped_visual,
+		grip_anchor_authoring)
 	if layer_entries.is_empty():
 		if bool(_drag_state.get("active", false)):
 			cancel_drag()
-		var diagnostic := "No preview PNGs could be resolved from the configured game_client_assets root."
-		var first_missing := _first_asset_resolution_hint()
-		if not first_missing.is_empty():
-			diagnostic += " First missing asset hint: %s" % first_missing
+		var diagnostic := _status_text(equippable, slot_id, rig_id, selected_direction, selected_frame, {}, equipped_visual)
+		if diagnostic == "No preview PNG matched the selected item visual.":
+			diagnostic = "No preview PNGs could be resolved from the configured game_client_assets root."
+			var first_missing := _first_asset_resolution_hint()
+			if not first_missing.is_empty():
+				diagnostic += " First missing asset hint: %s" % first_missing
 		_status.text = diagnostic
-		return {"status": _status.text, "resolved_asset_path": ""}
+		return {
+			"status": _status.text,
+			"resolved_asset_path": "",
+			"selected_item_pose_available": _selected_item_pose_available,
+			"selected_item_expected_path": _selected_item_expected_path,
+			"selected_item_pose_hidden": _selected_item_pose_hidden,
+			"selected_item_socket_attachment_valid": false,
+		}
 
 	var selected_entry: Dictionary = {}
 	for layer_entry_variant: Variant in layer_entries:
@@ -238,6 +257,8 @@ func update(
 			_last_resolved_asset_path = str(layer_entry.get("resolved_asset_path", ""))
 
 	var valid_socket_attachment := _is_valid_socket_attachment(equipped_visual, selected_entry)
+	if _grip_anchor_authoring and not _selected_item_pose_hidden and not valid_socket_attachment:
+		_selected_item_pose_available = false
 	var actor_bounds := _actor_bounds(layer_entries, valid_socket_attachment)
 	var view_bounds_result := _view_bounds(actor_bounds)
 	var view_bounds: Rect2 = _variant_to_rect2(view_bounds_result.get("bounds", Rect2()), Rect2())
@@ -286,6 +307,10 @@ func update(
 	return {
 		"status": _status.text,
 		"resolved_asset_path": _last_resolved_asset_path,
+		"selected_item_pose_available": _selected_item_pose_available,
+		"selected_item_expected_path": _selected_item_expected_path,
+		"selected_item_pose_hidden": _selected_item_pose_hidden,
+		"selected_item_socket_attachment_valid": valid_socket_attachment,
 		"current_pose_has_anchor": _current_pose_context.get("authored_anchor", false),
 		"preview_scale": preview_scale,
 		"view_bounds_source": view_bounds,
@@ -322,7 +347,8 @@ func _resolve_loaded_layers(
 	direction: String,
 	frame: int,
 	visible_slots: Array,
-	equipped_visual: Dictionary
+	equipped_visual: Dictionary,
+	grip_anchor_authoring: bool
 ) -> Array:
 	var entries: Array = []
 	var layers_variant: Variant = rig.get("layers", [])
@@ -355,19 +381,24 @@ func _resolve_loaded_layers(
 			elif not legacy_visual_key.is_empty() and slot_id == layer_id:
 				selected_visual = true
 		if selected_visual and _resolve_pose_hidden(equipped_visual, direction, frame):
+			_selected_item_pose_hidden = true
 			continue
 		if asset_key.is_empty():
 			continue
-		var load_result := _load_texture(layer_id, asset_key, frame, direction)
+		var exact_selected_item_pose := grip_anchor_authoring and selected_visual
+		var load_result := _load_texture(layer_id, asset_key, frame, direction, exact_selected_item_pose)
 		if load_result.is_empty():
 			var asset_path := _expected_layer_asset_path(layer_id, asset_key, frame, direction)
+			if exact_selected_item_pose:
+				_selected_item_pose_available = false
+				_selected_item_expected_path = asset_path
 			if not _asset_resolution_diagnostics.has(asset_path):
 				_asset_resolution_diagnostics.append(asset_path)
 			continue
 		var texture := load_result.get("texture") as Texture2D
 		if texture == null:
 			continue
-		var pose := _resolve_layer_pose(rig, equipped_visual, layer_id, direction, frame, texture.get_width())
+		var pose := _resolve_layer_pose(rig, equipped_visual, layer_id, direction, frame, texture.get_width(), grip_anchor_authoring and selected_visual)
 		var flip_x := selected_visual and _resolve_pose_flip_x(equipped_visual, direction, frame)
 		entries.append({
 			"layer_id": layer_id,
@@ -393,7 +424,8 @@ func _resolve_layer_pose(
 	layer_id: String,
 	direction: String,
 	frame: int,
-	texture_width: int
+	texture_width: int,
+	grip_anchor_authoring: bool
 ) -> Dictionary:
 	var pose := {
 		"position": ANCHOR_OFFSET,
@@ -418,7 +450,8 @@ func _resolve_layer_pose(
 		direction,
 		frame,
 		layer_id,
-		str(equipped_visual.get("asset_key", "")))
+		str(equipped_visual.get("asset_key", "")),
+		grip_anchor_authoring)
 	var authored_anchor: Variant = _resolve_directional_point(
 		equipped_visual.get("grip_anchors", null),
 		direction,
@@ -466,10 +499,15 @@ func _resolve_preview_grip_anchor(
 	direction: String,
 	frame: int,
 	layer_id: String,
-	asset_key: String) -> Vector2i:
+	asset_key: String,
+	grip_anchor_authoring: bool) -> Vector2i:
 	var authored_anchor = _resolve_directional_point(grip_points_variant, direction, frame)
 	if authored_anchor != null:
 		return authored_anchor
+	if grip_anchor_authoring:
+		var exact_path := _find_file(layer_id, asset_key, frame, direction)
+		var exact_texture := _texture_cache.get(exact_path, null) as Texture2D
+		return Vector2i(int(exact_texture.get_width() * 0.5), int(exact_texture.get_height() * 0.5)) if exact_texture != null else Vector2i.ZERO
 	var neighboring_frame := clampi(frame - 1, 1, 4)
 	var previous_anchor = _resolve_directional_point(grip_points_variant, direction, neighboring_frame)
 	if previous_anchor != null:
@@ -655,8 +693,9 @@ func _resolve_foreground_overlay_z_index(overlay: Dictionary, direction: String)
 	return int(z_indexes.get(direction, 0))
 
 
-func _load_texture(layer_id: String, asset_key: String, frame: int, direction: String) -> Dictionary:
-	for fallback_frame in _frame_fallbacks(frame, direction):
+func _load_texture(layer_id: String, asset_key: String, frame: int, direction: String, exact_only: bool = false) -> Dictionary:
+	var frames := [frame] if exact_only else _frame_fallbacks(frame, direction)
+	for fallback_frame in frames:
 		var file_path := _find_file(layer_id, asset_key, int(fallback_frame), direction)
 		if file_path.is_empty():
 			continue
@@ -835,6 +874,7 @@ func _update_markers(
 			"authored_anchor": bool(selected_entry.get("authored_anchor", false)),
 			"used_attachment": used_attachment,
 			"can_drag": true,
+			"clamp_grip_to_texture": _grip_anchor_authoring,
 			"grip_anchor": Vector2(grip_anchor),
 			"authored_grip_anchor": Vector2(_variant_to_vector2i(selected_entry.get("authored_grip_anchor", grip_anchor), grip_anchor)),
 			"flip_x": bool(selected_entry.get("flip_x", false)),
@@ -857,6 +897,10 @@ func _status_text(
 	if slot_id == "ring":
 		return "Ring is gameplay equipment but has no visible paper-doll layer in the current client."
 	if selected_entry.is_empty():
+		if _grip_anchor_authoring and not _selected_item_pose_available:
+			return "Item art unavailable for %s/F%d: %s" % [direction, frame, _selected_item_expected_path.get_file()]
+		if _selected_item_pose_hidden:
+			return "Item art hidden for %s/F%d." % [direction, frame]
 		return "No preview PNG matched the selected item visual."
 	var binding_type := str(equipped_visual.get("binding_type", "legacy"))
 	var authored_anchor := bool(selected_entry.get("authored_anchor", false))
@@ -975,6 +1019,7 @@ func _begin_drag(local_position: Vector2) -> void:
 		"preview_scale": preview_scale,
 		"texture_size": texture_size,
 		"flip_x": bool(_current_pose_context.get("flip_x", false)),
+		"clamp_grip_to_texture": bool(_current_pose_context.get("clamp_grip_to_texture", false)),
 		"direction": str(_current_pose_context.get("direction", "N")),
 		"frame": int(_current_pose_context.get("frame", 1)),
 	}
@@ -1028,13 +1073,14 @@ func _apply_drag_position_from_active_drag(local_position: Vector2) -> void:
 	var start_mouse := _variant_to_vector2(_drag_state.get("mouse_start_position", Vector2.ZERO), Vector2.ZERO)
 	var start_grip_anchor := _variant_to_vector2(_drag_state.get("start_grip_anchor", Vector2.ZERO), Vector2.ZERO)
 	var drag_delta_source := (local_position - start_mouse) / preview_scale
-	# Persisted "grip_anchor" contract names remain for compatibility, but the
-	# authored value is a virtual local attachment anchor and may sit outside the PNG.
 	var grip_source := start_grip_anchor - drag_delta_source
 	if bool(_drag_state.get("flip_x", false)):
 		grip_source.x = start_grip_anchor.x + drag_delta_source.x
 	var x := clampi(int(round(grip_source.x)), -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
 	var y := clampi(int(round(grip_source.y)), -ATTACHMENT_ANCHOR_LIMIT, ATTACHMENT_ANCHOR_LIMIT)
+	if bool(_drag_state.get("clamp_grip_to_texture", false)):
+		x = clampi(x, 0, int(texture_size.x) - 1)
+		y = clampi(y, 0, int(texture_size.y) - 1)
 	grip_anchor_changed.emit(
 		str(_drag_state.get("direction", "N")),
 		int(_drag_state.get("frame", 1)),
