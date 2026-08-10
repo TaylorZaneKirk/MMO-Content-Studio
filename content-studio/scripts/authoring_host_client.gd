@@ -33,6 +33,9 @@ signal dialogue_preview_received(payload: Dictionary)
 signal dialogue_playthrough_received(payload: Dictionary)
 signal dialogue_mutation_completed(payload: Dictionary)
 signal dialogue_delete_completed(payload: Dictionary)
+signal actor_calibration_received(payload: Dictionary)
+signal actor_calibration_saved(payload: Dictionary)
+signal actor_calibration_frames_received(payload: Dictionary)
 signal request_failed(operation: String, message: String, errors: Array)
 
 const TRANSPORT_SCRIPT := preload("res://scripts/http_json_client.gd")
@@ -76,6 +79,9 @@ const OP_DIALOGUE_SAVE_DRAFT := "dialogue_save_draft"
 const OP_DIALOGUE_PUBLISH := "dialogue_publish"
 const OP_DIALOGUE_DISABLE := "dialogue_disable"
 const OP_DIALOGUE_DELETE := "dialogue_delete"
+const OP_ACTOR_CALIBRATION := "actor_calibration"
+const OP_ACTOR_CALIBRATION_SAVE := "actor_calibration_save"
+const OP_ACTOR_CALIBRATION_FRAMES := "actor_calibration_frames"
 
 const CONNECTION_OPERATIONS := [
 	OP_HANDSHAKE,
@@ -316,6 +322,18 @@ func delete_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Va
 	})
 
 
+func load_actor_calibration(calibration_id: String) -> void:
+	_request(OP_ACTOR_CALIBRATION, "/api/v1/actor-appearance/calibrations/%s" % calibration_id.uri_encode())
+
+
+func save_actor_calibration(calibration_id: String, payload: Dictionary) -> void:
+	_request(OP_ACTOR_CALIBRATION_SAVE, "/api/v1/actor-appearance/calibrations/%s" % calibration_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+
+func load_actor_calibration_frames(payload: Dictionary) -> void:
+	_request(OP_ACTOR_CALIBRATION_FRAMES, "/api/v1/actor-appearance/calibration-frames", HTTPClient.METHOD_POST, payload)
+
+
 func _request(
 	operation: String,
 	path: String,
@@ -407,6 +425,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			dialogue_delete_completed.emit(data)
 		OP_DIALOGUE_SAVE_DRAFT, OP_DIALOGUE_PUBLISH, OP_DIALOGUE_DISABLE:
 			dialogue_mutation_completed.emit(data)
+		OP_ACTOR_CALIBRATION:
+			actor_calibration_received.emit(data)
+		OP_ACTOR_CALIBRATION_SAVE:
+			actor_calibration_saved.emit(data)
+		OP_ACTOR_CALIBRATION_FRAMES:
+			actor_calibration_frames_received.emit(data)
 		_:
 			_on_request_failed(operation, "Unexpected request completion.", [])
 

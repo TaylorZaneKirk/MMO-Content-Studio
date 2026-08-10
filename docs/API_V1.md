@@ -49,6 +49,32 @@ mob-authoring schema, NPCs are implemented when the configured database has the
 T5 NPC authoring schema, and Dialogue is implemented when the configured
 database has the D2 dialogue authoring schema.
 
+## Actor appearance routes
+
+R4D.1A exposes file-backed actor-specific rig calibration independently from
+item, NPC, and mob aggregates. The canonical catalog remains owned by MMO
+Project; the local host reads and atomically writes it beneath the configured
+`game_client_assets` root.
+
+### `GET /api/v1/actor-appearance/calibrations/{calibrationId}`
+
+Returns `exists`, the current SHA-256 `catalog_hash`, and the calibration when
+present. A missing calibration is a successful response with `exists = false`.
+
+### `PUT /api/v1/actor-appearance/calibrations/{calibrationId}`
+
+Replaces the complete socket override set after validating an
+`expected_catalog_hash`, immutable `rig_id`, canonical socket/direction/frame
+IDs, and signed integer source-pixel coordinates. Stale hashes return
+`actor_calibration_catalog_conflict`. Foreground-overlay overrides are
+preserved rather than owned by this endpoint.
+
+### `POST /api/v1/actor-appearance/calibration-frames`
+
+Returns exact source-art availability for every `N/E/S/W` and `F1-F4` pose of
+an NPC Chars family or normalized mob actor family. Missing exact art is
+reported unavailable; runtime preview fallbacks are intentionally not used.
+
 ## Item asset routes
 
 ### `GET /api/v1/assets/items`

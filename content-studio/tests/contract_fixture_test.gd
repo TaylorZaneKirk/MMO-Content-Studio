@@ -11,6 +11,7 @@ class FixtureAuthoringHostClient extends AuthoringHostClient:
 	var catalog_searches: Array = []
 	var requested_item_ids: Array = []
 	var preview_requests: Array = []
+	var actor_calibration_requests: Array = []
 
 	func search_item_catalog(search: String = "") -> void:
 		catalog_searches.append(search)
@@ -23,6 +24,20 @@ class FixtureAuthoringHostClient extends AuthoringHostClient:
 			"item_id": item_id,
 			"payload": payload.duplicate(true),
 		})
+
+	func _request(
+		operation: String,
+		path: String,
+		method: int = HTTPClient.METHOD_GET,
+		payload: Dictionary = {}
+	) -> void:
+		if operation.begins_with("actor_calibration"):
+			actor_calibration_requests.append({
+				"operation": operation,
+				"path": path,
+				"method": method,
+				"payload": payload.duplicate(true),
+			})
 
 
 func _initialize() -> void:
@@ -95,6 +110,7 @@ func _run_fixture() -> void:
 	await _verify_paper_doll_preview_camera_and_zoom()
 	await _verify_paper_doll_foreground_overlays()
 	_verify_rigged_sprite_preview_layout()
+	_verify_actor_calibration_host_client_operations()
 	await _verify_live_runtime_catalog_if_configured()
 
 	print("[content-studio-contract-fixture] passed")
@@ -120,6 +136,52 @@ func _verify_rigged_sprite_preview_layout() -> void:
 	var scale := RiggedSpritePreviewLayout.fit_scale(Vector2(128, 160), Vector2(280, 220))
 	if not is_equal_approx(scale, min(248.0 / 128.0, 188.0 / 160.0)):
 		_fail("Rigged preview fit must use one uniform source-art scale")
+		return
+	var canvas := Vector2(128, 160)
+	var pane := Vector2(280, 220)
+	var transform := RiggedSpritePreviewLayout.preview_transform(canvas, pane)
+	var origin := transform.get("origin", Vector2.ZERO) as Vector2
+	if not RiggedSpritePreviewLayout.source_to_preview(Vector2.ZERO, canvas, pane).is_equal_approx(origin):
+		_fail("Source origin must map to the preview origin")
+		return
+	var bottom_right := RiggedSpritePreviewLayout.source_to_preview(canvas, canvas, pane)
+	if not bottom_right.is_equal_approx(origin + canvas * float(transform.get("scale", 1.0))):
+		_fail("Source canvas bottom-right must map through the preview transform")
+		return
+	var source_point := Vector2(-12.25, 178.5)
+	var round_trip := RiggedSpritePreviewLayout.preview_to_source(
+		RiggedSpritePreviewLayout.source_to_preview(source_point, canvas, pane, 24.0),
+		canvas,
+		pane,
+		24.0)
+	if not round_trip.is_equal_approx(source_point):
+		_fail("Preview/source conversion must be inverse across padded aspect ratios")
+		return
+	var portrait_round_trip := RiggedSpritePreviewLayout.preview_to_source(
+		RiggedSpritePreviewLayout.source_to_preview(Vector2(127.75, -8.5), canvas, Vector2(180, 420), 12.0),
+		canvas,
+		Vector2(180, 420),
+		12.0)
+	if not portrait_round_trip.is_equal_approx(Vector2(127.75, -8.5)):
+		_fail("Preview/source conversion must support multiple pane aspect ratios")
+		return
+	if RiggedSpritePreviewLayout.quantize_source_pixel(1.5) != 2 or RiggedSpritePreviewLayout.quantize_source_pixel(-1.5) != -2 or RiggedSpritePreviewLayout.quantize_source_pixel(-0.49) != 0 or RiggedSpritePreviewLayout.quantize_source_pixel(5.49) != 5:
+		_fail("Source coordinate quantization must round deterministically without clamping")
+
+
+func _verify_actor_calibration_host_client_operations() -> void:
+	var client := FixtureAuthoringHostClient.new()
+	client.load_actor_calibration("orc_v1")
+	client.save_actor_calibration("orc_v1", {"expected_catalog_hash": "hash"})
+	client.load_actor_calibration_frames({"actor_kind": "mob", "visual_texture_path": "res://assets/maps/objects/mobs/orc.png"})
+	if client.actor_calibration_requests.size() != 3:
+		_fail("Actor calibration host-client operations must issue their narrow requests")
+		return
+	var load_request := client.actor_calibration_requests[0] as Dictionary
+	var save_request := client.actor_calibration_requests[1] as Dictionary
+	var frames_request := client.actor_calibration_requests[2] as Dictionary
+	if str(load_request.get("path", "")) != "/api/v1/actor-appearance/calibrations/orc_v1" or int(save_request.get("method", -1)) != HTTPClient.METHOD_PUT or str(frames_request.get("path", "")) != "/api/v1/actor-appearance/calibration-frames":
+		_fail("Actor calibration host-client routes must preserve the API contract")
 
 
 func _verify_mob_preview_preserves_unsaved_rigged_state(main_scene: PackedScene) -> void:

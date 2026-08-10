@@ -152,10 +152,8 @@ public sealed class RiggedSpritePreviewResolver
         if (charsMatch.Success)
         {
             var spriteGroup = charsMatch.Groups[1].Value;
-            var charsCandidate = Path.Combine(
-                Path.GetDirectoryName(baseAssetFilePath) ?? string.Empty,
-                $"Chars_{CharsFramePrefix(direction, frame)}_{spriteGroup}-F{frame}-{direction}.png");
-            if (File.Exists(charsCandidate))
+            var charsCandidate = ResolveExactCharsFrame(baseAssetFilePath, direction, frame);
+            if (charsCandidate is not null)
             {
                 return charsCandidate;
             }
@@ -187,11 +185,33 @@ public sealed class RiggedSpritePreviewResolver
         return File.Exists(genericFallbackCandidate) ? genericFallbackCandidate : baseAssetFilePath;
     }
 
-    private static int CharsFramePrefix(string direction, int frame) => direction switch
+    public static string? ResolveExactCharsFrame(string baseAssetFilePath, string direction, int frame)
     {
-        "E" => 128 + frame,
-        "W" => 131 + frame,
-        "N" => 134 + frame,
+        var fileName = Path.GetFileName(baseAssetFilePath);
+        var match = Regex.Match(
+            fileName,
+            "^Chars_\\d+_([^-]+)-F[1-4]-[NESW]\\.png$",
+            RegexOptions.CultureInvariant);
+        if (!match.Success || direction is not ("N" or "E" or "S" or "W") || frame is < 1 or > 4)
+        {
+            return null;
+        }
+
+        var candidate = Path.Combine(
+            Path.GetDirectoryName(baseAssetFilePath) ?? string.Empty,
+            $"Chars_{CharsFramePrefix(direction, frame)}_{match.Groups[1].Value}-F{frame}-{direction}.png");
+        return File.Exists(candidate) ? candidate : null;
+    }
+
+    private static int CharsFramePrefix(string direction, int frame) => (direction, frame) switch
+    {
+        ("E", 4) => 143,
+        ("W", 4) => 144,
+        ("N", 4) => 142,
+        ("S", 4) => 141,
+        ("E", _) => 128 + frame,
+        ("W", _) => 131 + frame,
+        ("N", _) => 134 + frame,
         _ => 137 + frame
     };
 

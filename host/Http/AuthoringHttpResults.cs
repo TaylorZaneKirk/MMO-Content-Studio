@@ -12,7 +12,8 @@ public static class AuthoringHttpResults
         "item_has_live_references",
         "item_has_published_consumable_references",
         "consumable_profile_missing",
-        "weapon_or_tool_requires_t3b"
+        "weapon_or_tool_requires_t3b",
+        "actor_calibration_catalog_conflict"
     };
 
     public static IResult Ok<T>(HttpContext context, T value)

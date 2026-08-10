@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
@@ -100,3 +101,30 @@ public sealed record RiggedSpritePreviewOverlayDefinition(
     [property: JsonPropertyName("x")] int X,
     [property: JsonPropertyName("y")] int Y,
     [property: JsonPropertyName("z_index")] int ZIndex);
+
+public sealed record ActorCalibrationLoadResponse(
+    [property: JsonPropertyName("exists")] bool Exists,
+    [property: JsonPropertyName("catalog_hash")] string CatalogHash,
+    [property: JsonPropertyName("calibration")] JsonElement? Calibration);
+
+public sealed record SaveActorCalibrationRequest(
+    [property: JsonPropertyName("expected_catalog_hash")] string ExpectedCatalogHash,
+    [property: JsonPropertyName("rig_id")] string RigId,
+    [property: JsonPropertyName("socket_overrides")] JsonElement SocketOverrides);
+
+public sealed record CalibrationFrameRequest(
+    [property: JsonPropertyName("actor_kind")] string ActorKind,
+    [property: JsonPropertyName("visual_texture_path")] string VisualTexturePath);
+
+public sealed record ActorCalibrationFrameDefinition(
+    [property: JsonPropertyName("direction")] string Direction,
+    [property: JsonPropertyName("frame")] int Frame,
+    [property: JsonPropertyName("available")] bool Available,
+    [property: JsonPropertyName("file_path")] string? FilePath,
+    [property: JsonPropertyName("source_width")] int? SourceWidth,
+    [property: JsonPropertyName("source_height")] int? SourceHeight);
+
+public sealed record ActorCalibrationFramesResponse(
+    [property: JsonPropertyName("actor_kind")] string ActorKind,
+    [property: JsonPropertyName("visual_texture_path")] string VisualTexturePath,
+    [property: JsonPropertyName("frames")] IReadOnlyList<ActorCalibrationFrameDefinition> Frames);

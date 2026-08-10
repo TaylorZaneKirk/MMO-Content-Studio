@@ -32,6 +32,20 @@ public sealed class RiggedSpritePreviewResolverTests : IDisposable
         Assert.Equal(seed, RiggedSpritePreviewResolver.ResolveBaseFrame(seed, "W", 2));
     }
 
+    [Theory]
+    [InlineData("N", "Chars_142_200-F4-N.png")]
+    [InlineData("E", "Chars_143_200-F4-E.png")]
+    [InlineData("S", "Chars_141_200-F4-S.png")]
+    [InlineData("W", "Chars_144_200-F4-W.png")]
+    public void ExactCharsFrameResolutionUsesTheDistinctFourthFrameFiles(string direction, string expectedFileName)
+    {
+        var seed = Write("Chars_139_200-F2-S.png");
+        var expected = Write(expectedFileName);
+
+        Assert.Equal(expected, RiggedSpritePreviewResolver.ResolveExactCharsFrame(seed, direction, 4));
+        Assert.Equal(expected, RiggedSpritePreviewResolver.ResolveBaseFrame(seed, direction, 4));
+    }
+
     [Fact]
     public void NormalizedFamilyAndSingleImageKeepTheirExistingFallbacks()
     {

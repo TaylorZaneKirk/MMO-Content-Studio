@@ -130,6 +130,9 @@ public sealed class ActorAppearanceCatalogService
         return RigCatalogCandidates(configuredRoot).FirstOrDefault();
     }
 
+    public string? ResolveRigCalibrationCatalogPath() =>
+        ResolveCatalogPath(RigCalibrationCatalogRelativePath);
+
     public ActorRiggedSpriteCatalogDefinition LoadRiggedSpriteCatalog()
     {
         var rigCatalog = LoadRigCatalog();
