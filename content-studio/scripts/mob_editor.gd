@@ -3,6 +3,7 @@ class_name MobEditor
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
+const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 const ACTOR_SOCKET_CALIBRATION_EDITOR := preload("res://scripts/actor_socket_calibration_editor.gd")
 const DEFAULT_BONUS_FIELDS := [
 	"attack_thrust",
@@ -256,6 +257,7 @@ func _build_ui() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 6)
 	catalog_scroll.add_child(_list)
+	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
 	var form_panel := _panel(Vector2(520, 0))
 	form_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL

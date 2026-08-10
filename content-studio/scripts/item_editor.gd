@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name UnifiedItemEditor
 
+const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
+
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const PAPER_DOLL_PREVIEW_SCRIPT := preload("res://scripts/paper_doll_preview.gd")
 
@@ -185,6 +187,7 @@ func _build_ui() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 6)
 	catalog_scroll.add_child(_list)
+	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
 	var editor_panel := _panel()
 	editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL

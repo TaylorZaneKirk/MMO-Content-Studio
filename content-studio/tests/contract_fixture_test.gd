@@ -97,6 +97,7 @@ func _run_fixture() -> void:
 		return
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
+	await _verify_catalog_pane_toggle(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
@@ -116,6 +117,34 @@ func _run_fixture() -> void:
 
 	print("[content-studio-contract-fixture] passed")
 	quit(0)
+
+
+func _verify_catalog_pane_toggle(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	for workspace_name in ["Items", "Mobs", "NPCs", "Dialogue"]:
+		var workspace := scene.get_node("Margin/Root/Tabs/%s" % workspace_name) as HBoxContainer
+		var toggle := workspace.get_node("CatalogToggle") as Button
+		var catalog_panel := workspace.get_child(toggle.get_index() + 1) as Control
+		if toggle == null or catalog_panel == null:
+			_fail("%s workspace must expose a catalog-pane toggle" % workspace_name)
+			return
+		toggle.emit_signal("pressed")
+		if catalog_panel.visible:
+			_fail("%s catalog pane did not collapse" % workspace_name)
+			return
+		var first_remaining := workspace.get_child(toggle.get_index() + 2) as Control
+		var second_remaining := workspace.get_child(toggle.get_index() + 3) as Control
+		if first_remaining == null or second_remaining == null or not is_equal_approx(first_remaining.size_flags_stretch_ratio, 1.0) or not is_equal_approx(second_remaining.size_flags_stretch_ratio, 1.0):
+			_fail("%s collapse must give the remaining panels equal width priority" % workspace_name)
+			return
+		toggle.emit_signal("pressed")
+		if not catalog_panel.visible:
+			_fail("%s catalog pane did not expand" % workspace_name)
+			return
+	scene.queue_free()
+	await process_frame
 
 
 func _verify_rigged_sprite_preview_layout() -> void:

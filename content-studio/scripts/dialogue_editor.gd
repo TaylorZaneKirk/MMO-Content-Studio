@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name DialogueEditor
 
+const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
+
 signal workspace_open_requested(workspace_id: String, resource_id: String)
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
@@ -103,6 +105,7 @@ func _build_ui() -> void:
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_list.add_theme_constant_override("separation", 6)
 	catalog_scroll.add_child(_list)
+	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
 	var graph_panel := _panel(Vector2(520, 0))
 	graph_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
