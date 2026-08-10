@@ -318,6 +318,8 @@ func _verify_composite_preview_requests() -> void:
 	if npc._preview_facing.disabled or npc._preview_frame.disabled:
 		_fail("Actor Pose NPC preview selectors must remain editable")
 		return
+	_verify_fixed_npc_preview_direction_selectors(descriptor)
+	_verify_actor_pose_npc_preview_direction_selectors(actor_pose_descriptor)
 
 	_verify_fixed_pose_rows(mob, npc)
 
@@ -337,6 +339,71 @@ func _verify_composite_preview_requests() -> void:
 	rejecting_mob._preview()
 	if rejecting_mob._status.text != "Another host request is still in progress.":
 		_fail("A synchronous Mob preview failure must not be overwritten by calculating status")
+
+
+func _verify_fixed_npc_preview_direction_selectors(base_descriptor: Dictionary) -> void:
+	for fixture in [
+		{"fixed_direction": "S", "selector_metadata": "south"},
+		{"fixed_direction": "W", "selector_metadata": "west"},
+		{"fixed_direction": "E", "selector_metadata": "east"},
+		{"fixed_direction": "N", "selector_metadata": "north"},
+	]:
+		var client := FixtureAuthoringHostClient.new()
+		var npc := FixtureNpcEditor.new()
+		npc._client = client
+		npc._npc_id = LineEdit.new()
+		npc._npc_id.text = "fixed_npc_%s" % str(fixture.get("fixed_direction", ""))
+		npc._operation = _option("save_draft")
+		npc._preview_facing = _direction_option("north")
+		npc._preview_frame = _option(2)
+		npc._visual_mode = _option("composite_rig")
+		npc._composite_visual = base_descriptor.duplicate(true)
+		npc._composite_visual["fixed_direction"] = fixture.get("fixed_direction", "S")
+		npc._composite_visual["fixed_frame"] = 1
+		npc._form_editable = true
+		npc._status = Label.new()
+		npc._sync_preview_pose_controls()
+		if _selected_metadata(npc._preview_facing) != str(fixture.get("selector_metadata", "")):
+			_fail("Fixed NPC preview selector must use its full direction metadata")
+			return
+		if not npc._preview_facing.disabled or not npc._preview_frame.disabled or int(_selected_metadata(npc._preview_frame)) != 1:
+			_fail("Fixed NPC preview controls must synchronize and remain disabled")
+			return
+		npc._preview()
+		var request := (client.requests.back() as Dictionary).get("payload", {}) as Dictionary
+		if str(request.get("preview_direction", "")) != str(fixture.get("fixed_direction", "")) or int(request.get("preview_frame", 0)) != 1:
+			_fail("Fixed NPC preview requests must retain canonical fixed pose values")
+			return
+
+
+func _verify_actor_pose_npc_preview_direction_selectors(base_descriptor: Dictionary) -> void:
+	for fixture in [
+		{"selector_metadata": "south", "direction": "S"},
+		{"selector_metadata": "west", "direction": "W"},
+		{"selector_metadata": "east", "direction": "E"},
+		{"selector_metadata": "north", "direction": "N"},
+	]:
+		var client := FixtureAuthoringHostClient.new()
+		var npc := FixtureNpcEditor.new()
+		npc._client = client
+		npc._npc_id = LineEdit.new()
+		npc._npc_id.text = "actor_pose_npc_%s" % str(fixture.get("direction", ""))
+		npc._operation = _option("save_draft")
+		npc._preview_facing = _direction_option(str(fixture.get("selector_metadata", "")))
+		npc._preview_frame = _option(2)
+		npc._visual_mode = _option("composite_rig")
+		npc._composite_visual = base_descriptor.duplicate(true)
+		npc._form_editable = true
+		npc._status = Label.new()
+		npc._sync_preview_pose_controls()
+		if npc._preview_facing.disabled or npc._preview_frame.disabled:
+			_fail("Actor Pose NPC preview controls must remain editable")
+			return
+		npc._preview()
+		var request := (client.requests.back() as Dictionary).get("payload", {}) as Dictionary
+		if str(request.get("preview_direction", "")) != str(fixture.get("direction", "")) or int(request.get("preview_frame", 0)) != 2:
+			_fail("Actor Pose NPC preview requests must use the selected canonical pose")
+			return
 
 
 func _verify_composite_visual_payload() -> void:
@@ -404,6 +471,22 @@ func _option(metadata: Variant) -> OptionButton:
 	option.set_item_metadata(0, metadata)
 	option.select(0)
 	return option
+
+
+func _direction_option(selected_metadata: String) -> OptionButton:
+	var option := OptionButton.new()
+	for metadata in ["south", "west", "east", "north"]:
+		option.add_item(metadata.capitalize())
+		option.set_item_metadata(option.item_count - 1, metadata)
+		if metadata == selected_metadata:
+			option.select(option.item_count - 1)
+	return option
+
+
+func _selected_metadata(control: OptionButton) -> String:
+	if control == null or control.selected < 0:
+		return ""
+	return str(control.get_item_metadata(control.selected))
 
 
 func _verify_rigged_mob_preview() -> void:

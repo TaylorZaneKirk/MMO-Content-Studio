@@ -1083,10 +1083,23 @@ func _sync_preview_pose_controls() -> void:
 		return
 	var fixed := _selected_metadata(_visual_mode) == "composite_rig" and str(_composite_visual.get("pose_policy", "")) == "fixed"
 	if fixed:
-		_select_option(_preview_facing, str(_composite_visual.get("fixed_direction", "S")).to_lower().left(1))
+		_select_option(_preview_facing, _preview_facing_metadata_for_direction(str(_composite_visual.get("fixed_direction", "S"))))
 		_select_option(_preview_frame, str(int(_composite_visual.get("fixed_frame", 1))))
 	_preview_facing.disabled = fixed or not _form_editable
 	_preview_frame.disabled = fixed or not _form_editable
+
+
+func _preview_facing_metadata_for_direction(direction: String) -> String:
+	match direction.to_upper():
+		"S":
+			return "south"
+		"W":
+			return "west"
+		"E":
+			return "east"
+		"N":
+			return "north"
+	return "south"
 
 
 func _set_fixed_pose_rows_visible(visible: bool) -> void:

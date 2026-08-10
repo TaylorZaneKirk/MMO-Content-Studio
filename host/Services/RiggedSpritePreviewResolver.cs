@@ -117,10 +117,23 @@ public sealed class RiggedSpritePreviewResolver
             }
         }
 
+        var baseFilePath = ResolveBaseFrame(
+            baseAssetFilePath,
+            direction,
+            frame.Value,
+            descriptor.PosePolicy == "actor_pose");
+        var previewSourceWidth = sourceWidth;
+        var previewSourceHeight = sourceHeight;
+        if (TryReadPngDimensions(baseFilePath, out var resolvedSourceWidth, out var resolvedSourceHeight))
+        {
+            previewSourceWidth = resolvedSourceWidth;
+            previewSourceHeight = resolvedSourceHeight;
+        }
+
         return new RiggedSpritePreviewDefinition(
-            ResolveBaseFrame(baseAssetFilePath, direction, frame.Value),
-            sourceWidth,
-            sourceHeight,
+            baseFilePath,
+            previewSourceWidth,
+            previewSourceHeight,
             direction,
             frame.Value,
             cosmetics.OrderBy(cosmetic => cosmetic.ZIndex).ThenBy(cosmetic => cosmetic.ItemId, StringComparer.Ordinal).ToArray(),
@@ -142,7 +155,11 @@ public sealed class RiggedSpritePreviewResolver
         return null;
     }
 
-    public static string ResolveBaseFrame(string baseAssetFilePath, string direction, int frame)
+    public static string ResolveBaseFrame(
+        string baseAssetFilePath,
+        string direction,
+        int frame,
+        bool resolveNormalizedMobFrame = false)
     {
         var fileName = Path.GetFileName(baseAssetFilePath);
         var charsMatch = Regex.Match(
@@ -172,7 +189,9 @@ public sealed class RiggedSpritePreviewResolver
         var match = Regex.Match(baseAssetFilePath, "-F[1-4]-[NESW]\\.png$", RegexOptions.CultureInvariant);
         if (!match.Success)
         {
-            var normalizedMobFrame = ResolveNormalizedMobFrame(baseAssetFilePath, direction, frame);
+            var normalizedMobFrame = resolveNormalizedMobFrame
+                ? ResolveNormalizedMobFrame(baseAssetFilePath, direction, frame)
+                : null;
             if (normalizedMobFrame is not null)
             {
                 return normalizedMobFrame;
