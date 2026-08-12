@@ -69,15 +69,15 @@ var _usable_in_combat: CheckBox
 var _cooldown_ms: SpinBox
 var _animation_id: LineEdit
 var _sound_path: LineEdit
-var _reference_value: SpinBox
+var _reference_value: LineEdit
 var _trade_policy: OptionButton
 var _death_behavior: OptionButton
 var _death_transform_item_id: LineEdit
 var _shop_policy: OptionButton
-var _npc_buy_price: SpinBox
-var _npc_sell_price: SpinBox
+var _npc_buy_price: LineEdit
+var _npc_sell_price: LineEdit
 var _reclaim_policy: OptionButton
-var _reclaim_value: SpinBox
+var _reclaim_value: LineEdit
 var _condition_policy_id: LineEdit
 var _repair_policy_id: LineEdit
 var _consumable_requirements: VBoxContainer
@@ -276,18 +276,18 @@ func _build_ui() -> void:
 	editor.add_child(_consumable_effects)
 
 	var economy_grid := _section_grid(editor, "Economy and Lifecycle")
-	_reference_value = _add_spin_field(economy_grid, "Reference value", 0, 9223372036854775807, 1)
+	_reference_value = _add_line_field(economy_grid, "Reference value", "0")
 	_trade_policy = _add_option_field(economy_grid, "Trade policy")
 	_death_behavior = _add_option_field(economy_grid, "Death behavior")
 	_death_behavior.item_selected.connect(_on_economy_policy_changed.unbind(1))
 	_death_transform_item_id = _add_line_field(economy_grid, "Transform target item ID", "Required only for transform")
 	_shop_policy = _add_option_field(economy_grid, "Shop policy")
 	_shop_policy.item_selected.connect(_on_economy_policy_changed.unbind(1))
-	_npc_buy_price = _add_spin_field(economy_grid, "NPC buy price", 0, 9223372036854775807, 1)
-	_npc_sell_price = _add_spin_field(economy_grid, "NPC sell price", 0, 9223372036854775807, 1)
+	_npc_buy_price = _add_line_field(economy_grid, "NPC buy price", "Non-negative integer")
+	_npc_sell_price = _add_line_field(economy_grid, "NPC sell price", "Non-negative integer")
 	_reclaim_policy = _add_option_field(economy_grid, "Reclaim policy")
 	_reclaim_policy.item_selected.connect(_on_economy_policy_changed.unbind(1))
-	_reclaim_value = _add_spin_field(economy_grid, "Reclaim value", 0, 9223372036854775807, 1)
+	_reclaim_value = _add_line_field(economy_grid, "Reclaim value", "Non-negative integer")
 	_condition_policy_id = _add_line_field(economy_grid, "Reserved condition policy ID", "Draft planning only")
 	_repair_policy_id = _add_line_field(economy_grid, "Reserved repair policy ID", "Draft planning only")
 	var economy_note := Label.new()
@@ -587,7 +587,7 @@ func _build_ui() -> void:
 	_file_dialog.file_selected.connect(_import_selected)
 	add_child(_file_dialog)
 
-	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id]:
+	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id, _reference_value, _death_transform_item_id, _npc_buy_price, _npc_sell_price, _reclaim_value, _condition_policy_id, _repair_policy_id]:
 		edit.text_changed.connect(_on_form_changed.unbind(1))
 	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range]:
 		spin.value_changed.connect(_on_form_changed.unbind(1))
@@ -795,6 +795,7 @@ func _start_new() -> void:
 	_kind.text = "Unified"
 	_updated.text = "Not saved"
 	_apply_consumable(null)
+	_apply_economy({})
 	_apply_equipment(null)
 	_clear_rows(_tool_rows)
 	_select_option(_operation, "save_draft")
@@ -868,6 +869,9 @@ func _preview() -> void:
 	if item_id.is_empty():
 		_status.text = "Enter a stable item ID before previewing."
 		return
+	if not _has_valid_economy_integers():
+		_status.text = "Economy values must be exact non-negative 64-bit integers."
+		return
 	var payload := _payload()
 	payload.erase("preview_signature")
 	payload["target_operation"] = _selected_metadata(_operation)
@@ -889,6 +893,9 @@ func _apply() -> void:
 	if not _workspace_support.can_apply(operation, preview_signature):
 		_status.text = "The form changed. Preview the operation again before applying it."
 		_apply_button.disabled = true
+		return
+	if not _has_valid_economy_integers():
+		_status.text = "Economy values must be exact non-negative 64-bit integers."
 		return
 	var item_id := _item_id.text.strip_edges()
 	var expected: Variant = _current_item.get("updated_at_utc", null)
@@ -927,15 +934,15 @@ func _economy_payload() -> Dictionary:
 	var shop := _selected_metadata(_shop_policy)
 	var reclaim := _selected_metadata(_death_behavior) == "reclaim"
 	return {
-		"reference_value": int(_reference_value.value),
+		"reference_value": _economic_integer(_reference_value),
 		"trade_policy": _selected_metadata(_trade_policy),
 		"death_behavior": _selected_metadata(_death_behavior),
 		"death_transform_item_id": _optional_payload(_death_transform_item_id.text) if transform else null,
 		"shop_policy": shop,
-		"npc_buy_price": int(_npc_buy_price.value) if shop == "npc_buys" or shop == "npc_buys_and_sells" else null,
-		"npc_sell_price": int(_npc_sell_price.value) if shop == "npc_sells" or shop == "npc_buys_and_sells" else null,
+		"npc_buy_price": _economic_integer(_npc_buy_price) if shop == "npc_buys" or shop == "npc_buys_and_sells" else null,
+		"npc_sell_price": _economic_integer(_npc_sell_price) if shop == "npc_sells" or shop == "npc_buys_and_sells" else null,
 		"reclaim_policy": _selected_metadata(_reclaim_policy) if reclaim else "none",
-		"reclaim_value": int(_reclaim_value.value) if reclaim else null,
+		"reclaim_value": _economic_integer(_reclaim_value) if reclaim else null,
 		"condition_policy_id": _optional_payload(_condition_policy_id.text),
 		"repair_policy_id": _optional_payload(_repair_policy_id.text),
 	}
@@ -943,15 +950,15 @@ func _economy_payload() -> Dictionary:
 
 func _apply_economy(value: Variant) -> void:
 	var economy: Dictionary = value as Dictionary if value is Dictionary else {}
-	_reference_value.value = int(economy.get("reference_value", 0))
+	_reference_value.text = str(economy.get("reference_value", 0))
 	_select_option(_trade_policy, str(economy.get("trade_policy", "tradeable")))
 	_select_option(_death_behavior, str(economy.get("death_behavior", "ordinary")))
 	_death_transform_item_id.text = _nullable_string(economy.get("death_transform_item_id", null))
 	_select_option(_shop_policy, str(economy.get("shop_policy", "not_shop_traded")))
-	_npc_buy_price.value = int(economy.get("npc_buy_price", 0))
-	_npc_sell_price.value = int(economy.get("npc_sell_price", 0))
+	_npc_buy_price.text = _nullable_string(economy.get("npc_buy_price", null))
+	_npc_sell_price.text = _nullable_string(economy.get("npc_sell_price", null))
 	_select_option(_reclaim_policy, str(economy.get("reclaim_policy", "none")))
-	_reclaim_value.value = int(economy.get("reclaim_value", 0))
+	_reclaim_value.text = _nullable_string(economy.get("reclaim_value", null))
 	_condition_policy_id.text = _nullable_string(economy.get("condition_policy_id", null))
 	_repair_policy_id.text = _nullable_string(economy.get("repair_policy_id", null))
 	_update_economy_controls()
@@ -971,6 +978,27 @@ func _update_economy_controls() -> void:
 	_npc_sell_price.editable = shop == "npc_sells" or shop == "npc_buys_and_sells"
 	_reclaim_policy.disabled = not reclaim
 	_reclaim_value.editable = reclaim
+
+
+func _economic_integer(control: LineEdit) -> int:
+	return int(control.text.strip_edges())
+
+
+func _has_valid_economy_integers() -> bool:
+	for control in [_reference_value, _npc_buy_price, _npc_sell_price, _reclaim_value]:
+		var value := control.text.strip_edges()
+		if not value.is_empty() and (not value.is_valid_int() or value.begins_with("-")):
+			return false
+	if _reference_value.text.strip_edges().is_empty():
+		return false
+	var shop := _selected_metadata(_shop_policy)
+	if (shop == "npc_buys" or shop == "npc_buys_and_sells") and _npc_buy_price.text.strip_edges().is_empty():
+		return false
+	if (shop == "npc_sells" or shop == "npc_buys_and_sells") and _npc_sell_price.text.strip_edges().is_empty():
+		return false
+	if _selected_metadata(_death_behavior) == "reclaim" and _reclaim_value.text.strip_edges().is_empty():
+		return false
+	return true
 
 
 func _equipment_payload() -> Dictionary:
@@ -1851,7 +1879,7 @@ func _update_contextual_sections() -> void:
 
 
 func _set_form_enabled(enabled: bool) -> void:
-	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id]:
+	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id, _reference_value, _npc_buy_price, _npc_sell_price, _reclaim_value, _death_transform_item_id, _condition_policy_id, _repair_policy_id]:
 		edit.editable = enabled and (edit != _item_id or _current_item.is_empty())
 	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _operation]:
 		option.disabled = not enabled

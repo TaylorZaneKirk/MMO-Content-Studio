@@ -175,6 +175,73 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EconomyOnlyEdit_RoundTripsPreservesSpecializationsAndInvalidatesPreview()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+        var before = repository.Records[ItemId];
+        var ordinary = ToSaveRequest(before, before.UpdatedAtUtc);
+        var economy = new ItemEconomyLifecycleDraft(
+            9223372036854775807, "untradeable", "ordinary", null,
+            "npc_buys_and_sells", 7, 11, "none", null, null, null);
+        var changed = ordinary with { EconomyLifecycle = economy };
+
+        var initialPreview = await service.PreviewAsync(ItemId, ToPreview(ordinary, "save_draft"), TestContext.Current.CancellationToken);
+        var changedPreview = await service.PreviewAsync(ItemId, ToPreview(changed, "save_draft"), TestContext.Current.CancellationToken);
+        AssertSucceeded(initialPreview);
+        AssertSucceeded(changedPreview);
+        Assert.NotEqual(initialPreview.Value!.PreviewSignature, changedPreview.Value!.PreviewSignature);
+        Assert.Contains(changedPreview.Value.Changes, change => change.Field == "economy_lifecycle");
+
+        var saved = await service.SaveDraftAsync(ItemId, changed with { PreviewSignature = changedPreview.Value.PreviewSignature }, TestContext.Current.CancellationToken);
+        AssertSucceeded(saved);
+        var after = repository.Records[ItemId];
+        Assert.NotNull(after.EconomyLifecycle);
+        Assert.Equal(economy.ReferenceValue, after.EconomyLifecycle!.ReferenceValue);
+        Assert.Equal(economy.TradePolicy, after.EconomyLifecycle.TradePolicy);
+        Assert.Equal(economy.NpcSellPrice, after.EconomyLifecycle.NpcSellPrice);
+        Assert.Equal(before.ConsumableBehavior, after.ConsumableBehavior);
+        Assert.Equal(before.WeaponProfile, after.WeaponProfile);
+        Assert.Equal(before.ToolCapabilities.Select(value => value.CapabilityId), after.ToolCapabilities.Select(value => value.CapabilityId));
+        Assert.Equal(before.ToolCapabilities.Select(value => value.PowerTier), after.ToolCapabilities.Select(value => value.PowerTier));
+        Assert.NotNull(after.EquippedVisual);
+        Assert.Equal(before.EquippedVisual!.AssetKey, after.EquippedVisual!.AssetKey);
+        Assert.Equal(before.EquippedVisual.BindingType, after.EquippedVisual.BindingType);
+        Assert.Equal(before.EquippedVisual.GripAnchors, after.EquippedVisual.GripAnchors);
+    }
+
+    [Fact]
+    public async Task EconomyValidation_RejectsInvalidPolicyCombinationsAndReservedPublication()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+        var invalid = ToSaveRequest(repository.Records[ItemId], repository.Records[ItemId].UpdatedAtUtc) with
+        {
+            EconomyLifecycle = new ItemEconomyLifecycleDraft(0, "tradeable", "transform", ItemId, "npc_buys", null, 1, "none", null, "planned_condition", null)
+        };
+
+        var invalidPreview = await service.PreviewAsync(ItemId, ToPreview(invalid, "save_draft"), TestContext.Current.CancellationToken);
+        AssertSucceeded(invalidPreview);
+        Assert.Contains(invalidPreview.Value!.Messages, message => message.Code == "death_transform_self_reference");
+        Assert.Contains(invalidPreview.Value.Messages, message => message.Code == "invalid_shop_policy_prices");
+
+        var request = ToSaveRequest(repository.Records[ItemId], repository.Records[ItemId].UpdatedAtUtc) with
+        {
+            EconomyLifecycle = new ItemEconomyLifecycleDraft(0, "tradeable", "ordinary", null, "not_shop_traded", null, null, "none", null, "planned_condition", null)
+        };
+        var draftPreview = await service.PreviewAsync(ItemId, ToPreview(request, "save_draft"), TestContext.Current.CancellationToken);
+        AssertSucceeded(draftPreview);
+        var save = await service.SaveDraftAsync(ItemId, request with { PreviewSignature = draftPreview.Value!.PreviewSignature }, TestContext.Current.CancellationToken);
+        AssertSucceeded(save);
+        var persisted = ToSaveRequest(repository.Records[ItemId], save.Value!.Item.UpdatedAtUtc);
+        var preview = await service.PreviewAsync(ItemId, ToPreview(persisted, "publish"), TestContext.Current.CancellationToken);
+
+        Assert.Contains(preview.Value!.Messages, message => message.Code == "condition_repair_publication_unsupported");
+    }
+
+    [Fact]
     public async Task ChildOnlyEditsAdvanceRootTimestamp()
     {
         var repository = new InMemoryUnifiedItemRepository();
@@ -531,6 +598,39 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             Path.Combine(_clientRoot, "actors", "appearance", "data", "rigs", "catalog_v1.json"),
             result.Value.ActorRigCatalog.SourcePath);
         Assert.Contains(result.Value.ActorRigCatalog.Rigs, value => value.RigId == "humanoid_v1");
+    }
+
+    [Fact]
+    public async Task LoadOptionsExposesTheCanonicalEconomyPolicyValues()
+    {
+        var service = CreateService(new InMemoryUnifiedItemRepository());
+
+        var result = await service.LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        AssertSucceeded(result);
+        Assert.Equal(["tradeable", "untradeable"], result.Value!.TradePolicies!.Select(value => value.Id));
+        Assert.Equal(["ordinary", "always_keep", "always_destroy", "transform", "reclaim"], result.Value.DeathBehaviors!.Select(value => value.Id));
+        Assert.Equal(["not_shop_traded", "npc_buys", "npc_sells", "npc_buys_and_sells"], result.Value.ShopPolicies!.Select(value => value.Id));
+        Assert.Equal(["none", "fixed_cost"], result.Value.ReclaimPolicies!.Select(value => value.Id));
+    }
+
+    [Fact]
+    public async Task PublishedTransformTargetCannotBeDisabled()
+    {
+        var repository = new InMemoryUnifiedItemRepository
+        {
+            HasPublishedDeathTransformReferences = true
+        };
+        repository.Put(CompleteRecord() with { RuntimeEnabled = true });
+        var service = CreateService(repository);
+
+        var result = await service.DisableAsync(
+            ItemId,
+            new ItemPublicationRequest(repository.Records[ItemId].UpdatedAtUtc, null),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "published_death_transform_reference");
     }
 
     [Fact]
@@ -1103,9 +1203,10 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             request.IconTexturePath,
             request.ConsumableBehavior,
             request.Equipment,
-            request.ToolCapabilities,
-            request.ExpectedUpdatedAtUtc,
-            operation);
+                request.ToolCapabilities,
+                request.ExpectedUpdatedAtUtc,
+                operation,
+                request.EconomyLifecycle);
 
     private static SaveItemDraftRequest ToSaveRequest(UnifiedItemRecord record, DateTimeOffset? expected)
     {
@@ -1151,7 +1252,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                             draft.Equipment.EquippedVisual.ItemOverGripByPose)),
             draft.ToolCapabilities,
             expected,
-            null);
+            null,
+            draft.EconomyLifecycle);
     }
 
     private static async Task<AuthoringOperationResult<ItemMutationResponse>> SaveDraftWithPreviewAsync(
@@ -1322,6 +1424,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
         public bool CorruptNextReloadAfterSave { get; init; }
 
+        public bool HasPublishedDeathTransformReferences { get; init; }
+
         private bool _corruptNextLoad;
 
         public void Put(UnifiedItemRecord record) => Records[record.ItemId] = record;
@@ -1375,7 +1479,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             Task.FromResult(false);
 
         public Task<bool> HasPublishedDeathTransformReferencesAsync(string itemId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(false);
+            Task.FromResult(HasPublishedDeathTransformReferences);
 
         public Task<ReferencedItemRecord?> LoadReferencedItemAsync(string itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult<ReferencedItemRecord?>(null);
@@ -1512,7 +1616,19 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                         value.ActionAnimationId,
                         value.EffectResourceId))
                     .ToArray(),
-                updatedAtUtc);
+                updatedAtUtc,
+                new ItemEconomyLifecycleDefinition(
+                    draft.EconomyLifecycle.ReferenceValue,
+                    draft.EconomyLifecycle.TradePolicy ?? string.Empty,
+                    draft.EconomyLifecycle.DeathBehavior ?? string.Empty,
+                    draft.EconomyLifecycle.DeathTransformItemId,
+                    draft.EconomyLifecycle.ShopPolicy ?? string.Empty,
+                    draft.EconomyLifecycle.NpcBuyPrice,
+                    draft.EconomyLifecycle.NpcSellPrice,
+                    draft.EconomyLifecycle.ReclaimPolicy ?? string.Empty,
+                    draft.EconomyLifecycle.ReclaimValue,
+                    draft.EconomyLifecycle.ConditionPolicyId,
+                    draft.EconomyLifecycle.RepairPolicyId));
         }
 
         private static void EnsureExpectedVersion(
