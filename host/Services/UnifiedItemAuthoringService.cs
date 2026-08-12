@@ -66,7 +66,11 @@ public sealed class UnifiedItemAuthoringService
                     actorRigCatalog,
                     ItemAuthoringRegistry.CombatUnitMilliseconds,
                     UnifiedItemDomainRules.MaximumPowerTier,
-                    true));
+                    true,
+                    [new("tradeable", "Tradeable"), new("untradeable", "Untradeable")],
+                    [new("ordinary", "Ordinary"), new("always_keep", "Always Keep"), new("always_destroy", "Always Destroy"), new("transform", "Transform"), new("reclaim", "Reclaim")],
+                    [new("not_shop_traded", "Not Shop Traded"), new("npc_buys", "NPC Buys"), new("npc_sells", "NPC Sells"), new("npc_buys_and_sells", "NPC Buys and Sells")],
+                    [new("none", "None"), new("fixed_cost", "Fixed Cost")]));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -408,6 +412,14 @@ public sealed class UnifiedItemAuthoringService
         {
             messages.Add(PublishedConsumableReferenceError(itemId));
         }
+        if (await _repository.HasPublishedDeathTransformReferencesAsync(itemId, cancellationToken))
+        {
+            messages.Add(new ApiError(
+                "published_death_transform_reference",
+                "This item remains the target of a published transform item and cannot be disabled or deleted.",
+                ValidationSeverity.Error,
+                "economy_lifecycle.death_transform_item_id"));
+        }
     }
 
     private NormalizedItemDraft Normalize(PreviewItemRequest request) =>
@@ -416,7 +428,8 @@ public sealed class UnifiedItemAuthoringService
             request.IconTexturePath,
             request.ConsumableBehavior,
             request.Equipment,
-            request.ToolCapabilities);
+            request.ToolCapabilities,
+            request.EconomyLifecycle);
 
     private NormalizedItemDraft Normalize(SaveItemDraftRequest request) =>
         UnifiedItemDomainRules.Normalize(
@@ -424,7 +437,8 @@ public sealed class UnifiedItemAuthoringService
             request.IconTexturePath,
             request.ConsumableBehavior,
             request.Equipment,
-            request.ToolCapabilities);
+            request.ToolCapabilities,
+            request.EconomyLifecycle);
 
     private ItemDefinitionSummary ToSummary(UnifiedItemRecord record)
     {
@@ -463,7 +477,8 @@ public sealed class UnifiedItemAuthoringService
             draft.Equipment is null ? null : ToEquipmentDefinition(draft.Equipment, record.EquipmentSlotDisplayName),
             record.ToolCapabilities,
             record.UpdatedAtUtc,
-            asset.FilePath);
+            asset.FilePath,
+            record.EconomyLifecycle);
     }
 
     private static ItemConsumableBehaviorDefinition ToConsumableDefinition(NormalizedItemConsumableBehavior consumable) =>
@@ -547,6 +562,7 @@ public sealed class UnifiedItemAuthoringService
         AddChange(changes, "consumable_behavior", Serialize(current?.ConsumableBehavior), Serialize(requested.ConsumableBehavior));
         AddChange(changes, "equipment", Serialize(current?.Equipment), Serialize(requested.Equipment));
         AddChange(changes, "tool_capabilities", Serialize(current?.ToolCapabilities ?? []), Serialize(requested.ToolCapabilities));
+        AddChange(changes, "economy_lifecycle", Serialize(current?.EconomyLifecycle), Serialize(requested.EconomyLifecycle));
         var before = existing?.RuntimeEnabled == true ? "Published" : existing is null ? null : "Draft";
         var after = operation switch
         {

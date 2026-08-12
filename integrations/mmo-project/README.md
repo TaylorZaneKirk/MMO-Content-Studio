@@ -1,5 +1,10 @@
 # MMO Project integration
 
+`prototype/sql/029_item_economy_policy.sql` mirrors the reviewed Item Economy
+Policy V1 migration. It adds definition metadata and reference/publication
+guards only; no death consequence, shop, trade, reclaim, condition, or repair
+behavior is executed.
+
 This directory contains reviewed integration artifacts that must ultimately be
 applied or copied into the main `MMO-Project` repository. The Content Studio
 repository does not silently modify the game repository.

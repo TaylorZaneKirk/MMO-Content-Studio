@@ -24,7 +24,8 @@ public static partial class UnifiedItemDomainRules
         string iconTexturePath,
         ItemConsumableBehaviorDraft? consumableBehavior,
         ItemEquipmentMetadataDraft? equipment,
-        IReadOnlyList<ItemToolCapabilityDraft>? toolCapabilities)
+        IReadOnlyList<ItemToolCapabilityDraft>? toolCapabilities,
+        ItemEconomyLifecycleDraft? economyLifecycle = null)
     {
         var normalizedEquipment = NormalizeEquipment(equipment);
         return new NormalizedItemDraft(
@@ -32,7 +33,8 @@ public static partial class UnifiedItemDomainRules
             NormalizeRequired(iconTexturePath),
             NormalizeConsumable(consumableBehavior),
             normalizedEquipment,
-            NormalizeToolCapabilities(toolCapabilities));
+            NormalizeToolCapabilities(toolCapabilities),
+            NormalizeEconomyLifecycle(economyLifecycle));
     }
 
     public static NormalizedItemDraft FromRecord(UnifiedItemRecord record) =>
@@ -79,7 +81,35 @@ public static partial class UnifiedItemDomainRules
                 value.CapabilityId,
                 value.PowerTier,
                 value.ActionAnimationId,
-                value.EffectResourceId)).ToArray());
+                value.EffectResourceId)).ToArray(),
+            record.EconomyLifecycle is null
+                ? null
+                : new ItemEconomyLifecycleDraft(
+                    record.EconomyLifecycle.ReferenceValue,
+                    record.EconomyLifecycle.TradePolicy,
+                    record.EconomyLifecycle.DeathBehavior,
+                    record.EconomyLifecycle.DeathTransformItemId,
+                    record.EconomyLifecycle.ShopPolicy,
+                    record.EconomyLifecycle.NpcBuyPrice,
+                    record.EconomyLifecycle.NpcSellPrice,
+                    record.EconomyLifecycle.ReclaimPolicy,
+                    record.EconomyLifecycle.ReclaimValue,
+                    record.EconomyLifecycle.ConditionPolicyId,
+                    record.EconomyLifecycle.RepairPolicyId));
+
+    private static ItemEconomyLifecycleDraft NormalizeEconomyLifecycle(ItemEconomyLifecycleDraft? value) =>
+        new(
+            value?.ReferenceValue ?? 0,
+            NormalizeRequired(value?.TradePolicy ?? "tradeable"),
+            NormalizeRequired(value?.DeathBehavior ?? "ordinary"),
+            NormalizeOptional(value?.DeathTransformItemId),
+            NormalizeRequired(value?.ShopPolicy ?? "not_shop_traded"),
+            value?.NpcBuyPrice,
+            value?.NpcSellPrice,
+            NormalizeRequired(value?.ReclaimPolicy ?? "none"),
+            value?.ReclaimValue,
+            NormalizeOptional(value?.ConditionPolicyId),
+            NormalizeOptional(value?.RepairPolicyId));
 
     public static bool HasEquipmentMetadata(UnifiedItemRecord record) =>
         record.EquipmentSlotId is not null
@@ -371,7 +401,8 @@ public sealed record NormalizedItemDraft(
     string IconTexturePath,
     NormalizedItemConsumableBehavior? ConsumableBehavior,
     NormalizedItemEquipmentMetadata? Equipment,
-    IReadOnlyList<ItemToolCapabilityDraft> ToolCapabilities);
+    IReadOnlyList<ItemToolCapabilityDraft> ToolCapabilities,
+    ItemEconomyLifecycleDraft EconomyLifecycle);
 
 public sealed record NormalizedItemConsumableBehavior(
     string UseAction,

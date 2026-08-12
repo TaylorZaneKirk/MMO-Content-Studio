@@ -53,7 +53,8 @@ public sealed record ItemDefinition(
     [property: JsonPropertyName("equipment")] ItemEquipmentMetadataDefinition? Equipment,
     [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
-    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath);
+    [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
+    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDefinition? EconomyLifecycle = null);
 
 public sealed record ItemConsumableBehaviorDefinition(
     [property: JsonPropertyName("use_action")] string UseAction,
@@ -84,7 +85,8 @@ public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("equipment")] ItemEquipmentMetadataDraft? Equipment,
     [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDraft>? ToolCapabilities,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("preview_signature")] string? PreviewSignature);
+    [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
+    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDraft? EconomyLifecycle = null);
 
 public sealed record PreviewItemRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -93,7 +95,34 @@ public sealed record PreviewItemRequest(
     [property: JsonPropertyName("equipment")] ItemEquipmentMetadataDraft? Equipment,
     [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDraft>? ToolCapabilities,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
-    [property: JsonPropertyName("target_operation")] string TargetOperation);
+    [property: JsonPropertyName("target_operation")] string TargetOperation,
+    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDraft? EconomyLifecycle = null);
+
+public sealed record ItemEconomyLifecycleDefinition(
+    [property: JsonPropertyName("reference_value")] long ReferenceValue,
+    [property: JsonPropertyName("trade_policy")] string TradePolicy,
+    [property: JsonPropertyName("death_behavior")] string DeathBehavior,
+    [property: JsonPropertyName("death_transform_item_id")] string? DeathTransformItemId,
+    [property: JsonPropertyName("shop_policy")] string ShopPolicy,
+    [property: JsonPropertyName("npc_buy_price")] long? NpcBuyPrice,
+    [property: JsonPropertyName("npc_sell_price")] long? NpcSellPrice,
+    [property: JsonPropertyName("reclaim_policy")] string ReclaimPolicy,
+    [property: JsonPropertyName("reclaim_value")] long? ReclaimValue,
+    [property: JsonPropertyName("condition_policy_id")] string? ConditionPolicyId,
+    [property: JsonPropertyName("repair_policy_id")] string? RepairPolicyId);
+
+public sealed record ItemEconomyLifecycleDraft(
+    [property: JsonPropertyName("reference_value")] long ReferenceValue = 0,
+    [property: JsonPropertyName("trade_policy")] string? TradePolicy = null,
+    [property: JsonPropertyName("death_behavior")] string? DeathBehavior = null,
+    [property: JsonPropertyName("death_transform_item_id")] string? DeathTransformItemId = null,
+    [property: JsonPropertyName("shop_policy")] string? ShopPolicy = null,
+    [property: JsonPropertyName("npc_buy_price")] long? NpcBuyPrice = null,
+    [property: JsonPropertyName("npc_sell_price")] long? NpcSellPrice = null,
+    [property: JsonPropertyName("reclaim_policy")] string? ReclaimPolicy = null,
+    [property: JsonPropertyName("reclaim_value")] long? ReclaimValue = null,
+    [property: JsonPropertyName("condition_policy_id")] string? ConditionPolicyId = null,
+    [property: JsonPropertyName("repair_policy_id")] string? RepairPolicyId = null);
 
 public sealed record ItemConsumableBehaviorDraft(
     [property: JsonPropertyName("use_action")] string UseAction,
@@ -173,7 +202,11 @@ public sealed record ItemOptionsResponse(
     [property: JsonPropertyName("actor_rig_catalog")] ActorRigCatalogDefinition ActorRigCatalog,
     [property: JsonPropertyName("combat_unit_milliseconds")] int CombatUnitMilliseconds,
     [property: JsonPropertyName("maximum_tool_power_tier")] int MaximumToolPowerTier,
-    [property: JsonPropertyName("supports_runtime_tool_resolution")] bool SupportsRuntimeToolResolution);
+    [property: JsonPropertyName("supports_runtime_tool_resolution")] bool SupportsRuntimeToolResolution,
+    [property: JsonPropertyName("trade_policies")] IReadOnlyList<AuthoringOption>? TradePolicies = null,
+    [property: JsonPropertyName("death_behaviors")] IReadOnlyList<AuthoringOption>? DeathBehaviors = null,
+    [property: JsonPropertyName("shop_policies")] IReadOnlyList<AuthoringOption>? ShopPolicies = null,
+    [property: JsonPropertyName("reclaim_policies")] IReadOnlyList<AuthoringOption>? ReclaimPolicies = null);
 
 public sealed record ItemAssetCatalogResponse(
     [property: JsonPropertyName("generated_at_utc")] DateTimeOffset GeneratedAtUtc,

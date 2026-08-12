@@ -1374,6 +1374,9 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         public Task<bool> HasPublishedConsumableResultReferencesAsync(string itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
 
+        public Task<bool> HasPublishedDeathTransformReferencesAsync(string itemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
         public Task<ReferencedItemRecord?> LoadReferencedItemAsync(string itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult<ReferencedItemRecord?>(null);
 

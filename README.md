@@ -1,5 +1,9 @@
 # MMO Content Studio
 
+The unified Items workspace includes Economy and Lifecycle authoring for static
+policy metadata only; it does not execute death, shop, trade, reclaim,
+condition, or repair behavior.
+
 A Godot-based content authoring application for the
 [MMO Project](https://github.com/TaylorZaneKirk/MMO-Project).
 

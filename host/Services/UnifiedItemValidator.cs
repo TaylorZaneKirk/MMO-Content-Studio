@@ -13,6 +13,14 @@ public sealed class UnifiedItemValidator
         new HashSet<string>(["health", "concentration", "special"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> RequirementTypes =
         new HashSet<string>(["skill_minimum"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> TradePolicies =
+        new HashSet<string>(["tradeable", "untradeable"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> DeathBehaviors =
+        new HashSet<string>(["ordinary", "always_keep", "always_destroy", "transform", "reclaim"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> ShopPolicies =
+        new HashSet<string>(["not_shop_traded", "npc_buys", "npc_sells", "npc_buys_and_sells"], StringComparer.Ordinal);
+    private static readonly IReadOnlySet<string> ReclaimPolicies =
+        new HashSet<string>(["none", "fixed_cost"], StringComparer.Ordinal);
 
     private readonly IUnifiedItemRepository _repository;
     private readonly ItemAuthoringRegistry _registry;
@@ -59,6 +67,7 @@ public sealed class UnifiedItemValidator
             await ValidateEquipmentAsync(draft.Equipment, forPublication, messages, cancellationToken);
         }
         await ValidateToolCapabilitiesAsync(draft.ToolCapabilities, messages, cancellationToken);
+        await ValidateEconomyLifecycleAsync(itemId, draft.EconomyLifecycle, forPublication, messages, cancellationToken);
 
         if (existing?.RuntimeEnabled == true && !forPublication)
         {
@@ -92,6 +101,88 @@ public sealed class UnifiedItemValidator
             !hasErrors && asset.Exists,
             messages,
             asset.FilePath);
+    }
+
+    private async Task ValidateEconomyLifecycleAsync(
+        string itemId,
+        ItemEconomyLifecycleDraft economy,
+        bool forPublication,
+        ICollection<ApiError> messages,
+        CancellationToken cancellationToken)
+    {
+        if (economy.ReferenceValue < 0)
+        {
+            messages.Add(new ApiError("invalid_reference_value", "Reference value must be non-negative.", ValidationSeverity.Error, "economy_lifecycle.reference_value"));
+        }
+        ValidatePolicy(economy.TradePolicy ?? string.Empty, TradePolicies, "trade_policy", messages);
+        ValidatePolicy(economy.DeathBehavior ?? string.Empty, DeathBehaviors, "death_behavior", messages);
+        ValidatePolicy(economy.ShopPolicy ?? string.Empty, ShopPolicies, "shop_policy", messages);
+        ValidatePolicy(economy.ReclaimPolicy ?? string.Empty, ReclaimPolicies, "reclaim_policy", messages);
+        var isTransform = string.Equals(economy.DeathBehavior, "transform", StringComparison.Ordinal);
+        if (isTransform != (economy.DeathTransformItemId is not null))
+        {
+            messages.Add(new ApiError("invalid_death_transform", "Transform behavior requires a target item ID and every other behavior forbids one.", ValidationSeverity.Error, "economy_lifecycle.death_transform_item_id"));
+        }
+        if (economy.DeathTransformItemId is not null)
+        {
+            if (!UnifiedItemDomainRules.StableIdRegex().IsMatch(economy.DeathTransformItemId))
+            {
+                messages.Add(new ApiError("invalid_death_transform_item_id", "Transform target must use the stable lowercase underscore format.", ValidationSeverity.Error, "economy_lifecycle.death_transform_item_id"));
+            }
+            else if (string.Equals(itemId, economy.DeathTransformItemId, StringComparison.Ordinal))
+            {
+                messages.Add(new ApiError("death_transform_self_reference", "An item cannot transform into itself.", ValidationSeverity.Error, "economy_lifecycle.death_transform_item_id"));
+            }
+            else
+            {
+                var target = await _repository.LoadReferencedItemAsync(economy.DeathTransformItemId, cancellationToken);
+                if (target is null || (forPublication && !target.RuntimeEnabled))
+                {
+                    messages.Add(new ApiError("death_transform_target_unavailable", "A published transform item must reference an existing published target item.", ValidationSeverity.Error, "economy_lifecycle.death_transform_item_id"));
+                }
+            }
+        }
+        var shopValid = economy.ShopPolicy switch
+        {
+            "not_shop_traded" => economy.NpcBuyPrice is null && economy.NpcSellPrice is null,
+            "npc_buys" => economy.NpcBuyPrice is not null && economy.NpcSellPrice is null,
+            "npc_sells" => economy.NpcBuyPrice is null && economy.NpcSellPrice is not null,
+            "npc_buys_and_sells" => economy.NpcBuyPrice is not null && economy.NpcSellPrice is not null,
+            _ => true
+        };
+        if (!shopValid || economy.NpcBuyPrice < 0 || economy.NpcSellPrice < 0)
+        {
+            messages.Add(new ApiError("invalid_shop_policy_prices", "Shop policy must exactly match non-negative NPC buy and sell prices.", ValidationSeverity.Error, "economy_lifecycle.shop_policy"));
+        }
+        var reclaimValid = economy.DeathBehavior == "reclaim"
+            ? economy.ReclaimPolicy == "fixed_cost" && economy.ReclaimValue is not null
+            : economy.ReclaimPolicy == "none" && economy.ReclaimValue is null;
+        if (!reclaimValid || economy.ReclaimValue < 0)
+        {
+            messages.Add(new ApiError("invalid_reclaim_policy", "Only reclaim behavior may use a non-negative fixed reclaim value.", ValidationSeverity.Error, "economy_lifecycle.reclaim_policy"));
+        }
+        ValidateReservedPolicyId(economy.ConditionPolicyId, "condition_policy_id", messages);
+        ValidateReservedPolicyId(economy.RepairPolicyId, "repair_policy_id", messages);
+        if (forPublication && (economy.ConditionPolicyId is not null || economy.RepairPolicyId is not null))
+        {
+            messages.Add(new ApiError("condition_repair_publication_unsupported", "Condition and repair policies are reserved metadata and cannot be published in V1.", ValidationSeverity.Error, "economy_lifecycle"));
+        }
+    }
+
+    private static void ValidatePolicy(string value, IReadOnlySet<string> allowed, string field, ICollection<ApiError> messages)
+    {
+        if (!allowed.Contains(value))
+        {
+            messages.Add(new ApiError("unknown_" + field, $"Unknown {field} '{value}'.", ValidationSeverity.Error, "economy_lifecycle." + field));
+        }
+    }
+
+    private static void ValidateReservedPolicyId(string? value, string field, ICollection<ApiError> messages)
+    {
+        if (value is not null && !UnifiedItemDomainRules.StableIdRegex().IsMatch(value))
+        {
+            messages.Add(new ApiError("invalid_" + field, "Reserved policy IDs must use the stable lowercase underscore format.", ValidationSeverity.Error, "economy_lifecycle." + field));
+        }
     }
 
     private async Task ValidateConsumableAsync(

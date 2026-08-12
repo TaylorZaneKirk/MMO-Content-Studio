@@ -69,6 +69,17 @@ var _usable_in_combat: CheckBox
 var _cooldown_ms: SpinBox
 var _animation_id: LineEdit
 var _sound_path: LineEdit
+var _reference_value: SpinBox
+var _trade_policy: OptionButton
+var _death_behavior: OptionButton
+var _death_transform_item_id: LineEdit
+var _shop_policy: OptionButton
+var _npc_buy_price: SpinBox
+var _npc_sell_price: SpinBox
+var _reclaim_policy: OptionButton
+var _reclaim_value: SpinBox
+var _condition_policy_id: LineEdit
+var _repair_policy_id: LineEdit
 var _consumable_requirements: VBoxContainer
 var _consumable_effects: VBoxContainer
 var _equipable: CheckBox
@@ -263,6 +274,26 @@ func _build_ui() -> void:
 	editor.add_child(_row_header("Consumable Effects", "+ Effect", _add_consumable_effect_row))
 	_consumable_effects = _rows()
 	editor.add_child(_consumable_effects)
+
+	var economy_grid := _section_grid(editor, "Economy and Lifecycle")
+	_reference_value = _add_spin_field(economy_grid, "Reference value", 0, 9223372036854775807, 1)
+	_trade_policy = _add_option_field(economy_grid, "Trade policy")
+	_death_behavior = _add_option_field(economy_grid, "Death behavior")
+	_death_behavior.item_selected.connect(_on_economy_policy_changed.unbind(1))
+	_death_transform_item_id = _add_line_field(economy_grid, "Transform target item ID", "Required only for transform")
+	_shop_policy = _add_option_field(economy_grid, "Shop policy")
+	_shop_policy.item_selected.connect(_on_economy_policy_changed.unbind(1))
+	_npc_buy_price = _add_spin_field(economy_grid, "NPC buy price", 0, 9223372036854775807, 1)
+	_npc_sell_price = _add_spin_field(economy_grid, "NPC sell price", 0, 9223372036854775807, 1)
+	_reclaim_policy = _add_option_field(economy_grid, "Reclaim policy")
+	_reclaim_policy.item_selected.connect(_on_economy_policy_changed.unbind(1))
+	_reclaim_value = _add_spin_field(economy_grid, "Reclaim value", 0, 9223372036854775807, 1)
+	_condition_policy_id = _add_line_field(economy_grid, "Reserved condition policy ID", "Draft planning only")
+	_repair_policy_id = _add_line_field(economy_grid, "Reserved repair policy ID", "Draft planning only")
+	var economy_note := Label.new()
+	economy_note.text = "Economy and lifecycle metadata is authoring-only in V1. Death, shop, trade, reclaim, condition, and repair behavior are not executed."
+	economy_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	economy_grid.add_child(economy_note)
 
 	var equip_grid := _section_grid(editor, "Equipability")
 	equip_grid.add_child(_field_label("Equipable"))
@@ -595,12 +626,17 @@ func _on_options_received(payload: Dictionary) -> void:
 	_options = payload
 	_fill_option(_equipment_slot, _option_array("equipment_slots", DEFAULT_EQUIPMENT_SLOTS))
 	_fill_option(_use_action, _option_array("use_actions", [{"id": "use", "display_name": "Use"}]))
+	_fill_option(_trade_policy, _option_array("trade_policies", [{"id": "tradeable", "display_name": "Tradeable"}, {"id": "untradeable", "display_name": "Untradeable"}]))
+	_fill_option(_death_behavior, _option_array("death_behaviors", [{"id": "ordinary", "display_name": "Ordinary"}, {"id": "always_keep", "display_name": "Always Keep"}, {"id": "always_destroy", "display_name": "Always Destroy"}, {"id": "transform", "display_name": "Transform"}, {"id": "reclaim", "display_name": "Reclaim"}]))
+	_fill_option(_shop_policy, _option_array("shop_policies", [{"id": "not_shop_traded", "display_name": "Not Shop Traded"}, {"id": "npc_buys", "display_name": "NPC Buys"}, {"id": "npc_sells", "display_name": "NPC Sells"}, {"id": "npc_buys_and_sells", "display_name": "NPC Buys and Sells"}]))
+	_fill_option(_reclaim_policy, _option_array("reclaim_policies", [{"id": "none", "display_name": "None"}, {"id": "fixed_cost", "display_name": "Fixed Cost"}]))
 	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}]))
 	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
 	_fill_option(_appearance_binding, _option_array("equipped_visual_binding_types", [{"id": "rig_layer", "display_name": "Rig Layer"}, {"id": "socket", "display_name": "Socket"}]))
 	_apply_actor_rig_catalog(payload.get("actor_rig_catalog", {}))
 	_rebuild_bonus_grid(_bonus_controls.get("_grid", null))
 	_update_weapon_timing()
+	_update_economy_controls()
 
 
 func _on_catalog_received(payload: Dictionary) -> void:
@@ -627,6 +663,7 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_kind.text = str(payload.get("authoring_kind", "Unknown"))
 	_updated.text = str(payload.get("updated_at_utc", "Unknown"))
 	_apply_consumable(payload.get("consumable_behavior", null))
+	_apply_economy(payload.get("economy_lifecycle", {}))
 	_apply_equipment(payload.get("equipment", null))
 	_clear_rows(_tool_rows)
 	for variant in payload.get("tool_capabilities", []) as Array:
@@ -820,6 +857,7 @@ func _payload() -> Dictionary:
 		"consumable_behavior": _consumable_payload() if _consumable_enabled.button_pressed else null,
 		"equipment": _equipment_payload() if _equipable.button_pressed else null,
 		"tool_capabilities": _collect_tool_capabilities(),
+		"economy_lifecycle": _economy_payload(),
 		"expected_updated_at_utc": _current_item.get("updated_at_utc", null),
 		"preview_signature": null,
 	}
@@ -882,6 +920,57 @@ func _consumable_payload() -> Dictionary:
 		"requirements": _collect_consumable_requirements(),
 		"effects": _collect_consumable_effects(),
 	}
+
+
+func _economy_payload() -> Dictionary:
+	var transform := _selected_metadata(_death_behavior) == "transform"
+	var shop := _selected_metadata(_shop_policy)
+	var reclaim := _selected_metadata(_death_behavior) == "reclaim"
+	return {
+		"reference_value": int(_reference_value.value),
+		"trade_policy": _selected_metadata(_trade_policy),
+		"death_behavior": _selected_metadata(_death_behavior),
+		"death_transform_item_id": _optional_payload(_death_transform_item_id.text) if transform else null,
+		"shop_policy": shop,
+		"npc_buy_price": int(_npc_buy_price.value) if shop == "npc_buys" or shop == "npc_buys_and_sells" else null,
+		"npc_sell_price": int(_npc_sell_price.value) if shop == "npc_sells" or shop == "npc_buys_and_sells" else null,
+		"reclaim_policy": _selected_metadata(_reclaim_policy) if reclaim else "none",
+		"reclaim_value": int(_reclaim_value.value) if reclaim else null,
+		"condition_policy_id": _optional_payload(_condition_policy_id.text),
+		"repair_policy_id": _optional_payload(_repair_policy_id.text),
+	}
+
+
+func _apply_economy(value: Variant) -> void:
+	var economy: Dictionary = value as Dictionary if value is Dictionary else {}
+	_reference_value.value = int(economy.get("reference_value", 0))
+	_select_option(_trade_policy, str(economy.get("trade_policy", "tradeable")))
+	_select_option(_death_behavior, str(economy.get("death_behavior", "ordinary")))
+	_death_transform_item_id.text = _nullable_string(economy.get("death_transform_item_id", null))
+	_select_option(_shop_policy, str(economy.get("shop_policy", "not_shop_traded")))
+	_npc_buy_price.value = int(economy.get("npc_buy_price", 0))
+	_npc_sell_price.value = int(economy.get("npc_sell_price", 0))
+	_select_option(_reclaim_policy, str(economy.get("reclaim_policy", "none")))
+	_reclaim_value.value = int(economy.get("reclaim_value", 0))
+	_condition_policy_id.text = _nullable_string(economy.get("condition_policy_id", null))
+	_repair_policy_id.text = _nullable_string(economy.get("repair_policy_id", null))
+	_update_economy_controls()
+
+
+func _on_economy_policy_changed() -> void:
+	_update_economy_controls()
+	_on_form_changed()
+
+
+func _update_economy_controls() -> void:
+	var transform := _selected_metadata(_death_behavior) == "transform"
+	var reclaim := _selected_metadata(_death_behavior) == "reclaim"
+	var shop := _selected_metadata(_shop_policy)
+	_death_transform_item_id.editable = transform
+	_npc_buy_price.editable = shop == "npc_buys" or shop == "npc_buys_and_sells"
+	_npc_sell_price.editable = shop == "npc_sells" or shop == "npc_buys_and_sells"
+	_reclaim_policy.disabled = not reclaim
+	_reclaim_value.editable = reclaim
 
 
 func _equipment_payload() -> Dictionary:

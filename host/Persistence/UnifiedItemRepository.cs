@@ -35,6 +35,10 @@ public interface IUnifiedItemRepository
         string itemId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> HasPublishedDeathTransformReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
     Task<ReferencedItemRecord?> LoadReferencedItemAsync(
         string itemId,
         CancellationToken cancellationToken = default);
@@ -80,6 +84,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 slot.display_name as equipment_slot_display_name,
                 i.runtime_enabled,
                 i.required_strength,
+                i.reference_value,
+                i.trade_policy,
+                i.death_behavior,
+                i.death_transform_item_id,
+                i.shop_policy,
+                i.npc_buy_price,
+                i.npc_sell_price,
+                i.reclaim_policy,
+                i.reclaim_value,
+                i.condition_policy_id,
+                i.repair_policy_id,
                 i.updated_at,
                 exists (select 1 from item_consumable_profiles p where p.item_id = i.item_id) as has_consumable_profile,
                 exists (select 1 from item_combat_profiles p where p.item_id = i.item_id) as has_combat_profile,
@@ -252,6 +267,24 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
     }
 
+    public async Task<bool> HasPublishedDeathTransformReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            select exists (
+                select 1 from item_definitions
+                where runtime_enabled = true
+                  and death_behavior = 'transform'
+                  and death_transform_item_id = @item_id
+            );
+            """;
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("item_id", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
+    }
+
     public async Task<ReferencedItemRecord?> LoadReferencedItemAsync(
         string itemId,
         CancellationToken cancellationToken = default)
@@ -300,6 +333,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 equipment_slot_id,
                 runtime_enabled,
                 required_strength,
+                reference_value,
+                trade_policy,
+                death_behavior,
+                death_transform_item_id,
+                shop_policy,
+                npc_buy_price,
+                npc_sell_price,
+                reclaim_policy,
+                reclaim_value,
+                condition_policy_id,
+                repair_policy_id,
                 updated_at
             ) values (
                 @item_id,
@@ -308,6 +352,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @equipment_slot_id,
                 false,
                 @required_strength,
+                @reference_value,
+                @trade_policy,
+                @death_behavior,
+                @death_transform_item_id,
+                @shop_policy,
+                @npc_buy_price,
+                @npc_sell_price,
+                @reclaim_policy,
+                @reclaim_value,
+                @condition_policy_id,
+                @repair_policy_id,
                 now()
             )
             on conflict (item_id)
@@ -316,6 +371,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 icon_texture_path = excluded.icon_texture_path,
                 equipment_slot_id = excluded.equipment_slot_id,
                 required_strength = excluded.required_strength,
+                reference_value = excluded.reference_value,
+                trade_policy = excluded.trade_policy,
+                death_behavior = excluded.death_behavior,
+                death_transform_item_id = excluded.death_transform_item_id,
+                shop_policy = excluded.shop_policy,
+                npc_buy_price = excluded.npc_buy_price,
+                npc_sell_price = excluded.npc_sell_price,
+                reclaim_policy = excluded.reclaim_policy,
+                reclaim_value = excluded.reclaim_value,
+                condition_policy_id = excluded.condition_policy_id,
+                repair_policy_id = excluded.repair_policy_id,
                 runtime_enabled = false,
                 updated_at = now();
             """;
@@ -327,6 +393,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             command.Parameters.Add("equipment_slot_id", NpgsqlDbType.Text).Value =
                 (object?)draft.Equipment?.EquipmentSlotId ?? DBNull.Value;
             command.Parameters.AddWithValue("required_strength", draft.Equipment?.RequiredStrength ?? 1);
+            command.Parameters.AddWithValue("reference_value", draft.EconomyLifecycle.ReferenceValue);
+            command.Parameters.AddWithValue("trade_policy", draft.EconomyLifecycle.TradePolicy ?? string.Empty);
+            command.Parameters.AddWithValue("death_behavior", draft.EconomyLifecycle.DeathBehavior ?? string.Empty);
+            AddNullableText(command, "death_transform_item_id", draft.EconomyLifecycle.DeathTransformItemId);
+            command.Parameters.AddWithValue("shop_policy", draft.EconomyLifecycle.ShopPolicy ?? string.Empty);
+            command.Parameters.Add("npc_buy_price", NpgsqlDbType.Bigint).Value = (object?)draft.EconomyLifecycle.NpcBuyPrice ?? DBNull.Value;
+            command.Parameters.Add("npc_sell_price", NpgsqlDbType.Bigint).Value = (object?)draft.EconomyLifecycle.NpcSellPrice ?? DBNull.Value;
+            command.Parameters.AddWithValue("reclaim_policy", draft.EconomyLifecycle.ReclaimPolicy ?? string.Empty);
+            command.Parameters.Add("reclaim_value", NpgsqlDbType.Bigint).Value = (object?)draft.EconomyLifecycle.ReclaimValue ?? DBNull.Value;
+            AddNullableText(command, "condition_policy_id", draft.EconomyLifecycle.ConditionPolicyId);
+            AddNullableText(command, "repair_policy_id", draft.EconomyLifecycle.RepairPolicyId);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
@@ -452,6 +529,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 slot.display_name as equipment_slot_display_name,
                 i.runtime_enabled,
                 i.required_strength,
+                i.reference_value,
+                i.trade_policy,
+                i.death_behavior,
+                i.death_transform_item_id,
+                i.shop_policy,
+                i.npc_buy_price,
+                i.npc_sell_price,
+                i.reclaim_policy,
+                i.reclaim_value,
+                i.condition_policy_id,
+                i.repair_policy_id,
                 i.updated_at,
                 exists (select 1 from item_consumable_profiles p where p.item_id = i.item_id) as has_consumable_profile,
                 exists (select 1 from item_combat_profiles p where p.item_id = i.item_id) as has_combat_profile,
@@ -1547,7 +1635,19 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             combatBonuses,
             null,
             toolCapabilities,
-            ReadUtc(reader, "updated_at"));
+            ReadUtc(reader, "updated_at"),
+            new ItemEconomyLifecycleDefinition(
+                reader.GetInt64(reader.GetOrdinal("reference_value")),
+                reader.GetString(reader.GetOrdinal("trade_policy")),
+                reader.GetString(reader.GetOrdinal("death_behavior")),
+                ReadNullableString(reader, "death_transform_item_id"),
+                reader.GetString(reader.GetOrdinal("shop_policy")),
+                ReadNullableInt64(reader, "npc_buy_price"),
+                ReadNullableInt64(reader, "npc_sell_price"),
+                reader.GetString(reader.GetOrdinal("reclaim_policy")),
+                ReadNullableInt64(reader, "reclaim_value"),
+                ReadNullableString(reader, "condition_policy_id"),
+                ReadNullableString(reader, "repair_policy_id")));
     }
 
     private static string? ReadNullableString(NpgsqlDataReader reader, string column)
@@ -1558,6 +1658,12 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
         new(DateTime.SpecifyKind(reader.GetFieldValue<DateTime>(reader.GetOrdinal(column)), DateTimeKind.Utc));
+
+    private static long? ReadNullableInt64(NpgsqlDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : reader.GetInt64(ordinal);
+    }
 
     private static void AddNullableText(NpgsqlCommand command, string name, string? value) =>
         command.Parameters.Add(name, NpgsqlDbType.Text).Value = (object?)value ?? DBNull.Value;
@@ -1603,7 +1709,8 @@ public sealed record UnifiedItemRecord(
     EquipmentCombatBonusDefinition? CombatBonuses,
     ItemEquippedVisualDefinition? EquippedVisual,
     IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
-    DateTimeOffset UpdatedAtUtc);
+    DateTimeOffset UpdatedAtUtc,
+    ItemEconomyLifecycleDefinition? EconomyLifecycle = null);
 
 public sealed record ConsumableProfileDraft(
     string UseAction,
