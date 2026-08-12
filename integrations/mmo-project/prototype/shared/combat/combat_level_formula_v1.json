@@ -1,0 +1,57 @@
+{
+  "schema_version": "combat_level_formula_v1",
+  "mob_examples": [
+    {
+      "name": "Slime",
+      "attack_level": 1,
+      "strength_level": 1,
+      "defence_level": 1,
+      "max_health": 5,
+      "expected_combat_level": 2
+    },
+    {
+      "name": "Training Goblin",
+      "attack_level": 3,
+      "strength_level": 3,
+      "defence_level": 2,
+      "max_health": 8,
+      "expected_combat_level": 4
+    },
+    {
+      "name": "Training Guard",
+      "attack_level": 4,
+      "strength_level": 3,
+      "defence_level": 3,
+      "max_health": 10,
+      "expected_combat_level": 5
+    },
+    {
+      "name": "Max V1 Mob",
+      "attack_level": 99,
+      "strength_level": 99,
+      "defence_level": 99,
+      "max_health": 99,
+      "expected_combat_level": 113
+    }
+  ],
+  "innate_bonus_diagnostic_examples": [
+    {
+      "name": "Slash-biased diagnostic",
+      "attack_level": 10,
+      "strength_level": 10,
+      "defence_level": 10,
+      "accuracy_style": "slash",
+      "attack_slash": 54,
+      "strength_melee": 64,
+      "defence_thrust": 0,
+      "defence_slash": 64,
+      "defence_crush": 128,
+      "expected_selected_attack_bonus": 54,
+      "expected_equivalent_attack_level": 26.03125,
+      "expected_equivalent_strength_level": 29,
+      "expected_equivalent_defence_thrust_level": 10,
+      "expected_equivalent_defence_slash_level": 29,
+      "expected_equivalent_defence_crush_level": 48
+    }
+  ]
+}

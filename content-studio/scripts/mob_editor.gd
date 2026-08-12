@@ -190,6 +190,7 @@ var _maximum_range: SpinBox
 var _attack_speed_units: SpinBox
 var _attack_interval: Label
 var _derived_combat_level: Label
+var _combat_level_diagnostics: Label
 var _attack_level: SpinBox
 var _strength_level: SpinBox
 var _defence_level: SpinBox
@@ -470,6 +471,7 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_strength_level = _spin_field(grid, "Strength level", 1, 1000, 1, 1)
 	_defence_level = _spin_field(grid, "Defence level", 1, 1000, 1, 1)
 	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
+	_combat_level_diagnostics = _value_label(grid, "Innate-bonus diagnostics", "Attack 1.0 / Strength 1.0 / Defence T 1.0, S 1.0, C 1.0")
 
 
 func _add_bonuses_section(parent: VBoxContainer) -> void:
@@ -548,6 +550,8 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 		_visual_preview.set_rigged_sprite_preview(rigged_preview)
 	if payload.has("derived_combat_level") and payload.get("derived_combat_level") != null:
 		_set_derived_combat_level(int(payload.get("derived_combat_level", 1)))
+	if payload.has("combat_level_diagnostics") and payload.get("combat_level_diagnostics") != null:
+		_set_combat_level_diagnostics(payload.get("combat_level_diagnostics", {}) as Dictionary)
 	_update_visual_preview()
 	_update_presentation_semantics()
 	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
@@ -1438,6 +1442,8 @@ func _update_derived_combat_level() -> void:
 		return
 	if _attack_enabled == null or not _attack_enabled.button_pressed:
 		_derived_combat_level.text = "No primary combat profile"
+		if _combat_level_diagnostics != null:
+			_combat_level_diagnostics.text = "No primary combat profile"
 		return
 	var attack := int(_attack_level.value) if _attack_level != null else 1
 	var strength := int(_strength_level.value) if _strength_level != null else 1
@@ -1445,12 +1451,62 @@ func _update_derived_combat_level() -> void:
 	var health := int(_max_health.value) if _max_health != null else 1
 	var level := maxi(1, int((10 * (defence + health) + 13 * (attack + strength)) / 40))
 	_set_derived_combat_level(level)
+	_set_combat_level_diagnostics(_local_combat_level_diagnostics(attack, strength, defence))
 
 
 func _set_derived_combat_level(level: int) -> void:
 	if _derived_combat_level == null:
 		return
 	_derived_combat_level.text = "%d (read-only; derived from authored combat stats and health)" % level
+
+
+func _set_combat_level_diagnostics(diagnostics: Dictionary) -> void:
+	if _combat_level_diagnostics == null:
+		return
+	var style := str(diagnostics.get("selected_accuracy_style", "crush"))
+	_combat_level_diagnostics.text = (
+		"Attack %.1f (%s %+d) / Strength %.1f (%+d) / Defence T %.1f (%+d), S %.1f (%+d), C %.1f (%+d) — read-only; diagnostics do not alter displayed combat level"
+	) % [
+		float(diagnostics.get("equivalent_attack_level", 1.0)),
+		style,
+		int(diagnostics.get("selected_attack_bonus", 0)),
+		float(diagnostics.get("equivalent_strength_level", 1.0)),
+		int(diagnostics.get("strength_bonus", 0)),
+		float(diagnostics.get("equivalent_defence_thrust_level", 1.0)),
+		int(diagnostics.get("defence_thrust_bonus", 0)),
+		float(diagnostics.get("equivalent_defence_slash_level", 1.0)),
+		int(diagnostics.get("defence_slash_bonus", 0)),
+		float(diagnostics.get("equivalent_defence_crush_level", 1.0)),
+		int(diagnostics.get("defence_crush_bonus", 0)),
+	]
+
+
+func _local_combat_level_diagnostics(attack: int, strength: int, defence: int) -> Dictionary:
+	var style := _selected_metadata(_accuracy_style)
+	var selected_attack_bonus := _bonus_value("attack_%s" % style)
+	return {
+		"selected_accuracy_style": style,
+		"selected_attack_bonus": selected_attack_bonus,
+		"strength_bonus": _bonus_value("strength_melee"),
+		"defence_thrust_bonus": _bonus_value("defence_thrust"),
+		"defence_slash_bonus": _bonus_value("defence_slash"),
+		"defence_crush_bonus": _bonus_value("defence_crush"),
+		"equivalent_attack_level": _equivalent_level(attack, selected_attack_bonus),
+		"equivalent_strength_level": _equivalent_level(strength, _bonus_value("strength_melee")),
+		"equivalent_defence_thrust_level": _equivalent_level(defence, _bonus_value("defence_thrust")),
+		"equivalent_defence_slash_level": _equivalent_level(defence, _bonus_value("defence_slash")),
+		"equivalent_defence_crush_level": _equivalent_level(defence, _bonus_value("defence_crush")),
+	}
+
+
+func _equivalent_level(base_level: int, bonus: int) -> float:
+	return (((float(base_level) + 9.0) * (64.0 + float(bonus))) / 64.0) - 9.0
+
+
+func _bonus_value(field_name: String) -> int:
+	if not _bonus_controls.has(field_name):
+		return 0
+	return int((_bonus_controls[field_name] as SpinBox).value)
 
 
 func _update_visual_preview() -> void:

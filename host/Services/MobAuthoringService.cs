@@ -192,7 +192,8 @@ public sealed class MobAuthoringService
                         effective.CompositeVisual,
                         request.PreviewDirection,
                         request.PreviewFrame),
-                    CalculateDerivedCombatLevel(effective)));
+                    CalculateDerivedCombatLevel(effective),
+                    CalculateCombatLevelDiagnostics(effective)));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -709,7 +710,8 @@ public sealed class MobAuthoringService
             record.VisualMode,
             record.CompositeVisual,
             ResolvePersistedRiggedSpritePreview(record, asset),
-            CalculateDerivedCombatLevel(FromRecord(record)));
+            CalculateDerivedCombatLevel(FromRecord(record)),
+            CalculateCombatLevelDiagnostics(FromRecord(record)));
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
@@ -756,6 +758,15 @@ public sealed class MobAuthoringService
                 draft.PrimaryCombatProfile.StrengthLevel,
                 draft.PrimaryCombatProfile.DefenceLevel,
                 draft.MaxHealth);
+    }
+
+    private static MobCombatLevelDiagnosticsDefinition? CalculateCombatLevelDiagnostics(NormalizedMobDraft draft)
+    {
+        return draft.PrimaryCombatProfile is null
+            ? null
+            : MobDomainRules.CalculateCombatLevelDiagnostics(
+                draft.PrimaryCombatProfile,
+                draft.CombatBonuses);
     }
 
     private static IReadOnlyList<AuthoringChange> CalculateChanges(

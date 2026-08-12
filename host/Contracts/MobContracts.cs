@@ -58,7 +58,8 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
-    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null);
+    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null,
+    [property: JsonPropertyName("combat_level_diagnostics")] MobCombatLevelDiagnosticsDefinition? CombatLevelDiagnostics = null);
 
 public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_type")] string AttackType,
@@ -158,12 +159,26 @@ public sealed record MobValidationResponse(
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("preview_signature")] string PreviewSignature,
     [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
-    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null);
+    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null,
+    [property: JsonPropertyName("combat_level_diagnostics")] MobCombatLevelDiagnosticsDefinition? CombatLevelDiagnostics = null);
 
 public sealed record MobMutationResponse(
     [property: JsonPropertyName("operation")] string Operation,
     [property: JsonPropertyName("mob")] MobDefinition Mob,
     [property: JsonPropertyName("messages")] IReadOnlyList<ApiError> Messages);
+
+public sealed record MobCombatLevelDiagnosticsDefinition(
+    [property: JsonPropertyName("selected_accuracy_style")] string SelectedAccuracyStyle,
+    [property: JsonPropertyName("selected_attack_bonus")] int SelectedAttackBonus,
+    [property: JsonPropertyName("strength_bonus")] int StrengthBonus,
+    [property: JsonPropertyName("defence_thrust_bonus")] int DefenceThrustBonus,
+    [property: JsonPropertyName("defence_slash_bonus")] int DefenceSlashBonus,
+    [property: JsonPropertyName("defence_crush_bonus")] int DefenceCrushBonus,
+    [property: JsonPropertyName("equivalent_attack_level")] double EquivalentAttackLevel,
+    [property: JsonPropertyName("equivalent_strength_level")] double EquivalentStrengthLevel,
+    [property: JsonPropertyName("equivalent_defence_thrust_level")] double EquivalentDefenceThrustLevel,
+    [property: JsonPropertyName("equivalent_defence_slash_level")] double EquivalentDefenceSlashLevel,
+    [property: JsonPropertyName("equivalent_defence_crush_level")] double EquivalentDefenceCrushLevel);
 
 public sealed record MobAuthoringOptionsResponse(
     [property: JsonPropertyName("publication_states")] IReadOnlyList<AuthoringOption> PublicationStates,

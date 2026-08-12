@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Xunit;
@@ -70,6 +72,83 @@ public sealed class MobDomainRulesTests
             maxHealth));
     }
 
+    [Fact]
+    public void CombatLevelDiagnosticsUseApprovedInnateBonusLevelEquivalentFormula()
+    {
+        var diagnostics = MobDomainRules.CalculateCombatLevelDiagnostics(
+            new MobCombatProfileDefinition("melee", "slash", 1, 1, 4, 10, 10, 10),
+            new EquipmentCombatBonusDefinition(
+                AttackThrust: 0,
+                AttackSlash: 54,
+                AttackCrush: 12,
+                AttackRanged: 99,
+                AttackMagic: 99,
+                StrengthMelee: 64,
+                StrengthRanged: 99,
+                StrengthMagic: 99,
+                DefenceThrust: 0,
+                DefenceSlash: 64,
+                DefenceCrush: 128,
+                DefenceRanged: 99,
+                DefenceMagic: 99));
+
+        Assert.Equal("slash", diagnostics.SelectedAccuracyStyle);
+        Assert.Equal(54, diagnostics.SelectedAttackBonus);
+        Assert.Equal(26.03125d, diagnostics.EquivalentAttackLevel);
+        Assert.Equal(29d, diagnostics.EquivalentStrengthLevel);
+        Assert.Equal(10d, diagnostics.EquivalentDefenceThrustLevel);
+        Assert.Equal(29d, diagnostics.EquivalentDefenceSlashLevel);
+        Assert.Equal(48d, diagnostics.EquivalentDefenceCrushLevel);
+    }
+
+    [Fact]
+    public void DerivedMobCombatLevelMatchesMirroredCrossRepositoryFixture()
+    {
+        var fixture = LoadCombatLevelFixture();
+
+        Assert.Equal("combat_level_formula_v1", fixture.SchemaVersion);
+        foreach (var example in fixture.MobExamples)
+        {
+            Assert.Equal(example.ExpectedCombatLevel, MobDomainRules.CalculateDerivedCombatLevel(
+                example.AttackLevel,
+                example.StrengthLevel,
+                example.DefenceLevel,
+                example.MaxHealth));
+        }
+
+        var diagnostic = Assert.Single(fixture.InnateBonusDiagnosticExamples);
+        var actual = MobDomainRules.CalculateCombatLevelDiagnostics(
+            new MobCombatProfileDefinition(
+                "melee",
+                diagnostic.AccuracyStyle,
+                1,
+                1,
+                4,
+                diagnostic.AttackLevel,
+                diagnostic.StrengthLevel,
+                diagnostic.DefenceLevel),
+            new EquipmentCombatBonusDefinition(
+                AttackThrust: 0,
+                AttackSlash: diagnostic.AttackSlash,
+                AttackCrush: 0,
+                AttackRanged: 0,
+                AttackMagic: 0,
+                StrengthMelee: diagnostic.StrengthMelee,
+                StrengthRanged: 0,
+                StrengthMagic: 0,
+                DefenceThrust: diagnostic.DefenceThrust,
+                DefenceSlash: diagnostic.DefenceSlash,
+                DefenceCrush: diagnostic.DefenceCrush,
+                DefenceRanged: 0,
+                DefenceMagic: 0));
+        Assert.Equal(diagnostic.ExpectedSelectedAttackBonus, actual.SelectedAttackBonus);
+        Assert.Equal(diagnostic.ExpectedEquivalentAttackLevel, actual.EquivalentAttackLevel);
+        Assert.Equal(diagnostic.ExpectedEquivalentStrengthLevel, actual.EquivalentStrengthLevel);
+        Assert.Equal(diagnostic.ExpectedEquivalentDefenceThrustLevel, actual.EquivalentDefenceThrustLevel);
+        Assert.Equal(diagnostic.ExpectedEquivalentDefenceSlashLevel, actual.EquivalentDefenceSlashLevel);
+        Assert.Equal(diagnostic.ExpectedEquivalentDefenceCrushLevel, actual.EquivalentDefenceCrushLevel);
+    }
+
     [Theory]
     [InlineData("melee", true)]
     [InlineData("ranged", false)]
@@ -128,6 +207,65 @@ public sealed class MobDomainRulesTests
         Assert.Equal([1, 1, 2], drops.Select(drop => drop.DropOrder));
         Assert.Equal(["coal", "iron_ore", "apple"], drops.Select(drop => drop.ItemId));
     }
+
+    private static CombatLevelFixture LoadCombatLevelFixture()
+    {
+        var root = FindRepositoryRoot();
+        var localPath = Path.Combine(root, "integrations", "mmo-project", "prototype", "shared", "combat", "combat_level_formula_v1.json");
+        var canonicalPath = Path.Combine(root, "..", "..", "prototype", "shared", "combat", "combat_level_formula_v1.json");
+        Assert.Equal(
+            File.ReadAllText(canonicalPath),
+            File.ReadAllText(localPath));
+        return JsonSerializer.Deserialize<CombatLevelFixture>(File.ReadAllText(localPath)) ??
+               throw new InvalidOperationException("Expected combat-level parity fixture.");
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "MMO.ContentStudio.AuthoringHost.csproj")) ||
+                Directory.Exists(Path.Combine(directory.FullName, "host")) &&
+                Directory.Exists(Path.Combine(directory.FullName, "integrations")))
+            {
+                return directory.FullName;
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("Expected to find Content Studio repository root.");
+    }
+
+    private sealed record CombatLevelFixture(
+        [property: JsonPropertyName("schema_version")] string SchemaVersion,
+        [property: JsonPropertyName("mob_examples")] IReadOnlyList<MobCombatLevelExample> MobExamples,
+        [property: JsonPropertyName("innate_bonus_diagnostic_examples")] IReadOnlyList<InnateBonusDiagnosticExample> InnateBonusDiagnosticExamples);
+
+    private sealed record MobCombatLevelExample(
+        [property: JsonPropertyName("attack_level")] int AttackLevel,
+        [property: JsonPropertyName("strength_level")] int StrengthLevel,
+        [property: JsonPropertyName("defence_level")] int DefenceLevel,
+        [property: JsonPropertyName("max_health")] int MaxHealth,
+        [property: JsonPropertyName("expected_combat_level")] int ExpectedCombatLevel);
+
+    private sealed record InnateBonusDiagnosticExample(
+        [property: JsonPropertyName("attack_level")] int AttackLevel,
+        [property: JsonPropertyName("strength_level")] int StrengthLevel,
+        [property: JsonPropertyName("defence_level")] int DefenceLevel,
+        [property: JsonPropertyName("accuracy_style")] string AccuracyStyle,
+        [property: JsonPropertyName("attack_slash")] int AttackSlash,
+        [property: JsonPropertyName("strength_melee")] int StrengthMelee,
+        [property: JsonPropertyName("defence_thrust")] int DefenceThrust,
+        [property: JsonPropertyName("defence_slash")] int DefenceSlash,
+        [property: JsonPropertyName("defence_crush")] int DefenceCrush,
+        [property: JsonPropertyName("expected_selected_attack_bonus")] int ExpectedSelectedAttackBonus,
+        [property: JsonPropertyName("expected_equivalent_attack_level")] double ExpectedEquivalentAttackLevel,
+        [property: JsonPropertyName("expected_equivalent_strength_level")] double ExpectedEquivalentStrengthLevel,
+        [property: JsonPropertyName("expected_equivalent_defence_thrust_level")] double ExpectedEquivalentDefenceThrustLevel,
+        [property: JsonPropertyName("expected_equivalent_defence_slash_level")] double ExpectedEquivalentDefenceSlashLevel,
+        [property: JsonPropertyName("expected_equivalent_defence_crush_level")] double ExpectedEquivalentDefenceCrushLevel);
 
     [Fact]
     public void DuplicateDropChecksUsePersistedIdentity()

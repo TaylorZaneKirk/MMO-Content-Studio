@@ -159,6 +159,48 @@ public static class MobDomainRules
         }
     }
 
+    public static MobCombatLevelDiagnosticsDefinition CalculateCombatLevelDiagnostics(
+        MobCombatProfileDefinition profile,
+        EquipmentCombatBonusDefinition bonuses)
+    {
+        var style = NormalizeAccuracyStyle(profile.AccuracyStyle) ?? "crush";
+        var selectedAttackBonus = style switch
+        {
+            "thrust" => bonuses.AttackThrust,
+            "slash" => bonuses.AttackSlash,
+            "crush" => bonuses.AttackCrush,
+            _ => bonuses.AttackCrush
+        };
+
+        return new MobCombatLevelDiagnosticsDefinition(
+            style,
+            selectedAttackBonus,
+            bonuses.StrengthMelee,
+            bonuses.DefenceThrust,
+            bonuses.DefenceSlash,
+            bonuses.DefenceCrush,
+            CalculateEquivalentLevel(profile.AttackLevel, selectedAttackBonus),
+            CalculateEquivalentLevel(profile.StrengthLevel, bonuses.StrengthMelee),
+            CalculateEquivalentLevel(profile.DefenceLevel, bonuses.DefenceThrust),
+            CalculateEquivalentLevel(profile.DefenceLevel, bonuses.DefenceSlash),
+            CalculateEquivalentLevel(profile.DefenceLevel, bonuses.DefenceCrush));
+    }
+
+    public static double CalculateEquivalentLevel(
+        int baseLevel,
+        int bonus)
+    {
+        if (baseLevel < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(baseLevel), "Equivalent-level inputs must be nonnegative.");
+        }
+
+        checked
+        {
+            return ((baseLevel + 9) * (64 + bonus) / 64d) - 9;
+        }
+    }
+
     public static bool IsCombatBonusSupported(int value) =>
         value is >= -MobAuthoringRegistry.MaxCombatBonusMagnitude
             and <= MobAuthoringRegistry.MaxCombatBonusMagnitude;

@@ -450,14 +450,28 @@ public sealed class MobAuthoringServiceTests
     }
 
     [Fact]
-    public async Task PreviewAndLoadedDefinitionsExposeReadOnlyDerivedCombatLevel()
+    public async Task PreviewAndLoadedDefinitionsExposeReadOnlyDerivedCombatLevelAndInnateBonusDiagnostics()
     {
         var repository = new InMemoryMobRepository();
         repository.Put(Record() with
         {
             MobDefinitionId = "training_guard",
             MaxHealth = 10,
-            PrimaryCombatProfile = new MobCombatProfileDefinition("melee", "slash", 1, 1, 4, 4, 3, 3)
+            PrimaryCombatProfile = new MobCombatProfileDefinition("melee", "slash", 1, 1, 4, 4, 3, 3),
+            CombatBonuses = new EquipmentCombatBonusDefinition(
+                AttackThrust: 0,
+                AttackSlash: 64,
+                AttackCrush: 0,
+                AttackRanged: 0,
+                AttackMagic: 0,
+                StrengthMelee: 64,
+                StrengthRanged: 0,
+                StrengthMagic: 0,
+                DefenceThrust: 0,
+                DefenceSlash: 64,
+                DefenceCrush: 128,
+                DefenceRanged: 0,
+                DefenceMagic: 0)
         });
         var service = CreateService(repository, Path.GetTempPath());
 
@@ -471,8 +485,15 @@ public sealed class MobAuthoringServiceTests
 
         AssertSucceeded(preview);
         Assert.Equal(5, preview.Value!.DerivedCombatLevel);
+        Assert.NotNull(preview.Value.CombatLevelDiagnostics);
+        Assert.Equal("slash", preview.Value.CombatLevelDiagnostics!.SelectedAccuracyStyle);
+        Assert.Equal(17d, preview.Value.CombatLevelDiagnostics.EquivalentAttackLevel);
+        Assert.Equal(15d, preview.Value.CombatLevelDiagnostics.EquivalentStrengthLevel);
+        Assert.Equal(27d, preview.Value.CombatLevelDiagnostics.EquivalentDefenceCrushLevel);
         AssertSucceeded(loaded);
         Assert.Equal(5, loaded.Value!.DerivedCombatLevel);
+        Assert.NotNull(loaded.Value.CombatLevelDiagnostics);
+        Assert.Equal(preview.Value.CombatLevelDiagnostics, loaded.Value.CombatLevelDiagnostics);
     }
 
     [Fact]
