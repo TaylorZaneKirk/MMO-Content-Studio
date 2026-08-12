@@ -140,6 +140,25 @@ public static class MobDomainRules
     public static bool IsLevelSupported(int level) =>
         level is >= 0 and <= MobAuthoringRegistry.MaxMobLevel;
 
+    public static int CalculateDerivedCombatLevel(
+        int attackLevel,
+        int strengthLevel,
+        int defenceLevel,
+        int maxHealth)
+    {
+        if (attackLevel < 0 || strengthLevel < 0 || defenceLevel < 0 || maxHealth < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(attackLevel), "Combat-level inputs must be nonnegative.");
+        }
+
+        checked
+        {
+            return Math.Max(
+                1,
+                (10 * (defenceLevel + maxHealth) + 13 * (attackLevel + strengthLevel)) / 40);
+        }
+    }
+
     public static bool IsCombatBonusSupported(int value) =>
         value is >= -MobAuthoringRegistry.MaxCombatBonusMagnitude
             and <= MobAuthoringRegistry.MaxCombatBonusMagnitude;

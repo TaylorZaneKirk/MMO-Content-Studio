@@ -101,7 +101,7 @@ class U4UnifiedItemRetirementTests(unittest.TestCase):
         service = (HOST / "Services" / "UnifiedItemAuthoringService.cs").read_text()
         validator = (HOST / "Services" / "UnifiedItemValidator.cs").read_text()
         self.assertIn('supports_runtime_tool_resolution', contracts)
-        self.assertIn("true));", service)
+        self.assertIn("UnifiedItemDomainRules.MaximumPowerTier,\n                    true,", service)
         self.assertIn("runtime_tool_execution_deferred", validator)
 
     def test_mmo_project_checkout_changes_are_limited_to_u5_tool_resolution(self) -> None:

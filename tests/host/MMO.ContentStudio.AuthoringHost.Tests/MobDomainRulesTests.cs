@@ -52,6 +52,25 @@ public sealed class MobDomainRulesTests
     }
 
     [Theory]
+    [InlineData(1, 1, 1, 5, 2)]
+    [InlineData(3, 3, 2, 8, 4)]
+    [InlineData(4, 3, 3, 10, 5)]
+    [InlineData(99, 99, 99, 99, 113)]
+    public void DerivedMobCombatLevelUsesApprovedIntegerFormula(
+        int attack,
+        int strength,
+        int defence,
+        int maxHealth,
+        int expected)
+    {
+        Assert.Equal(expected, MobDomainRules.CalculateDerivedCombatLevel(
+            attack,
+            strength,
+            defence,
+            maxHealth));
+    }
+
+    [Theory]
     [InlineData("melee", true)]
     [InlineData("ranged", false)]
     public void AttackTypeRegistryIsNarrow(string attackType, bool supported)

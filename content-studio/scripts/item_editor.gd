@@ -986,7 +986,8 @@ func _economic_integer(control: LineEdit) -> int:
 
 func _has_valid_economy_integers() -> bool:
 	for control in [_reference_value, _npc_buy_price, _npc_sell_price, _reclaim_value]:
-		var value := control.text.strip_edges()
+		var line_edit := control as LineEdit
+		var value: String = line_edit.text.strip_edges()
 		if not value.is_empty() and (not value.is_valid_int() or value.begins_with("-")):
 			return false
 	if _reference_value.text.strip_edges().is_empty():

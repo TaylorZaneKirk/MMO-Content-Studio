@@ -189,6 +189,7 @@ var _minimum_range: SpinBox
 var _maximum_range: SpinBox
 var _attack_speed_units: SpinBox
 var _attack_interval: Label
+var _derived_combat_level: Label
 var _attack_level: SpinBox
 var _strength_level: SpinBox
 var _defence_level: SpinBox
@@ -468,6 +469,7 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_attack_level = _spin_field(grid, "Attack level", 1, 1000, 1, 1)
 	_strength_level = _spin_field(grid, "Strength level", 1, 1000, 1, 1)
 	_defence_level = _spin_field(grid, "Defence level", 1, 1000, 1, 1)
+	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
 
 
 func _add_bonuses_section(parent: VBoxContainer) -> void:
@@ -544,6 +546,8 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 		_has_rigged_preview = true
 		_asset_preview_file_path = str(rigged_preview.get("base_file_path", _asset_preview_file_path))
 		_visual_preview.set_rigged_sprite_preview(rigged_preview)
+	if payload.has("derived_combat_level") and payload.get("derived_combat_level") != null:
+		_set_derived_combat_level(int(payload.get("derived_combat_level", 1)))
 	_update_visual_preview()
 	_update_presentation_semantics()
 	_status.text = "Preview ready." if applicable else "Preview contains blocking validation errors."
@@ -676,6 +680,7 @@ func _load_mob(payload: Dictionary) -> void:
 	_update_behavior_controls()
 	_update_targeting_controls()
 	_update_attack_controls()
+	_update_derived_combat_level()
 	_clear_preview()
 	_apply_persisted_rigged_preview(payload)
 	_update_visual_preview()
@@ -735,6 +740,7 @@ func _start_new_mob() -> void:
 	_update_behavior_controls()
 	_update_targeting_controls()
 	_update_attack_controls()
+	_update_derived_combat_level()
 	_update_visual_preview()
 	_clear_preview()
 	_status.text = "Creating a new reusable mob definition."
@@ -1352,6 +1358,7 @@ func _on_preview_pose_changed() -> void:
 
 
 func _on_spin_changed() -> void:
+	_update_derived_combat_level()
 	_on_form_changed()
 
 
@@ -1367,11 +1374,13 @@ func _on_behavior_changed() -> void:
 
 func _on_attack_toggled(_value: bool) -> void:
 	_update_attack_controls()
+	_update_derived_combat_level()
 	_on_form_changed()
 
 
 func _on_attack_speed_changed() -> void:
 	_update_attack_interval()
+	_update_derived_combat_level()
 	_on_form_changed()
 
 
@@ -1422,6 +1431,26 @@ func _update_attack_interval() -> void:
 		_attack_speed_unit_milliseconds,
 		units * _attack_speed_unit_milliseconds,
 	]
+
+
+func _update_derived_combat_level() -> void:
+	if _derived_combat_level == null:
+		return
+	if _attack_enabled == null or not _attack_enabled.button_pressed:
+		_derived_combat_level.text = "No primary combat profile"
+		return
+	var attack := int(_attack_level.value) if _attack_level != null else 1
+	var strength := int(_strength_level.value) if _strength_level != null else 1
+	var defence := int(_defence_level.value) if _defence_level != null else 1
+	var health := int(_max_health.value) if _max_health != null else 1
+	var level := maxi(1, int((10 * (defence + health) + 13 * (attack + strength)) / 40))
+	_set_derived_combat_level(level)
+
+
+func _set_derived_combat_level(level: int) -> void:
+	if _derived_combat_level == null:
+		return
+	_derived_combat_level.text = "%d (read-only; derived from authored combat stats and health)" % level
 
 
 func _update_visual_preview() -> void:

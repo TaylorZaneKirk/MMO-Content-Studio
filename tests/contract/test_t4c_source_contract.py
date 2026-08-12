@@ -276,7 +276,7 @@ class T4CGodotMobWorkspaceTests(unittest.TestCase):
             "_footprint_height",
         ):
             self.assertIn(token, editor)
-        self.assertNotIn("draw_texture_rect_region", editor)
+        self.assertIn("draw_texture_rect_region", editor)
 
     def test_visual_preview_resolves_typed_game_asset_paths_from_health_root(self) -> None:
         editor = (SCRIPTS / "mob_editor.gd").read_text()

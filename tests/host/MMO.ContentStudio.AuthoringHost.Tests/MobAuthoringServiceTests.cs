@@ -450,6 +450,32 @@ public sealed class MobAuthoringServiceTests
     }
 
     [Fact]
+    public async Task PreviewAndLoadedDefinitionsExposeReadOnlyDerivedCombatLevel()
+    {
+        var repository = new InMemoryMobRepository();
+        repository.Put(Record() with
+        {
+            MobDefinitionId = "training_guard",
+            MaxHealth = 10,
+            PrimaryCombatProfile = new MobCombatProfileDefinition("melee", "slash", 1, 1, 4, 4, 3, 3)
+        });
+        var service = CreateService(repository, Path.GetTempPath());
+
+        var preview = await service.PreviewAsync(
+            "training_guard",
+            ToPreviewRequest(repository.Records["training_guard"], "save_draft"),
+            TestContext.Current.CancellationToken);
+        var loaded = await service.LoadAsync(
+            "training_guard",
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Equal(5, preview.Value!.DerivedCombatLevel);
+        AssertSucceeded(loaded);
+        Assert.Equal(5, loaded.Value!.DerivedCombatLevel);
+    }
+
+    [Fact]
     public void MatchingPreviewRejectsMissingSignature()
     {
         Assert.False(MobAuthoringService.IsMatchingPreview(

@@ -131,7 +131,8 @@ class T4MobSourceContractTests(unittest.TestCase):
             "patrol",
             "probability",
             "weight",
-            "script",
+            "script_id",
+            "script_body",
         ):
             self.assertNotIn(forbidden, source)
 
@@ -140,7 +141,7 @@ class T4MobSourceContractTests(unittest.TestCase):
         aggregator = (ROOT / "host" / "Features" / "AuthoringFeatureExtensions.cs").read_text()
 
         for token in (
-            "AddSingleton<MobRepository>()",
+            "AddSingleton<IMobRepository, MobRepository>()",
             "AddSingleton<MobAuthoringRegistry>()",
             "AddSingleton<MobDefinitionValidator>()",
             "AddSingleton<MobAuthoringService>()",

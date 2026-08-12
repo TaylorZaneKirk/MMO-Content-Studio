@@ -21,7 +21,8 @@ public sealed record MobDefinitionSummary(
     [property: JsonPropertyName("editable_in_mobs")] bool EditableInMobs,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null);
 
 public sealed record MobDefinition(
     [property: JsonPropertyName("mob_definition_id")] string MobDefinitionId,
@@ -56,7 +57,8 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
-    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null);
+    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
+    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null);
 
 public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_type")] string AttackType,
@@ -155,7 +157,8 @@ public sealed record MobValidationResponse(
     [property: JsonPropertyName("changes")] IReadOnlyList<AuthoringChange> Changes,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("preview_signature")] string PreviewSignature,
-    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null);
+    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
+    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null);
 
 public sealed record MobMutationResponse(
     [property: JsonPropertyName("operation")] string Operation,
