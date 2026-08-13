@@ -568,6 +568,10 @@ func _verify_persisted_composite_previews() -> void:
 	if not mob._visual_preview.rigged_sprite_preview.is_empty() or not mob._presentation_semantics.text.contains("Validate changes to preview the unsaved composition"):
 		_fail("Unsaved Mob appearance changes must clear the saved composite manifest")
 		return
+	mob._apply_persisted_rigged_preview({"rigged_sprite_preview": null})
+	if mob._has_persisted_rigged_preview or mob._has_rigged_preview:
+		_fail("Mob definitions with null persisted rigged previews must load without retaining stale rigged state")
+		return
 
 	var npc_client := FixtureAuthoringHostClient.new()
 	var npc := FixtureNpcEditor.new()
@@ -599,6 +603,10 @@ func _verify_persisted_composite_previews() -> void:
 		return
 	if not npc_client.requests.is_empty() or not npc._apply_button.disabled or npc._presentation_semantics.text.contains("Static base presentation") or not npc._presentation_semantics.text.contains("Actor-pose presentation"):
 		_fail("Actor-pose NPC presentation must remain literal without a static-base explanation or mutation preview")
+		return
+	npc._apply_persisted_rigged_preview({"rigged_sprite_preview": null})
+	if npc._has_persisted_rigged_preview or npc._has_rigged_preview:
+		_fail("NPC definitions with null persisted rigged previews must load without retaining stale rigged state")
 
 
 func _verify_fixed_pose_rows(mob: FixtureMobEditor, npc: FixtureNpcEditor) -> void:

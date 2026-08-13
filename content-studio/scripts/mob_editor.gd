@@ -542,7 +542,7 @@ func _on_mob_preview_received(payload: Dictionary) -> void:
 	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
 	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
 	_asset_preview_file_path = str(payload.get("asset_preview_file_path", ""))
-	var rigged_preview: Dictionary = payload.get("rigged_sprite_preview", {}) as Dictionary
+	var rigged_preview := _rigged_preview_from_payload(payload)
 	if not rigged_preview.is_empty():
 		_has_persisted_rigged_preview = false
 		_has_rigged_preview = true
@@ -1044,7 +1044,7 @@ func _load_composite_visual(payload: Dictionary) -> void:
 
 
 func _apply_persisted_rigged_preview(payload: Dictionary) -> void:
-	var rigged_preview: Dictionary = payload.get("rigged_sprite_preview", {}) as Dictionary
+	var rigged_preview := _rigged_preview_from_payload(payload)
 	_has_persisted_rigged_preview = not rigged_preview.is_empty()
 	_has_rigged_preview = _has_persisted_rigged_preview
 	if rigged_preview.is_empty():
@@ -1054,6 +1054,11 @@ func _apply_persisted_rigged_preview(payload: Dictionary) -> void:
 	if str(_composite_visual.get("pose_policy", "")) == "actor_pose":
 		_select_option(_preview_facing, str(rigged_preview.get("direction", "S")))
 		_select_option(_preview_frame, str(int(rigged_preview.get("frame", 1))))
+
+
+func _rigged_preview_from_payload(payload: Dictionary) -> Dictionary:
+	var preview_variant: Variant = payload.get("rigged_sprite_preview", {})
+	return preview_variant as Dictionary if preview_variant is Dictionary else {}
 
 
 func _update_presentation_semantics() -> void:
