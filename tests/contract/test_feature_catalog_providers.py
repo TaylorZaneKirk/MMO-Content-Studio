@@ -28,6 +28,13 @@ class FeatureCatalogProviderTests(unittest.TestCase):
     def test_each_implemented_feature_owns_its_catalog_projection(self) -> None:
         expectations = {
             "Items": ("ItemCatalogSectionProvider.cs", "items", "UnifiedItemAuthoringService", "item.ItemId"),
+            "LootTables": (
+                "LootTableCatalogSectionProvider.cs",
+                "loot_tables",
+                "LootTableAuthoringService",
+                "table.LootTableId",
+                "true",
+            ),
             "Mobs": (
                 "MobCatalogSectionProvider.cs",
                 "mobs",
@@ -51,6 +58,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
     def test_feature_modules_register_their_catalog_provider(self) -> None:
         expectations = (
             ("Items", "ItemAuthoringFeature.cs", "ItemCatalogSectionProvider"),
+            ("LootTables", "LootTableAuthoringFeature.cs", "LootTableCatalogSectionProvider"),
             ("Mobs", "MobAuthoringFeature.cs", "MobCatalogSectionProvider"),
             ("Npcs", "NpcAuthoringFeature.cs", "NpcCatalogSectionProvider"),
         )
@@ -84,6 +92,7 @@ class FeatureCatalogProviderTests(unittest.TestCase):
         self.assertNotIn('new PlannedCatalogSectionProvider("npcs", "NPCs", 500)', aggregator)
         self.assertNotIn('new PlannedCatalogSectionProvider("mobs", "Mobs", 400)', aggregator)
         self.assertIn("services.AddMobAuthoring();", aggregator)
+        self.assertIn("services.AddLootTableAuthoring();", aggregator)
         self.assertIn("services.AddNpcAuthoring();", aggregator)
 
 

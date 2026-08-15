@@ -2,6 +2,7 @@ using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Features.ActorAppearance;
 using MMO.ContentStudio.AuthoringHost.Features.Dialogues;
 using MMO.ContentStudio.AuthoringHost.Features.Items;
+using MMO.ContentStudio.AuthoringHost.Features.LootTables;
 using MMO.ContentStudio.AuthoringHost.Features.Mobs;
 using MMO.ContentStudio.AuthoringHost.Features.Npcs;
 using MMO.ContentStudio.AuthoringHost.Services;
@@ -14,6 +15,7 @@ public static class AuthoringFeatureExtensions
     {
         services.AddActorAppearanceAuthoring();
         services.AddItemAuthoring();
+        services.AddLootTableAuthoring();
         services.AddMobAuthoring();
         services.AddNpcAuthoring();
         services.AddDialogueAuthoring();
@@ -26,6 +28,7 @@ public static class AuthoringFeatureExtensions
     {
         endpoints.MapActorAppearanceAuthoring();
         endpoints.MapItemAuthoring();
+        endpoints.MapLootTableAuthoring();
         endpoints.MapMobAuthoring();
         endpoints.MapNpcAuthoring();
         endpoints.MapDialogueAuthoring();

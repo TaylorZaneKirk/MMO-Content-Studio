@@ -788,6 +788,8 @@ public sealed class MobAuthoringServiceTests
 
         public Dictionary<string, MobDefinitionRecord> Records { get; } = new(StringComparer.Ordinal);
 
+        public Dictionary<string, LootTableOptionRecord> LootTables { get; } = new(StringComparer.Ordinal);
+
         public void Put(MobDefinitionRecord record) => Records[record.MobDefinitionId] = record;
 
         public Task<IReadOnlyList<MobDefinitionRecord>> ListAsync(
@@ -813,6 +815,10 @@ public sealed class MobAuthoringServiceTests
         public Task<IReadOnlyList<MobDropItemRecord>> LoadDropItemsAsync(
             CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<MobDropItemRecord>>(KnownDropItems().Values.ToArray());
+
+        public Task<IReadOnlyList<LootTableOptionRecord>> LoadLootTableOptionsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<LootTableOptionRecord>>(LootTables.Values.ToArray());
 
         public Task<MobDefinitionRecord> SaveDraftAsync(
             string mobDefinitionId,
@@ -938,7 +944,8 @@ public sealed class MobAuthoringServiceTests
                 dropDefinitions.Length,
                 updatedAtUtc,
                 draft.VisualMode,
-                CloneCompositeVisual(draft.CompositeVisual));
+                CloneCompositeVisual(draft.CompositeVisual),
+                draft.RootLootTableId);
         }
 
         private static RiggedSpriteVisualDescriptor? CloneCompositeVisual(

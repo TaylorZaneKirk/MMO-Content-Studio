@@ -22,6 +22,9 @@ public interface IMobRepository
     Task<IReadOnlyList<MobDropItemRecord>> LoadDropItemsAsync(
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<LootTableOptionRecord>> LoadLootTableOptionsAsync(
+        CancellationToken cancellationToken = default);
+
     Task<MobDefinitionRecord> SaveDraftAsync(
         string mobDefinitionId,
         NormalizedMobDraft draft,
@@ -82,6 +85,7 @@ public sealed class MobRepository : IMobRepository
                 m.mob_detection_radius_tiles,
                 m.mob_target_scan_interval_ms,
                 m.mob_target_scan_candidate_limit,
+                m.root_loot_table_id,
                 m.updated_at,
                 exists (
                     select 1 from mob_combat_profiles profile
@@ -165,6 +169,30 @@ public sealed class MobRepository : IMobRepository
                 reader.GetString(reader.GetOrdinal("item_id")),
                 reader.GetString(reader.GetOrdinal("item_name")),
                 reader.GetBoolean(reader.GetOrdinal("runtime_enabled"))));
+        }
+
+        return records;
+    }
+
+    public async Task<IReadOnlyList<LootTableOptionRecord>> LoadLootTableOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            select loot_table_id, display_name, publication_state
+            from loot_tables
+            order by display_name, loot_table_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var records = new List<LootTableOptionRecord>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            records.Add(new LootTableOptionRecord(
+                reader.GetString(reader.GetOrdinal("loot_table_id")),
+                reader.GetString(reader.GetOrdinal("display_name")),
+                reader.GetString(reader.GetOrdinal("publication_state"))));
         }
 
         return records;
@@ -313,6 +341,7 @@ public sealed class MobRepository : IMobRepository
                 m.mob_detection_radius_tiles,
                 m.mob_target_scan_interval_ms,
                 m.mob_target_scan_candidate_limit,
+                m.root_loot_table_id,
                 m.updated_at,
                 exists (
                     select 1 from mob_combat_profiles profile
@@ -467,6 +496,7 @@ public sealed class MobRepository : IMobRepository
                 mob_detection_radius_tiles,
                 mob_target_scan_interval_ms,
                 mob_target_scan_candidate_limit,
+                root_loot_table_id,
                 created_at,
                 updated_at
             ) values (
@@ -496,6 +526,7 @@ public sealed class MobRepository : IMobRepository
                 @mob_detection_radius_tiles,
                 @mob_target_scan_interval_ms,
                 @mob_target_scan_candidate_limit,
+                @root_loot_table_id,
                 now(),
                 now()
             );
@@ -540,6 +571,7 @@ public sealed class MobRepository : IMobRepository
                 mob_detection_radius_tiles = @mob_detection_radius_tiles,
                 mob_target_scan_interval_ms = @mob_target_scan_interval_ms,
                 mob_target_scan_candidate_limit = @mob_target_scan_candidate_limit,
+                root_loot_table_id = @root_loot_table_id,
                 updated_at = now()
             where mob_definition_id = @mob_definition_id;
             """;
@@ -745,6 +777,8 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("mob_detection_radius_tiles", draft.MobDetectionRadiusTiles);
         command.Parameters.AddWithValue("mob_target_scan_interval_ms", draft.MobTargetScanIntervalMs);
         command.Parameters.AddWithValue("mob_target_scan_candidate_limit", draft.MobTargetScanCandidateLimit);
+        command.Parameters.Add("root_loot_table_id", NpgsqlDbType.Text).Value =
+            (object?)draft.RootLootTableId ?? DBNull.Value;
     }
 
     private static void AddCombatBonusParameters(
@@ -776,6 +810,7 @@ public sealed class MobRepository : IMobRepository
         var factionOrdinal = reader.GetOrdinal("combat_faction_id");
         var factionDisplayOrdinal = reader.GetOrdinal("combat_faction_display_name");
         var compositeVisualOrdinal = reader.GetOrdinal("composite_visual");
+        var rootLootTableOrdinal = reader.GetOrdinal("root_loot_table_id");
         return new MobDefinitionRecord(
             reader.GetString(reader.GetOrdinal("mob_definition_id")),
             reader.GetString(reader.GetOrdinal("display_name")),
@@ -811,7 +846,8 @@ public sealed class MobRepository : IMobRepository
             reader.GetString(reader.GetOrdinal("visual_mode")),
             reader.IsDBNull(compositeVisualOrdinal)
                 ? null
-                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)));
+                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)),
+            reader.IsDBNull(rootLootTableOrdinal) ? null : reader.GetString(rootLootTableOrdinal));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -873,7 +909,8 @@ public sealed record MobDefinitionRecord(
     int GuaranteedDropCount,
     DateTimeOffset UpdatedAtUtc,
     string VisualMode = ActorVisualModes.FlatSprite,
-    RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    string? RootLootTableId = null);
 
 public sealed record MobFactionRecord(string FactionId, string DisplayName);
 

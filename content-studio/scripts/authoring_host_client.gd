@@ -20,6 +20,12 @@ signal mob_catalog_received(payload: Dictionary)
 signal mob_item_received(payload: Dictionary)
 signal mob_preview_received(payload: Dictionary)
 signal mob_mutation_completed(payload: Dictionary)
+signal loot_table_options_received(payload: Dictionary)
+signal loot_table_catalog_received(payload: Dictionary)
+signal loot_table_definition_received(payload: Dictionary)
+signal loot_table_preview_received(payload: Dictionary)
+signal loot_table_mutation_completed(payload: Dictionary)
+signal loot_table_delete_completed(payload: Dictionary)
 signal npc_options_received(payload: Dictionary)
 signal npc_catalog_received(payload: Dictionary)
 signal npc_definition_received(payload: Dictionary)
@@ -62,6 +68,14 @@ const OP_MOB_SAVE_DRAFT := "mob_save_draft"
 const OP_MOB_PUBLISH := "mob_publish"
 const OP_MOB_DISABLE := "mob_disable"
 const OP_MOB_DELETE := "mob_delete"
+const OP_LOOT_TABLE_OPTIONS := "loot_table_options"
+const OP_LOOT_TABLES := "loot_tables"
+const OP_LOOT_TABLE_DEFINITION := "loot_table_definition"
+const OP_LOOT_TABLE_PREVIEW := "loot_table_preview"
+const OP_LOOT_TABLE_SAVE_DRAFT := "loot_table_save_draft"
+const OP_LOOT_TABLE_PUBLISH := "loot_table_publish"
+const OP_LOOT_TABLE_DISABLE := "loot_table_disable"
+const OP_LOOT_TABLE_DELETE := "loot_table_delete"
 const OP_NPC_OPTIONS := "npc_options"
 const OP_NPCS := "npcs"
 const OP_NPC_DEFINITION := "npc_definition"
@@ -97,14 +111,12 @@ const CONNECTION_OPERATIONS := [
 var _transport: AuthoringHttpTransport
 var _startup_operations: Array = []
 
-
 func _ready() -> void:
 	_transport = TRANSPORT_SCRIPT.new() as AuthoringHttpTransport
 	_transport.base_url = base_url
 	_transport.request_succeeded.connect(_on_request_succeeded)
 	_transport.request_failed.connect(_on_request_failed)
 	add_child(_transport)
-
 
 func connect_and_load() -> void:
 	if _transport.is_busy():
@@ -113,11 +125,9 @@ func connect_and_load() -> void:
 	connection_state_changed.emit("connecting", "Connecting to the local authoring host…")
 	_request(OP_HANDSHAKE, "/api/v1/system/handshake")
 
-
 func retry() -> void:
 	_transport.reset()
 	connect_and_load()
-
 
 func import_item_asset(source_file_path: String, target_file_name: String = "") -> void:
 	_request(OP_ITEM_ASSET_IMPORT, "/api/v1/assets/items/import", HTTPClient.METHOD_POST, {
@@ -125,14 +135,11 @@ func import_item_asset(source_file_path: String, target_file_name: String = "") 
 		"target_file_name": target_file_name,
 	})
 
-
 func load_items(search: String = "") -> void:
 	search_item_catalog(search)
 
-
 func load_item_options() -> void:
 	_request(OP_ITEM_OPTIONS, "/api/v1/items/options")
-
 
 func search_item_catalog(search: String = "") -> void:
 	var suffix := ""
@@ -140,30 +147,23 @@ func search_item_catalog(search: String = "") -> void:
 		suffix = "?search=%s" % search.strip_edges().uri_encode()
 	_request(OP_ITEMS, "/api/v1/items%s" % suffix)
 
-
 func load_item(item_id: String) -> void:
 	load_item_definition(item_id)
-
 
 func load_item_definition(item_id: String) -> void:
 	_request(OP_ITEM, "/api/v1/items/%s" % item_id.uri_encode())
 
-
 func preview_item(item_id: String, payload: Dictionary) -> void:
 	preview_item_operation(item_id, payload)
-
 
 func preview_item_operation(item_id: String, payload: Dictionary) -> void:
 	_request(OP_ITEM_PREVIEW, "/api/v1/items/%s/preview" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
-
 func save_item_draft(item_id: String, payload: Dictionary) -> void:
 	save_complete_item_draft(item_id, payload)
 
-
 func save_complete_item_draft(item_id: String, payload: Dictionary) -> void:
 	_request(OP_ITEM_SAVE_DRAFT, "/api/v1/items/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
 
 func publish_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
 	_request(OP_ITEM_PUBLISH, "/api/v1/items/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -171,13 +171,11 @@ func publish_item(item_id: String, expected_updated_at_utc: Variant, preview_sig
 		"preview_signature": preview_signature,
 	})
 
-
 func disable_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
 	_request(OP_ITEM_DISABLE, "/api/v1/items/%s/disable" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
 		"expected_updated_at_utc": expected_updated_at_utc,
 		"preview_signature": preview_signature,
 	})
-
 
 func delete_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
 	_request(OP_ITEM_DELETE, "/api/v1/items/%s/delete" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -185,10 +183,8 @@ func delete_item(item_id: String, expected_updated_at_utc: Variant, preview_sign
 		"preview_signature": preview_signature,
 	})
 
-
 func load_mob_options() -> void:
 	_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
-
 
 func load_mobs(search: String = "") -> void:
 	var suffix := ""
@@ -196,18 +192,14 @@ func load_mobs(search: String = "") -> void:
 		suffix = "?search=%s" % search.strip_edges().uri_encode()
 	_request(OP_MOBS, "/api/v1/mobs%s" % suffix)
 
-
 func load_mob(mob_definition_id: String) -> void:
 	_request(OP_MOB_ITEM, "/api/v1/mobs/%s" % mob_definition_id.uri_encode())
-
 
 func preview_mob(mob_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_MOB_PREVIEW, "/api/v1/mobs/%s/preview" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
-
 func save_mob_draft(mob_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_MOB_SAVE_DRAFT, "/api/v1/mobs/%s/draft" % mob_definition_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
 
 func publish_mob(mob_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_MOB_PUBLISH, "/api/v1/mobs/%s/publish" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -215,13 +207,11 @@ func publish_mob(mob_definition_id: String, expected_updated_at_utc: Variant, pr
 		"preview_signature": preview_signature,
 	})
 
-
 func disable_mob(mob_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_MOB_DISABLE, "/api/v1/mobs/%s/disable" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
 		"expected_updated_at_utc": expected_updated_at_utc,
 		"preview_signature": preview_signature,
 	})
-
 
 func delete_mob(mob_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_MOB_DELETE, "/api/v1/mobs/%s/delete" % mob_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -229,10 +219,35 @@ func delete_mob(mob_definition_id: String, expected_updated_at_utc: Variant, pre
 		"preview_signature": preview_signature,
 	})
 
+func load_loot_table_options() -> void:
+	_request(OP_LOOT_TABLE_OPTIONS, "/api/v1/loot-tables/options")
+
+func load_loot_tables(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(OP_LOOT_TABLES, "/api/v1/loot-tables%s" % suffix)
+
+func load_loot_table(loot_table_id: String) -> void: _request_loot_table(OP_LOOT_TABLE_DEFINITION, loot_table_id)
+
+func preview_loot_table(loot_table_id: String, payload: Dictionary) -> void: _request_loot_table(OP_LOOT_TABLE_PREVIEW, loot_table_id, "/preview", HTTPClient.METHOD_POST, payload)
+
+func save_loot_table_draft(loot_table_id: String, payload: Dictionary) -> void: _request_loot_table(OP_LOOT_TABLE_SAVE_DRAFT, loot_table_id, "/draft", HTTPClient.METHOD_PUT, payload)
+
+func publish_loot_table(loot_table_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void: _mutate_loot_table(OP_LOOT_TABLE_PUBLISH, loot_table_id, "/publish", expected_updated_at_utc, preview_signature)
+
+func disable_loot_table(loot_table_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void: _mutate_loot_table(OP_LOOT_TABLE_DISABLE, loot_table_id, "/disable", expected_updated_at_utc, preview_signature)
+
+func delete_loot_table(loot_table_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void: _mutate_loot_table(OP_LOOT_TABLE_DELETE, loot_table_id, "/delete", expected_updated_at_utc, preview_signature)
+
+func _request_loot_table(operation: String, loot_table_id: String, suffix: String = "", method: int = HTTPClient.METHOD_GET, payload: Dictionary = {}) -> void:
+	_request(operation, "/api/v1/loot-tables/%s%s" % [loot_table_id.uri_encode(), suffix], method, payload)
+
+func _mutate_loot_table(operation: String, loot_table_id: String, suffix: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request_loot_table(operation, loot_table_id, suffix, HTTPClient.METHOD_POST, {"expected_updated_at_utc": expected_updated_at_utc, "preview_signature": preview_signature})
 
 func load_npc_options() -> void:
 	_request(OP_NPC_OPTIONS, "/api/v1/npcs/options")
-
 
 func load_npcs(search: String = "") -> void:
 	var suffix := ""
@@ -240,18 +255,14 @@ func load_npcs(search: String = "") -> void:
 		suffix = "?search=%s" % search.strip_edges().uri_encode()
 	_request(OP_NPCS, "/api/v1/npcs%s" % suffix)
 
-
 func load_npc(npc_definition_id: String) -> void:
 	_request(OP_NPC_DEFINITION, "/api/v1/npcs/%s" % npc_definition_id.uri_encode())
-
 
 func preview_npc(npc_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_NPC_PREVIEW, "/api/v1/npcs/%s/preview" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
-
 func save_npc_draft(npc_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_NPC_SAVE_DRAFT, "/api/v1/npcs/%s/draft" % npc_definition_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
 
 func publish_npc(npc_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_NPC_PUBLISH, "/api/v1/npcs/%s/publish" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -259,13 +270,11 @@ func publish_npc(npc_definition_id: String, expected_updated_at_utc: Variant, pr
 		"preview_signature": preview_signature,
 	})
 
-
 func disable_npc(npc_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_NPC_DISABLE, "/api/v1/npcs/%s/disable" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
 		"expected_updated_at_utc": expected_updated_at_utc,
 		"preview_signature": preview_signature,
 	})
-
 
 func delete_npc(npc_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_NPC_DELETE, "/api/v1/npcs/%s/delete" % npc_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -273,10 +282,8 @@ func delete_npc(npc_definition_id: String, expected_updated_at_utc: Variant, pre
 		"preview_signature": preview_signature,
 	})
 
-
 func load_dialogue_options() -> void:
 	_request(OP_DIALOGUE_OPTIONS, "/api/v1/dialogues/options")
-
 
 func load_dialogues(search: String = "") -> void:
 	var suffix := ""
@@ -284,22 +291,17 @@ func load_dialogues(search: String = "") -> void:
 		suffix = "?search=%s" % search.strip_edges().uri_encode()
 	_request(OP_DIALOGUES, "/api/v1/dialogues%s" % suffix)
 
-
 func load_dialogue(dialogue_definition_id: String) -> void:
 	_request(OP_DIALOGUE_DEFINITION, "/api/v1/dialogues/%s" % dialogue_definition_id.uri_encode())
-
 
 func preview_dialogue(dialogue_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_DIALOGUE_PREVIEW, "/api/v1/dialogues/%s/preview" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
-
 func preview_dialogue_playthrough(dialogue_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_DIALOGUE_PLAYTHROUGH, "/api/v1/dialogues/%s/playthrough" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
-
 func save_dialogue_draft(dialogue_definition_id: String, payload: Dictionary) -> void:
 	_request(OP_DIALOGUE_SAVE_DRAFT, "/api/v1/dialogues/%s/draft" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
-
 
 func publish_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_DIALOGUE_PUBLISH, "/api/v1/dialogues/%s/publish" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -307,13 +309,11 @@ func publish_dialogue(dialogue_definition_id: String, expected_updated_at_utc: V
 		"preview_signature": preview_signature,
 	})
 
-
 func disable_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_DIALOGUE_DISABLE, "/api/v1/dialogues/%s/disable" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
 		"expected_updated_at_utc": expected_updated_at_utc,
 		"preview_signature": preview_signature,
 	})
-
 
 func delete_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
 	_request(OP_DIALOGUE_DELETE, "/api/v1/dialogues/%s/delete" % dialogue_definition_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -321,18 +321,14 @@ func delete_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Va
 		"preview_signature": preview_signature,
 	})
 
-
 func load_actor_calibration(calibration_id: String) -> void:
 	_request(OP_ACTOR_CALIBRATION, "/api/v1/actor-appearance/calibrations/%s" % calibration_id.uri_encode())
-
 
 func save_actor_calibration(calibration_id: String, payload: Dictionary) -> void:
 	_request(OP_ACTOR_CALIBRATION_SAVE, "/api/v1/actor-appearance/calibrations/%s" % calibration_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
 
-
 func load_actor_calibration_frames(payload: Dictionary) -> void:
 	_request(OP_ACTOR_CALIBRATION_FRAMES, "/api/v1/actor-appearance/calibration-frames", HTTPClient.METHOD_POST, payload)
-
 
 func _request(
 	operation: String,
@@ -341,7 +337,6 @@ func _request(
 	payload: Dictionary = {}
 ) -> void:
 	_transport.request(operation, path, method, payload)
-
 
 func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 	match operation:
@@ -380,6 +375,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		OP_MOBS:
 			mob_catalog_received.emit(data)
 			_request_next_startup_operation()
+		OP_LOOT_TABLE_OPTIONS:
+			loot_table_options_received.emit(data)
+			_request(OP_LOOT_TABLES, "/api/v1/loot-tables")
+		OP_LOOT_TABLES:
+			loot_table_catalog_received.emit(data)
+			_request_next_startup_operation()
 		OP_NPC_OPTIONS:
 			npc_options_received.emit(data)
 			_request(OP_NPCS, "/api/v1/npcs")
@@ -407,6 +408,14 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			mob_preview_received.emit(data)
 		OP_MOB_SAVE_DRAFT, OP_MOB_PUBLISH, OP_MOB_DISABLE, OP_MOB_DELETE:
 			mob_mutation_completed.emit(data)
+		OP_LOOT_TABLE_DEFINITION:
+			loot_table_definition_received.emit(data)
+		OP_LOOT_TABLE_PREVIEW:
+			loot_table_preview_received.emit(data)
+		OP_LOOT_TABLE_DELETE:
+			loot_table_delete_completed.emit(data)
+		OP_LOOT_TABLE_SAVE_DRAFT, OP_LOOT_TABLE_PUBLISH, OP_LOOT_TABLE_DISABLE:
+			loot_table_mutation_completed.emit(data)
 		OP_NPC_DEFINITION:
 			npc_definition_received.emit(data)
 		OP_NPC_PREVIEW:
@@ -434,7 +443,6 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		_:
 			_on_request_failed(operation, "Unexpected request completion.", [])
 
-
 func _on_request_failed(operation: String, message: String, errors: Array) -> void:
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
@@ -442,11 +450,9 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES]:
 		_request_next_startup_operation()
 
-
 func _start_workspace_initialization() -> void:
 	_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS]
 	_request_next_startup_operation()
-
 
 func _request_next_startup_operation() -> void:
 	if _transport.is_busy() or _startup_operations.is_empty():

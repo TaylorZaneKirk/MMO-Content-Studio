@@ -38,7 +38,8 @@ public sealed partial class MobDefinitionValidator
         "invalid_mob_drop_order",
         "invalid_mob_drop_item_id",
         "invalid_mob_drop_stack_count",
-        "invalid_mob_drop_item"
+        "invalid_mob_drop_item",
+        "invalid_mob_root_loot_table"
     };
 
     private readonly IMobRepository _repository;
@@ -77,6 +78,8 @@ public sealed partial class MobDefinitionValidator
         var dropItems = await _repository.LoadDropItemsAsync(cancellationToken);
         var dropItemLookup = dropItems.ToDictionary(item => item.ItemId, StringComparer.Ordinal);
         ValidateGuaranteedDrops(draft, dropItemLookup, messages, forPublication);
+        var lootTables = await _repository.LoadLootTableOptionsAsync(cancellationToken);
+        ValidateRootLootTable(draft, lootTables, messages, forPublication);
         ValidateRiggedSpriteVisual(draft, dropItems, messages);
 
         if (existing is not null && existing.PublicationState == "Published" && !forPublication)
@@ -116,6 +119,58 @@ public sealed partial class MobDefinitionValidator
             items.Where(item => item.RuntimeEnabled).Select(item => item.ItemId).ToHashSet(StringComparer.Ordinal),
             "mob",
             messages);
+    }
+
+    private static void ValidateRootLootTable(
+        NormalizedMobDraft draft,
+        IReadOnlyList<LootTableOptionRecord> lootTables,
+        ICollection<ApiError> messages,
+        bool forPublication)
+    {
+        if (draft.RootLootTableId is null)
+        {
+            return;
+        }
+
+        if (!MobDomainRules.IsStableId(draft.RootLootTableId))
+        {
+            messages.Add(new ApiError(
+                "invalid_mob_root_loot_table",
+                "Root loot table id must use lower snake_case stable-id syntax.",
+                ValidationSeverity.Error,
+                "root_loot_table_id"));
+            return;
+        }
+
+        var table = lootTables.FirstOrDefault(table =>
+            string.Equals(table.LootTableId, draft.RootLootTableId, StringComparison.Ordinal));
+        if (table is null)
+        {
+            messages.Add(new ApiError(
+                "invalid_mob_root_loot_table",
+                $"Loot table '{draft.RootLootTableId}' does not exist.",
+                ValidationSeverity.Error,
+                "root_loot_table_id"));
+            return;
+        }
+
+        if (forPublication && table.PublicationState != LootTableDomainRules.Published)
+        {
+            messages.Add(new ApiError(
+                "mob_root_loot_table_not_published",
+                $"Loot table '{draft.RootLootTableId}' must be published before this mob can be published.",
+                ValidationSeverity.Error,
+                "root_loot_table_id"));
+        }
+
+        if (forPublication && draft.GuaranteedDrops.Count > 0)
+        {
+            messages.Add(new ApiError(
+                "published_mob_legacy_and_root_loot_conflict",
+                "Published mobs cannot carry both legacy guaranteed mob_drops and an authored root loot table.",
+                ValidationSeverity.Error,
+                "root_loot_table_id"));
+        }
     }
 
     public static void ValidateIdentity(
@@ -593,7 +648,8 @@ public sealed record NormalizedMobDraft(
     EquipmentCombatBonusDefinition CombatBonuses,
     IReadOnlyList<MobDropDraft> GuaranteedDrops,
     string VisualMode,
-    RiggedSpriteVisualDescriptor? CompositeVisual);
+    RiggedSpriteVisualDescriptor? CompositeVisual,
+    string? RootLootTableId = null);
 
 public sealed record MobValidationOutcome(
     bool ValidForDraft,

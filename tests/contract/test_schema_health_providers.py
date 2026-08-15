@@ -46,6 +46,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
     def test_each_feature_registers_a_schema_provider(self) -> None:
         expectations = {
             "Items/ItemAuthoringFeature.cs": "ItemSchemaRequirements",
+            "LootTables/LootTableAuthoringFeature.cs": "LootTableSchemaRequirements",
             "Mobs/MobAuthoringFeature.cs": "MobSchemaRequirements",
             "Npcs/NpcAuthoringFeature.cs": "NpcSchemaRequirements",
         }
@@ -77,6 +78,15 @@ class SchemaHealthProviderTests(unittest.TestCase):
                 "mob_definitions",
                 "mob_combat_profiles",
                 "mob_definitions_proactive_targeting_check",
+            ),
+            "LootTables/LootTableSchemaRequirements.cs": (
+                "loot_tables",
+                "loot_table_roll_groups",
+                "loot_table_outcomes",
+                "pre_roll_success_sequence_behavior",
+                "pre_roll_success_main_behavior",
+                "loot_table_roll_groups_pre_roll_success_shape_check",
+                "mob_definitions_root_loot_table_id_fkey",
             ),
             "Npcs/NpcSchemaRequirements.cs": (
                 "npc_definitions",

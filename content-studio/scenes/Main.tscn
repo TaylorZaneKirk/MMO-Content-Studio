@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/mob_editor.gd" id="4_mobs"]
 [ext_resource type="Script" path="res://scripts/npc_editor.gd" id="5_npcs"]
 [ext_resource type="Script" path="res://scripts/dialogue_editor.gd" id="6_dialogue"]
+[ext_resource type="Script" path="res://scripts/loot_table_editor.gd" id="7_loot"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -105,6 +106,12 @@ unique_name_in_owner = true
 layout_mode = 2
 theme_override_constants/separation = 14
 script = ExtResource("3_items")
+
+[node name="LootTables" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 14
+script = ExtResource("7_loot")
 
 [node name="Mobs" type="HBoxContainer" parent="Margin/Root/Tabs"]
 unique_name_in_owner = true

@@ -47,6 +47,7 @@ public sealed class MobAuthoringService
         {
             var factions = await _repository.LoadFactionsAsync(cancellationToken);
             var dropItems = await _repository.LoadDropItemsAsync(cancellationToken);
+            var lootTables = await _repository.LoadLootTableOptionsAsync(cancellationToken);
             return AuthoringOperationResult<MobAuthoringOptionsResponse>.Success(
                 new MobAuthoringOptionsResponse(
                     _registry.LoadPublicationStates(),
@@ -73,7 +74,13 @@ public sealed class MobAuthoringService
                         MobVisualResourcePrefix,
                         _assetService.GetGameAssetsRoot()),
                     _registry.Defaults,
-                    _actorAppearanceCatalogService.LoadOptions()));
+                    _actorAppearanceCatalogService.LoadOptions(),
+                    lootTables
+                        .Select(table => new LootTableOption(
+                            table.LootTableId,
+                            table.DisplayName,
+                            table.PublicationState))
+                        .ToArray()));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -358,7 +365,8 @@ public sealed class MobAuthoringService
             request.CombatBonuses,
             request.GuaranteedDrops,
             request.VisualMode,
-            request.CompositeVisual);
+            request.CompositeVisual,
+            request.RootLootTableId);
 
     public static NormalizedMobDraft Normalize(MobPreviewRequest request) =>
         Normalize(
@@ -388,7 +396,8 @@ public sealed class MobAuthoringService
             request.CombatBonuses,
             request.GuaranteedDrops,
             request.VisualMode,
-            request.CompositeVisual);
+            request.CompositeVisual,
+            request.RootLootTableId);
 
     public static NormalizedMobDraft Normalize(
         string displayName,
@@ -417,7 +426,8 @@ public sealed class MobAuthoringService
         EquipmentCombatBonusDefinition? combatBonuses,
         IReadOnlyList<MobDropDraft>? guaranteedDrops,
         string? visualMode = ActorVisualModes.FlatSprite,
-        RiggedSpriteVisualDescriptor? compositeVisual = null)
+        RiggedSpriteVisualDescriptor? compositeVisual = null,
+        string? rootLootTableId = null)
     {
         var proactive = canProactivelyTargetHostileMobs;
         var presentation = RiggedSpriteVisualDescriptorNormalizer.Normalize(visualMode, compositeVisual);
@@ -458,7 +468,8 @@ public sealed class MobAuthoringService
             combatBonuses ?? EquipmentCombatBonusDefinition.Zero,
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
-            presentation.CompositeVisual);
+            presentation.CompositeVisual,
+            MobDomainRules.NormalizeOptional(rootLootTableId)?.ToLowerInvariant());
     }
 
     public static NormalizedMobDraft FromRecord(MobDefinitionRecord record) =>
@@ -494,7 +505,8 @@ public sealed class MobAuthoringService
                     drop.StackCount))
                 .ToArray(),
             record.VisualMode,
-            record.CompositeVisual);
+            record.CompositeVisual,
+            record.RootLootTableId);
 
     public static string ComputePreviewSignature(
         string mobDefinitionId,
@@ -551,7 +563,8 @@ public sealed class MobAuthoringService
         && (record.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == draft.CombatBonuses
         && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops)
         && record.VisualMode == draft.VisualMode
-        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual);
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
+        && string.Equals(record.RootLootTableId, draft.RootLootTableId, StringComparison.Ordinal);
 
     public static bool Equivalent(MobDefinitionRecord left, MobDefinitionRecord right) =>
         left.MobDefinitionId == right.MobDefinitionId
@@ -582,7 +595,8 @@ public sealed class MobAuthoringService
         && (left.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == (right.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero)
         && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops)
         && left.VisualMode == right.VisualMode
-        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual);
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
+        && left.RootLootTableId == right.RootLootTableId;
 
     private async Task<AuthoringOperationResult<MobMutationResponse>> SetPublicationAsync(
         string mobDefinitionId,
@@ -711,7 +725,9 @@ public sealed class MobAuthoringService
             record.CompositeVisual,
             ResolvePersistedRiggedSpritePreview(record, asset),
             CalculateDerivedCombatLevel(FromRecord(record)),
-            CalculateCombatLevelDiagnostics(FromRecord(record)));
+            CalculateCombatLevelDiagnostics(FromRecord(record)),
+            record.RootLootTableId,
+            null);
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
@@ -747,7 +763,9 @@ public sealed class MobAuthoringService
             record.UpdatedAtUtc,
             record.VisualMode,
             record.CompositeVisual,
-            CalculateDerivedCombatLevel(FromRecord(record)));
+            CalculateDerivedCombatLevel(FromRecord(record)),
+            record.RootLootTableId,
+            record.RootLootTableId is not null);
 
     private static int? CalculateDerivedCombatLevel(NormalizedMobDraft draft)
     {
@@ -804,6 +822,7 @@ public sealed class MobAuthoringService
         AddChange(changes, "primary_combat_profile", JsonSerializer.Serialize(existing?.PrimaryCombatProfile), JsonSerializer.Serialize(requested.PrimaryCombatProfile));
         AddChange(changes, "combat_bonuses", JsonSerializer.Serialize(existing?.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero), JsonSerializer.Serialize(requested.CombatBonuses));
         AddChange(changes, "guaranteed_drops", SerializeDrops(existing?.GuaranteedDrops ?? []), JsonSerializer.Serialize(requested.GuaranteedDrops));
+        AddChange(changes, "root_loot_table_id", existing?.RootLootTableId, requested.RootLootTableId);
         var targetState = operation switch
         {
             "publish" => "Published",

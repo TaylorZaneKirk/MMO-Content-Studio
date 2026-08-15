@@ -22,7 +22,9 @@ public sealed record MobDefinitionSummary(
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
-    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null);
+    [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null,
+    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
+    [property: JsonPropertyName("has_root_loot_table")] bool HasRootLootTable = false);
 
 public sealed record MobDefinition(
     [property: JsonPropertyName("mob_definition_id")] string MobDefinitionId,
@@ -59,7 +61,9 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
     [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null,
-    [property: JsonPropertyName("combat_level_diagnostics")] MobCombatLevelDiagnosticsDefinition? CombatLevelDiagnostics = null);
+    [property: JsonPropertyName("combat_level_diagnostics")] MobCombatLevelDiagnosticsDefinition? CombatLevelDiagnostics = null,
+    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
+    [property: JsonPropertyName("root_loot_table_expected_value")] LootExpectedValueReport? RootLootTableExpectedValue = null);
 
 public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_type")] string AttackType,
@@ -111,7 +115,8 @@ public sealed record SaveMobDraftRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null);
 
 public sealed record MobPreviewRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -144,7 +149,8 @@ public sealed record MobPreviewRequest(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
-    [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null);
+    [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null,
+    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null);
 
 public sealed record MobPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
@@ -195,7 +201,8 @@ public sealed record MobAuthoringOptionsResponse(
     [property: JsonPropertyName("published_drop_items")] IReadOnlyList<MobDropItemOption> PublishedDropItems,
     [property: JsonPropertyName("visual_assets")] MobVisualAssetOptions VisualAssets,
     [property: JsonPropertyName("defaults")] MobAuthoringDefaults Defaults,
-    [property: JsonPropertyName("actor_appearance")] ActorAppearanceOptionsDefinition? ActorAppearance = null);
+    [property: JsonPropertyName("actor_appearance")] ActorAppearanceOptionsDefinition? ActorAppearance = null,
+    [property: JsonPropertyName("loot_tables")] IReadOnlyList<LootTableOption>? LootTables = null);
 
 public sealed record MobFactionOption(
     [property: JsonPropertyName("faction_id")] string FactionId,
