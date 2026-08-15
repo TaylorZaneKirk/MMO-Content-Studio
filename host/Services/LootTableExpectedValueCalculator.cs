@@ -223,7 +223,7 @@ public sealed class LootTableExpectedValueCalculator
 
         if (group.RollKind == LootTableDomainRules.RollIndependent)
         {
-            var noSuccess = ExactRational.One;
+            var perRollNoSuccess = ExactRational.One;
             foreach (var outcome in group.Outcomes)
             {
                 var probability = new ExactRational(outcome.ProbabilityNumerator ?? 0, outcome.ProbabilityDenominator ?? 1);
@@ -233,11 +233,12 @@ public sealed class LootTableExpectedValueCalculator
                     continue;
                 }
 
-                noSuccess *= ExactRational.One - probability;
+                perRollNoSuccess *= ExactRational.One - probability;
                 AddOutcomeContribution(group, outcome, tables, items, groupProbability * probability * group.RollCount.ToExact(), path, accumulator, depth, visited);
             }
 
-            return new PreRollGroupResult(ExactRational.One - noSuccess, noSuccess);
+            var failure = Pow(perRollNoSuccess, group.RollCount);
+            return new PreRollGroupResult(ExactRational.One - failure, failure);
         }
 
         foreach (var outcome in group.Outcomes)
