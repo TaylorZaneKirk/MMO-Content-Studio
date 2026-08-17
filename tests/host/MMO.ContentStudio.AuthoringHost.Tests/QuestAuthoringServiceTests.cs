@@ -373,6 +373,9 @@ public sealed class QuestAuthoringServiceTests
         public Task<QuestStateReferenceSummary> LoadStateReferencesAsync(string questId, CancellationToken cancellationToken = default) =>
             Task.FromResult(_references.GetValueOrDefault(questId) ?? new QuestStateReferenceSummary(questId, 0, 0, 0, []));
 
+        public Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(string questId, CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+
         public Task<QuestDefinitionRecord> ReplaceDraftAsync(string questId, QuestDraft draft, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default)
         {
             var existing = _records.GetValueOrDefault(questId);

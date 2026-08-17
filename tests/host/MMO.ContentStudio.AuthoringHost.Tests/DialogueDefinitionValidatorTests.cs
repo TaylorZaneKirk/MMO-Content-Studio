@@ -44,7 +44,7 @@ public sealed class DialogueDefinitionValidatorTests
     {
         var draft = DialogueTestData.ValidDraft() with
         {
-            EntryPoints = [new DialogueEntryPoint("default", "start", 0, 0, ["future_flag"])],
+            EntryPoints = [new DialogueEntryPoint("default", "start", 0, 0, [new DialogueCondition("future_flag", null, null, null, null, null)])],
             Nodes = [new DialogueNode("start", "quest_branch", null, null, null, true, 0, 0, null, [])]
         };
 
@@ -53,6 +53,61 @@ public sealed class DialogueDefinitionValidatorTests
         Assert.False(outcome.ValidForDraft);
         Assert.Contains(outcome.Messages, message => message.Code == "dialogue_unsupported_node_type");
         Assert.Contains(outcome.Messages, message => message.Code == "dialogue_unsupported_condition");
+    }
+
+    [Fact]
+    public void TypedConditionsAreValidWhenShapeMatchesType()
+    {
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            EntryPoints =
+            [
+                new DialogueEntryPoint(
+                    "default",
+                    "start",
+                    0,
+                    0,
+                    [new DialogueCondition("quest_status", "meal", "not_started", null, null, null)])
+            ],
+            Nodes =
+            [
+                DialogueTestData.Speaker("start", "Hello", "choice"),
+                new("choice", "player_choice", null, "Choose.", null, true, 100, 0, null,
+                [
+                    new("ready", "Ready.", "end", 0, [new DialogueCondition("quest_step", "meal", null, "return_to_inn", null, null)]),
+                    new("item", "I have it.", "end", 1, [new DialogueCondition("has_item", null, null, null, "replacement_ingredient", 1)])
+                ]),
+                DialogueTestData.End("end")
+            ]
+        };
+
+        var outcome = CreateValidator().Validate("test_npc_greeting", draft, null, false);
+
+        Assert.True(outcome.ValidForDraft);
+        Assert.DoesNotContain(outcome.Messages, message => message.Code is "dialogue_invalid_condition" or "dialogue_unsupported_condition");
+    }
+
+    [Fact]
+    public void MalformedTypedConditionsAreRejected()
+    {
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            EntryPoints =
+            [
+                new DialogueEntryPoint(
+                    "default",
+                    "start",
+                    0,
+                    0,
+                    [new DialogueCondition("has_item", "meal", null, null, "replacement_ingredient", 0)])
+            ]
+        };
+
+        var outcome = CreateValidator().Validate("test_npc_greeting", draft, null, false);
+
+        Assert.False(outcome.ValidForDraft);
+        Assert.Contains(outcome.Messages, message => message.Code == "dialogue_invalid_condition" && message.Field == "entry_points.conditions.quantity");
+        Assert.Contains(outcome.Messages, message => message.Code == "dialogue_invalid_condition" && message.Field == "entry_points.conditions.quest_id");
     }
 
     [Fact]

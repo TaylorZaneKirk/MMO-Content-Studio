@@ -74,7 +74,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "signal dialogue_mutation_completed",
             "signal dialogue_delete_completed",
             'const OP_DIALOGUE_OPTIONS := "dialogue_options"',
-            "_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS]",
+            "_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]",
             "_request_next_startup_operation()",
             "/api/v1/dialogues/options",
             "/api/v1/dialogues%s",
@@ -103,6 +103,14 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             '"expected_updated_at_utc"',
             '"preview_signature"',
             '"conditions": []',
+            'CONDITION_TYPE_QUEST_STATUS := "quest_status"',
+            'CONDITION_TYPE_QUEST_STEP := "quest_step"',
+            'CONDITION_TYPE_HAS_ITEM := "has_item"',
+            "_fill_quest_reference_options",
+            "_fill_quest_step_options",
+            "_fill_item_reference_options",
+            '"quest_references"',
+            '"item_references"',
             "supports_runtime_dialogue_catalog",
             "supports_conditions",
             "supports_effects",
@@ -112,7 +120,6 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             self.assertIn(token, editor)
 
         for forbidden in (
-            "quest_id",
             "quest_stage",
             "objective_progress",
             "start_quest",
@@ -174,8 +181,9 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "GraphEdit",
             "NPC cross-navigation",
             "D4 MMO Project runtime catalog handoff implemented",
-            "D1-D5 non-quest Dialogue Studio authoring",
-            "no quest, condition, or effect authoring",
+            "D1-D5 Dialogue Studio authoring",
+            "QV3 typed read-only quest/item predicates",
+            "effects and quest-state mutation remain deferred",
         ):
             self.assertIn(token, docs)
 

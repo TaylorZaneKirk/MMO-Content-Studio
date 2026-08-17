@@ -26,13 +26,13 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             '[node name="Mobs" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             '[node name="NPCs" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             '[node name="Dialogue" type="HBoxContainer" parent="Margin/Root/Tabs"]',
+            '[node name="Quests" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             '[node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]',
             'script = ExtResource("5_npcs")',
         ):
             self.assertIn(token, scene)
 
         for forbidden in (
-            '[node name="Quests"',
             '[node name="Services"',
             '[node name="Shops"',
         ):
@@ -78,11 +78,11 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
         connection_operations = client.split("const CONNECTION_OPERATIONS := [", 1)[1].split("]", 1)[0]
 
         self.assertNotIn("OP_NPC_OPTIONS", connection_operations)
-        self.assertIn("_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS]", client)
+        self.assertIn("_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]", client)
         self.assertIn("OP_NPC_OPTIONS:", client)
         self.assertIn("npc_options_received.emit(data)", client)
         self.assertIn("npc_catalog_received.emit(data)", client)
-        self.assertIn("operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES]", client)
+        self.assertIn("operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]", client)
         self.assertIn("_request_next_startup_operation()", client)
 
     def test_successful_npc_catalog_load_recovers_schema_enabled_ui(self) -> None:
@@ -333,9 +333,15 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             "docs/development/CONTENT_AUTHORING_GUIDE.md",
             "docs/design/DIALOGUE_FOUNDATION_V1.md",
             "docs/design/OSRS_STYLE_NPC_CONVERSATIONS_AND_QUEST_GATES.md",
+            "docs/modernization/CURRENT_HANDOFF.md",
+            "docs/modernization/DIALOGUE_QUEST_AND_CUTSCENE_ROADMAP.md",
             "prototype/importer/",
+            "prototype/server/Program.cs",
+            "prototype/server/features/dialogue/application/DialogueConditionEvaluator.cs",
             "prototype/server/features/dialogue/application/DialogueDefinitionCatalog.cs",
             "prototype/server/features/dialogue/application/DialogueSessionService.cs",
+            "prototype/server/features/dialogue/host/DialogueCommandHandlers.cs",
+            "prototype/server/features/inventory/persistence/CharacterInventoryRepository.cs",
             "prototype/server/features/README.md",
             "prototype/server/features/npcs/application/NpcRuntimeService.cs",
             "prototype/server/features/static_content/application/",
@@ -349,9 +355,12 @@ class T5DGodotNpcWorkspaceTests(unittest.TestCase):
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/DialogueCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueCatalogExporterConditionTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueConditionEvaluatorTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSeedMigrationTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
+            "prototype/tests/MMO.Project.Prototype.Server.Tests/QuestStatePersistenceAcceptanceTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/MapPublisher/",
             "prototype/tools/MapPublisher/",

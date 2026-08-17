@@ -10,6 +10,7 @@ public interface IQuestRepository
     Task<IReadOnlyList<QuestDefinitionRecord>> ListAsync(string? search, CancellationToken cancellationToken = default);
     Task<QuestDefinitionRecord?> LoadAsync(string questId, CancellationToken cancellationToken = default);
     Task<QuestStateReferenceSummary> LoadStateReferencesAsync(string questId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(string questId, CancellationToken cancellationToken = default);
     Task<QuestDefinitionRecord> ReplaceDraftAsync(string questId, QuestDraft draft, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default);
     Task<QuestDefinitionRecord> SetPublicationAsync(string questId, string publicationState, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default);
     Task DeleteAsync(string questId, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default);
@@ -81,6 +82,12 @@ public sealed class QuestRepository : IQuestRepository
         return await LoadStateReferencesAsync(connection, null, questId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(string questId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        return await LoadPublishedDialogueReferencesAsync(connection, null, questId, cancellationToken);
+    }
+
     public async Task<QuestDefinitionRecord> ReplaceDraftAsync(
         string questId,
         QuestDraft draft,
@@ -94,6 +101,7 @@ public sealed class QuestRepository : IQuestRepository
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, questId);
         var references = await LoadStateReferencesAsync(connection, transaction, questId, cancellationToken);
         EnsureReferenceSafeDraftReplacement(questId, references);
+        await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, questId, "save_draft", cancellationToken);
 
         if (existing is null)
         {
@@ -126,6 +134,10 @@ public sealed class QuestRepository : IQuestRepository
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, questId);
         var references = await LoadStateReferencesAsync(connection, transaction, questId, cancellationToken);
         EnsureReferenceSafePublication(questId, publicationState, existing, references);
+        if (publicationState != "Published")
+        {
+            await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, questId, "disable", cancellationToken);
+        }
 
         const string sql = """
             update quest_definitions
@@ -163,6 +175,7 @@ public sealed class QuestRepository : IQuestRepository
         {
             throw new QuestDefinitionReferencedByStateException(questId, "delete", references);
         }
+        await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, questId, "delete", cancellationToken);
 
         await using var command = new NpgsqlCommand("delete from quest_definitions where quest_id = @quest_id;", connection, transaction);
         command.Parameters.AddWithValue("quest_id", questId);
@@ -512,6 +525,66 @@ public sealed class QuestRepository : IQuestRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static async Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string questId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select distinct d.dialogue_definition_id
+            from dialogue_definitions d
+            join (
+                select dialogue_definition_id, quest_id
+                from dialogue_entry_conditions
+                where quest_id = @quest_id
+                union all
+                select dialogue_definition_id, quest_id
+                from dialogue_choice_conditions
+                where quest_id = @quest_id
+            ) condition on condition.dialogue_definition_id = d.dialogue_definition_id
+            where d.publication_state = 'Published'
+            order by d.dialogue_definition_id;
+            """;
+
+        try
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("quest_id", questId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var dialogueIds = new List<string>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                dialogueIds.Add(reader.GetString(0));
+            }
+
+            return dialogueIds;
+        }
+        catch (PostgresException exception) when (
+            exception.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedColumn)
+        {
+            return [];
+        }
+    }
+
+    private static async Task EnsureNoPublishedDialogueReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string questId,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        var dialogueIds = await LoadPublishedDialogueReferencesAsync(
+            connection,
+            transaction,
+            questId,
+            cancellationToken);
+        if (dialogueIds.Count > 0)
+        {
+            throw new QuestDefinitionReferencedByPublishedDialogueException(questId, operation, dialogueIds);
+        }
+    }
+
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
         reader.GetFieldValue<DateTimeOffset>(reader.GetOrdinal(column)).ToUniversalTime();
 }
@@ -565,4 +638,22 @@ public sealed class QuestDefinitionMissingActiveStepException : Exception
     public string QuestId { get; }
     public IReadOnlyList<string> MissingStepIds { get; }
     public QuestStateReferenceSummary References { get; }
+}
+
+public sealed class QuestDefinitionReferencedByPublishedDialogueException : Exception
+{
+    public QuestDefinitionReferencedByPublishedDialogueException(
+        string questId,
+        string operation,
+        IReadOnlyList<string> dialogueDefinitionIds)
+        : base($"Quest definition '{questId}' cannot {operation} while referenced by published dialogue conditions.")
+    {
+        QuestId = questId;
+        Operation = operation;
+        DialogueDefinitionIds = dialogueDefinitionIds;
+    }
+
+    public string QuestId { get; }
+    public string Operation { get; }
+    public IReadOnlyList<string> DialogueDefinitionIds { get; }
 }

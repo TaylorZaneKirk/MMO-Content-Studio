@@ -98,6 +98,11 @@ public sealed class QuestAuthoringService
                 var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
                 AddReferenceSafetyDiagnostics(stableId, operation, effective, references, messages);
             }
+            if (operation is "save_draft" or "disable" or "delete")
+            {
+                var dialogueReferences = await _repository.LoadPublishedDialogueReferencesAsync(stableId, cancellationToken);
+                AddPublishedDialogueReferenceDiagnostics(stableId, operation, dialogueReferences, messages);
+            }
             if (operation is "publish" or "disable" or "delete" && !EquivalentDraft(existing!, requested))
             {
                 messages.Add(new ApiError(
@@ -153,6 +158,8 @@ public sealed class QuestAuthoringService
             {
                 var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
                 AddReferenceSafetyDiagnostics(stableId, "save_draft", draft, references, messages);
+                var dialogueReferences = await _repository.LoadPublishedDialogueReferencesAsync(stableId, cancellationToken);
+                AddPublishedDialogueReferenceDiagnostics(stableId, "save_draft", dialogueReferences, messages);
             }
             if (!validation.ValidForDraft || messages.Any(message => message.Severity == ValidationSeverity.Error))
             {
@@ -179,6 +186,13 @@ public sealed class QuestAuthoringService
                 exception.QuestId,
                 exception.Operation,
                 exception.References));
+        }
+        catch (QuestDefinitionReferencedByPublishedDialogueException exception)
+        {
+            return AuthoringOperationResult<QuestMutationResponse>.Failure(PublishedDialogueReferenceError(
+                exception.QuestId,
+                exception.Operation,
+                exception.DialogueDefinitionIds));
         }
         catch (PostgresException exception) when (exception.SqlState is PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation)
         {
@@ -230,6 +244,14 @@ public sealed class QuestAuthoringService
                     "delete",
                     references));
             }
+            var dialogueReferences = await _repository.LoadPublishedDialogueReferencesAsync(stableId, cancellationToken);
+            if (dialogueReferences.Count > 0)
+            {
+                return AuthoringOperationResult<QuestDeleteResponse>.Failure(PublishedDialogueReferenceError(
+                    stableId,
+                    "delete",
+                    dialogueReferences));
+            }
 
             await _repository.DeleteAsync(stableId, request.ExpectedUpdatedAtUtc, cancellationToken);
             var messages = _runtimeCatalogPublisher is null
@@ -254,6 +276,13 @@ public sealed class QuestAuthoringService
                 exception.QuestId,
                 exception.Operation,
                 exception.References));
+        }
+        catch (QuestDefinitionReferencedByPublishedDialogueException exception)
+        {
+            return AuthoringOperationResult<QuestDeleteResponse>.Failure(PublishedDialogueReferenceError(
+                exception.QuestId,
+                exception.Operation,
+                exception.DialogueDefinitionIds));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -353,6 +382,11 @@ public sealed class QuestAuthoringService
             var messages = validation.Messages.ToList();
             var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
             AddReferenceSafetyDiagnostics(stableId, operation, draft, references, messages);
+            if (operation is "disable")
+            {
+                var dialogueReferences = await _repository.LoadPublishedDialogueReferencesAsync(stableId, cancellationToken);
+                AddPublishedDialogueReferenceDiagnostics(stableId, operation, dialogueReferences, messages);
+            }
             if (!validation.ValidForDraft || messages.Any(message => message.Severity == ValidationSeverity.Error))
             {
                 return AuthoringOperationResult<QuestMutationResponse>.Failure(messages);
@@ -385,6 +419,13 @@ public sealed class QuestAuthoringService
                 exception.QuestId,
                 exception.Operation,
                 exception.References));
+        }
+        catch (QuestDefinitionReferencedByPublishedDialogueException exception)
+        {
+            return AuthoringOperationResult<QuestMutationResponse>.Failure(PublishedDialogueReferenceError(
+                exception.QuestId,
+                exception.Operation,
+                exception.DialogueDefinitionIds));
         }
         catch (QuestDefinitionMissingActiveStepException exception)
         {
@@ -502,6 +543,29 @@ public sealed class QuestAuthoringService
             "publication_state");
     }
 
+    private static void AddPublishedDialogueReferenceDiagnostics(
+        string questId,
+        string operation,
+        IReadOnlyList<string> dialogueDefinitionIds,
+        ICollection<ApiError> messages)
+    {
+        if (dialogueDefinitionIds.Count > 0)
+        {
+            messages.Add(PublishedDialogueReferenceError(questId, operation, dialogueDefinitionIds));
+        }
+    }
+
+    private static ApiError PublishedDialogueReferenceError(
+        string questId,
+        string operation,
+        IReadOnlyList<string> dialogueDefinitionIds) =>
+        new(
+            "quest_published_dialogue_reference_blocked",
+            $"Quest definition '{questId}' cannot {operation} because published dialogue condition(s) reference it.",
+            ValidationSeverity.Error,
+            "publication_state",
+            string.Join(", ", dialogueDefinitionIds));
+
     private static ApiError MissingActiveStepsError(
         string questId,
         IReadOnlyList<string> missingStepIds,
@@ -523,5 +587,5 @@ public sealed class QuestAuthoringService
         AuthoringOperationResult<T>.Failure(new ApiError("database_unavailable", exception.Message, ValidationSeverity.Error));
 
     private static bool IsDatabaseFailure(Exception exception) =>
-        exception is NpgsqlException or InvalidOperationException;
+        exception is AuthoringDatabaseUnavailableException or NpgsqlException or InvalidOperationException;
 }

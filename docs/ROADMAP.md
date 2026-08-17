@@ -243,9 +243,10 @@ quest editing.
 
 ## D - Dialogue Studio
 
-**Status:** D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
-catalog export, validator/runtime equivalence, reference safety, and end-to-end
-verification are complete. Quest predicates/effects remain deferred.
+**Status:** D1-D5 Dialogue Studio authoring, graph editing, runtime catalog
+export, validator/runtime equivalence, reference safety, and end-to-end
+verification are complete. QV3 typed read-only quest/item predicates are
+implemented; effects and quest-state mutation remain deferred.
 
 Move current non-quest dialogue graph authoring into MMO Content Studio as a
 first-class workspace after NPCs and before Environment. Dialogue Studio is not
@@ -265,12 +266,12 @@ Locked D1-D5 boundaries:
 - Content Studio owns reusable dialogue definitions in the D2 host schema.
 - NPC definitions reference dialogues by stable `default_dialogue_id`; NPC
   placement remains in Tiled.
-- D1-D5 author only current runtime-compatible dialogue semantics.
-- Initial condition and effect registries expose no production authorable types.
-- Quest predicates, quest effects, objective progress, rewards, content gates,
-  arbitrary scripting, portraits, cutscenes, localization, and hot reload remain
-  deferred.
-- D3 provides no quest, condition, or effect authoring.
+- D1-D5 author current runtime-compatible dialogue semantics.
+- QV3 condition registries expose `quest_status`, `quest_step`, and `has_item`.
+- Quest effects, objective progress, rewards, broader content gates, arbitrary
+  scripting, portraits, cutscenes, localization, and hot reload remain deferred.
+- D3 provided no quest, condition, or effect authoring; QV3 adds typed condition
+  controls only.
 
 References:
 
@@ -300,14 +301,15 @@ locks the root, checks the expected timestamp, replaces children
 transactionally, reloads inside the transaction, commits, and reloads again.
 Published NPC references through `npc_definitions.default_dialogue_id` block
 disable; any NPC reference blocks delete. Current capabilities report
-`supports_runtime_dialogue_catalog = true`, empty condition/effect registries,
-and no quest, localization, portrait, cutscene, or hot-reload support.
+`supports_runtime_dialogue_catalog = true`, typed read-only condition
+registries, an empty effect registry, and no localization, portrait, cutscene,
+or hot-reload support.
 
 D3 Godot Dialogue Studio is implemented over the D2 `/api/v1/dialogues` routes.
 The Dialogue workspace after NPCs and before Environment lists definitions,
 loads complete aggregates, edits `speaker_text`, `player_choice`, and `end`
-nodes on a GraphEdit canvas, keeps condition/effect controls read-only as
-unsupported, previews exact logical changes, gates mutations with
+nodes on a GraphEdit canvas, exposes typed QV3 condition controls, keeps effect
+controls read-only as unsupported, previews exact logical changes, gates mutations with
 preview-signatures, runs host playthrough preview, and routes NPC references
 back to the NPCs workspace. D4 MMO Project runtime catalog handoff now exports
 Published authoring rows to runtime JSON.

@@ -35,9 +35,22 @@ public sealed class DialogueAuthoringService
         _logger = logger;
     }
 
-    public Task<AuthoringOperationResult<DialogueOptionsResponse>> LoadOptionsAsync(
-        CancellationToken cancellationToken = default) =>
-        Task.FromResult(AuthoringOperationResult<DialogueOptionsResponse>.Success(
+    public async Task<AuthoringOperationResult<DialogueOptionsResponse>> LoadOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<DialogueQuestConditionOption> questReferences = [];
+        IReadOnlyList<AuthoringOption> itemReferences = [];
+        try
+        {
+            questReferences = await _repository.LoadPublishedQuestConditionOptionsAsync(cancellationToken);
+            itemReferences = await _repository.LoadRuntimeItemConditionOptionsAsync(cancellationToken);
+        }
+        catch (Exception exception) when (IsDatabaseFailure(exception))
+        {
+            _logger.LogWarning(exception, "Dialogue condition reference options are unavailable");
+        }
+
+        return AuthoringOperationResult<DialogueOptionsResponse>.Success(
             new DialogueOptionsResponse(
                 _registry.LoadPublicationStates(),
                 _registry.LoadNodeTypes(),
@@ -45,7 +58,10 @@ public sealed class DialogueAuthoringService
                 _registry.LoadEffectTypes(),
                 _registry.LoadSupportedLimits(),
                 _registry.LoadCapabilities(),
-                _registry.Defaults)));
+                _registry.Defaults,
+                questReferences,
+                itemReferences));
+    }
 
     public async Task<AuthoringOperationResult<DialogueCatalogResponse>> ListAsync(
         string? search,
@@ -115,6 +131,10 @@ public sealed class DialogueAuthoringService
                 existing,
                 operation == "publish");
             var messages = validation.Messages.ToList();
+            if (operation == "publish")
+            {
+                await AddConditionReferenceDiagnosticsAsync(effective, messages, cancellationToken);
+            }
 
             if (operation is "publish" or "disable" or "delete" && !EquivalentDraft(existing!, requested))
             {
@@ -417,6 +437,10 @@ public sealed class DialogueAuthoringService
 
             var validation = _validator.Validate(stableId, draft, existing, operation == "publish");
             var messages = validation.Messages.ToList();
+            if (operation == "publish")
+            {
+                await AddConditionReferenceDiagnosticsAsync(draft, messages, cancellationToken);
+            }
             if (operation == "disable")
             {
                 var references = await LoadReferenceSummaryAsync(stableId, cancellationToken);
@@ -478,6 +502,95 @@ public sealed class DialogueAuthoringService
         string dialogueDefinitionId,
         CancellationToken cancellationToken) =>
         await _repository.LoadNpcReferencesAsync(dialogueDefinitionId, cancellationToken);
+
+    private async Task AddConditionReferenceDiagnosticsAsync(
+        DialogueDraft draft,
+        ICollection<ApiError> messages,
+        CancellationToken cancellationToken)
+    {
+        var conditions = draft.EntryPoints
+            .SelectMany(entry => entry.Conditions)
+            .Concat(draft.Nodes.SelectMany(node => node.Choices.SelectMany(choice => choice.Conditions)))
+            .ToArray();
+        var questIds = conditions
+            .Where(condition => condition.ConditionType is DialogueAuthoringRegistry.QuestStatusConditionType or DialogueAuthoringRegistry.QuestStepConditionType)
+            .Select(condition => condition.QuestId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var itemIds = conditions
+            .Where(condition => condition.ConditionType == DialogueAuthoringRegistry.HasItemConditionType)
+            .Select(condition => condition.ItemId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        var questRefs = await _repository.LoadQuestReferencesAsync(questIds, cancellationToken);
+        foreach (var questId in questIds.Order(StringComparer.Ordinal))
+        {
+            if (!questRefs.TryGetValue(questId, out var quest))
+            {
+                messages.Add(new ApiError(
+                    "dialogue_condition_missing_quest",
+                    $"Dialogue condition references missing quest '{questId}'.",
+                    ValidationSeverity.Error,
+                    "conditions.quest_id"));
+                continue;
+            }
+
+            if (quest.PublicationState != "Published")
+            {
+                messages.Add(new ApiError(
+                    "dialogue_condition_unpublished_quest",
+                    $"Dialogue condition references quest '{questId}' while it is {quest.PublicationState}; referenced quests must be Published.",
+                    ValidationSeverity.Error,
+                    "conditions.quest_id"));
+            }
+        }
+
+        foreach (var condition in conditions
+            .Where(condition => condition.ConditionType == DialogueAuthoringRegistry.QuestStepConditionType)
+            .OrderBy(condition => condition.QuestId, StringComparer.Ordinal)
+            .ThenBy(condition => condition.StepId, StringComparer.Ordinal))
+        {
+            if (condition.QuestId is null ||
+                condition.StepId is null ||
+                !questRefs.TryGetValue(condition.QuestId, out var quest) ||
+                !quest.StepIds.Contains(condition.StepId, StringComparer.Ordinal))
+            {
+                messages.Add(new ApiError(
+                    "dialogue_condition_missing_quest_step",
+                    $"Dialogue condition references missing quest step '{condition.QuestId}:{condition.StepId}'.",
+                    ValidationSeverity.Error,
+                    "conditions.step_id"));
+            }
+        }
+
+        var itemRefs = await _repository.LoadItemReferencesAsync(itemIds, cancellationToken);
+        foreach (var itemId in itemIds.Order(StringComparer.Ordinal))
+        {
+            if (!itemRefs.TryGetValue(itemId, out var item))
+            {
+                messages.Add(new ApiError(
+                    "dialogue_condition_missing_item",
+                    $"Dialogue condition references missing item '{itemId}'.",
+                    ValidationSeverity.Error,
+                    "conditions.item_id"));
+                continue;
+            }
+
+            if (!item.RuntimeEnabled)
+            {
+                messages.Add(new ApiError(
+                    "dialogue_condition_runtime_disabled_item",
+                    $"Dialogue condition references item '{itemId}' while it is not runtime-enabled.",
+                    ValidationSeverity.Error,
+                    "conditions.item_id"));
+            }
+        }
+    }
 
     private static DialogueDefinition ToDefinition(DialogueDefinitionRecord record) =>
         new(
@@ -548,6 +661,7 @@ public sealed class DialogueAuthoringService
             AddChange(changes, $"entry_points.{entryId}.node_id", before[entryId].NodeId, after[entryId].NodeId);
             AddChange(changes, $"entry_points.{entryId}.priority", before[entryId].Priority.ToString(), after[entryId].Priority.ToString());
             AddChange(changes, $"entry_points.{entryId}.entry_order", before[entryId].EntryOrder.ToString(), after[entryId].EntryOrder.ToString());
+            AddChange(changes, $"entry_points.{entryId}.conditions", ConditionsSignature(before[entryId].Conditions), ConditionsSignature(after[entryId].Conditions));
         }
     }
 
@@ -603,8 +717,13 @@ public sealed class DialogueAuthoringService
             AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.text", before[choiceId].Text, after[choiceId].Text);
             AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.target_node_id", before[choiceId].TargetNodeId, after[choiceId].TargetNodeId);
             AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.choice_order", before[choiceId].ChoiceOrder.ToString(), after[choiceId].ChoiceOrder.ToString());
+            AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.conditions", ConditionsSignature(before[choiceId].Conditions), ConditionsSignature(after[choiceId].Conditions));
         }
     }
+
+    private static string ConditionsSignature(IReadOnlyList<DialogueCondition> conditions) =>
+        string.Join(",", conditions.Select(condition =>
+            $"{condition.ConditionType}:{condition.QuestId}:{condition.Status}:{condition.StepId}:{condition.ItemId}:{condition.Quantity}"));
 
     private static bool EntriesEquivalent(
         IReadOnlyList<DialogueEntryPoint> left,
@@ -615,7 +734,7 @@ public sealed class DialogueAuthoringService
             && pair.First.NodeId == pair.Second.NodeId
             && pair.First.Priority == pair.Second.Priority
             && pair.First.EntryOrder == pair.Second.EntryOrder
-            && pair.First.Conditions.SequenceEqual(pair.Second.Conditions, StringComparer.Ordinal));
+            && pair.First.Conditions.SequenceEqual(pair.Second.Conditions));
 
     private static bool NodesEquivalent(
         IReadOnlyList<DialogueNode> left,
@@ -642,7 +761,7 @@ public sealed class DialogueAuthoringService
             && pair.First.Text == pair.Second.Text
             && pair.First.TargetNodeId == pair.Second.TargetNodeId
             && pair.First.ChoiceOrder == pair.Second.ChoiceOrder
-            && pair.First.Conditions.SequenceEqual(pair.Second.Conditions, StringComparer.Ordinal));
+            && pair.First.Conditions.SequenceEqual(pair.Second.Conditions));
 
     private static DialogueReferenceSummary ToReferenceSummary(DialogueReferenceSummaryRecord record) =>
         new(record.KnownReferenceCount, record.ReferenceSources, record.ReferenceCheckComplete);

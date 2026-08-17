@@ -65,7 +65,7 @@ class D4DialogueRuntimeHandoffTests(unittest.TestCase):
         registry = (ROOT / "host" / "Services" / "DialogueAuthoringRegistry.cs").read_text()
 
         self.assertIn("public DialogueOperationCapabilities LoadCapabilities() => new(", registry)
-        self.assertIn("true,\n        false,\n        false,\n        false,\n        false,\n        false,\n        false,\n        false", registry)
+        self.assertIn("true,\n        true,\n        false,\n        true,\n        false,\n        false,\n        false,\n        false", registry)
 
     def test_docs_describe_d4_handoff_without_hot_reload_or_quest_scope(self) -> None:
         docs = "\n".join(
@@ -81,7 +81,8 @@ class D4DialogueRuntimeHandoffTests(unittest.TestCase):
         self.assertIn("D4 MMO Project runtime catalog handoff implemented", docs)
         self.assertIn("export-dialogue-catalog", docs)
         self.assertIn("only Published definitions", docs)
-        self.assertIn("D1-D5 non-quest Dialogue Studio authoring", docs)
+        self.assertIn("D1-D5 Dialogue Studio authoring", docs)
+        self.assertIn("QV3 typed read-only quest/item predicates", docs)
         self.assertIn("hot reload", docs)
         self.assertNotIn("Quest authoring implemented", docs)
         self.assertNotIn("D5 hardening and playthrough verification remain pending", docs)

@@ -39,6 +39,10 @@ public interface IUnifiedItemRepository
         string itemId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
     Task<ReferencedItemRecord?> LoadReferencedItemAsync(
         string itemId,
         CancellationToken cancellationToken = default);
@@ -285,6 +289,14 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
     }
 
+    public async Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        return await LoadPublishedDialogueReferencesAsync(connection, null, itemId, cancellationToken);
+    }
+
     public async Task<ReferencedItemRecord?> LoadReferencedItemAsync(
         string itemId,
         CancellationToken cancellationToken = default)
@@ -428,6 +440,10 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken)
             ?? throw new UnifiedItemNotFoundException(itemId);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, itemId);
+        if (existing.RuntimeEnabled && !runtimeEnabled)
+        {
+            await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, itemId, "disable", cancellationToken);
+        }
         if (existing.RuntimeEnabled != runtimeEnabled)
         {
             const string sql = """
@@ -462,6 +478,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         {
             throw new UnifiedItemPublishedDeleteException(itemId);
         }
+        await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, itemId, "delete", cancellationToken);
 
         await ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities", itemId, cancellationToken);
         await ExecuteDeleteAsync(connection, transaction, "item_skill_requirements", itemId, cancellationToken);
@@ -511,6 +528,66 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             EquippedVisual = await LoadEquippedVisualAsync(connection, transaction, itemId, cancellationToken),
             ToolCapabilities = await LoadToolCapabilitiesAsync(connection, transaction, itemId, cancellationToken)
         };
+    }
+
+    private static async Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select distinct d.dialogue_definition_id
+            from dialogue_definitions d
+            join (
+                select dialogue_definition_id, item_id
+                from dialogue_entry_conditions
+                where item_id = @item_id
+                union all
+                select dialogue_definition_id, item_id
+                from dialogue_choice_conditions
+                where item_id = @item_id
+            ) condition on condition.dialogue_definition_id = d.dialogue_definition_id
+            where d.publication_state = 'Published'
+            order by d.dialogue_definition_id;
+            """;
+
+        try
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("item_id", itemId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            var dialogueIds = new List<string>();
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                dialogueIds.Add(reader.GetString(0));
+            }
+
+            return dialogueIds;
+        }
+        catch (PostgresException exception) when (
+            exception.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedColumn)
+        {
+            return [];
+        }
+    }
+
+    private static async Task EnsureNoPublishedDialogueReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        var dialogueIds = await LoadPublishedDialogueReferencesAsync(
+            connection,
+            transaction,
+            itemId,
+            cancellationToken);
+        if (dialogueIds.Count > 0)
+        {
+            throw new UnifiedItemReferencedByPublishedDialogueException(itemId, operation, dialogueIds);
+        }
     }
 
     private static async Task<UnifiedItemRecord?> LoadBaseAsync(
@@ -1753,4 +1830,22 @@ public sealed class UnifiedItemPublishedDeleteException : Exception
         : base($"Item '{itemId}' must be disabled before it can be deleted.")
     {
     }
+}
+
+public sealed class UnifiedItemReferencedByPublishedDialogueException : Exception
+{
+    public UnifiedItemReferencedByPublishedDialogueException(
+        string itemId,
+        string operation,
+        IReadOnlyList<string> dialogueDefinitionIds)
+        : base($"Item '{itemId}' cannot {operation} while referenced by published dialogue conditions.")
+    {
+        ItemId = itemId;
+        Operation = operation;
+        DialogueDefinitionIds = dialogueDefinitionIds;
+    }
+
+    public string ItemId { get; }
+    public string Operation { get; }
+    public IReadOnlyList<string> DialogueDefinitionIds { get; }
 }

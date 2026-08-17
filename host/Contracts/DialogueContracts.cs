@@ -35,7 +35,14 @@ public sealed record DialogueOptionsResponse(
     [property: JsonPropertyName("effect_types")] IReadOnlyList<AuthoringOption> EffectTypes,
     [property: JsonPropertyName("supported_limits")] DialogueSupportedLimits SupportedLimits,
     [property: JsonPropertyName("capabilities")] DialogueOperationCapabilities Capabilities,
-    [property: JsonPropertyName("defaults")] DialogueAuthoringDefaults Defaults);
+    [property: JsonPropertyName("defaults")] DialogueAuthoringDefaults Defaults,
+    [property: JsonPropertyName("quest_references")] IReadOnlyList<DialogueQuestConditionOption>? QuestReferences = null,
+    [property: JsonPropertyName("item_references")] IReadOnlyList<AuthoringOption>? ItemReferences = null);
+
+public sealed record DialogueQuestConditionOption(
+    [property: JsonPropertyName("quest_id")] string QuestId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("steps")] IReadOnlyList<AuthoringOption> Steps);
 
 public sealed record DialogueOperationCapabilities(
     [property: JsonPropertyName("supports_runtime_dialogue_catalog")] bool SupportsRuntimeDialogueCatalog,
@@ -46,6 +53,14 @@ public sealed record DialogueOperationCapabilities(
     [property: JsonPropertyName("supports_localization")] bool SupportsLocalization,
     [property: JsonPropertyName("supports_portraits")] bool SupportsPortraits,
     [property: JsonPropertyName("supports_hot_reload")] bool SupportsHotReload);
+
+public sealed record DialogueCondition(
+    [property: JsonPropertyName("condition_type")] string ConditionType,
+    [property: JsonPropertyName("quest_id")] string? QuestId,
+    [property: JsonPropertyName("status")] string? Status,
+    [property: JsonPropertyName("step_id")] string? StepId,
+    [property: JsonPropertyName("item_id")] string? ItemId,
+    [property: JsonPropertyName("quantity")] int? Quantity);
 
 public sealed record DialogueSupportedLimits(
     [property: JsonPropertyName("max_identifier_length")] int MaxIdentifierLength,
@@ -70,7 +85,7 @@ public sealed record DialogueEntryPoint(
     [property: JsonPropertyName("node_id")] string NodeId,
     [property: JsonPropertyName("priority")] int Priority,
     [property: JsonPropertyName("entry_order")] int EntryOrder,
-    [property: JsonPropertyName("conditions")] IReadOnlyList<string> Conditions);
+    [property: JsonPropertyName("conditions")] IReadOnlyList<DialogueCondition> Conditions);
 
 public sealed record DialogueNode(
     [property: JsonPropertyName("node_id")] string NodeId,
@@ -89,7 +104,7 @@ public sealed record DialogueChoice(
     [property: JsonPropertyName("text")] string Text,
     [property: JsonPropertyName("target_node_id")] string TargetNodeId,
     [property: JsonPropertyName("choice_order")] int ChoiceOrder,
-    [property: JsonPropertyName("conditions")] IReadOnlyList<string> Conditions);
+    [property: JsonPropertyName("conditions")] IReadOnlyList<DialogueCondition> Conditions);
 
 public sealed record DialogueDraft(
     [property: JsonPropertyName("display_name")] string DisplayName,

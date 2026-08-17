@@ -87,7 +87,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             "dialogue_entry_points",
             "dialogue_nodes",
             "dialogue_choices",
-            "D1 registers no condition or effect types.",
+            "QV3 supports `quest_status`, `quest_step`, and `has_item` conditions",
         ):
             self.assertIn(token, domain)
 
@@ -109,7 +109,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         integration = (ROOT / "integrations" / "mmo-project" / "README.md").read_text()
 
         for token in (
-            "D1-D5 — Dialogue Studio",
+            "D1-D5 + QV3 — Dialogue Studio",
             "MMO Project quest foundations",
             "Dialogue Studio quest integration",
             "DIALOGUE_STUDIO_RUNTIME_AUDIT.md",
@@ -123,7 +123,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             "## D - Dialogue Studio",
             "first-class workspace after NPCs and before Environment",
             "separate application",
-            "D1-D5 author only current runtime-compatible dialogue semantics",
+            "D1-D5 author current runtime-compatible dialogue semantics",
             "not blockers\nfor D1-D5",
         ):
             self.assertIn(token, roadmap)
@@ -133,7 +133,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn("D3 Dialogue Studio uses the same support boundary", workspace)
         self.assertIn("## D Dialogue Studio runtime handoff plan", integration)
 
-    def test_initial_schema_excludes_quest_semantics(self) -> None:
+    def test_initial_schema_excludes_quest_effect_semantics(self) -> None:
         domain = (ROOT / "docs" / "DIALOGUE_STUDIO_DOMAIN_MODEL.md").read_text()
         table_heading = "## Implemented Tables" if "## Implemented Tables" in domain else "## Proposed Tables"
         proposed_tables = domain.split(table_heading, 1)[1].split("## Identity Rules", 1)[0]
@@ -142,7 +142,6 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         )[0]
 
         forbidden_schema_tokens = (
-            "quest_id",
             "quest_started",
             "quest_completed",
             "quest_stage",
@@ -160,8 +159,14 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             self.assertNotIn(token, proposed_tables)
             self.assertIn(token, deferred)
 
+        self.assertIn("dialogue_entry_conditions", domain)
+        self.assertIn("dialogue_choice_conditions", domain)
+        self.assertIn("quest_id", proposed_tables)
+        self.assertIn("quest_status", proposed_tables)
+        self.assertIn("quest_step", domain)
+        self.assertIn("has_item", domain)
         self.assertIn("Effect tables should be deferred", domain)
-        self.assertIn("D1 registers no condition or effect types.", domain)
+        self.assertIn("Dialogue Studio must not add dialogue effects or quest-state mutation", domain)
 
     def test_godot_dialogue_editor_keeps_d1_runtime_boundary(self) -> None:
         main_scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
@@ -172,7 +177,9 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn('const NODE_TYPE_SPEAKER_TEXT := "speaker_text"', editor)
         self.assertIn('const NODE_TYPE_PLAYER_CHOICE := "player_choice"', editor)
         self.assertIn('const NODE_TYPE_END := "end"', editor)
-        self.assertIn("Quest and condition authoring are deferred", editor)
+        self.assertIn('const CONDITION_TYPE_QUEST_STATUS := "quest_status"', editor)
+        self.assertIn('const CONDITION_TYPE_QUEST_STEP := "quest_step"', editor)
+        self.assertIn('const CONDITION_TYPE_HAS_ITEM := "has_item"', editor)
         self.assertNotIn("/api/v1/quests", editor)
 
     def test_runtime_checkout_confirms_current_dialogue_when_available(self) -> None:
@@ -231,9 +238,11 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn("speaker_text", catalog_source)
         self.assertIn("player_choice", catalog_source)
         self.assertIn("end", catalog_source)
-        self.assertIn("Conditions.Count == 0", catalog_source)
-        self.assertIn(".Where(IsChoiceEligible)", session)
-        self.assertIn("Conditions.Count == 0", session)
+        self.assertIn("DialogueConditionTypes", catalog_source)
+        self.assertIn("quest_status", catalog_source)
+        self.assertIn("IDialogueConditionEvaluator", session)
+        self.assertIn("IsChoiceEligible", session)
+        self.assertIn("EvaluateConditionSets", session)
         self.assertIn('"default_dialogue_id": "test_npc_greeting"', npc_catalog)
         self.assertIn("dialogue_continue_request", protocol)
         self.assertIn("dialogue_choice_request", protocol)
@@ -257,20 +266,27 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             "M tools/mmoproject.tiled-session",
             "M docs/development/CONTENT_AUTHORING_GUIDE.md",
             "M docs/design/DIALOGUE_FOUNDATION_V1.md",
+            "M docs/modernization/CURRENT_HANDOFF.md",
+            "M docs/modernization/DIALOGUE_QUEST_AND_CUTSCENE_ROADMAP.md",
             "M docs/design/OSRS_STYLE_NPC_CONVERSATIONS_AND_QUEST_GATES.md",
             "M prototype/importer/README.md",
+            "M prototype/server/Program.cs",
             "M prototype/server/features/dialogue/application/DialogueDefinitionCatalog.cs",
             "M prototype/server/features/dialogue/application/DialogueSessionService.cs",
+            "M prototype/server/features/dialogue/host/DialogueCommandHandlers.cs",
+            "M prototype/server/features/inventory/persistence/CharacterInventoryRepository.cs",
             "M prototype/shared/dialogues/catalog.json",
             "M prototype/sql/MODULE_OWNERSHIP.md",
             "M prototype/sql/027_seed_existing_dialogue_definitions.sql",
             "M prototype/sql/README.md",
+            "M prototype/sql/043_quest_transition_evidence_lifecycle_delete.sql",
             "M prototype/tools/MapPublisher/Program.cs",
             "M prototype/tools/MapPublisher/DialogueCatalogExporter.cs",
             "M prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/DialogueCatalogExporterTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/QuestStatePersistenceAcceptanceTests.cs",
             "m tools/MMO-Content-Studio"
         }
         unexpected = [line for line in result.stdout.splitlines() if line.strip() not in allowed]

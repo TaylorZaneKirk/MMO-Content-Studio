@@ -1,8 +1,9 @@
 # Dialogue Studio Acceptance
 
-Status: D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
-catalog export, validator/runtime equivalence, reference safety, and end-to-end
-verification are complete. Quest predicates/effects remain deferred.
+Status: D1-D5 Dialogue Studio authoring, graph editing, runtime catalog export,
+validator/runtime equivalence, reference safety, and end-to-end verification are
+complete. QV3 typed read-only quest/item predicates are implemented; effects and
+quest-state mutation remain deferred.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -47,8 +48,9 @@ Status: complete for host-side authoring.
   root timestamp for child-only edits.
 - Reference guards block disable when Published NPC definitions reference a
   dialogue and block delete when any NPC definition references it.
-- Initial condition and effect registries expose no authorable runtime types.
-- No quest fields are accepted.
+- QV3 condition registries expose `quest_status`, `quest_step`, and `has_item`.
+- Quest fields are accepted only through typed read-only conditions.
+- Effect registries expose no authorable runtime types.
 
 ## D3 - Godot Dialogue Studio
 
@@ -84,8 +86,8 @@ Status: complete for the generated runtime catalog handoff.
 - NPC `default_dialogue_id` validation resolves against the exported catalog.
 - Runtime client protocol payloads remain backward-compatible.
 - Active runtime sessions are not hot-reloaded.
-- No quest predicates, quest effects, rewards, objective progress, or content
-  locks are exported.
+- Typed QV3 predicates may be exported. Quest effects, rewards, objective
+  progress, and content locks are not exported.
 
 ## D5 - Hardening And Verification
 
@@ -109,7 +111,8 @@ Status: complete for the non-quest runtime-compatible dialogue slice.
 ## Non-Goals Through D5
 
 - No quest authoring.
-- No quest condition types.
+- No additional quest condition types beyond QV3 `quest_status`, `quest_step`,
+  and `has_item`.
 - No quest effects.
 - No objective progress.
 - No quest rewards.

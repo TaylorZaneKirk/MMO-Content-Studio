@@ -67,15 +67,15 @@ public sealed class DialogueDomainRulesTests
     }
 
     [Fact]
-    public void RegistryExposesRuntimeCatalogOnlyCapability()
+    public void RegistryExposesTypedConditionCapabilityWithoutEffects()
     {
         var registry = new DialogueAuthoringRegistry();
 
-        Assert.Empty(registry.LoadConditionTypes());
+        Assert.Equal(["quest_status", "quest_step", "has_item"], registry.LoadConditionTypes().Select(option => option.Id));
         Assert.Empty(registry.LoadEffectTypes());
-        Assert.False(registry.LoadCapabilities().SupportsConditions);
+        Assert.True(registry.LoadCapabilities().SupportsConditions);
         Assert.False(registry.LoadCapabilities().SupportsEffects);
-        Assert.False(registry.LoadCapabilities().SupportsQuestConditions);
+        Assert.True(registry.LoadCapabilities().SupportsQuestConditions);
         Assert.False(registry.LoadCapabilities().SupportsQuestEffects);
         Assert.True(registry.LoadCapabilities().SupportsRuntimeDialogueCatalog);
         Assert.False(registry.LoadCapabilities().SupportsLocalization);

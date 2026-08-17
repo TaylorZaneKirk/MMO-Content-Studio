@@ -44,6 +44,20 @@ public interface IDialogueRepository
     Task<DialogueReferenceSummaryRecord> LoadNpcReferencesAsync(
         string dialogueDefinitionId,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<string, DialogueQuestReferenceRecord>> LoadQuestReferencesAsync(
+        IReadOnlyCollection<string> questIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyDictionary<string, DialogueItemReferenceRecord>> LoadItemReferencesAsync(
+        IReadOnlyCollection<string> itemIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<DialogueQuestConditionOption>> LoadPublishedQuestConditionOptionsAsync(
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<AuthoringOption>> LoadRuntimeItemConditionOptionsAsync(
+        CancellationToken cancellationToken = default);
 }
 
 public sealed class DialogueRepository : IDialogueRepository
@@ -284,6 +298,141 @@ public sealed class DialogueRepository : IDialogueRepository
         return new DialogueReferenceSummaryRecord(dialogueDefinitionId, sources.Count, published, sources, true);
     }
 
+    public async Task<IReadOnlyDictionary<string, DialogueQuestReferenceRecord>> LoadQuestReferencesAsync(
+        IReadOnlyCollection<string> questIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (questIds.Count == 0)
+        {
+            return new Dictionary<string, DialogueQuestReferenceRecord>(StringComparer.Ordinal);
+        }
+
+        const string sql = """
+            select q.quest_id, q.publication_state, s.step_id
+            from quest_definitions q
+            left join quest_steps s on s.quest_id = q.quest_id
+            where q.quest_id = any(@quest_ids)
+            order by q.quest_id, s.step_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("quest_ids", questIds.ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var builders = new Dictionary<string, DialogueQuestReferenceBuilder>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var questId = reader.GetString(0);
+            if (!builders.TryGetValue(questId, out var builder))
+            {
+                builder = new DialogueQuestReferenceBuilder(questId, reader.GetString(1));
+                builders[questId] = builder;
+            }
+
+            if (!reader.IsDBNull(2))
+            {
+                builder.StepIds.Add(reader.GetString(2));
+            }
+        }
+
+        return builders.ToDictionary(
+            pair => pair.Key,
+            pair => new DialogueQuestReferenceRecord(
+                pair.Value.QuestId,
+                pair.Value.PublicationState,
+                pair.Value.StepIds.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray()),
+            StringComparer.Ordinal);
+    }
+
+    public async Task<IReadOnlyDictionary<string, DialogueItemReferenceRecord>> LoadItemReferencesAsync(
+        IReadOnlyCollection<string> itemIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (itemIds.Count == 0)
+        {
+            return new Dictionary<string, DialogueItemReferenceRecord>(StringComparer.Ordinal);
+        }
+
+        const string sql = """
+            select item_id, item_name, runtime_enabled
+            from item_definitions
+            where item_id = any(@item_ids)
+            order by item_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        command.Parameters.AddWithValue("item_ids", itemIds.ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var records = new Dictionary<string, DialogueItemReferenceRecord>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            records[reader.GetString(0)] = new DialogueItemReferenceRecord(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetBoolean(2));
+        }
+
+        return records;
+    }
+
+    public async Task<IReadOnlyList<DialogueQuestConditionOption>> LoadPublishedQuestConditionOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            select q.quest_id, q.display_name, s.step_id, s.display_name
+            from quest_definitions q
+            left join quest_steps s on s.quest_id = q.quest_id
+            where q.publication_state = 'Published'
+            order by q.display_name, q.quest_id, s.step_order, s.step_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var builders = new Dictionary<string, DialogueQuestConditionOptionBuilder>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var questId = reader.GetString(0);
+            if (!builders.TryGetValue(questId, out var builder))
+            {
+                builder = new DialogueQuestConditionOptionBuilder(questId, reader.GetString(1));
+                builders[questId] = builder;
+            }
+
+            if (!reader.IsDBNull(2))
+            {
+                builder.Steps.Add(new AuthoringOption(reader.GetString(2), reader.GetString(3)));
+            }
+        }
+
+        return builders.Values
+            .Select(builder => new DialogueQuestConditionOption(builder.QuestId, builder.DisplayName, builder.Steps))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<AuthoringOption>> LoadRuntimeItemConditionOptionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        const string sql = """
+            select item_id, item_name
+            from item_definitions
+            where runtime_enabled = true
+            order by item_name, item_id;
+            """;
+
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var options = new List<AuthoringOption>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            options.Add(new AuthoringOption(reader.GetString(0), reader.GetString(1)));
+        }
+
+        return options;
+    }
+
     private static async Task<DialogueDefinitionRecord?> LoadAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
@@ -333,10 +482,27 @@ public sealed class DialogueRepository : IDialogueRepository
 
         var entryPoints = await LoadEntryPointsAsync(connection, transaction, dialogueDefinitionId, cancellationToken);
         var nodes = await LoadNodesAsync(connection, transaction, dialogueDefinitionId, cancellationToken);
+        var entryConditions = await LoadEntryConditionsAsync(connection, transaction, dialogueDefinitionId, cancellationToken);
+        var choiceConditions = await LoadChoiceConditionsAsync(connection, transaction, dialogueDefinitionId, cancellationToken);
         return root with
         {
-            EntryPoints = entryPoints,
-            Nodes = nodes,
+            EntryPoints = entryPoints
+                .Select(entry => entry with
+                {
+                    Conditions = entryConditions.TryGetValue(entry.EntryId, out var conditions) ? conditions : []
+                })
+                .ToArray(),
+            Nodes = nodes
+                .Select(node => node with
+                {
+                    Choices = node.Choices
+                        .Select(choice => choice with
+                        {
+                            Conditions = choiceConditions.TryGetValue((node.NodeId, choice.ChoiceId), out var conditions) ? conditions : []
+                        })
+                        .ToArray()
+                })
+                .ToArray(),
             EntryPointCount = entryPoints.Count,
             NodeCount = nodes.Count,
             ChoiceCount = nodes.Sum(node => node.Choices.Count)
@@ -453,6 +619,84 @@ public sealed class DialogueRepository : IDialogueRepository
             StringComparer.Ordinal);
     }
 
+    private static async Task<Dictionary<string, IReadOnlyList<DialogueCondition>>> LoadEntryConditionsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string dialogueDefinitionId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select entry_id, condition_type, quest_id, quest_status, quest_step_id, item_id, item_quantity
+            from dialogue_entry_conditions
+            where dialogue_definition_id = @dialogue_definition_id
+            order by entry_id, condition_order;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("dialogue_definition_id", dialogueDefinitionId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var conditions = new Dictionary<string, List<DialogueCondition>>(StringComparer.Ordinal);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var entryId = reader.GetString(0);
+            if (!conditions.TryGetValue(entryId, out var entryConditions))
+            {
+                entryConditions = [];
+                conditions[entryId] = entryConditions;
+            }
+
+            entryConditions.Add(ReadCondition(reader, offset: 1));
+        }
+
+        return conditions.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<DialogueCondition>)pair.Value,
+            StringComparer.Ordinal);
+    }
+
+    private static async Task<Dictionary<(string NodeId, string ChoiceId), IReadOnlyList<DialogueCondition>>> LoadChoiceConditionsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string dialogueDefinitionId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select node_id, choice_id, condition_type, quest_id, quest_status, quest_step_id, item_id, item_quantity
+            from dialogue_choice_conditions
+            where dialogue_definition_id = @dialogue_definition_id
+            order by node_id, choice_id, condition_order;
+            """;
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("dialogue_definition_id", dialogueDefinitionId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var conditions = new Dictionary<(string NodeId, string ChoiceId), List<DialogueCondition>>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var key = (reader.GetString(0), reader.GetString(1));
+            if (!conditions.TryGetValue(key, out var choiceConditions))
+            {
+                choiceConditions = [];
+                conditions[key] = choiceConditions;
+            }
+
+            choiceConditions.Add(ReadCondition(reader, offset: 2));
+        }
+
+        return conditions.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<DialogueCondition>)pair.Value);
+    }
+
+    private static DialogueCondition ReadCondition(
+        NpgsqlDataReader reader,
+        int offset) =>
+        new(
+            reader.GetString(offset),
+            reader.IsDBNull(offset + 1) ? null : reader.GetString(offset + 1),
+            reader.IsDBNull(offset + 2) ? null : reader.GetString(offset + 2),
+            reader.IsDBNull(offset + 3) ? null : reader.GetString(offset + 3),
+            reader.IsDBNull(offset + 4) ? null : reader.GetString(offset + 4),
+            reader.IsDBNull(offset + 5) ? null : reader.GetInt32(offset + 5));
+
     private static async Task InsertRootAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -521,6 +765,8 @@ public sealed class DialogueRepository : IDialogueRepository
         foreach (var sql in new[]
         {
             "delete from dialogue_choices where dialogue_definition_id = @dialogue_definition_id;",
+            "delete from dialogue_entry_conditions where dialogue_definition_id = @dialogue_definition_id;",
+            "delete from dialogue_choice_conditions where dialogue_definition_id = @dialogue_definition_id;",
             "delete from dialogue_entry_points where dialogue_definition_id = @dialogue_definition_id;",
             "delete from dialogue_nodes where dialogue_definition_id = @dialogue_definition_id;"
         })
@@ -548,11 +794,13 @@ public sealed class DialogueRepository : IDialogueRepository
             foreach (var choice in node.Choices)
             {
                 await InsertChoiceAsync(connection, transaction, dialogueDefinitionId, node.NodeId, choice, cancellationToken);
+                await InsertChoiceConditionsAsync(connection, transaction, dialogueDefinitionId, node.NodeId, choice, cancellationToken);
             }
         }
         foreach (var entryPoint in draft.EntryPoints)
         {
             await InsertEntryPointAsync(connection, transaction, dialogueDefinitionId, entryPoint, cancellationToken);
+            await InsertEntryConditionsAsync(connection, transaction, dialogueDefinitionId, entryPoint, cancellationToken);
         }
     }
 
@@ -672,6 +920,135 @@ public sealed class DialogueRepository : IDialogueRepository
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
+    private static async Task InsertEntryConditionsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string dialogueDefinitionId,
+        DialogueEntryPoint entryPoint,
+        CancellationToken cancellationToken)
+    {
+        for (var index = 0; index < entryPoint.Conditions.Count; index++)
+        {
+            await InsertConditionAsync(
+                connection,
+                transaction,
+                """
+                insert into dialogue_entry_conditions (
+                    dialogue_definition_id,
+                    entry_id,
+                    condition_order,
+                    condition_type,
+                    quest_id,
+                    quest_status,
+                    quest_step_id,
+                    item_id,
+                    item_quantity
+                ) values (
+                    @dialogue_definition_id,
+                    @entry_id,
+                    @condition_order,
+                    @condition_type,
+                    @quest_id,
+                    @quest_status,
+                    @quest_step_id,
+                    @item_id,
+                    @item_quantity
+                );
+                """,
+                dialogueDefinitionId,
+                entryPoint.EntryId,
+                null,
+                null,
+                index,
+                entryPoint.Conditions[index],
+                cancellationToken);
+        }
+    }
+
+    private static async Task InsertChoiceConditionsAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string dialogueDefinitionId,
+        string nodeId,
+        DialogueChoice choice,
+        CancellationToken cancellationToken)
+    {
+        for (var index = 0; index < choice.Conditions.Count; index++)
+        {
+            await InsertConditionAsync(
+                connection,
+                transaction,
+                """
+                insert into dialogue_choice_conditions (
+                    dialogue_definition_id,
+                    node_id,
+                    choice_id,
+                    condition_order,
+                    condition_type,
+                    quest_id,
+                    quest_status,
+                    quest_step_id,
+                    item_id,
+                    item_quantity
+                ) values (
+                    @dialogue_definition_id,
+                    @node_id,
+                    @choice_id,
+                    @condition_order,
+                    @condition_type,
+                    @quest_id,
+                    @quest_status,
+                    @quest_step_id,
+                    @item_id,
+                    @item_quantity
+                );
+                """,
+                dialogueDefinitionId,
+                null,
+                nodeId,
+                choice.ChoiceId,
+                index,
+                choice.Conditions[index],
+                cancellationToken);
+        }
+    }
+
+    private static async Task InsertConditionAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string sql,
+        string dialogueDefinitionId,
+        string? entryId,
+        string? nodeId,
+        string? choiceId,
+        int conditionOrder,
+        DialogueCondition condition,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("dialogue_definition_id", dialogueDefinitionId);
+        if (entryId is not null)
+        {
+            command.Parameters.AddWithValue("entry_id", entryId);
+        }
+        if (nodeId is not null)
+        {
+            command.Parameters.AddWithValue("node_id", nodeId);
+        }
+        if (choiceId is not null)
+        {
+            command.Parameters.AddWithValue("choice_id", choiceId);
+        }
+        command.Parameters.AddWithValue("condition_order", conditionOrder);
+        command.Parameters.AddWithValue("condition_type", condition.ConditionType);
+        command.Parameters.Add("quest_id", NpgsqlDbType.Text).Value = (object?)condition.QuestId ?? DBNull.Value;
+        command.Parameters.Add("quest_status", NpgsqlDbType.Text).Value = (object?)condition.Status ?? DBNull.Value;
+        command.Parameters.Add("quest_step_id", NpgsqlDbType.Text).Value = (object?)condition.StepId ?? DBNull.Value;
+        command.Parameters.Add("item_id", NpgsqlDbType.Text).Value = (object?)condition.ItemId ?? DBNull.Value;
+        command.Parameters.Add("item_quantity", NpgsqlDbType.Integer).Value = (object?)condition.Quantity ?? DBNull.Value;
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
     private static void AddRootParameters(
         NpgsqlCommand command,
         string dialogueDefinitionId,
@@ -739,6 +1116,46 @@ public sealed record DialogueReferenceSummaryRecord(
     int PublishedReferenceCount,
     IReadOnlyList<string> ReferenceSources,
     bool ReferenceCheckComplete);
+
+public sealed record DialogueQuestReferenceRecord(
+    string QuestId,
+    string PublicationState,
+    IReadOnlyList<string> StepIds);
+
+public sealed record DialogueItemReferenceRecord(
+    string ItemId,
+    string DisplayName,
+    bool RuntimeEnabled);
+
+internal sealed class DialogueQuestReferenceBuilder
+{
+    public DialogueQuestReferenceBuilder(string questId, string publicationState)
+    {
+        QuestId = questId;
+        PublicationState = publicationState;
+    }
+
+    public string QuestId { get; }
+
+    public string PublicationState { get; }
+
+    public List<string> StepIds { get; } = [];
+}
+
+internal sealed class DialogueQuestConditionOptionBuilder
+{
+    public DialogueQuestConditionOptionBuilder(string questId, string displayName)
+    {
+        QuestId = questId;
+        DisplayName = displayName;
+    }
+
+    public string QuestId { get; }
+
+    public string DisplayName { get; }
+
+    public List<AuthoringOption> Steps { get; } = [];
+}
 
 public sealed class DialogueDefinitionNotFoundException : Exception
 {

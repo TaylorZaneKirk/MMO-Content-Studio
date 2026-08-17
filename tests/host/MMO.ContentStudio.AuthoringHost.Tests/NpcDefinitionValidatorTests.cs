@@ -353,5 +353,23 @@ public sealed class NpcDefinitionValidatorTests : IDisposable
             string dialogueDefinitionId,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<string, DialogueQuestReferenceRecord>> LoadQuestReferencesAsync(
+            IReadOnlyCollection<string> questIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyDictionary<string, DialogueItemReferenceRecord>> LoadItemReferencesAsync(
+            IReadOnlyCollection<string> itemIds,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<DialogueQuestConditionOption>> LoadPublishedQuestConditionOptionsAsync(
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<AuthoringOption>> LoadRuntimeItemConditionOptionsAsync(
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 }

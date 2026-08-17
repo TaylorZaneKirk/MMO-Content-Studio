@@ -42,6 +42,9 @@ public static partial class DialogueDomainRules
             or DialogueAuthoringRegistry.PlayerChoiceNodeType
             or DialogueAuthoringRegistry.EndNodeType;
 
+    public static string NormalizeConditionType(string value) =>
+        NormalizeStableId(value);
+
     public static bool IsSupportedPublicationState(string value) =>
         NormalizePublicationState(value) is "Draft" or "Published" or "Disabled";
 
@@ -103,7 +106,7 @@ public static partial class DialogueDomainRules
             NormalizeStableId(entryPoint.NodeId),
             entryPoint.Priority,
             entryPoint.EntryOrder,
-            entryPoint.Conditions.Select(NormalizeRequired).Where(condition => condition.Length > 0).ToArray());
+            NormalizeConditions(entryPoint.Conditions));
 
     public static DialogueNode NormalizeNode(DialogueNode node)
     {
@@ -136,10 +139,24 @@ public static partial class DialogueDomainRules
                 NormalizeRequired(choice.Text),
                 NormalizeStableId(choice.TargetNodeId),
                 choice.ChoiceOrder,
-                choice.Conditions.Select(NormalizeRequired).Where(condition => condition.Length > 0).ToArray()))
+                NormalizeConditions(choice.Conditions)))
             .OrderBy(choice => choice.ChoiceOrder)
             .ThenBy(choice => choice.ChoiceId, StringComparer.Ordinal)
             .ToArray();
+
+    public static IReadOnlyList<DialogueCondition> NormalizeConditions(IReadOnlyList<DialogueCondition> conditions) =>
+        conditions
+            .Select(NormalizeCondition)
+            .ToArray();
+
+    public static DialogueCondition NormalizeCondition(DialogueCondition condition) =>
+        new(
+            NormalizeConditionType(condition.ConditionType),
+            NormalizeOptional(condition.QuestId)?.ToLowerInvariant(),
+            NormalizeOptional(condition.Status)?.ToLowerInvariant(),
+            NormalizeOptional(condition.StepId)?.ToLowerInvariant(),
+            NormalizeOptional(condition.ItemId)?.ToLowerInvariant(),
+            condition.Quantity);
 
     public static string BuildSemanticComparisonInput(DialogueDraft draft)
     {
@@ -149,12 +166,16 @@ public static partial class DialogueDomainRules
             normalized.DisplayName,
             normalized.SchemaVersion,
             string.Join("|", normalized.EntryPoints.Select(entry =>
-                $"{entry.EntryId}:{entry.NodeId}:{entry.Priority}:{entry.EntryOrder}:{string.Join(",", entry.Conditions)}")),
+                $"{entry.EntryId}:{entry.NodeId}:{entry.Priority}:{entry.EntryOrder}:{ConditionsSignature(entry.Conditions)}")),
             string.Join("|", normalized.Nodes.Select(node =>
-                $"{node.NodeId}:{node.NodeType}:{node.Speaker}:{node.Text}:{node.NextNodeId}:{node.Dismissible}:{node.CanvasX:R}:{node.CanvasY:R}:{node.EditorNotes}:{string.Join(",", node.Choices.Select(choice => $"{choice.ChoiceId}>{choice.TargetNodeId}:{choice.ChoiceOrder}:{choice.Text}:{string.Join(",", choice.Conditions)}"))}")),
+                $"{node.NodeId}:{node.NodeType}:{node.Speaker}:{node.Text}:{node.NextNodeId}:{node.Dismissible}:{node.CanvasX:R}:{node.CanvasY:R}:{node.EditorNotes}:{string.Join(",", node.Choices.Select(choice => $"{choice.ChoiceId}>{choice.TargetNodeId}:{choice.ChoiceOrder}:{choice.Text}:{ConditionsSignature(choice.Conditions)}"))}")),
             normalized.MetadataDescription ?? string.Empty,
             normalized.Notes ?? string.Empty);
     }
+
+    private static string ConditionsSignature(IReadOnlyList<DialogueCondition> conditions) =>
+        string.Join(",", conditions.Select(condition =>
+            $"{condition.ConditionType}:{condition.QuestId}:{condition.Status}:{condition.StepId}:{condition.ItemId}:{condition.Quantity}"));
 
     [GeneratedRegex("^[a-z][a-z0-9]*(_[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
     private static partial Regex StableIdentifierRegex();

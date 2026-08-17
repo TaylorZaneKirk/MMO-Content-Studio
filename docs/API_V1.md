@@ -358,11 +358,11 @@ definitions to MMO Project runtime JSON through `MapPublisher`.
 ### `GET /api/v1/dialogues/options`
 
 Returns publication states, node types `speaker_text`, `player_choice`, and
-`end`, ID rules/limits, default entry/start IDs, and capability flags. The
-condition and effect registries are empty. Quest conditions/effects,
-localization, portraits, hot reload, and cutscenes all report unsupported. The
-Godot workspace shows those capabilities as unsupported and provides no quest,
-condition, or effect authoring.
+`end`, ID rules/limits, default entry/start IDs, condition types
+`quest_status`, `quest_step`, and `has_item`, published quest references with
+scoped step options, runtime item references, and capability flags. QV3
+conditions are read-only predicates; effects, dialogue quest-state mutation,
+localization, portraits, hot reload, and cutscenes report unsupported.
 
 ### `GET /api/v1/dialogues?search=greeting`
 

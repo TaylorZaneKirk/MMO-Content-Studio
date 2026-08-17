@@ -10,6 +10,10 @@ const NODE_TYPE_SPEAKER_TEXT := "speaker_text"
 const NODE_TYPE_PLAYER_CHOICE := "player_choice"
 const NODE_TYPE_END := "end"
 const FORM_LABEL_WIDTH := 132.0
+const CONDITION_TYPE_QUEST_STATUS := "quest_status"
+const CONDITION_TYPE_QUEST_STEP := "quest_step"
+const CONDITION_TYPE_HAS_ITEM := "has_item"
+const QUEST_STATUSES := ["not_started", "active", "completed"]
 
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
 
@@ -868,8 +872,7 @@ func _rebuild_choices(node: Dictionary) -> void:
 		remove.text = "Remove Choice"
 		remove.pressed.connect(_remove_choice.bind(index))
 		row.add_child(remove)
-		var condition_note := _wrapped_label("Conditions: none. Quest and condition authoring are deferred.")
-		row.add_child(condition_note)
+		_add_conditions_editor(row, choice.get("conditions", []) as Array, "choice", index, index)
 
 
 func _on_choice_id_changed(value: String, index: int) -> void:
@@ -913,6 +916,254 @@ func _remove_choice(index: int) -> void:
 	_on_form_changed()
 
 
+func _add_conditions_editor(parent: VBoxContainer, conditions: Array, owner_kind: String, owner_index: int, choice_index: int) -> void:
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	parent.add_child(header)
+	var label := _wrapped_label("Conditions (%d)" % conditions.size())
+	header.add_child(label)
+	var add_button := Button.new()
+	add_button.text = "+ Condition"
+	add_button.disabled = not _form_editable
+	add_button.pressed.connect(_add_condition.bind(owner_kind, owner_index, choice_index))
+	header.add_child(add_button)
+	for condition_index in range(conditions.size()):
+		if conditions[condition_index] is not Dictionary:
+			continue
+		var condition := conditions[condition_index] as Dictionary
+		_add_condition_row(parent, condition, owner_kind, owner_index, choice_index, condition_index)
+
+
+func _add_condition_row(parent: VBoxContainer, condition: Dictionary, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	parent.add_child(row)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	row.add_child(top)
+	var type_select := OptionButton.new()
+	type_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_condition_type_options(type_select, str(condition.get("condition_type", CONDITION_TYPE_QUEST_STATUS)))
+	type_select.disabled = not _form_editable
+	type_select.item_selected.connect(_on_condition_type_selected.bind(owner_kind, owner_index, choice_index, condition_index, type_select))
+	top.add_child(type_select)
+	var remove := Button.new()
+	remove.text = "Remove"
+	remove.disabled = not _form_editable
+	remove.pressed.connect(_remove_condition.bind(owner_kind, owner_index, choice_index, condition_index))
+	top.add_child(remove)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 4)
+	row.add_child(grid)
+	var condition_type := str(condition.get("condition_type", CONDITION_TYPE_QUEST_STATUS))
+	match condition_type:
+		CONDITION_TYPE_QUEST_STEP:
+			_add_condition_quest_field(grid, str(condition.get("quest_id", "")), owner_kind, owner_index, choice_index, condition_index)
+			_add_condition_step_field(grid, str(condition.get("quest_id", "")), str(condition.get("quest_step_id", "")), owner_kind, owner_index, choice_index, condition_index)
+		CONDITION_TYPE_HAS_ITEM:
+			_add_condition_item_field(grid, str(condition.get("item_id", "")), owner_kind, owner_index, choice_index, condition_index)
+			_add_condition_quantity_field(grid, int(condition.get("item_quantity", 1)), owner_kind, owner_index, choice_index, condition_index)
+		_:
+			_add_condition_quest_field(grid, str(condition.get("quest_id", "")), owner_kind, owner_index, choice_index, condition_index)
+			_add_condition_status_field(grid, str(condition.get("quest_status", "active")), owner_kind, owner_index, choice_index, condition_index)
+
+
+func _add_condition_text_field(grid: GridContainer, label_text: String, value: String, placeholder: String, callback: Callable) -> void:
+	grid.add_child(_label(label_text))
+	var field := LineEdit.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.placeholder_text = placeholder
+	field.text = value
+	field.editable = _form_editable
+	field.text_changed.connect(callback)
+	grid.add_child(field)
+
+
+func _add_condition_quest_field(grid: GridContainer, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	grid.add_child(_label("Quest"))
+	var quest := OptionButton.new()
+	quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_quest_reference_options(quest, selected)
+	quest.disabled = not _form_editable
+	quest.item_selected.connect(_on_condition_quest_selected.bind(owner_kind, owner_index, choice_index, condition_index, quest))
+	grid.add_child(quest)
+
+
+func _add_condition_step_field(grid: GridContainer, quest_id: String, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	grid.add_child(_label("Step"))
+	var step := OptionButton.new()
+	step.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_quest_step_options(step, quest_id, selected)
+	step.disabled = not _form_editable
+	step.item_selected.connect(_on_condition_step_selected.bind(owner_kind, owner_index, choice_index, condition_index, step))
+	grid.add_child(step)
+
+
+func _add_condition_item_field(grid: GridContainer, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	grid.add_child(_label("Item"))
+	var item := OptionButton.new()
+	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_item_reference_options(item, selected)
+	item.disabled = not _form_editable
+	item.item_selected.connect(_on_condition_item_selected.bind(owner_kind, owner_index, choice_index, condition_index, item))
+	grid.add_child(item)
+
+
+func _add_condition_status_field(grid: GridContainer, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	grid.add_child(_label("Status"))
+	var status := OptionButton.new()
+	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for quest_status in QUEST_STATUSES:
+		status.add_item(quest_status)
+		status.set_item_metadata(status.item_count - 1, quest_status)
+	_select_option(status, selected)
+	status.disabled = not _form_editable
+	status.item_selected.connect(_on_condition_status_selected.bind(owner_kind, owner_index, choice_index, condition_index, status))
+	grid.add_child(status)
+
+
+func _add_condition_quantity_field(grid: GridContainer, value: int, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	grid.add_child(_label("Quantity"))
+	var quantity := SpinBox.new()
+	quantity.min_value = 1
+	quantity.max_value = 999999
+	quantity.step = 1
+	quantity.value = max(1, value)
+	quantity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quantity.editable = _form_editable
+	quantity.value_changed.connect(_on_condition_quantity_changed.bind(owner_kind, owner_index, choice_index, condition_index))
+	grid.add_child(quantity)
+
+
+func _add_condition(owner_kind: String, owner_index: int, choice_index: int) -> void:
+	var conditions := _condition_list_at(owner_kind, owner_index, choice_index)
+	conditions.append(_default_condition(CONDITION_TYPE_QUEST_STATUS))
+	_refresh_condition_owner(owner_kind)
+	_on_form_changed()
+
+
+func _remove_condition(owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	var conditions := _condition_list_at(owner_kind, owner_index, choice_index)
+	if condition_index >= 0 and condition_index < conditions.size():
+		conditions.remove_at(condition_index)
+	_refresh_condition_owner(owner_kind)
+	_on_form_changed()
+
+
+func _on_condition_type_selected(_selected_index: int, owner_kind: String, owner_index: int, choice_index: int, condition_index: int, control: OptionButton) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	var replacement := _default_condition(_selected_metadata(control))
+	condition.clear()
+	for key in replacement.keys():
+		condition[key] = replacement[key]
+	_refresh_condition_owner(owner_kind)
+	_on_form_changed()
+
+
+func _on_condition_quest_id_changed(value: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["quest_id"] = value.strip_edges()
+	_on_form_changed()
+
+
+func _on_condition_quest_selected(_selected_index: int, owner_kind: String, owner_index: int, choice_index: int, condition_index: int, control: OptionButton) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	var quest_id := _selected_metadata(control)
+	condition["quest_id"] = quest_id
+	if str(condition.get("condition_type", "")) == CONDITION_TYPE_QUEST_STEP:
+		condition["quest_step_id"] = _first_step_id_for_quest(quest_id)
+		_refresh_condition_owner(owner_kind)
+	_on_form_changed()
+
+
+func _on_condition_step_id_changed(value: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["quest_step_id"] = value.strip_edges()
+	_on_form_changed()
+
+
+func _on_condition_step_selected(_selected_index: int, owner_kind: String, owner_index: int, choice_index: int, condition_index: int, control: OptionButton) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["quest_step_id"] = _selected_metadata(control)
+	_on_form_changed()
+
+
+func _on_condition_item_id_changed(value: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["item_id"] = value.strip_edges()
+	_on_form_changed()
+
+
+func _on_condition_item_selected(_selected_index: int, owner_kind: String, owner_index: int, choice_index: int, condition_index: int, control: OptionButton) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["item_id"] = _selected_metadata(control)
+	_on_form_changed()
+
+
+func _on_condition_status_selected(_selected_index: int, owner_kind: String, owner_index: int, choice_index: int, condition_index: int, control: OptionButton) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["quest_status"] = _selected_metadata(control)
+	_on_form_changed()
+
+
+func _on_condition_quantity_changed(value: float, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
+	var condition := _condition_at(owner_kind, owner_index, choice_index, condition_index)
+	if condition.is_empty():
+		return
+	condition["item_quantity"] = int(value)
+	_on_form_changed()
+
+
+func _condition_list_at(owner_kind: String, owner_index: int, choice_index: int) -> Array:
+	if owner_kind == "entry":
+		var entries := _current_dialogue.get("entry_points", []) as Array
+		if owner_index < 0 or owner_index >= entries.size() or entries[owner_index] is not Dictionary:
+			return []
+		var entry := entries[owner_index] as Dictionary
+		if entry.get("conditions", null) is not Array:
+			entry["conditions"] = []
+		return entry.get("conditions", []) as Array
+	var choice := _choice_at(choice_index)
+	if choice.is_empty():
+		return []
+	if choice.get("conditions", null) is not Array:
+		choice["conditions"] = []
+	return choice.get("conditions", []) as Array
+
+
+func _condition_at(owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> Dictionary:
+	var conditions := _condition_list_at(owner_kind, owner_index, choice_index)
+	if condition_index < 0 or condition_index >= conditions.size() or conditions[condition_index] is not Dictionary:
+		return {}
+	return conditions[condition_index] as Dictionary
+
+
+func _refresh_condition_owner(owner_kind: String) -> void:
+	if owner_kind == "entry":
+		_rebuild_entry_points()
+	else:
+		_load_selected_node()
+
+
 func _choice_at(index: int) -> Dictionary:
 	var node := _find_node(_selected_node_id)
 	if node.is_empty():
@@ -932,9 +1183,12 @@ func _rebuild_entry_points() -> void:
 		if entries[index] is not Dictionary:
 			continue
 		var entry := entries[index] as Dictionary
+		var entry_container := VBoxContainer.new()
+		entry_container.add_theme_constant_override("separation", 4)
+		_entry_points.add_child(entry_container)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
-		_entry_points.add_child(row)
+		entry_container.add_child(row)
 		var label := _wrapped_label("%s ->" % str(entry.get("entry_id", "entry")))
 		row.add_child(label)
 		var target := OptionButton.new()
@@ -942,8 +1196,7 @@ func _rebuild_entry_points() -> void:
 		_fill_node_options(target, str(entry.get("node_id", "")), "Choose entry node")
 		target.item_selected.connect(_on_entry_target_selected.bind(index, target))
 		row.add_child(target)
-		var condition_label := _wrapped_label("Conditions unavailable")
-		row.add_child(condition_label)
+		_add_conditions_editor(entry_container, entry.get("conditions", []) as Array, "entry", index, -1)
 
 
 func _on_entry_target_selected(_selected_index: int, index: int, target: OptionButton) -> void:
@@ -1058,7 +1311,7 @@ func _apply_options() -> void:
 	_set_spin_limits(_schema_version, 1, max(1, int(limits.get("max_schema_version", 100))))
 	var capabilities := _options.get("capabilities", {}) as Dictionary
 	_runtime_status.text = "Available" if bool(capabilities.get("supports_runtime_dialogue_catalog", false)) else "Unavailable"
-	_condition_status.text = "Supported" if bool(capabilities.get("supports_conditions", false)) else "Not supported in D3"
+	_condition_status.text = "Typed quest/item predicates" if bool(capabilities.get("supports_conditions", false)) else "Unavailable"
 	_effect_status.text = "Supported" if bool(capabilities.get("supports_effects", false)) else "Not supported in D3"
 
 
@@ -1182,6 +1435,144 @@ func _fill_authoring_options(control: OptionButton, values: Array) -> void:
 			control.add_item(str(option.get("display_name", option.get("id", "Option"))))
 			control.set_item_metadata(control.item_count - 1, str(option.get("id", "")))
 	_select_option(control, selected)
+
+
+func _fill_condition_type_options(control: OptionButton, selected: String) -> void:
+	control.clear()
+	var values := _options.get("condition_types", []) as Array
+	if values.is_empty():
+		values = [
+			{"id": CONDITION_TYPE_QUEST_STATUS, "display_name": "Quest Status"},
+			{"id": CONDITION_TYPE_QUEST_STEP, "display_name": "Quest Step"},
+			{"id": CONDITION_TYPE_HAS_ITEM, "display_name": "Has Item"},
+		]
+	for variant in values:
+		if variant is Dictionary:
+			var option := variant as Dictionary
+			control.add_item(str(option.get("display_name", option.get("id", "Condition"))))
+			control.set_item_metadata(control.item_count - 1, str(option.get("id", "")))
+	_select_option(control, selected)
+
+
+func _fill_quest_reference_options(control: OptionButton, selected: String) -> void:
+	control.clear()
+	var references := _options.get("quest_references", []) as Array
+	var selected_found := false
+	for variant in references:
+		if variant is Dictionary:
+			var quest := variant as Dictionary
+			var quest_id := str(quest.get("quest_id", ""))
+			control.add_item(_display_option_label(str(quest.get("display_name", quest_id)), quest_id))
+			control.set_item_metadata(control.item_count - 1, quest_id)
+			if quest_id == selected:
+				selected_found = true
+	if not selected_found and not selected.is_empty():
+		control.add_item("%s (unavailable)" % selected)
+		control.set_item_metadata(control.item_count - 1, selected)
+	if control.item_count == 0:
+		control.add_item("No published quests")
+		control.set_item_metadata(0, "")
+	_select_option(control, selected)
+
+
+func _fill_quest_step_options(control: OptionButton, quest_id: String, selected: String) -> void:
+	control.clear()
+	var selected_found := false
+	for step in _steps_for_quest(quest_id):
+		if step is Dictionary:
+			var option := step as Dictionary
+			var step_id := str(option.get("id", ""))
+			control.add_item(_display_option_label(str(option.get("display_name", step_id)), step_id))
+			control.set_item_metadata(control.item_count - 1, step_id)
+			if step_id == selected:
+				selected_found = true
+	if not selected_found and not selected.is_empty():
+		control.add_item("%s (unavailable)" % selected)
+		control.set_item_metadata(control.item_count - 1, selected)
+	if control.item_count == 0:
+		control.add_item("No steps")
+		control.set_item_metadata(0, "")
+	_select_option(control, selected)
+
+
+func _fill_item_reference_options(control: OptionButton, selected: String) -> void:
+	control.clear()
+	var references := _options.get("item_references", []) as Array
+	var selected_found := false
+	for variant in references:
+		if variant is Dictionary:
+			var item := variant as Dictionary
+			var item_id := str(item.get("id", ""))
+			control.add_item(_display_option_label(str(item.get("display_name", item_id)), item_id))
+			control.set_item_metadata(control.item_count - 1, item_id)
+			if item_id == selected:
+				selected_found = true
+	if not selected_found and not selected.is_empty():
+		control.add_item("%s (unavailable)" % selected)
+		control.set_item_metadata(control.item_count - 1, selected)
+	if control.item_count == 0:
+		control.add_item("No runtime items")
+		control.set_item_metadata(0, "")
+	_select_option(control, selected)
+
+
+func _steps_for_quest(quest_id: String) -> Array:
+	for variant in _options.get("quest_references", []) as Array:
+		if variant is Dictionary and str((variant as Dictionary).get("quest_id", "")) == quest_id:
+			return (variant as Dictionary).get("steps", []) as Array
+	return []
+
+
+func _first_quest_id() -> String:
+	var references := _options.get("quest_references", []) as Array
+	for variant in references:
+		if variant is Dictionary:
+			return str((variant as Dictionary).get("quest_id", ""))
+	return ""
+
+
+func _first_step_id_for_quest(quest_id: String) -> String:
+	for step in _steps_for_quest(quest_id):
+		if step is Dictionary:
+			return str((step as Dictionary).get("id", ""))
+	return ""
+
+
+func _first_item_id() -> String:
+	var references := _options.get("item_references", []) as Array
+	for variant in references:
+		if variant is Dictionary:
+			return str((variant as Dictionary).get("id", ""))
+	return ""
+
+
+func _display_option_label(display_name: String, stable_id: String) -> String:
+	if stable_id.is_empty() or display_name == stable_id:
+		return display_name
+	return "%s (%s)" % [display_name, stable_id]
+
+
+func _default_condition(condition_type: String) -> Dictionary:
+	match condition_type:
+		CONDITION_TYPE_QUEST_STEP:
+			var quest_id := _first_quest_id()
+			return {
+				"condition_type": CONDITION_TYPE_QUEST_STEP,
+				"quest_id": quest_id,
+				"quest_step_id": _first_step_id_for_quest(quest_id),
+			}
+		CONDITION_TYPE_HAS_ITEM:
+			return {
+				"condition_type": CONDITION_TYPE_HAS_ITEM,
+				"item_id": _first_item_id(),
+				"item_quantity": 1,
+			}
+		_:
+			return {
+				"condition_type": CONDITION_TYPE_QUEST_STATUS,
+				"quest_id": _first_quest_id(),
+				"quest_status": "active",
+			}
 
 
 func _unique_node_id(node_type: String) -> String:

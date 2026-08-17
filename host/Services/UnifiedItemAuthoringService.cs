@@ -234,6 +234,12 @@ public sealed class UnifiedItemAuthoringService
         {
             return AuthoringOperationResult<ItemMutationResponse>.Failure(LiveReferenceError(itemId));
         }
+        catch (UnifiedItemReferencedByPublishedDialogueException exception)
+        {
+            return AuthoringOperationResult<ItemMutationResponse>.Failure(PublishedDialogueReferenceError(
+                exception.ItemId,
+                exception.DialogueDefinitionIds));
+        }
         catch (UnifiedItemConcurrencyException)
         {
             return VersionConflict<ItemMutationResponse>(itemId);
@@ -301,6 +307,12 @@ public sealed class UnifiedItemAuthoringService
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
             return AuthoringOperationResult<DeleteMutationResponse>.Failure(LiveReferenceError(itemId));
+        }
+        catch (UnifiedItemReferencedByPublishedDialogueException exception)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(PublishedDialogueReferenceError(
+                exception.ItemId,
+                exception.DialogueDefinitionIds));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -376,6 +388,12 @@ public sealed class UnifiedItemAuthoringService
         {
             return AuthoringOperationResult<ItemMutationResponse>.Failure(LiveReferenceError(itemId));
         }
+        catch (UnifiedItemReferencedByPublishedDialogueException exception)
+        {
+            return AuthoringOperationResult<ItemMutationResponse>.Failure(PublishedDialogueReferenceError(
+                exception.ItemId,
+                exception.DialogueDefinitionIds));
+        }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
             return DatabaseFailure<ItemMutationResponse>(exception);
@@ -419,6 +437,11 @@ public sealed class UnifiedItemAuthoringService
                 "This item remains the target of a published transform item and cannot be disabled or deleted.",
                 ValidationSeverity.Error,
                 "economy_lifecycle.death_transform_item_id"));
+        }
+        var dialogueReferences = await _repository.LoadPublishedDialogueReferencesAsync(itemId, cancellationToken);
+        if (dialogueReferences.Count > 0)
+        {
+            messages.Add(PublishedDialogueReferenceError(itemId, dialogueReferences));
         }
     }
 
@@ -685,6 +708,15 @@ public sealed class UnifiedItemAuthoringService
         $"Item '{itemId}' is the result item for a published consumable.",
         ValidationSeverity.Error,
         "publication_state");
+
+    private static ApiError PublishedDialogueReferenceError(
+        string itemId,
+        IReadOnlyList<string> dialogueDefinitionIds) => new(
+            "item_has_published_dialogue_condition_references",
+            $"Item '{itemId}' is referenced by published dialogue condition(s).",
+            ValidationSeverity.Error,
+            "publication_state",
+            string.Join(", ", dialogueDefinitionIds));
 
     private static AuthoringOperationResult<T> VersionConflict<T>(string itemId) =>
         AuthoringOperationResult<T>.Failure(new ApiError(

@@ -19,14 +19,36 @@ public sealed class DialogueAuthoringServiceTests
 
         AssertSucceeded(result);
         Assert.Contains(result.Value!.NodeTypes, option => option.Id == "speaker_text");
-        Assert.Empty(result.Value.ConditionTypes);
+        Assert.Equal(["quest_status", "quest_step", "has_item"], result.Value.ConditionTypes.Select(option => option.Id));
         Assert.Empty(result.Value.EffectTypes);
         Assert.True(result.Value.Capabilities.SupportsRuntimeDialogueCatalog);
-        Assert.False(result.Value.Capabilities.SupportsConditions);
+        Assert.True(result.Value.Capabilities.SupportsConditions);
         Assert.False(result.Value.Capabilities.SupportsEffects);
-        Assert.False(result.Value.Capabilities.SupportsQuestConditions);
+        Assert.True(result.Value.Capabilities.SupportsQuestConditions);
         Assert.False(result.Value.Capabilities.SupportsQuestEffects);
         Assert.False(result.Value.Capabilities.SupportsHotReload);
+        Assert.NotNull(result.Value.QuestReferences);
+        Assert.NotNull(result.Value.ItemReferences);
+    }
+
+    [Fact]
+    public async Task OptionsExposeQuestStepAndItemConditionSelectors()
+    {
+        var repository = new InMemoryDialogueRepository();
+        repository.QuestConditionOptions.Add(new DialogueQuestConditionOption(
+            "starter_quest",
+            "Starter Quest",
+            [new AuthoringOption("talk_to_npc", "Talk to NPC")]));
+        repository.ItemConditionOptions.Add(new AuthoringOption("replacement_ingredient", "Replacement Ingredient"));
+        var service = CreateService(repository);
+
+        var result = await service.LoadOptionsAsync(TestContext.Current.CancellationToken);
+
+        AssertSucceeded(result);
+        var quest = Assert.Single(result.Value!.QuestReferences!);
+        Assert.Equal("starter_quest", quest.QuestId);
+        Assert.Equal("talk_to_npc", Assert.Single(quest.Steps).Id);
+        Assert.Equal("replacement_ingredient", Assert.Single(result.Value.ItemReferences!).Id);
     }
 
     [Fact]
@@ -177,6 +199,64 @@ public sealed class DialogueAuthoringServiceTests
         AssertSucceeded(publish);
         Assert.Equal([RuntimeCatalogPublicationScope.Dialogue], catalogPublisher.PublishScopes);
         Assert.DoesNotContain(publish.Value!.Messages, message => message.Code == "map_catalog_publish_warning");
+    }
+
+    [Fact]
+    public async Task PublishBlocksInvalidTypedConditionReferences()
+    {
+        var repository = new InMemoryDialogueRepository();
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            EntryPoints =
+            [
+                new DialogueEntryPoint(
+                    "default",
+                    "start",
+                    0,
+                    0,
+                    [new DialogueCondition("quest_status", "meal", "active", null, null, null)])
+            ],
+            Nodes =
+            [
+                DialogueTestData.Speaker("start", "Welcome.", "choice"),
+                new("choice", "player_choice", null, "Choose.", null, true, 100, 0, null,
+                [
+                    new("step", "Step.", "end", 0, [new DialogueCondition("quest_step", "meal", null, "missing_step", null, null)]),
+                    new("item", "Item.", "end", 1, [new DialogueCondition("has_item", null, null, null, "replacement_ingredient", 1)])
+                ]),
+                DialogueTestData.End("end")
+            ]
+        };
+        var now = DateTimeOffset.UtcNow;
+        repository.Put(new DialogueDefinitionRecord(
+            DialogueId,
+            draft.DisplayName,
+            "Draft",
+            draft.SchemaVersion,
+            draft.EntryPoints,
+            draft.Nodes,
+            draft.MetadataDescription,
+            draft.Notes,
+            now,
+            now,
+            draft.EntryPoints.Count,
+            draft.Nodes.Count,
+            draft.Nodes.Sum(node => node.Choices.Count)));
+        repository.QuestReferences["meal"] = new DialogueQuestReferenceRecord("meal", "Draft", ["return_to_inn"]);
+        repository.ItemReferences["replacement_ingredient"] = new DialogueItemReferenceRecord("replacement_ingredient", "Replacement Ingredient", false);
+        var service = CreateService(repository);
+        var expected = repository.Records[DialogueId].UpdatedAtUtc;
+
+        var preview = await service.PreviewAsync(
+            DialogueId,
+            ToPreviewRequest(draft with { ExpectedUpdatedAtUtc = expected }, "publish"),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Contains(preview.Value!.Messages, message => message.Code == "dialogue_condition_unpublished_quest");
+        Assert.Contains(preview.Value.Messages, message => message.Code == "dialogue_condition_missing_quest_step");
+        Assert.Contains(preview.Value.Messages, message => message.Code == "dialogue_condition_runtime_disabled_item");
+        Assert.False(preview.Value.ValidForPublication);
     }
 
     [Fact]
@@ -365,6 +445,14 @@ public sealed class DialogueAuthoringServiceTests
 
         public Dictionary<string, DialogueReferenceSummaryRecord> ReferenceSummaries { get; } = new(StringComparer.Ordinal);
 
+        public Dictionary<string, DialogueQuestReferenceRecord> QuestReferences { get; } = new(StringComparer.Ordinal);
+
+        public Dictionary<string, DialogueItemReferenceRecord> ItemReferences { get; } = new(StringComparer.Ordinal);
+
+        public List<DialogueQuestConditionOption> QuestConditionOptions { get; } = [];
+
+        public List<AuthoringOption> ItemConditionOptions { get; } = [];
+
         public Task<IReadOnlyList<DialogueDefinitionRecord>> ListAsync(
             string? search,
             CancellationToken cancellationToken = default)
@@ -467,6 +555,28 @@ public sealed class DialogueAuthoringServiceTests
             CancellationToken cancellationToken = default) =>
             Task.FromResult(ReferenceSummaries.GetValueOrDefault(dialogueDefinitionId)
                 ?? new DialogueReferenceSummaryRecord(dialogueDefinitionId, 0, 0, [], true));
+
+        public Task<IReadOnlyDictionary<string, DialogueQuestReferenceRecord>> LoadQuestReferencesAsync(
+            IReadOnlyCollection<string> questIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<string, DialogueQuestReferenceRecord>>(QuestReferences
+                .Where(pair => questIds.Contains(pair.Key, StringComparer.Ordinal))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+
+        public Task<IReadOnlyDictionary<string, DialogueItemReferenceRecord>> LoadItemReferencesAsync(
+            IReadOnlyCollection<string> itemIds,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyDictionary<string, DialogueItemReferenceRecord>>(ItemReferences
+                .Where(pair => itemIds.Contains(pair.Key, StringComparer.Ordinal))
+                .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal));
+
+        public Task<IReadOnlyList<DialogueQuestConditionOption>> LoadPublishedQuestConditionOptionsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<DialogueQuestConditionOption>>(QuestConditionOptions);
+
+        public Task<IReadOnlyList<AuthoringOption>> LoadRuntimeItemConditionOptionsAsync(
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<AuthoringOption>>(ItemConditionOptions);
 
         public void Put(DialogueDefinitionRecord record)
         {

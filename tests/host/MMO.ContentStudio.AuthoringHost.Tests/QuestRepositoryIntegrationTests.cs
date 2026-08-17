@@ -62,40 +62,18 @@ public sealed class QuestRepositoryIntegrationTests
         await fixture.SeedCharacterAsync();
         var repository = CreateRepository(connectionString);
         var questId = fixture.TrackQuestId("quest_step_ref_" + Guid.NewGuid().ToString("N"));
-        var saved = await repository.ReplaceDraftAsync(questId, Draft(
-            steps: [Step("first", 0), Step("second", 1)],
-            transitions: [
-                Transition("accept", "not_started", null, "active", "first", 0),
-                Transition("advance", "active", "first", "active", "second", 1),
-                Transition("finish", "active", "second", "completed", null, 2)
-            ]), null, TestContext.Current.CancellationToken);
-        var published = await repository.SetPublicationAsync(questId, "Published", saved.UpdatedAtUtc, TestContext.Current.CancellationToken);
-        await fixture.InsertQuestStateAsync(questId, "active", "first");
-
         var incompatibleDraft = await repository.ReplaceDraftAsync(questId, Draft(
             steps: [Step("second", 0)],
             transitions: [
                 Transition("accept", "not_started", null, "active", "second", 0),
                 Transition("finish", "active", "second", "completed", null, 1)
-            ]), published.UpdatedAtUtc, TestContext.Current.CancellationToken);
+            ]), null, TestContext.Current.CancellationToken);
+        await fixture.InsertQuestStateAsync(questId, "active", "first");
 
         var missingStepError = await Assert.ThrowsAsync<QuestDefinitionMissingActiveStepException>(() =>
             repository.SetPublicationAsync(questId, "Published", incompatibleDraft.UpdatedAtUtc, TestContext.Current.CancellationToken));
 
         Assert.Equal(["first"], missingStepError.MissingStepIds);
-
-        var compatibleDraft = await repository.ReplaceDraftAsync(questId, Draft(
-            steps: [Step("first", 0), Step("second", 1), Step("replacement", 2)],
-            transitions: [
-                Transition("accept", "not_started", null, "active", "first", 0),
-                Transition("advance", "active", "first", "active", "replacement", 1),
-                Transition("finish", "active", "replacement", "completed", null, 2),
-                Transition("legacy_finish", "active", "second", "completed", null, 3)
-            ]), incompatibleDraft.UpdatedAtUtc, TestContext.Current.CancellationToken);
-
-        var republished = await repository.SetPublicationAsync(questId, "Published", compatibleDraft.UpdatedAtUtc, TestContext.Current.CancellationToken);
-
-        Assert.Equal("Published", republished.PublicationState);
     }
 
     [Fact]

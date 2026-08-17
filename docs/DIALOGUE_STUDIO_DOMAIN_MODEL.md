@@ -55,7 +55,7 @@ DialogueEntryPoint
   node_id
   priority
   order
-  conditions[]  # empty until a runtime condition type is implemented
+  conditions[]  # QV3 typed read-only predicates
 
 DialogueNode
   node_id
@@ -73,7 +73,7 @@ DialogueChoice
   text
   target_node_id
   choice_order
-  conditions[]  # empty until a runtime condition type is implemented
+  conditions[]  # QV3 typed read-only predicates
 ```
 
 `dialogue_definition_id` maps to the current runtime `dialogue_id`. The API may
@@ -115,16 +115,17 @@ dialogue_nodes
 dialogue_choices
 ```
 
-Deferred condition storage seam:
+Implemented QV3 condition storage:
 
 ```text
-dialogue_entry_point_conditions
+dialogue_entry_conditions
 dialogue_choice_conditions
 ```
 
-D2 does not create condition tables because MMO Project has no typed runtime
-condition contract beyond "empty list is eligible." Contracts expose empty
-condition arrays and validation rejects nonempty arrays.
+QV3 supports `quest_status`, `quest_step`, and `has_item` conditions on entry
+points and choices. Conditions are validated during authoring/publication,
+exported to the runtime dialogue catalog, evaluated server-side for entry
+selection and visible choices, and revalidated when a player submits a choice.
 
 Effect tables should be deferred until MMO Project has an implemented effect
 contract. The current runtime has no effect fields, no execution timing, and no
@@ -182,6 +183,31 @@ CREATE TABLE dialogue_choices (
     FOREIGN KEY (dialogue_definition_id, node_id)
         REFERENCES dialogue_nodes(dialogue_definition_id, node_id)
         ON DELETE CASCADE
+);
+
+CREATE TABLE dialogue_entry_conditions (
+    dialogue_definition_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    condition_order INTEGER NOT NULL,
+    condition_type TEXT NOT NULL,
+    quest_id TEXT NULL,
+    quest_status TEXT NULL,
+    quest_step_id TEXT NULL,
+    item_id TEXT NULL,
+    item_quantity INTEGER NULL
+);
+
+CREATE TABLE dialogue_choice_conditions (
+    dialogue_definition_id TEXT NOT NULL,
+    node_id TEXT NOT NULL,
+    choice_id TEXT NOT NULL,
+    condition_order INTEGER NOT NULL,
+    condition_type TEXT NOT NULL,
+    quest_id TEXT NULL,
+    quest_status TEXT NULL,
+    quest_step_id TEXT NULL,
+    item_id TEXT NULL,
+    item_quantity INTEGER NULL
 );
 ```
 
@@ -245,7 +271,7 @@ Publish validation requires runtime-compatible completeness:
   from publication
 - no non-empty condition collections until a runtime condition evaluator exists
 - no effect collections until a runtime effect contract exists
-- no quest fields
+- quest fields only through typed read-only conditions
 
 Draft warnings and publish diagnostics include:
 
@@ -342,7 +368,7 @@ For D4, preserving the current runtime JSON shape is the safest path:
   editor convenience
 - nodes sorted by `node_order`
 - choices sorted by `choice_order`
-- empty condition arrays emitted for current compatibility
+- typed QV3 condition arrays emitted for entry points and choices
 - no effect fields emitted until runtime supports them
 
 `test_npc_greeting` should be seeded or migrated into the authoring database and
@@ -364,20 +390,21 @@ effect
   typed payload
 ```
 
-D1 registers no condition or effect types. Future MMO Project quest foundations
-must define the authoritative payloads and evaluation/application owners before
-Dialogue Studio adds quest predicates or effects.
+QV3 registers `quest_status`, `quest_step`, and `has_item` condition types.
+MMO Project owns the authoritative payload validation and runtime evaluation.
+Dialogue Studio must not add dialogue effects or quest-state mutation until MMO
+Project defines the application owner and transaction boundary for those effects.
 
-Future additions may include quest predicates, quest transition effects,
-objective effects, and reward requests, but their payloads are deliberately not
-defined in D1.
+Future additions may include quest transition effects, objective effects, and
+reward requests, but their payloads are deliberately not defined in QV3.
 
 ## Initial Dialogue Studio UX Requirements
 
 D3 Godot Dialogue Studio implemented the initial UI as a top-level Dialogue
 workspace after NPCs and before Environment. The workspace uses GraphEdit and
-GraphNode for graph editing, keeps condition and effect authoring read-only as
-unsupported, and routes NPC reference summaries back to the NPCs workspace.
+GraphNode for graph editing, now exposes QV3 typed condition controls, keeps
+effect authoring read-only as unsupported, and routes NPC reference summaries
+back to the NPCs workspace.
 
 Top-level workspace:
 
@@ -439,25 +466,27 @@ Only relevant fields should be visible for each node type:
 - `player_choice`: speaker, text, ordered choices, dismissible
 - `end`: speaker, text, dismissible
 
-Conditions and effects should be visible as empty/read-only "not supported by
-current runtime" sections until runtime types are implemented.
+Conditions should use typed controls for the QV3 condition registry. Effects
+should remain visible as empty/read-only "not supported by current runtime"
+sections until runtime effect types are implemented.
 
-D3 provides no quest, condition, or effect authoring.
+D3 provided no quest, condition, or effect authoring. QV3 adds read-only
+condition predicates only.
 
 ## Playthrough Preview
 
 The safest first preview is a pure Content Studio validator/simulator that uses
 the same semantics as current runtime:
 
-- choose the highest-priority unconditional entry point, using entry order and
-  then stable ID for ties
+- choose the highest-priority eligible entry point, using entry order and then
+  stable ID for ties
 - show speaker/text
 - continue through `next_node_id`
 - show visible choices in `choice_order`
 - select choices by `choice_id`
 - keep end nodes visible until acknowledged
 - detect loops and offer restart
-- show hidden/invalid reasons for unsupported conditions where possible
+- filter choices using the same typed condition semantics as runtime
 
 It must not call production MMO Project session endpoints and must not commit
 effects. D5 equivalence tests compare Content Studio preview behavior with

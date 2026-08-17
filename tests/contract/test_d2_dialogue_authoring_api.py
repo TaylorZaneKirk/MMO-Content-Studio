@@ -56,6 +56,12 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "ReplaceChildrenAsync",
             "updated_at_utc = now()",
             "DialogueDefinitionConcurrencyException",
+            "LoadQuestReferencesAsync",
+            "LoadItemReferencesAsync",
+            "LoadPublishedQuestConditionOptionsAsync",
+            "LoadRuntimeItemConditionOptionsAsync",
+            "dialogue_entry_conditions",
+            "dialogue_choice_conditions",
         ):
             self.assertIn(token, repository)
 
@@ -120,12 +126,21 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
         ):
             self.assertIn(token, registry + (HOST / "Contracts" / "DialogueContracts.cs").read_text())
 
-        self.assertIn("LoadConditionTypes() => []", registry)
+        self.assertIn("LoadConditionTypes() => ConditionTypes", registry)
         self.assertIn("LoadEffectTypes() => []", registry)
+        self.assertIn('JsonPropertyName("quest_references")', (HOST / "Contracts" / "DialogueContracts.cs").read_text())
+        self.assertIn('JsonPropertyName("item_references")', (HOST / "Contracts" / "DialogueContracts.cs").read_text())
+        self.assertIn("quest_status", registry)
+        self.assertIn("quest_step", registry)
+        self.assertIn("has_item", registry)
         self.assertIn("dialogue_definitions", schema)
         self.assertIn("dialogue_entry_points", schema)
         self.assertIn("dialogue_nodes", schema)
         self.assertIn("dialogue_choices", schema)
+        self.assertIn("dialogue_entry_conditions", schema)
+        self.assertIn("dialogue_choice_conditions", schema)
+        self.assertIn("dialogue_entry_conditions_shape_check", schema)
+        self.assertIn("dialogue_choice_conditions_shape_check", schema)
         self.assertIn("DialogueAuthoringService", catalog)
         self.assertIn("dialogues.ListAsync", catalog)
 
@@ -150,7 +165,6 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
         ):
             self.assertIn(route, (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text())
         self.assertNotIn("/api/v1/quests", editor)
-        self.assertNotIn("/api/v1/quests", host_text)
         for token in (
             "quest_stage",
             "quest_rewards",
@@ -182,13 +196,14 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "026_dialogue_authoring_schema.sql",
             "/api/v1/dialogues",
             "supports_runtime_dialogue_catalog = true",
-            "empty condition/effect registries",
+            "typed read-only condition",
+            "empty effect registry",
             "Published NPC references block disable",
             "any NPC reference blocks delete",
             "Godot Dialogue Studio",
             "D4 MMO Project runtime catalog handoff implemented",
-            "D1-D5 non-quest Dialogue Studio authoring",
-            "no quest, condition, or effect authoring",
+            "D1-D5 Dialogue Studio authoring",
+            "QV3 typed read-only quest/item predicates",
         ):
             self.assertIn(token, docs)
 

@@ -46,7 +46,7 @@ remain feature-owned, while `AuthoringWorkspaceSupport` owns the shared
 lifecycle mechanics. The NPC workspace offers shell-level navigation to a
 referenced dialogue, and the Dialogue workspace routes NPC reference summaries
 back to NPCs without either editor directly instantiating the other. D1-D5
-non-quest Dialogue Studio authoring, graph editing, runtime catalog export,
-validator/runtime equivalence, reference safety, and end-to-end verification
-are complete. Quest predicates, effects, conditions, and quest-state authoring
+Dialogue Studio authoring, graph editing, runtime catalog export,
+validator/runtime equivalence, reference safety, QV3 typed condition authoring,
+and end-to-end verification are complete. Effects and quest-state mutation
 remain deferred.

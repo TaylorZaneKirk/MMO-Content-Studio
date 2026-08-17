@@ -18,6 +18,9 @@ public sealed class DialogueAuthoringRegistry
     public const string SpeakerTextNodeType = "speaker_text";
     public const string PlayerChoiceNodeType = "player_choice";
     public const string EndNodeType = "end";
+    public const string QuestStatusConditionType = "quest_status";
+    public const string QuestStepConditionType = "quest_step";
+    public const string HasItemConditionType = "has_item";
 
     private static readonly AuthoringOption[] PublicationStates =
     [
@@ -33,6 +36,13 @@ public sealed class DialogueAuthoringRegistry
         new(EndNodeType, "End")
     ];
 
+    private static readonly AuthoringOption[] ConditionTypes =
+    [
+        new(QuestStatusConditionType, "Quest Status"),
+        new(QuestStepConditionType, "Quest Step"),
+        new(HasItemConditionType, "Has Item")
+    ];
+
     public DialogueAuthoringDefaults Defaults { get; } = new(
         CurrentSchemaVersion,
         DefaultEntryId,
@@ -46,7 +56,7 @@ public sealed class DialogueAuthoringRegistry
 
     public IReadOnlyList<AuthoringOption> LoadNodeTypes() => NodeTypes;
 
-    public IReadOnlyList<AuthoringOption> LoadConditionTypes() => [];
+    public IReadOnlyList<AuthoringOption> LoadConditionTypes() => ConditionTypes;
 
     public IReadOnlyList<AuthoringOption> LoadEffectTypes() => [];
 
@@ -61,9 +71,9 @@ public sealed class DialogueAuthoringRegistry
 
     public DialogueOperationCapabilities LoadCapabilities() => new(
         true,
+        true,
         false,
-        false,
-        false,
+        true,
         false,
         false,
         false,

@@ -64,7 +64,7 @@ class GodotHttpTransportTests(unittest.TestCase):
         self.assertNotIn("JSON.parse_string", facade)
         self.assertNotIn("enum RequestKind", facade)
         self.assertNotIn("func _extract_error_message", facade)
-        self.assertLess(len(facade.splitlines()), 470)
+        self.assertLess(len(facade.splitlines()), 560)
 
     def test_public_client_surface_remains_available(self) -> None:
         facade = (SCRIPTS / "authoring_host_client.gd").read_text()

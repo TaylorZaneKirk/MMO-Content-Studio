@@ -10,6 +10,7 @@ public sealed class DialogueDefinitionValidator
         "dialogue_invalid_definition",
         "dialogue_invalid_graph",
         "dialogue_unsupported_node_type",
+        "dialogue_invalid_condition",
         "dialogue_unsupported_condition",
         "dialogue_unsupported_effect"
     };
@@ -141,10 +142,7 @@ public sealed class DialogueDefinitionValidator
             {
                 messages.Add(InvalidOrder("entry_order"));
             }
-            if (entry.Conditions.Count > 0)
-            {
-                messages.Add(UnsupportedCondition("entry_points.conditions"));
-            }
+            ValidateConditions(entry.Conditions, $"entry point '{entry.EntryId}'", "entry_points.conditions", messages);
         }
 
         foreach (var node in draft.Nodes)
@@ -223,10 +221,7 @@ public sealed class DialogueDefinitionValidator
                         ValidationSeverity.Error,
                         "choices.text"));
                 }
-                if (choice.Conditions.Count > 0)
-                {
-                    messages.Add(UnsupportedCondition("choices.conditions"));
-                }
+                ValidateConditions(choice.Conditions, $"choice '{choice.ChoiceId}'", "choices.conditions", messages);
             }
         }
 
@@ -291,7 +286,7 @@ public sealed class DialogueDefinitionValidator
         {
             messages.Add(new ApiError(
                 "dialogue_invalid_graph",
-                "Multiple entry points are allowed for forward compatibility; with no condition vocabulary, lower-priority entries may be unreachable at runtime.",
+                "Multiple entry points are allowed; runtime selects the highest-priority eligible entry point.",
                 ValidationSeverity.Warning,
                 "entry_points"));
         }
@@ -402,9 +397,116 @@ public sealed class DialogueDefinitionValidator
 
     private static ApiError UnsupportedCondition(string field) => new(
         "dialogue_unsupported_condition",
-        "No dialogue condition types are authorable in D2; condition arrays must be empty.",
+        "Only quest_status, quest_step, and has_item dialogue conditions are authorable in QV3.",
         ValidationSeverity.Error,
         field);
+
+    private static void ValidateConditions(
+        IReadOnlyList<DialogueCondition> conditions,
+        string owner,
+        string field,
+        ICollection<ApiError> messages)
+    {
+        foreach (var condition in conditions)
+        {
+            switch (condition.ConditionType)
+            {
+                case DialogueAuthoringRegistry.QuestStatusConditionType:
+                    RequireStableId(condition.QuestId, $"{field}.quest_id", messages);
+                    RequireQuestStatus(condition.Status, $"{field}.status", messages);
+                    RequireAbsent(condition.StepId, $"{field}.step_id", owner, messages);
+                    RequireAbsent(condition.ItemId, $"{field}.item_id", owner, messages);
+                    RequireAbsent(condition.Quantity, $"{field}.quantity", owner, messages);
+                    break;
+                case DialogueAuthoringRegistry.QuestStepConditionType:
+                    RequireStableId(condition.QuestId, $"{field}.quest_id", messages);
+                    RequireStableId(condition.StepId, $"{field}.step_id", messages);
+                    RequireAbsent(condition.Status, $"{field}.status", owner, messages);
+                    RequireAbsent(condition.ItemId, $"{field}.item_id", owner, messages);
+                    RequireAbsent(condition.Quantity, $"{field}.quantity", owner, messages);
+                    break;
+                case DialogueAuthoringRegistry.HasItemConditionType:
+                    RequireStableId(condition.ItemId, $"{field}.item_id", messages);
+                    if (condition.Quantity is null or < 1)
+                    {
+                        messages.Add(new ApiError(
+                            "dialogue_invalid_condition",
+                            $"Condition on {owner} must define quantity >= 1.",
+                            ValidationSeverity.Error,
+                            $"{field}.quantity"));
+                    }
+                    RequireAbsent(condition.QuestId, $"{field}.quest_id", owner, messages);
+                    RequireAbsent(condition.Status, $"{field}.status", owner, messages);
+                    RequireAbsent(condition.StepId, $"{field}.step_id", owner, messages);
+                    break;
+                default:
+                    messages.Add(UnsupportedCondition(field));
+                    break;
+            }
+        }
+    }
+
+    private static void RequireStableId(
+        string? value,
+        string field,
+        ICollection<ApiError> messages)
+    {
+        if (string.IsNullOrWhiteSpace(value) || !DialogueDomainRules.IsStableId(value))
+        {
+            messages.Add(new ApiError(
+                "dialogue_invalid_condition",
+                $"{field} must be a lowercase snake-case stable identifier.",
+                ValidationSeverity.Error,
+                field));
+        }
+    }
+
+    private static void RequireQuestStatus(
+        string? value,
+        string field,
+        ICollection<ApiError> messages)
+    {
+        if (value is not "not_started" and not "active" and not "completed")
+        {
+            messages.Add(new ApiError(
+                "dialogue_invalid_condition",
+                "Quest status conditions must use not_started, active, or completed.",
+                ValidationSeverity.Error,
+                field));
+        }
+    }
+
+    private static void RequireAbsent(
+        string? value,
+        string field,
+        string owner,
+        ICollection<ApiError> messages)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+        {
+            messages.Add(new ApiError(
+                "dialogue_invalid_condition",
+                $"Condition on {owner} must not define {field}.",
+                ValidationSeverity.Error,
+                field));
+        }
+    }
+
+    private static void RequireAbsent(
+        int? value,
+        string field,
+        string owner,
+        ICollection<ApiError> messages)
+    {
+        if (value is not null)
+        {
+            messages.Add(new ApiError(
+                "dialogue_invalid_condition",
+                $"Condition on {owner} must not define {field}.",
+                ValidationSeverity.Error,
+                field));
+        }
+    }
 }
 
 public sealed record DialogueValidationOutcome(

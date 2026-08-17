@@ -1,8 +1,9 @@
 # Dialogue Studio Implementation Plan
 
-Status: D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
-catalog export, validator/runtime equivalence, reference safety, and end-to-end
-verification are complete. Quest predicates/effects remain deferred.
+Status: D1-D5 Dialogue Studio authoring, graph editing, runtime catalog export,
+validator/runtime equivalence, reference safety, and end-to-end verification are
+complete. QV3 typed read-only quest/item predicates are implemented; effects and
+quest-state mutation remain deferred.
 
 ## Sequence Lock
 
@@ -16,16 +17,17 @@ D2 dialogue schema and host API            complete
 D3 Godot Dialogue Studio graph editor       complete
 D4 MMO Project runtime catalog handoff     complete
 D5 hardening and playthrough verification       complete
+QV3 typed dialogue conditions                   complete
 
 MMO Project quest foundations
-Dialogue Studio quest integration
+Dialogue Studio quest effects
 Quest Studio
 ```
 
-Dialogue Studio will first author the current non-quest dialogue runtime model.
-MMO Project quest foundations will then define authoritative quest predicates
-and effects. Dialogue Studio will subsequently gain quest-aware
-condition/effect types, followed by Quest Studio.
+Dialogue Studio first authored the D1-D5 dialogue runtime model. MMO Project
+quest foundations then defined authoritative quest state, and QV3 adds
+read-only typed dialogue predicates over quest state and inventory. Dialogue
+effects, quest-state mutation from dialogue, and Quest Studio remain later work.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -69,8 +71,9 @@ Schema:
 - `dialogue_entry_points`
 - `dialogue_nodes`
 - `dialogue_choices`
-- no condition/effect tables; contracts expose empty condition arrays and
-  registries report zero types
+- QV3 adds `dialogue_entry_conditions` and `dialogue_choice_conditions` for
+  typed read-only predicates
+- no effect tables
 
 Routes:
 
@@ -99,9 +102,9 @@ Contract rules:
 Validation:
 
 - current node types only: `speaker_text`, `player_choice`, `end`
-- empty condition collections only
+- QV3 condition types only: `quest_status`, `quest_step`, `has_item`
 - no effects
-- no quest fields
+- quest fields only through typed read-only conditions
 - no arbitrary scripts
 - graph references verified
 - unreachable/cycle/self-loop diagnostics surfaced
@@ -110,9 +113,9 @@ Options should expose:
 
 - publication states
 - supported node types
-- current condition registry: empty
+- current condition registry: `quest_status`, `quest_step`, `has_item`
 - current effect registry: empty
-- capability flags such as `supports_quest_conditions = false` and
+- capability flags such as `supports_quest_conditions = true` and
   `supports_effects = false`
 
 D2 combines schema/repository/API in one slice so the route family is useful
@@ -217,7 +220,8 @@ Verification targets:
   interaction, hostile attack, defeat, and terminal cleanup close/cancel as
   currently documented
 - disable/delete blocked while published NPC definitions reference a dialogue
-- no quest fields or unsupported condition/effect rows reach runtime export
+- only supported typed condition rows reach runtime export; no effects reach
+  runtime export
 
 Manual playthrough:
 
@@ -232,7 +236,7 @@ Manual playthrough:
 
 ## Deferred Work
 
-- quest predicates and effects
+- dialogue effects and quest-state mutation
 - objective progress
 - quest rewards
 - quest journal data
@@ -254,7 +258,7 @@ D2 is complete when:
 - complete aggregate round-trips transactionally
 - graph validation matches current runtime
 - preview signatures and optimistic concurrency are enforced
-- no quest fields are accepted
+- quest fields are accepted only through typed read-only conditions
 
 D3 is complete when:
 

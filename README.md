@@ -93,15 +93,14 @@ D2 implements the Content Studio host-side Dialogue authoring boundary over
 `/api/v1/dialogues`. D3 Godot Dialogue Studio implemented the integrated
 Dialogue workspace after NPCs and before Environment with a GraphEdit canvas,
 node inspector, entry-point editing, validation/change previews, playthrough
-preview, and NPC cross-navigation. D4 MMO Project runtime catalog handoff implemented
-through deterministic Published dialogue export to
+preview, and NPC cross-navigation. D4 MMO Project runtime catalog handoff
+implemented through deterministic Published dialogue export to
 `prototype/shared/dialogues/catalog.json`. D5 hardens validator/runtime
 equivalence, playthrough/session behavior, reference safety, and export
-reproducibility. D1-D5 author only the current non-quest
-dialogue runtime model: definitions, entry points, `speaker_text`,
-`player_choice`, and `end` nodes, node-owned transitions, server-filtered
-choices, and no quest, condition, or effect authoring. Quest predicates, quest
-effects, objective progress, rewards, content gates, hot reload, and Quest
+reproducibility. QV3 adds typed read-only `quest_status`, `quest_step`, and
+`has_item` dialogue conditions across schema, host validation, Studio controls,
+export, and runtime evaluation. Dialogue effects, quest-state mutation,
+objective progress, rewards, broader content gates, hot reload, and Quest
 Studio remain deferred until later phases.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
@@ -180,7 +179,7 @@ The default API address is `http://127.0.0.1:5187`.
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
-8. **D1-D5 — Dialogue Studio** — non-quest authoring, runtime export, equivalence, and reference safety implemented
+8. **D1-D5 + QV3 — Dialogue Studio** — authoring, runtime export, equivalence, reference safety, and typed read-only conditions implemented
 9. **R4D.1B.1 — Actor appearance discovery and socket editor loading repair** — implemented
 10. **R4D.2 — Equipment grip anchor editor hardening** — implemented
 11. **R4D.3 — Foreground grip overlay editor** — implemented
