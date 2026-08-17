@@ -40,14 +40,16 @@ public sealed class DialogueAuthoringService
     {
         IReadOnlyList<DialogueQuestConditionOption> questReferences = [];
         IReadOnlyList<AuthoringOption> itemReferences = [];
+        IReadOnlyList<AuthoringOption> skillReferences = [];
         try
         {
             questReferences = await _repository.LoadPublishedQuestConditionOptionsAsync(cancellationToken);
             itemReferences = await _repository.LoadRuntimeItemConditionOptionsAsync(cancellationToken);
+            skillReferences = await _repository.LoadSkillOptionsAsync(cancellationToken);
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
-            _logger.LogWarning(exception, "Dialogue condition reference options are unavailable");
+            _logger.LogWarning(exception, "Dialogue condition/effect reference options are unavailable");
         }
 
         return AuthoringOperationResult<DialogueOptionsResponse>.Success(
@@ -60,7 +62,8 @@ public sealed class DialogueAuthoringService
                 _registry.LoadCapabilities(),
                 _registry.Defaults,
                 questReferences,
-                itemReferences));
+                itemReferences,
+                skillReferences));
     }
 
     public async Task<AuthoringOperationResult<DialogueCatalogResponse>> ListAsync(
@@ -526,9 +529,37 @@ public sealed class DialogueAuthoringService
             .Select(id => id!)
             .Distinct(StringComparer.Ordinal)
             .ToArray();
+        var effects = draft.Nodes
+            .SelectMany(node => node.Choices.SelectMany(choice => choice.Effects ?? []))
+            .ToArray();
+        var effectQuestIds = effects
+            .Where(effect => effect.EffectType is DialogueAuthoringRegistry.StartQuestEffectType
+                or DialogueAuthoringRegistry.AdvanceQuestEffectType
+                or DialogueAuthoringRegistry.CompleteQuestEffectType)
+            .Select(effect => effect.QuestId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var effectItemIds = effects
+            .Where(effect => effect.EffectType is DialogueAuthoringRegistry.GrantItemEffectType
+                or DialogueAuthoringRegistry.RemoveItemEffectType)
+            .Select(effect => effect.ItemId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+        var effectSkillIds = effects
+            .Where(effect => effect.EffectType == DialogueAuthoringRegistry.GrantExperienceEffectType)
+            .Select(effect => effect.SkillId)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .Select(id => id!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
 
-        var questRefs = await _repository.LoadQuestReferencesAsync(questIds, cancellationToken);
-        foreach (var questId in questIds.Order(StringComparer.Ordinal))
+        var allQuestIds = questIds.Concat(effectQuestIds).Distinct(StringComparer.Ordinal).ToArray();
+        var questRefs = await _repository.LoadQuestReferencesAsync(allQuestIds, cancellationToken);
+        foreach (var questId in allQuestIds.Order(StringComparer.Ordinal))
         {
             if (!questRefs.TryGetValue(questId, out var quest))
             {
@@ -564,12 +595,33 @@ public sealed class DialogueAuthoringService
                     "dialogue_condition_missing_quest_step",
                     $"Dialogue condition references missing quest step '{condition.QuestId}:{condition.StepId}'.",
                     ValidationSeverity.Error,
-                    "conditions.step_id"));
+                "conditions.step_id"));
             }
         }
 
-        var itemRefs = await _repository.LoadItemReferencesAsync(itemIds, cancellationToken);
-        foreach (var itemId in itemIds.Order(StringComparer.Ordinal))
+        foreach (var effect in effects
+            .Where(effect => effect.EffectType is DialogueAuthoringRegistry.StartQuestEffectType
+                or DialogueAuthoringRegistry.AdvanceQuestEffectType
+                or DialogueAuthoringRegistry.CompleteQuestEffectType)
+            .OrderBy(effect => effect.QuestId, StringComparer.Ordinal)
+            .ThenBy(effect => effect.TransitionId, StringComparer.Ordinal))
+        {
+            if (effect.QuestId is null ||
+                effect.TransitionId is null ||
+                !questRefs.TryGetValue(effect.QuestId, out var quest) ||
+                !quest.TransitionIds.Contains(effect.TransitionId, StringComparer.Ordinal))
+            {
+                messages.Add(new ApiError(
+                    "dialogue_effect_missing_quest_transition",
+                    $"Dialogue effect references missing quest transition '{effect.QuestId}:{effect.TransitionId}'.",
+                    ValidationSeverity.Error,
+                    "effects.transition_id"));
+            }
+        }
+
+        var allItemIds = itemIds.Concat(effectItemIds).Distinct(StringComparer.Ordinal).ToArray();
+        var itemRefs = await _repository.LoadItemReferencesAsync(allItemIds, cancellationToken);
+        foreach (var itemId in allItemIds.Order(StringComparer.Ordinal))
         {
             if (!itemRefs.TryGetValue(itemId, out var item))
             {
@@ -587,7 +639,20 @@ public sealed class DialogueAuthoringService
                     "dialogue_condition_runtime_disabled_item",
                     $"Dialogue condition references item '{itemId}' while it is not runtime-enabled.",
                     ValidationSeverity.Error,
-                    "conditions.item_id"));
+                "conditions.item_id"));
+            }
+        }
+
+        var skillRefs = await _repository.LoadSkillReferencesAsync(effectSkillIds, cancellationToken);
+        foreach (var skillId in effectSkillIds.Order(StringComparer.Ordinal))
+        {
+            if (!skillRefs.Contains(skillId))
+            {
+                messages.Add(new ApiError(
+                    "dialogue_effect_missing_skill",
+                    $"Dialogue effect references missing skill '{skillId}'.",
+                    ValidationSeverity.Error,
+                    "effects.skill_id"));
             }
         }
     }
@@ -718,12 +783,17 @@ public sealed class DialogueAuthoringService
             AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.target_node_id", before[choiceId].TargetNodeId, after[choiceId].TargetNodeId);
             AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.choice_order", before[choiceId].ChoiceOrder.ToString(), after[choiceId].ChoiceOrder.ToString());
             AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.conditions", ConditionsSignature(before[choiceId].Conditions), ConditionsSignature(after[choiceId].Conditions));
+            AddChange(changes, $"nodes.{nodeId}.choices.{choiceId}.effects", EffectsSignature(before[choiceId].Effects ?? []), EffectsSignature(after[choiceId].Effects ?? []));
         }
     }
 
     private static string ConditionsSignature(IReadOnlyList<DialogueCondition> conditions) =>
         string.Join(",", conditions.Select(condition =>
             $"{condition.ConditionType}:{condition.QuestId}:{condition.Status}:{condition.StepId}:{condition.ItemId}:{condition.Quantity}"));
+
+    private static string EffectsSignature(IReadOnlyList<DialogueEffect> effects) =>
+        string.Join(",", effects.Select(effect =>
+            $"{effect.EffectId}:{effect.EffectOrder}:{effect.EffectType}:{effect.QuestId}:{effect.TransitionId}:{effect.ItemId}:{effect.Quantity}:{effect.SkillId}:{effect.XpAmount}"));
 
     private static bool EntriesEquivalent(
         IReadOnlyList<DialogueEntryPoint> left,
@@ -761,7 +831,8 @@ public sealed class DialogueAuthoringService
             && pair.First.Text == pair.Second.Text
             && pair.First.TargetNodeId == pair.Second.TargetNodeId
             && pair.First.ChoiceOrder == pair.Second.ChoiceOrder
-            && pair.First.Conditions.SequenceEqual(pair.Second.Conditions));
+            && pair.First.Conditions.SequenceEqual(pair.Second.Conditions)
+            && (pair.First.Effects ?? []).SequenceEqual(pair.Second.Effects ?? []));
 
     private static DialogueReferenceSummary ToReferenceSummary(DialogueReferenceSummaryRecord record) =>
         new(record.KnownReferenceCount, record.ReferenceSources, record.ReferenceCheckComplete);

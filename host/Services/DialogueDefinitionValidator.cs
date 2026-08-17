@@ -11,6 +11,7 @@ public sealed class DialogueDefinitionValidator
         "dialogue_invalid_graph",
         "dialogue_unsupported_node_type",
         "dialogue_invalid_condition",
+        "dialogue_invalid_effect",
         "dialogue_unsupported_condition",
         "dialogue_unsupported_effect"
     };
@@ -222,6 +223,7 @@ public sealed class DialogueDefinitionValidator
                         "choices.text"));
                 }
                 ValidateConditions(choice.Conditions, $"choice '{choice.ChoiceId}'", "choices.conditions", messages);
+                ValidateEffects(choice.Effects ?? [], $"choice '{choice.ChoiceId}'", "choices.effects", messages);
             }
         }
 
@@ -401,6 +403,12 @@ public sealed class DialogueDefinitionValidator
         ValidationSeverity.Error,
         field);
 
+    private static ApiError UnsupportedEffect(string field) => new(
+        "dialogue_unsupported_effect",
+        "Only start_quest, advance_quest, complete_quest, grant_item, remove_item, and grant_experience effects are authorable in QV4.",
+        ValidationSeverity.Error,
+        field);
+
     private static void ValidateConditions(
         IReadOnlyList<DialogueCondition> conditions,
         string owner,
@@ -453,11 +461,91 @@ public sealed class DialogueDefinitionValidator
     {
         if (string.IsNullOrWhiteSpace(value) || !DialogueDomainRules.IsStableId(value))
         {
+            var isEffect = field.Contains("effects", StringComparison.Ordinal);
             messages.Add(new ApiError(
-                "dialogue_invalid_condition",
+                isEffect ? "dialogue_invalid_effect" : "dialogue_invalid_condition",
                 $"{field} must be a lowercase snake-case stable identifier.",
                 ValidationSeverity.Error,
                 field));
+        }
+    }
+
+    private static void ValidateEffects(
+        IReadOnlyList<DialogueEffect> effects,
+        string owner,
+        string field,
+        ICollection<ApiError> messages)
+    {
+        AddDuplicateMessages(
+            effects.Select(effect => effect.EffectId),
+            "dialogue_invalid_effect",
+            $"Effect IDs must be unique within {owner}.",
+            field,
+            messages);
+        if (effects.GroupBy(effect => effect.EffectOrder).Any(group => group.Count() > 1))
+        {
+            messages.Add(new ApiError(
+                "dialogue_invalid_effect",
+                $"Effect orders must be unique within {owner}.",
+                ValidationSeverity.Error,
+                $"{field}.effect_order"));
+        }
+
+        foreach (var effect in effects)
+        {
+            RequireStableId(effect.EffectId, $"{field}.effect_id", messages);
+            if (!DialogueDomainRules.IsOrderValueSupported(effect.EffectOrder))
+            {
+                messages.Add(InvalidOrder($"{field}.effect_order"));
+            }
+
+            switch (effect.EffectType)
+            {
+                case DialogueAuthoringRegistry.StartQuestEffectType:
+                case DialogueAuthoringRegistry.AdvanceQuestEffectType:
+                case DialogueAuthoringRegistry.CompleteQuestEffectType:
+                    RequireStableId(effect.QuestId, $"{field}.quest_id", messages);
+                    RequireStableId(effect.TransitionId, $"{field}.transition_id", messages);
+                    RequireAbsent(effect.ItemId, $"{field}.item_id", owner, messages);
+                    RequireAbsent(effect.Quantity, $"{field}.quantity", owner, messages);
+                    RequireAbsent(effect.SkillId, $"{field}.skill_id", owner, messages);
+                    RequireAbsent(effect.XpAmount, $"{field}.xp_amount", owner, messages);
+                    break;
+                case DialogueAuthoringRegistry.GrantItemEffectType:
+                case DialogueAuthoringRegistry.RemoveItemEffectType:
+                    RequireStableId(effect.ItemId, $"{field}.item_id", messages);
+                    if (effect.Quantity is null or < 1)
+                    {
+                        messages.Add(new ApiError(
+                            "dialogue_invalid_effect",
+                            $"Effect on {owner} must define quantity >= 1.",
+                            ValidationSeverity.Error,
+                            $"{field}.quantity"));
+                    }
+                    RequireAbsent(effect.QuestId, $"{field}.quest_id", owner, messages);
+                    RequireAbsent(effect.TransitionId, $"{field}.transition_id", owner, messages);
+                    RequireAbsent(effect.SkillId, $"{field}.skill_id", owner, messages);
+                    RequireAbsent(effect.XpAmount, $"{field}.xp_amount", owner, messages);
+                    break;
+                case DialogueAuthoringRegistry.GrantExperienceEffectType:
+                    RequireStableId(effect.SkillId, $"{field}.skill_id", messages);
+                    if (effect.XpAmount is null or <= 0)
+                    {
+                        messages.Add(new ApiError(
+                            "dialogue_invalid_effect",
+                            $"Effect on {owner} must define xp_amount > 0.",
+                            ValidationSeverity.Error,
+                            $"{field}.xp_amount"));
+                    }
+                    RequireAbsent(effect.QuestId, $"{field}.quest_id", owner, messages);
+                    RequireAbsent(effect.TransitionId, $"{field}.transition_id", owner, messages);
+                    RequireAbsent(effect.ItemId, $"{field}.item_id", owner, messages);
+                    RequireAbsent(effect.Quantity, $"{field}.quantity", owner, messages);
+                    break;
+                default:
+                    messages.Add(UnsupportedEffect(field));
+                    break;
+            }
         }
     }
 
@@ -484,9 +572,10 @@ public sealed class DialogueDefinitionValidator
     {
         if (!string.IsNullOrWhiteSpace(value))
         {
+            var isEffect = field.Contains("effects", StringComparison.Ordinal);
             messages.Add(new ApiError(
-                "dialogue_invalid_condition",
-                $"Condition on {owner} must not define {field}.",
+                isEffect ? "dialogue_invalid_effect" : "dialogue_invalid_condition",
+                $"{(isEffect ? "Effect" : "Condition")} on {owner} must not define {field}.",
                 ValidationSeverity.Error,
                 field));
         }
@@ -500,9 +589,26 @@ public sealed class DialogueDefinitionValidator
     {
         if (value is not null)
         {
+            var isEffect = field.Contains("effects", StringComparison.Ordinal);
             messages.Add(new ApiError(
-                "dialogue_invalid_condition",
-                $"Condition on {owner} must not define {field}.",
+                field.Contains("effects", StringComparison.Ordinal) ? "dialogue_invalid_effect" : "dialogue_invalid_condition",
+                $"{(isEffect ? "Effect" : "Condition")} on {owner} must not define {field}.",
+                ValidationSeverity.Error,
+                field));
+        }
+    }
+
+    private static void RequireAbsent(
+        long? value,
+        string field,
+        string owner,
+        ICollection<ApiError> messages)
+    {
+        if (value is not null)
+        {
+            messages.Add(new ApiError(
+                "dialogue_invalid_effect",
+                $"Effect on {owner} must not define {field}.",
                 ValidationSeverity.Error,
                 field));
         }

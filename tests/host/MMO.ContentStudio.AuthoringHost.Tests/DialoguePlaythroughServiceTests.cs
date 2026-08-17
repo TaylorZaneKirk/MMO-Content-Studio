@@ -59,6 +59,36 @@ public sealed class DialoguePlaythroughServiceTests
     }
 
     [Fact]
+    public void SelectedChoiceReportsEffectsWithoutMutating()
+    {
+        var service = new DialoguePlaythroughService();
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            Nodes =
+            [
+                DialogueTestData.Speaker("start", "Welcome.", "choice"),
+                new DialogueNode("choice", "player_choice", null, "What do you say?", null, true, 100, 0, null,
+                [
+                    new DialogueChoice(
+                        "accept",
+                        "Accept.",
+                        "end",
+                        0,
+                        [],
+                        [new DialogueEffect("start_quest", 0, "start_quest", "meal", "accept", null, null, null, null)])
+                ]),
+                DialogueTestData.End("end")
+            ]
+        };
+
+        var end = service.Preview(draft, Request(currentNodeId: "choice", selectedChoiceId: "accept"));
+
+        Assert.Equal("end", end.CurrentNode!.NodeId);
+        Assert.Equal("start_quest", Assert.Single(end.WouldApplyEffects).EffectType);
+    }
+
+
+    [Fact]
     public void InvalidChoiceStaleNodeAndLoopProtectionReturnWarnings()
     {
         var service = new DialoguePlaythroughService();

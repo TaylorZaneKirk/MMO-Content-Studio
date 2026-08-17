@@ -27,11 +27,13 @@ public sealed class DialoguePlaythroughService
                 false,
                 false,
                 null,
+                [],
                 visited,
                 warnings.Count == 0 ? [InvalidState("Dialogue could not resolve a current node.", "current_node_id")] : warnings);
         }
 
         var nextNodeId = default(string?);
+        IReadOnlyList<DialogueEffect> wouldApplyEffects = [];
         if (request.AcknowledgeEnd && current.NodeType == DialogueAuthoringRegistry.EndNodeType)
         {
             visited.Add(current.NodeId);
@@ -43,6 +45,7 @@ public sealed class DialoguePlaythroughService
                 false,
                 true,
                 null,
+                [],
                 visited.Distinct(StringComparer.Ordinal).ToArray(),
                 warnings);
         }
@@ -72,6 +75,7 @@ public sealed class DialoguePlaythroughService
             else
             {
                 nextNodeId = choice.TargetNodeId;
+                wouldApplyEffects = choice.Effects ?? [];
                 if (!nodes.TryGetValue(nextNodeId, out current!))
                 {
                     warnings.Add(InvalidState($"Choice target node '{nextNodeId}' does not exist.", "target_node_id"));
@@ -94,6 +98,7 @@ public sealed class DialoguePlaythroughService
             current.NodeType is DialogueAuthoringRegistry.SpeakerTextNodeType or DialogueAuthoringRegistry.EndNodeType,
             current.NodeType == DialogueAuthoringRegistry.EndNodeType,
             nextNodeId,
+            wouldApplyEffects,
             visited,
             warnings);
     }

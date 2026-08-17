@@ -139,7 +139,8 @@ public static partial class DialogueDomainRules
                 NormalizeRequired(choice.Text),
                 NormalizeStableId(choice.TargetNodeId),
                 choice.ChoiceOrder,
-                NormalizeConditions(choice.Conditions)))
+                NormalizeConditions(choice.Conditions),
+                NormalizeEffects(choice.Effects ?? [])))
             .OrderBy(choice => choice.ChoiceOrder)
             .ThenBy(choice => choice.ChoiceId, StringComparer.Ordinal)
             .ToArray();
@@ -158,6 +159,25 @@ public static partial class DialogueDomainRules
             NormalizeOptional(condition.ItemId)?.ToLowerInvariant(),
             condition.Quantity);
 
+    public static IReadOnlyList<DialogueEffect> NormalizeEffects(IReadOnlyList<DialogueEffect> effects) =>
+        effects
+            .Select(NormalizeEffect)
+            .OrderBy(effect => effect.EffectOrder)
+            .ThenBy(effect => effect.EffectId, StringComparer.Ordinal)
+            .ToArray();
+
+    public static DialogueEffect NormalizeEffect(DialogueEffect effect) =>
+        new(
+            NormalizeStableId(effect.EffectId),
+            effect.EffectOrder,
+            NormalizeStableId(effect.EffectType),
+            NormalizeOptional(effect.QuestId)?.ToLowerInvariant(),
+            NormalizeOptional(effect.TransitionId)?.ToLowerInvariant(),
+            NormalizeOptional(effect.ItemId)?.ToLowerInvariant(),
+            effect.Quantity,
+            NormalizeOptional(effect.SkillId)?.ToLowerInvariant(),
+            effect.XpAmount);
+
     public static string BuildSemanticComparisonInput(DialogueDraft draft)
     {
         var normalized = NormalizeDraft(draft);
@@ -168,7 +188,7 @@ public static partial class DialogueDomainRules
             string.Join("|", normalized.EntryPoints.Select(entry =>
                 $"{entry.EntryId}:{entry.NodeId}:{entry.Priority}:{entry.EntryOrder}:{ConditionsSignature(entry.Conditions)}")),
             string.Join("|", normalized.Nodes.Select(node =>
-                $"{node.NodeId}:{node.NodeType}:{node.Speaker}:{node.Text}:{node.NextNodeId}:{node.Dismissible}:{node.CanvasX:R}:{node.CanvasY:R}:{node.EditorNotes}:{string.Join(",", node.Choices.Select(choice => $"{choice.ChoiceId}>{choice.TargetNodeId}:{choice.ChoiceOrder}:{choice.Text}:{ConditionsSignature(choice.Conditions)}"))}")),
+                $"{node.NodeId}:{node.NodeType}:{node.Speaker}:{node.Text}:{node.NextNodeId}:{node.Dismissible}:{node.CanvasX:R}:{node.CanvasY:R}:{node.EditorNotes}:{string.Join(",", node.Choices.Select(choice => $"{choice.ChoiceId}>{choice.TargetNodeId}:{choice.ChoiceOrder}:{choice.Text}:{ConditionsSignature(choice.Conditions)}:{EffectsSignature(choice.Effects ?? [])}"))}")),
             normalized.MetadataDescription ?? string.Empty,
             normalized.Notes ?? string.Empty);
     }
@@ -176,6 +196,10 @@ public static partial class DialogueDomainRules
     private static string ConditionsSignature(IReadOnlyList<DialogueCondition> conditions) =>
         string.Join(",", conditions.Select(condition =>
             $"{condition.ConditionType}:{condition.QuestId}:{condition.Status}:{condition.StepId}:{condition.ItemId}:{condition.Quantity}"));
+
+    private static string EffectsSignature(IReadOnlyList<DialogueEffect> effects) =>
+        string.Join(",", effects.Select(effect =>
+            $"{effect.EffectId}:{effect.EffectOrder}:{effect.EffectType}:{effect.QuestId}:{effect.TransitionId}:{effect.ItemId}:{effect.Quantity}:{effect.SkillId}:{effect.XpAmount}"));
 
     [GeneratedRegex("^[a-z][a-z0-9]*(_[a-z0-9]+)*$", RegexOptions.CultureInvariant)]
     private static partial Regex StableIdentifierRegex();

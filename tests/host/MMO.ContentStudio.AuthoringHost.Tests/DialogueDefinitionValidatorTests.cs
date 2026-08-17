@@ -111,6 +111,38 @@ public sealed class DialogueDefinitionValidatorTests
     }
 
     [Fact]
+    public void TypedEffectsAreValidatedByShapeAndStableIdentifiers()
+    {
+        var draft = DialogueTestData.ValidDraft() with
+        {
+            Nodes =
+            [
+                DialogueTestData.Speaker("start", "Hello", "choice"),
+                new("choice", "player_choice", null, "Choose.", null, true, 100, 0, null,
+                [
+                    new(
+                        "ready",
+                        "Ready.",
+                        "end",
+                        0,
+                        [],
+                        [
+                            new DialogueEffect("bad_item", 0, "grant_item", null, null, "Apple", 1, null, null),
+                            new DialogueEffect("bad_xp", 1, "grant_experience", null, null, null, null, "discipline", 0)
+                        ])
+                ]),
+                DialogueTestData.End("end")
+            ]
+        };
+
+        var outcome = CreateValidator().Validate("test_npc_greeting", draft, null, false);
+
+        Assert.False(outcome.ValidForDraft);
+        Assert.Contains(outcome.Messages, message => message.Code == "dialogue_invalid_effect" && message.Field == "choices.effects.item_id");
+        Assert.Contains(outcome.Messages, message => message.Code == "dialogue_invalid_effect" && message.Field == "choices.effects.xp_amount");
+    }
+
+    [Fact]
     public void MissingTargetsAreDraftWarningsAndPublicationErrors()
     {
         var draft = DialogueTestData.ValidDraft() with

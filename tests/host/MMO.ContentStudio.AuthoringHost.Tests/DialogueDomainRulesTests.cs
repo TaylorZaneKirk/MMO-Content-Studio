@@ -67,16 +67,16 @@ public sealed class DialogueDomainRulesTests
     }
 
     [Fact]
-    public void RegistryExposesTypedConditionCapabilityWithoutEffects()
+    public void RegistryExposesTypedConditionAndEffectCapabilities()
     {
         var registry = new DialogueAuthoringRegistry();
 
         Assert.Equal(["quest_status", "quest_step", "has_item"], registry.LoadConditionTypes().Select(option => option.Id));
-        Assert.Empty(registry.LoadEffectTypes());
+        Assert.Equal(["start_quest", "advance_quest", "complete_quest", "grant_item", "remove_item", "grant_experience"], registry.LoadEffectTypes().Select(option => option.Id));
         Assert.True(registry.LoadCapabilities().SupportsConditions);
-        Assert.False(registry.LoadCapabilities().SupportsEffects);
+        Assert.True(registry.LoadCapabilities().SupportsEffects);
         Assert.True(registry.LoadCapabilities().SupportsQuestConditions);
-        Assert.False(registry.LoadCapabilities().SupportsQuestEffects);
+        Assert.True(registry.LoadCapabilities().SupportsQuestEffects);
         Assert.True(registry.LoadCapabilities().SupportsRuntimeDialogueCatalog);
         Assert.False(registry.LoadCapabilities().SupportsLocalization);
         Assert.False(registry.LoadCapabilities().SupportsPortraits);

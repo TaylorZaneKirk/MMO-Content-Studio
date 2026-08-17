@@ -2,8 +2,9 @@
 
 Status: D1-D5 Dialogue Studio authoring, graph editing, runtime catalog export,
 validator/runtime equivalence, reference safety, and end-to-end verification are
-complete. QV3 typed read-only quest/item predicates are implemented; effects and
-quest-state mutation remain deferred.
+complete. QV3 typed read-only quest/item predicates and QV4 typed dialogue
+choice effects are implemented; Quest Studio and authored first-quest content
+remain deferred.
 
 ## Sequence Lock
 
@@ -18,16 +19,18 @@ D3 Godot Dialogue Studio graph editor       complete
 D4 MMO Project runtime catalog handoff     complete
 D5 hardening and playthrough verification       complete
 QV3 typed dialogue conditions                   complete
+QV4 typed dialogue effects                      complete
 
 MMO Project quest foundations
-Dialogue Studio quest effects
 Quest Studio
 ```
 
 Dialogue Studio first authored the D1-D5 dialogue runtime model. MMO Project
-quest foundations then defined authoritative quest state, and QV3 adds
-read-only typed dialogue predicates over quest state and inventory. Dialogue
-effects, quest-state mutation from dialogue, and Quest Studio remain later work.
+quest foundations then defined authoritative quest state, QV3 added read-only
+typed dialogue predicates over quest state and inventory, and QV4 adds typed
+dialogue choice effects that can start/advance/complete quests, grant/remove
+items, and grant XP through runtime-owned settlement. Quest Studio remains
+later work.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -73,7 +76,7 @@ Schema:
 - `dialogue_choices`
 - QV3 adds `dialogue_entry_conditions` and `dialogue_choice_conditions` for
   typed read-only predicates
-- no effect tables
+- QV4 adds `dialogue_choice_effects` for typed runtime-settled choice effects
 
 Routes:
 
@@ -103,8 +106,9 @@ Validation:
 
 - current node types only: `speaker_text`, `player_choice`, `end`
 - QV3 condition types only: `quest_status`, `quest_step`, `has_item`
-- no effects
-- quest fields only through typed read-only conditions
+- QV4 effect types only: `start_quest`, `advance_quest`, `complete_quest`,
+  `grant_item`, `remove_item`, `grant_experience`
+- quest fields only through typed conditions and typed quest-transition effects
 - no arbitrary scripts
 - graph references verified
 - unreachable/cycle/self-loop diagnostics surfaced
@@ -114,9 +118,10 @@ Options should expose:
 - publication states
 - supported node types
 - current condition registry: `quest_status`, `quest_step`, `has_item`
-- current effect registry: empty
+- current effect registry: `start_quest`, `advance_quest`, `complete_quest`,
+  `grant_item`, `remove_item`, `grant_experience`
 - capability flags such as `supports_quest_conditions = true` and
-  `supports_effects = false`
+  `supports_effects = true`
 
 D2 combines schema/repository/API in one slice so the route family is useful
 with repository, preview, playthrough, schema-health, and catalog registration.
@@ -220,8 +225,8 @@ Verification targets:
   interaction, hostile attack, defeat, and terminal cleanup close/cancel as
   currently documented
 - disable/delete blocked while published NPC definitions reference a dialogue
-- only supported typed condition rows reach runtime export; no effects reach
-  runtime export
+- only supported typed condition and effect rows reach runtime export; effect
+  settlement remains server-authoritative and exact-once
 
 Manual playthrough:
 
@@ -236,9 +241,8 @@ Manual playthrough:
 
 ## Deferred Work
 
-- dialogue effects and quest-state mutation
 - objective progress
-- quest rewards
+- broader quest rewards beyond typed item/XP dialogue effects
 - quest journal data
 - content-access gates
 - localization

@@ -21,6 +21,12 @@ public sealed class DialogueAuthoringRegistry
     public const string QuestStatusConditionType = "quest_status";
     public const string QuestStepConditionType = "quest_step";
     public const string HasItemConditionType = "has_item";
+    public const string StartQuestEffectType = "start_quest";
+    public const string AdvanceQuestEffectType = "advance_quest";
+    public const string CompleteQuestEffectType = "complete_quest";
+    public const string GrantItemEffectType = "grant_item";
+    public const string RemoveItemEffectType = "remove_item";
+    public const string GrantExperienceEffectType = "grant_experience";
 
     private static readonly AuthoringOption[] PublicationStates =
     [
@@ -43,6 +49,16 @@ public sealed class DialogueAuthoringRegistry
         new(HasItemConditionType, "Has Item")
     ];
 
+    private static readonly AuthoringOption[] EffectTypes =
+    [
+        new(StartQuestEffectType, "Start Quest"),
+        new(AdvanceQuestEffectType, "Advance Quest"),
+        new(CompleteQuestEffectType, "Complete Quest"),
+        new(GrantItemEffectType, "Grant Item"),
+        new(RemoveItemEffectType, "Remove Item"),
+        new(GrantExperienceEffectType, "Grant Experience")
+    ];
+
     public DialogueAuthoringDefaults Defaults { get; } = new(
         CurrentSchemaVersion,
         DefaultEntryId,
@@ -58,7 +74,7 @@ public sealed class DialogueAuthoringRegistry
 
     public IReadOnlyList<AuthoringOption> LoadConditionTypes() => ConditionTypes;
 
-    public IReadOnlyList<AuthoringOption> LoadEffectTypes() => [];
+    public IReadOnlyList<AuthoringOption> LoadEffectTypes() => EffectTypes;
 
     public DialogueSupportedLimits LoadSupportedLimits() => new(
         MaxIdentifierLength,
@@ -72,9 +88,9 @@ public sealed class DialogueAuthoringRegistry
     public DialogueOperationCapabilities LoadCapabilities() => new(
         true,
         true,
-        false,
         true,
-        false,
+        true,
+        true,
         false,
         false,
         false);

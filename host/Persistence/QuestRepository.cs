@@ -542,6 +542,10 @@ public sealed class QuestRepository : IQuestRepository
                 select dialogue_definition_id, quest_id
                 from dialogue_choice_conditions
                 where quest_id = @quest_id
+                union all
+                select dialogue_definition_id, quest_id
+                from dialogue_choice_effects
+                where quest_id = @quest_id
             ) condition on condition.dialogue_definition_id = d.dialogue_definition_id
             where d.publication_state = 'Published'
             order by d.dialogue_definition_id;

@@ -13,6 +13,12 @@ const FORM_LABEL_WIDTH := 132.0
 const CONDITION_TYPE_QUEST_STATUS := "quest_status"
 const CONDITION_TYPE_QUEST_STEP := "quest_step"
 const CONDITION_TYPE_HAS_ITEM := "has_item"
+const EFFECT_TYPE_START_QUEST := "start_quest"
+const EFFECT_TYPE_ADVANCE_QUEST := "advance_quest"
+const EFFECT_TYPE_COMPLETE_QUEST := "complete_quest"
+const EFFECT_TYPE_GRANT_ITEM := "grant_item"
+const EFFECT_TYPE_REMOVE_ITEM := "remove_item"
+const EFFECT_TYPE_GRANT_EXPERIENCE := "grant_experience"
 const QUEST_STATUSES := ["not_started", "active", "completed"]
 
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
@@ -597,6 +603,7 @@ func _add_node(node_type: String) -> void:
 			"target_node_id": "",
 			"choice_order": 0,
 			"conditions": [],
+			"effects": [],
 		}],
 	})
 	_current_dialogue["nodes"] = nodes
@@ -702,6 +709,7 @@ func _on_connection_request(from_node: StringName, _from_port: int, to_node: Str
 				"target_node_id": str(to_node),
 				"choice_order": 0,
 				"conditions": [],
+				"effects": [],
 			})
 		else:
 			(choices[0] as Dictionary)["target_node_id"] = str(to_node)
@@ -831,6 +839,7 @@ func _add_choice_to_selected_node() -> void:
 		"target_node_id": "",
 		"choice_order": order,
 		"conditions": [],
+		"effects": [],
 	})
 	node["choices"] = choices
 	_rebuild_graph()
@@ -873,6 +882,7 @@ func _rebuild_choices(node: Dictionary) -> void:
 		remove.pressed.connect(_remove_choice.bind(index))
 		row.add_child(remove)
 		_add_conditions_editor(row, choice.get("conditions", []) as Array, "choice", index, index)
+		_add_effects_editor(row, choice.get("effects", []) as Array, index)
 
 
 func _on_choice_id_changed(value: String, index: int) -> void:
@@ -1038,6 +1048,144 @@ func _add_condition_quantity_field(grid: GridContainer, value: int, owner_kind: 
 	grid.add_child(quantity)
 
 
+func _add_effects_editor(parent: VBoxContainer, effects: Array, choice_index: int) -> void:
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 6)
+	parent.add_child(header)
+	var label := _wrapped_label("Effects (%d)" % effects.size())
+	header.add_child(label)
+	var add_button := Button.new()
+	add_button.text = "+ Effect"
+	add_button.disabled = not _form_editable
+	add_button.pressed.connect(_add_effect.bind(choice_index))
+	header.add_child(add_button)
+	for effect_index in range(effects.size()):
+		if effects[effect_index] is not Dictionary:
+			continue
+		var effect := effects[effect_index] as Dictionary
+		_add_effect_row(parent, effect, choice_index, effect_index)
+
+
+func _add_effect_row(parent: VBoxContainer, effect: Dictionary, choice_index: int, effect_index: int) -> void:
+	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 4)
+	parent.add_child(row)
+	var top := HBoxContainer.new()
+	top.add_theme_constant_override("separation", 6)
+	row.add_child(top)
+	var id_field := LineEdit.new()
+	id_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	id_field.placeholder_text = "effect_id"
+	id_field.text = str(effect.get("effect_id", ""))
+	id_field.editable = _form_editable
+	id_field.text_changed.connect(_on_effect_id_changed.bind(choice_index, effect_index))
+	top.add_child(id_field)
+	var type_select := OptionButton.new()
+	type_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_effect_type_options(type_select, str(effect.get("effect_type", EFFECT_TYPE_GRANT_ITEM)))
+	type_select.disabled = not _form_editable
+	type_select.item_selected.connect(_on_effect_type_selected.bind(choice_index, effect_index, type_select))
+	top.add_child(type_select)
+	var up := Button.new()
+	up.text = "Up"
+	up.disabled = not _form_editable or effect_index <= 0
+	up.pressed.connect(_move_effect.bind(choice_index, effect_index, -1))
+	top.add_child(up)
+	var down := Button.new()
+	down.text = "Down"
+	down.disabled = not _form_editable or effect_index >= (_effect_list_at(choice_index).size() - 1)
+	down.pressed.connect(_move_effect.bind(choice_index, effect_index, 1))
+	top.add_child(down)
+	var remove := Button.new()
+	remove.text = "Remove"
+	remove.disabled = not _form_editable
+	remove.pressed.connect(_remove_effect.bind(choice_index, effect_index))
+	top.add_child(remove)
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 4)
+	row.add_child(grid)
+	var effect_type := str(effect.get("effect_type", EFFECT_TYPE_GRANT_ITEM))
+	match effect_type:
+		EFFECT_TYPE_START_QUEST, EFFECT_TYPE_ADVANCE_QUEST, EFFECT_TYPE_COMPLETE_QUEST:
+			_add_effect_quest_field(grid, str(effect.get("quest_id", "")), choice_index, effect_index)
+			_add_effect_transition_field(grid, str(effect.get("quest_id", "")), effect_type, str(effect.get("transition_id", "")), choice_index, effect_index)
+		EFFECT_TYPE_GRANT_EXPERIENCE:
+			_add_effect_skill_field(grid, str(effect.get("skill_id", "")), choice_index, effect_index)
+			_add_effect_xp_field(grid, int(effect.get("xp_amount", 1)), choice_index, effect_index)
+		_:
+			_add_effect_item_field(grid, str(effect.get("item_id", "")), choice_index, effect_index)
+			_add_effect_quantity_field(grid, int(effect.get("quantity", 1)), choice_index, effect_index)
+
+
+func _add_effect_quest_field(grid: GridContainer, selected: String, choice_index: int, effect_index: int) -> void:
+	grid.add_child(_label("Quest"))
+	var quest := OptionButton.new()
+	quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_quest_reference_options(quest, selected)
+	quest.disabled = not _form_editable
+	quest.item_selected.connect(_on_effect_quest_selected.bind(choice_index, effect_index, quest))
+	grid.add_child(quest)
+
+
+func _add_effect_transition_field(grid: GridContainer, quest_id: String, effect_type: String, selected: String, choice_index: int, effect_index: int) -> void:
+	grid.add_child(_label("Transition"))
+	var transition := OptionButton.new()
+	transition.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_quest_transition_options(transition, quest_id, effect_type, selected)
+	transition.disabled = not _form_editable
+	transition.item_selected.connect(_on_effect_transition_selected.bind(choice_index, effect_index, transition))
+	grid.add_child(transition)
+
+
+func _add_effect_item_field(grid: GridContainer, selected: String, choice_index: int, effect_index: int) -> void:
+	grid.add_child(_label("Item"))
+	var item := OptionButton.new()
+	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_item_reference_options(item, selected)
+	item.disabled = not _form_editable
+	item.item_selected.connect(_on_effect_item_selected.bind(choice_index, effect_index, item))
+	grid.add_child(item)
+
+
+func _add_effect_quantity_field(grid: GridContainer, value: int, choice_index: int, effect_index: int) -> void:
+	grid.add_child(_label("Quantity"))
+	var quantity := SpinBox.new()
+	quantity.min_value = 1
+	quantity.max_value = 999999
+	quantity.step = 1
+	quantity.value = max(1, value)
+	quantity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quantity.editable = _form_editable
+	quantity.value_changed.connect(_on_effect_quantity_changed.bind(choice_index, effect_index))
+	grid.add_child(quantity)
+
+
+func _add_effect_skill_field(grid: GridContainer, selected: String, choice_index: int, effect_index: int) -> void:
+	grid.add_child(_label("Skill"))
+	var skill := OptionButton.new()
+	skill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_fill_skill_reference_options(skill, selected)
+	skill.disabled = not _form_editable
+	skill.item_selected.connect(_on_effect_skill_selected.bind(choice_index, effect_index, skill))
+	grid.add_child(skill)
+
+
+func _add_effect_xp_field(grid: GridContainer, value: int, choice_index: int, effect_index: int) -> void:
+	grid.add_child(_label("XP"))
+	var xp := SpinBox.new()
+	xp.min_value = 1
+	xp.max_value = 999999999
+	xp.step = 1
+	xp.value = max(1, value)
+	xp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	xp.editable = _form_editable
+	xp.value_changed.connect(_on_effect_xp_changed.bind(choice_index, effect_index))
+	grid.add_child(xp)
+
+
 func _add_condition(owner_kind: String, owner_index: int, choice_index: int) -> void:
 	var conditions := _condition_list_at(owner_kind, owner_index, choice_index)
 	conditions.append(_default_condition(CONDITION_TYPE_QUEST_STATUS))
@@ -1133,6 +1281,110 @@ func _on_condition_quantity_changed(value: float, owner_kind: String, owner_inde
 	_on_form_changed()
 
 
+func _add_effect(choice_index: int) -> void:
+	var effects := _effect_list_at(choice_index)
+	effects.append(_default_effect(EFFECT_TYPE_GRANT_ITEM, _choice_at(choice_index), effects.size()))
+	_refresh_effect_owner()
+	_on_form_changed()
+
+
+func _remove_effect(choice_index: int, effect_index: int) -> void:
+	var effects := _effect_list_at(choice_index)
+	if effect_index >= 0 and effect_index < effects.size():
+		effects.remove_at(effect_index)
+	_reorder_effects(effects)
+	_refresh_effect_owner()
+	_on_form_changed()
+
+
+func _move_effect(choice_index: int, effect_index: int, direction: int) -> void:
+	var effects := _effect_list_at(choice_index)
+	var target := effect_index + direction
+	if effect_index < 0 or effect_index >= effects.size() or target < 0 or target >= effects.size():
+		return
+	var moving = effects[effect_index]
+	effects.remove_at(effect_index)
+	effects.insert(target, moving)
+	_reorder_effects(effects)
+	_refresh_effect_owner()
+	_on_form_changed()
+
+
+func _on_effect_id_changed(value: String, choice_index: int, effect_index: int) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	effect["effect_id"] = value.strip_edges()
+	_on_form_changed()
+
+
+func _on_effect_type_selected(_selected_index: int, choice_index: int, effect_index: int, control: OptionButton) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	var replacement := _default_effect(
+		_selected_metadata(control),
+		_choice_at(choice_index),
+		int(effect.get("effect_order", effect_index)))
+	replacement["effect_id"] = str(effect.get("effect_id", replacement.get("effect_id", "")))
+	effect.clear()
+	for key in replacement.keys():
+		effect[key] = replacement[key]
+	_refresh_effect_owner()
+	_on_form_changed()
+
+
+func _on_effect_quest_selected(_selected_index: int, choice_index: int, effect_index: int, control: OptionButton) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	var quest_id := _selected_metadata(control)
+	effect["quest_id"] = quest_id
+	effect["transition_id"] = _first_transition_id_for_effect(quest_id, str(effect.get("effect_type", EFFECT_TYPE_START_QUEST)))
+	_refresh_effect_owner()
+	_on_form_changed()
+
+
+func _on_effect_transition_selected(_selected_index: int, choice_index: int, effect_index: int, control: OptionButton) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	effect["transition_id"] = _selected_metadata(control)
+	_on_form_changed()
+
+
+func _on_effect_item_selected(_selected_index: int, choice_index: int, effect_index: int, control: OptionButton) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	effect["item_id"] = _selected_metadata(control)
+	_on_form_changed()
+
+
+func _on_effect_quantity_changed(value: float, choice_index: int, effect_index: int) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	effect["quantity"] = int(value)
+	_on_form_changed()
+
+
+func _on_effect_skill_selected(_selected_index: int, choice_index: int, effect_index: int, control: OptionButton) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	effect["skill_id"] = _selected_metadata(control)
+	_on_form_changed()
+
+
+func _on_effect_xp_changed(value: float, choice_index: int, effect_index: int) -> void:
+	var effect := _effect_at(choice_index, effect_index)
+	if effect.is_empty():
+		return
+	effect["xp_amount"] = int(value)
+	_on_form_changed()
+
+
 func _condition_list_at(owner_kind: String, owner_index: int, choice_index: int) -> Array:
 	if owner_kind == "entry":
 		var entries := _current_dialogue.get("entry_points", []) as Array
@@ -1155,6 +1407,32 @@ func _condition_at(owner_kind: String, owner_index: int, choice_index: int, cond
 	if condition_index < 0 or condition_index >= conditions.size() or conditions[condition_index] is not Dictionary:
 		return {}
 	return conditions[condition_index] as Dictionary
+
+
+func _effect_list_at(choice_index: int) -> Array:
+	var choice := _choice_at(choice_index)
+	if choice.is_empty():
+		return []
+	if choice.get("effects", null) is not Array:
+		choice["effects"] = []
+	return choice.get("effects", []) as Array
+
+
+func _effect_at(choice_index: int, effect_index: int) -> Dictionary:
+	var effects := _effect_list_at(choice_index)
+	if effect_index < 0 or effect_index >= effects.size() or effects[effect_index] is not Dictionary:
+		return {}
+	return effects[effect_index] as Dictionary
+
+
+func _refresh_effect_owner() -> void:
+	_load_selected_node()
+
+
+func _reorder_effects(effects: Array) -> void:
+	for index in range(effects.size()):
+		if effects[index] is Dictionary:
+			(effects[index] as Dictionary)["effect_order"] = index
 
 
 func _refresh_condition_owner(owner_kind: String) -> void:
@@ -1255,6 +1533,9 @@ func _render_playthrough(payload: Dictionary) -> void:
 	var speaker := _nullable_string(payload.get("speaker", ""))
 	var text := _nullable_string(payload.get("text", ""))
 	_workspace_support.add_wrapped_label(_playthrough, "%s%s" % [speaker + ": " if not speaker.is_empty() else "", text if not text.is_empty() else "(No text)"])
+	var effects := payload.get("would_apply_effects", []) as Array
+	if not effects.is_empty():
+		_workspace_support.add_wrapped_label(_playthrough, "Would apply: %s" % _effect_summary_list(effects))
 	var choices := payload.get("visible_choices", []) as Array
 	if not choices.is_empty():
 		for choice_variant in choices:
@@ -1454,6 +1735,26 @@ func _fill_condition_type_options(control: OptionButton, selected: String) -> vo
 	_select_option(control, selected)
 
 
+func _fill_effect_type_options(control: OptionButton, selected: String) -> void:
+	control.clear()
+	var values := _options.get("effect_types", []) as Array
+	if values.is_empty():
+		values = [
+			{"id": EFFECT_TYPE_START_QUEST, "display_name": "Start Quest"},
+			{"id": EFFECT_TYPE_ADVANCE_QUEST, "display_name": "Advance Quest"},
+			{"id": EFFECT_TYPE_COMPLETE_QUEST, "display_name": "Complete Quest"},
+			{"id": EFFECT_TYPE_GRANT_ITEM, "display_name": "Grant Item"},
+			{"id": EFFECT_TYPE_REMOVE_ITEM, "display_name": "Remove Item"},
+			{"id": EFFECT_TYPE_GRANT_EXPERIENCE, "display_name": "Grant Experience"},
+		]
+	for variant in values:
+		if variant is Dictionary:
+			var option := variant as Dictionary
+			control.add_item(str(option.get("display_name", option.get("id", "Effect"))))
+			control.set_item_metadata(control.item_count - 1, str(option.get("id", "")))
+	_select_option(control, selected)
+
+
 func _fill_quest_reference_options(control: OptionButton, selected: String) -> void:
 	control.clear()
 	var references := _options.get("quest_references", []) as Array
@@ -1495,6 +1796,26 @@ func _fill_quest_step_options(control: OptionButton, quest_id: String, selected:
 	_select_option(control, selected)
 
 
+func _fill_quest_transition_options(control: OptionButton, quest_id: String, effect_type: String, selected: String) -> void:
+	control.clear()
+	var selected_found := false
+	for transition in _transitions_for_quest(quest_id):
+		if transition is Dictionary and _transition_matches_effect(effect_type, transition as Dictionary):
+			var option := transition as Dictionary
+			var transition_id := str(option.get("transition_id", ""))
+			control.add_item(str(option.get("display_name", transition_id)))
+			control.set_item_metadata(control.item_count - 1, transition_id)
+			if transition_id == selected:
+				selected_found = true
+	if not selected_found and not selected.is_empty():
+		control.add_item("%s (unavailable)" % selected)
+		control.set_item_metadata(control.item_count - 1, selected)
+	if control.item_count == 0:
+		control.add_item("No matching transitions")
+		control.set_item_metadata(0, "")
+	_select_option(control, selected)
+
+
 func _fill_item_reference_options(control: OptionButton, selected: String) -> void:
 	control.clear()
 	var references := _options.get("item_references", []) as Array
@@ -1516,10 +1837,38 @@ func _fill_item_reference_options(control: OptionButton, selected: String) -> vo
 	_select_option(control, selected)
 
 
+func _fill_skill_reference_options(control: OptionButton, selected: String) -> void:
+	control.clear()
+	var references := _options.get("skill_references", []) as Array
+	var selected_found := false
+	for variant in references:
+		if variant is Dictionary:
+			var skill := variant as Dictionary
+			var skill_id := str(skill.get("id", ""))
+			control.add_item(_display_option_label(str(skill.get("display_name", skill_id)), skill_id))
+			control.set_item_metadata(control.item_count - 1, skill_id)
+			if skill_id == selected:
+				selected_found = true
+	if not selected_found and not selected.is_empty():
+		control.add_item("%s (unavailable)" % selected)
+		control.set_item_metadata(control.item_count - 1, selected)
+	if control.item_count == 0:
+		control.add_item("No skills")
+		control.set_item_metadata(0, "")
+	_select_option(control, selected)
+
+
 func _steps_for_quest(quest_id: String) -> Array:
 	for variant in _options.get("quest_references", []) as Array:
 		if variant is Dictionary and str((variant as Dictionary).get("quest_id", "")) == quest_id:
 			return (variant as Dictionary).get("steps", []) as Array
+	return []
+
+
+func _transitions_for_quest(quest_id: String) -> Array:
+	for variant in _options.get("quest_references", []) as Array:
+		if variant is Dictionary and str((variant as Dictionary).get("quest_id", "")) == quest_id:
+			return (variant as Dictionary).get("transitions", []) as Array
 	return []
 
 
@@ -1538,8 +1887,23 @@ func _first_step_id_for_quest(quest_id: String) -> String:
 	return ""
 
 
+func _first_transition_id_for_effect(quest_id: String, effect_type: String) -> String:
+	for transition in _transitions_for_quest(quest_id):
+		if transition is Dictionary and _transition_matches_effect(effect_type, transition as Dictionary):
+			return str((transition as Dictionary).get("transition_id", ""))
+	return ""
+
+
 func _first_item_id() -> String:
 	var references := _options.get("item_references", []) as Array
+	for variant in references:
+		if variant is Dictionary:
+			return str((variant as Dictionary).get("id", ""))
+	return ""
+
+
+func _first_skill_id() -> String:
+	var references := _options.get("skill_references", []) as Array
 	for variant in references:
 		if variant is Dictionary:
 			return str((variant as Dictionary).get("id", ""))
@@ -1575,6 +1939,44 @@ func _default_condition(condition_type: String) -> Dictionary:
 			}
 
 
+func _default_effect(effect_type: String, choice: Dictionary, order: int) -> Dictionary:
+	var effect_id := _unique_effect_id(choice, "effect")
+	match effect_type:
+		EFFECT_TYPE_START_QUEST, EFFECT_TYPE_ADVANCE_QUEST, EFFECT_TYPE_COMPLETE_QUEST:
+			var quest_id := _first_quest_id()
+			return {
+				"effect_id": effect_id,
+				"effect_order": order,
+				"effect_type": effect_type,
+				"quest_id": quest_id,
+				"transition_id": _first_transition_id_for_effect(quest_id, effect_type),
+			}
+		EFFECT_TYPE_GRANT_EXPERIENCE:
+			return {
+				"effect_id": effect_id,
+				"effect_order": order,
+				"effect_type": EFFECT_TYPE_GRANT_EXPERIENCE,
+				"skill_id": _first_skill_id(),
+				"xp_amount": 1,
+			}
+		EFFECT_TYPE_REMOVE_ITEM:
+			return {
+				"effect_id": effect_id,
+				"effect_order": order,
+				"effect_type": EFFECT_TYPE_REMOVE_ITEM,
+				"item_id": _first_item_id(),
+				"quantity": 1,
+			}
+		_:
+			return {
+				"effect_id": effect_id,
+				"effect_order": order,
+				"effect_type": EFFECT_TYPE_GRANT_ITEM,
+				"item_id": _first_item_id(),
+				"quantity": 1,
+			}
+
+
 func _unique_node_id(node_type: String) -> String:
 	var prefix := "node"
 	match node_type:
@@ -1603,6 +2005,42 @@ func _unique_choice_id(node: Dictionary, prefix: String) -> String:
 		index += 1
 		candidate = "%s_%d" % [prefix, index]
 	return candidate
+
+
+func _unique_effect_id(choice: Dictionary, prefix: String) -> String:
+	var existing := {}
+	for effect_variant in choice.get("effects", []) as Array:
+		if effect_variant is Dictionary:
+			existing[str((effect_variant as Dictionary).get("effect_id", ""))] = true
+	var index := 1
+	var candidate := "%s_%d" % [prefix, index]
+	while existing.has(candidate):
+		index += 1
+		candidate = "%s_%d" % [prefix, index]
+	return candidate
+
+
+func _transition_matches_effect(effect_type: String, transition: Dictionary) -> bool:
+	var source_status := str(transition.get("source_status", ""))
+	var target_status := str(transition.get("target_status", ""))
+	match effect_type:
+		EFFECT_TYPE_START_QUEST:
+			return source_status == "not_started" and target_status == "active"
+		EFFECT_TYPE_ADVANCE_QUEST:
+			return source_status == "active" and target_status == "active"
+		EFFECT_TYPE_COMPLETE_QUEST:
+			return source_status == "active" and target_status == "completed"
+		_:
+			return false
+
+
+func _effect_summary_list(effects: Array) -> String:
+	var parts: Array[String] = []
+	for effect_variant in effects:
+		if effect_variant is Dictionary:
+			var effect := effect_variant as Dictionary
+			parts.append("%s:%s" % [str(effect.get("effect_order", 0)), str(effect.get("effect_type", ""))])
+	return ", ".join(parts)
 
 
 func _graph_summary(node: Dictionary) -> String:

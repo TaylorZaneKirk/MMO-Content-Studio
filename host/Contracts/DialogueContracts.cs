@@ -37,12 +37,22 @@ public sealed record DialogueOptionsResponse(
     [property: JsonPropertyName("capabilities")] DialogueOperationCapabilities Capabilities,
     [property: JsonPropertyName("defaults")] DialogueAuthoringDefaults Defaults,
     [property: JsonPropertyName("quest_references")] IReadOnlyList<DialogueQuestConditionOption>? QuestReferences = null,
-    [property: JsonPropertyName("item_references")] IReadOnlyList<AuthoringOption>? ItemReferences = null);
+    [property: JsonPropertyName("item_references")] IReadOnlyList<AuthoringOption>? ItemReferences = null,
+    [property: JsonPropertyName("skill_references")] IReadOnlyList<AuthoringOption>? SkillReferences = null);
 
 public sealed record DialogueQuestConditionOption(
     [property: JsonPropertyName("quest_id")] string QuestId,
     [property: JsonPropertyName("display_name")] string DisplayName,
-    [property: JsonPropertyName("steps")] IReadOnlyList<AuthoringOption> Steps);
+    [property: JsonPropertyName("steps")] IReadOnlyList<AuthoringOption> Steps,
+    [property: JsonPropertyName("transitions")] IReadOnlyList<DialogueQuestTransitionOption>? Transitions = null);
+
+public sealed record DialogueQuestTransitionOption(
+    [property: JsonPropertyName("transition_id")] string TransitionId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("source_status")] string SourceStatus,
+    [property: JsonPropertyName("source_step_id")] string? SourceStepId,
+    [property: JsonPropertyName("target_status")] string TargetStatus,
+    [property: JsonPropertyName("target_step_id")] string? TargetStepId);
 
 public sealed record DialogueOperationCapabilities(
     [property: JsonPropertyName("supports_runtime_dialogue_catalog")] bool SupportsRuntimeDialogueCatalog,
@@ -61,6 +71,17 @@ public sealed record DialogueCondition(
     [property: JsonPropertyName("step_id")] string? StepId,
     [property: JsonPropertyName("item_id")] string? ItemId,
     [property: JsonPropertyName("quantity")] int? Quantity);
+
+public sealed record DialogueEffect(
+    [property: JsonPropertyName("effect_id")] string EffectId,
+    [property: JsonPropertyName("effect_order")] int EffectOrder,
+    [property: JsonPropertyName("effect_type")] string EffectType,
+    [property: JsonPropertyName("quest_id")] string? QuestId,
+    [property: JsonPropertyName("transition_id")] string? TransitionId,
+    [property: JsonPropertyName("item_id")] string? ItemId,
+    [property: JsonPropertyName("quantity")] int? Quantity,
+    [property: JsonPropertyName("skill_id")] string? SkillId,
+    [property: JsonPropertyName("xp_amount")] long? XpAmount);
 
 public sealed record DialogueSupportedLimits(
     [property: JsonPropertyName("max_identifier_length")] int MaxIdentifierLength,
@@ -104,7 +125,8 @@ public sealed record DialogueChoice(
     [property: JsonPropertyName("text")] string Text,
     [property: JsonPropertyName("target_node_id")] string TargetNodeId,
     [property: JsonPropertyName("choice_order")] int ChoiceOrder,
-    [property: JsonPropertyName("conditions")] IReadOnlyList<DialogueCondition> Conditions);
+    [property: JsonPropertyName("conditions")] IReadOnlyList<DialogueCondition> Conditions,
+    [property: JsonPropertyName("effects")] IReadOnlyList<DialogueEffect>? Effects = null);
 
 public sealed record DialogueDraft(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -172,6 +194,7 @@ public sealed record DialoguePlaythroughResponse(
     [property: JsonPropertyName("can_continue")] bool CanContinue,
     [property: JsonPropertyName("is_end")] bool IsEnd,
     [property: JsonPropertyName("next_node_id")] string? NextNodeId,
+    [property: JsonPropertyName("would_apply_effects")] IReadOnlyList<DialogueEffect> WouldApplyEffects,
     [property: JsonPropertyName("visited_node_ids")] IReadOnlyList<string> VisitedNodeIds,
     [property: JsonPropertyName("warnings")] IReadOnlyList<ApiError> Warnings);
 

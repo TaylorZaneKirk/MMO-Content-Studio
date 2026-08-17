@@ -13,6 +13,7 @@ public sealed class QuestSchemaRequirements : IAuthoringSchemaRequirementProvide
         AuthoringSchemaRequirement.Column("quest_definitions", "display_name"),
         AuthoringSchemaRequirement.Column("quest_definitions", "publication_state"),
         AuthoringSchemaRequirement.Column("quest_definitions", "schema_version"),
+        AuthoringSchemaRequirement.Column("quest_definitions", "publication_token"),
         AuthoringSchemaRequirement.Column("quest_definitions", "created_at_utc"),
         AuthoringSchemaRequirement.Column("quest_definitions", "updated_at_utc"),
         AuthoringSchemaRequirement.Table("quest_steps"),
@@ -38,6 +39,7 @@ public sealed class QuestSchemaRequirements : IAuthoringSchemaRequirementProvide
         AuthoringSchemaRequirement.Constraint("quest_transitions_transition_id_format_check"),
         AuthoringSchemaRequirement.Constraint("quest_transitions_source_status_check"),
         AuthoringSchemaRequirement.Constraint("quest_transitions_target_status_check"),
+        AuthoringSchemaRequirement.Trigger("quest_definitions", "quest_definitions_publication_token_lifecycle"),
         AuthoringSchemaRequirement.Trigger("quest_steps", "quest_steps_touch_definition_updated_at"),
         AuthoringSchemaRequirement.Trigger("quest_transitions", "quest_transitions_touch_definition_updated_at")
     ];

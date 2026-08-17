@@ -11,7 +11,7 @@ public sealed class DialogueAuthoringServiceTests
     private const string DialogueId = "test_npc_greeting";
 
     [Fact]
-    public async Task OptionsExposeLockedD4Capabilities()
+    public async Task OptionsExposeLockedQv4Capabilities()
     {
         var service = CreateService(new InMemoryDialogueRepository());
 
@@ -20,12 +20,12 @@ public sealed class DialogueAuthoringServiceTests
         AssertSucceeded(result);
         Assert.Contains(result.Value!.NodeTypes, option => option.Id == "speaker_text");
         Assert.Equal(["quest_status", "quest_step", "has_item"], result.Value.ConditionTypes.Select(option => option.Id));
-        Assert.Empty(result.Value.EffectTypes);
+        Assert.Equal(["start_quest", "advance_quest", "complete_quest", "grant_item", "remove_item", "grant_experience"], result.Value.EffectTypes.Select(option => option.Id));
         Assert.True(result.Value.Capabilities.SupportsRuntimeDialogueCatalog);
         Assert.True(result.Value.Capabilities.SupportsConditions);
-        Assert.False(result.Value.Capabilities.SupportsEffects);
+        Assert.True(result.Value.Capabilities.SupportsEffects);
         Assert.True(result.Value.Capabilities.SupportsQuestConditions);
-        Assert.False(result.Value.Capabilities.SupportsQuestEffects);
+        Assert.True(result.Value.Capabilities.SupportsQuestEffects);
         Assert.False(result.Value.Capabilities.SupportsHotReload);
         Assert.NotNull(result.Value.QuestReferences);
         Assert.NotNull(result.Value.ItemReferences);

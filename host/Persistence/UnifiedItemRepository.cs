@@ -547,6 +547,10 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 select dialogue_definition_id, item_id
                 from dialogue_choice_conditions
                 where item_id = @item_id
+                union all
+                select dialogue_definition_id, item_id
+                from dialogue_choice_effects
+                where item_id = @item_id
             ) condition on condition.dialogue_definition_id = d.dialogue_definition_id
             where d.publication_state = 'Published'
             order by d.dialogue_definition_id;
