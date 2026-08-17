@@ -27,6 +27,122 @@ public sealed class QuestAuthoringServiceTests
     }
 
     [Fact]
+    public async Task SaveDraftUnreferencedExistingQuestSucceeds()
+    {
+        var repository = new TestQuestRepository();
+        var record = repository.Upsert("test_quest", "Published", Draft());
+        var service = CreateService(repository);
+        var draft = Draft(
+            steps: [Step("replacement", 0)],
+            transitions: [
+                Transition("accept", "not_started", null, "active", "replacement", 0),
+                Transition("finish", "active", "replacement", "completed", null, 1)
+            ]);
+        var signature = QuestAuthoringService.ComputePreviewSignature(
+            record.QuestId,
+            "save_draft",
+            draft,
+            record.UpdatedAtUtc);
+
+        var result = await service.SaveDraftAsync(
+            record.QuestId,
+            new QuestMutationRequest(
+                draft.DisplayName,
+                draft.SchemaVersion,
+                draft.Steps,
+                draft.Transitions,
+                record.UpdatedAtUtc,
+                signature),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Draft", result.Value!.Quest.PublicationState);
+        Assert.Equal("replacement", Assert.Single(result.Value.Quest.Steps).StepId);
+    }
+
+    [Fact]
+    public async Task ReferencedPublishedQuestCannotSaveDraftAndPreviewReportsBlocker()
+    {
+        var repository = new TestQuestRepository();
+        var record = repository.Upsert("test_quest", "Published", Draft());
+        repository.SetReferences(record.QuestId, ActiveReference(record.QuestId, "first"));
+        var service = CreateService(repository);
+        var draft = Draft(
+            steps: [Step("replacement", 0)],
+            transitions: [
+                Transition("accept", "not_started", null, "active", "replacement", 0),
+                Transition("finish", "active", "replacement", "completed", null, 1)
+            ]);
+
+        var preview = await service.PreviewAsync(
+            record.QuestId,
+            new PreviewQuestRequest(
+                draft.DisplayName,
+                draft.SchemaVersion,
+                draft.Steps,
+                draft.Transitions,
+                record.UpdatedAtUtc,
+                "save_draft"),
+            TestContext.Current.CancellationToken);
+        var result = await service.SaveDraftAsync(
+            record.QuestId,
+            new QuestMutationRequest(
+                draft.DisplayName,
+                draft.SchemaVersion,
+                draft.Steps,
+                draft.Transitions,
+                record.UpdatedAtUtc,
+                preview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(preview.Succeeded);
+        Assert.False(preview.Value!.ValidForDraft);
+        Assert.Contains(preview.Value.Messages, IsReferenceBlocked);
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, IsReferenceBlocked);
+        var current = await repository.LoadAsync(record.QuestId, TestContext.Current.CancellationToken);
+        Assert.Equal("Published", current!.PublicationState);
+        Assert.Equal("first", Assert.Single(current.Steps).StepId);
+    }
+
+    [Fact]
+    public async Task ReferencedDraftQuestCannotBeStructurallyReplacedBySaveDraft()
+    {
+        var repository = new TestQuestRepository();
+        var record = repository.Upsert("test_quest", "Draft", Draft());
+        repository.SetReferences(record.QuestId, new QuestStateReferenceSummary(record.QuestId, 1, 0, 1, []));
+        var service = CreateService(repository);
+        var draft = Draft(
+            steps: [Step("replacement", 0)],
+            transitions: [
+                Transition("accept", "not_started", null, "active", "replacement", 0),
+                Transition("finish", "active", "replacement", "completed", null, 1)
+            ]);
+        var signature = QuestAuthoringService.ComputePreviewSignature(
+            record.QuestId,
+            "save_draft",
+            draft,
+            record.UpdatedAtUtc);
+
+        var result = await service.SaveDraftAsync(
+            record.QuestId,
+            new QuestMutationRequest(
+                draft.DisplayName,
+                draft.SchemaVersion,
+                draft.Steps,
+                draft.Transitions,
+                record.UpdatedAtUtc,
+                signature),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, IsReferenceBlocked);
+        var current = await repository.LoadAsync(record.QuestId, TestContext.Current.CancellationToken);
+        Assert.Equal("Draft", current!.PublicationState);
+        Assert.Equal("first", Assert.Single(current.Steps).StepId);
+    }
+
+    [Fact]
     public async Task DisableActiveReferencedQuestIsBlockedAndDoesNotPublish()
     {
         var repository = new TestQuestRepository();
@@ -263,6 +379,11 @@ public sealed class QuestAuthoringServiceTests
             if (existing is not null && expectedUpdatedAtUtc != existing.UpdatedAtUtc)
             {
                 throw new QuestDefinitionConcurrencyException(questId);
+            }
+            var references = _references.GetValueOrDefault(questId);
+            if (references is not null && references.HasReferences)
+            {
+                throw new QuestDefinitionReferencedByStateException(questId, "save_draft", references);
             }
 
             return Task.FromResult(Upsert(questId, "Draft", draft));

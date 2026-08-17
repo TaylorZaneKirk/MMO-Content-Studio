@@ -8,7 +8,8 @@ public sealed class QuestDefinitionValidator
     private static readonly HashSet<string> DraftBlockingValidationCodes = new(StringComparer.Ordinal)
     {
         "quest_invalid_definition",
-        "quest_invalid_graph"
+        "quest_invalid_graph",
+        "quest_state_reference_blocked"
     };
 
     public QuestValidationOutcome Validate(

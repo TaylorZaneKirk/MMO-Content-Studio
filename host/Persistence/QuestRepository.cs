@@ -89,8 +89,12 @@ public sealed class QuestRepository : IQuestRepository
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockQuestContentStateAsync(connection, transaction, questId, cancellationToken);
         var existing = await LoadAsync(connection, transaction, questId, true, cancellationToken);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, questId);
+        var references = await LoadStateReferencesAsync(connection, transaction, questId, cancellationToken);
+        EnsureReferenceSafeDraftReplacement(questId, references);
+
         if (existing is null)
         {
             await InsertRootAsync(connection, transaction, questId, draft, cancellationToken);
@@ -116,6 +120,7 @@ public sealed class QuestRepository : IQuestRepository
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockQuestContentStateAsync(connection, transaction, questId, cancellationToken);
         var existing = await LoadAsync(connection, transaction, questId, true, cancellationToken)
             ?? throw new QuestDefinitionNotFoundException(questId);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, questId);
@@ -145,6 +150,7 @@ public sealed class QuestRepository : IQuestRepository
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockQuestContentStateAsync(connection, transaction, questId, cancellationToken);
         var existing = await LoadAsync(connection, transaction, questId, true, cancellationToken)
             ?? throw new QuestDefinitionNotFoundException(questId);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, questId);
@@ -479,6 +485,31 @@ public sealed class QuestRepository : IQuestRepository
         {
             throw new QuestDefinitionMissingActiveStepException(questId, missingStepIds, references);
         }
+    }
+
+    private static void EnsureReferenceSafeDraftReplacement(
+        string questId,
+        QuestStateReferenceSummary references)
+    {
+        if (references.HasReferences)
+        {
+            throw new QuestDefinitionReferencedByStateException(questId, "save_draft", references);
+        }
+    }
+
+    private static async Task LockQuestContentStateAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string questId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select pg_advisory_xact_lock(hashtextextended(@identity, 0));
+            """;
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("identity", $"quest_content_state_v1|{questId}");
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>

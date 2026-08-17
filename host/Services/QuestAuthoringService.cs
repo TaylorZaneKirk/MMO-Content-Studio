@@ -93,7 +93,7 @@ public sealed class QuestAuthoringService
             var effective = operation == "save_draft" ? requested : FromRecord(existing!);
             var validation = _validator.Validate(stableId, effective, existing, operation == "publish");
             var messages = validation.Messages.ToList();
-            if (operation is "publish" or "disable" or "delete")
+            if (operation is "save_draft" or "publish" or "disable" or "delete")
             {
                 var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
                 AddReferenceSafetyDiagnostics(stableId, operation, effective, references, messages);
@@ -148,9 +148,15 @@ public sealed class QuestAuthoringService
             }
 
             var validation = _validator.Validate(stableId, draft, existing, false);
-            if (!validation.ValidForDraft)
+            var messages = validation.Messages.ToList();
+            if (existing is not null)
             {
-                return AuthoringOperationResult<QuestMutationResponse>.Failure(validation.Messages);
+                var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
+                AddReferenceSafetyDiagnostics(stableId, "save_draft", draft, references, messages);
+            }
+            if (!validation.ValidForDraft || messages.Any(message => message.Severity == ValidationSeverity.Error))
+            {
+                return AuthoringOperationResult<QuestMutationResponse>.Failure(messages);
             }
 
             var saved = await _repository.ReplaceDraftAsync(stableId, draft, request.ExpectedUpdatedAtUtc, cancellationToken);
@@ -161,11 +167,18 @@ public sealed class QuestAuthoringService
             }
 
             return AuthoringOperationResult<QuestMutationResponse>.Success(
-                new QuestMutationResponse("save_draft", ToDefinition(verified), validation.Messages));
+                new QuestMutationResponse("save_draft", ToDefinition(verified), messages));
         }
         catch (QuestDefinitionConcurrencyException)
         {
             return VersionConflict<QuestMutationResponse>(QuestDomainRules.NormalizeStableId(questId));
+        }
+        catch (QuestDefinitionReferencedByStateException exception)
+        {
+            return AuthoringOperationResult<QuestMutationResponse>.Failure(ReferenceBlockedError(
+                exception.QuestId,
+                exception.Operation,
+                exception.References));
         }
         catch (PostgresException exception) when (exception.SqlState is PostgresErrorCodes.UniqueViolation or PostgresErrorCodes.CheckViolation)
         {
@@ -452,7 +465,7 @@ public sealed class QuestAuthoringService
         QuestStateReferenceSummary references,
         ICollection<ApiError> messages)
     {
-        if (operation is "disable" or "delete" && references.HasReferences)
+        if ((operation is "save_draft" or "disable" or "delete") && references.HasReferences)
         {
             messages.Add(ReferenceBlockedError(questId, operation, references));
             return;

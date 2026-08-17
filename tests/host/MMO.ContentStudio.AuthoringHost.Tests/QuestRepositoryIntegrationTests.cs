@@ -98,6 +98,90 @@ public sealed class QuestRepositoryIntegrationTests
         Assert.Equal("Published", republished.PublicationState);
     }
 
+    [Fact]
+    public async Task SaveDraftIsRejectedForReferencedExistingQuestWhenIntegrationDatabaseIsConfigured()
+    {
+        var connectionString = AcceptanceConnectionString();
+        if (connectionString is null)
+        {
+            return;
+        }
+
+        await using var fixture = await QuestRepositoryFixture.CreateAsync(connectionString);
+        await fixture.SeedCharacterAsync();
+        var repository = CreateRepository(connectionString);
+        var questId = fixture.TrackQuestId("quest_draft_ref_" + Guid.NewGuid().ToString("N"));
+        var saved = await repository.ReplaceDraftAsync(questId, Draft(), null, TestContext.Current.CancellationToken);
+        var published = await repository.SetPublicationAsync(questId, "Published", saved.UpdatedAtUtc, TestContext.Current.CancellationToken);
+        await fixture.InsertQuestStateAsync(questId, "active", "first");
+
+        var error = await Assert.ThrowsAsync<QuestDefinitionReferencedByStateException>(() =>
+            repository.ReplaceDraftAsync(
+                questId,
+                Draft(
+                    steps: [Step("replacement", 0)],
+                    transitions: [
+                        Transition("accept", "not_started", null, "active", "replacement", 0),
+                        Transition("finish", "active", "replacement", "completed", null, 1)
+                    ]),
+                published.UpdatedAtUtc,
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("save_draft", error.Operation);
+        Assert.Equal(1, error.References.ActiveCount);
+        var reloaded = await repository.LoadAsync(questId, TestContext.Current.CancellationToken);
+        Assert.Equal("Published", reloaded!.PublicationState);
+        Assert.Equal("first", Assert.Single(reloaded.Steps).StepId);
+    }
+
+    [Fact]
+    public async Task SaveDraftReferenceCheckRunsAfterQuestContentStateLockWhenIntegrationDatabaseIsConfigured()
+    {
+        var connectionString = AcceptanceConnectionString();
+        if (connectionString is null)
+        {
+            return;
+        }
+
+        await using var fixture = await QuestRepositoryFixture.CreateAsync(connectionString);
+        await fixture.SeedCharacterAsync();
+        var repository = CreateRepository(connectionString);
+        var questId = fixture.TrackQuestId("quest_lock_ref_" + Guid.NewGuid().ToString("N"));
+        var saved = await repository.ReplaceDraftAsync(questId, Draft(), null, TestContext.Current.CancellationToken);
+
+        await using var lockConnection = new NpgsqlConnection(connectionString);
+        await lockConnection.OpenAsync(TestContext.Current.CancellationToken);
+        await using var lockTransaction = await lockConnection.BeginTransactionAsync(TestContext.Current.CancellationToken);
+        await AcquireQuestContentStateLockAsync(
+            lockConnection,
+            lockTransaction,
+            questId,
+            TestContext.Current.CancellationToken);
+
+        var replaceTask = repository.ReplaceDraftAsync(
+            questId,
+            Draft(
+                steps: [Step("replacement", 0)],
+                transitions: [
+                    Transition("accept", "not_started", null, "active", "replacement", 0),
+                    Transition("finish", "active", "replacement", "completed", null, 1)
+                ]),
+            saved.UpdatedAtUtc,
+            TestContext.Current.CancellationToken);
+
+        await Task.Delay(TimeSpan.FromMilliseconds(150), TestContext.Current.CancellationToken);
+        Assert.False(replaceTask.IsCompleted);
+
+        await fixture.InsertQuestStateAsync(questId, "active", "first");
+        await lockTransaction.CommitAsync(TestContext.Current.CancellationToken);
+
+        var error = await Assert.ThrowsAsync<QuestDefinitionReferencedByStateException>(() => replaceTask);
+
+        Assert.Equal("save_draft", error.Operation);
+        var reloaded = await repository.LoadAsync(questId, TestContext.Current.CancellationToken);
+        Assert.Equal("first", Assert.Single(reloaded!.Steps).StepId);
+    }
+
     private static QuestRepository CreateRepository(string connectionString) =>
         new(new AuthoringDatabaseConnectionFactory(
             Options.Create(new ConnectionProfilesOptions
@@ -150,6 +234,19 @@ public sealed class QuestRepositoryIntegrationTests
         string? targetStepId,
         int transitionOrder) =>
         new(transitionId, sourceStatus, sourceStepId, targetStatus, targetStepId, transitionOrder);
+
+    private static async Task AcquireQuestContentStateLockAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string questId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            select pg_advisory_xact_lock(hashtextextended(@identity, 0));
+            """, connection, transaction);
+        command.Parameters.AddWithValue("identity", $"quest_content_state_v1|{questId}");
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
 
     private sealed class QuestRepositoryFixture : IAsyncDisposable
     {
