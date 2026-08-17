@@ -119,5 +119,16 @@ public sealed record QuestGraphAnalysis(
     [property: JsonPropertyName("reachable_step_ids")] IReadOnlyList<string> ReachableStepIds,
     [property: JsonPropertyName("unreachable_step_ids")] IReadOnlyList<string> UnreachableStepIds,
     [property: JsonPropertyName("unreachable_transition_ids")] IReadOnlyList<string> UnreachableTransitionIds,
+    [property: JsonPropertyName("dead_end_step_ids")] IReadOnlyList<string> DeadEndStepIds,
     [property: JsonPropertyName("has_start_transition")] bool HasStartTransition,
     [property: JsonPropertyName("has_completion_path")] bool HasCompletionPath);
+
+public sealed record QuestStateReferenceSummary(
+    [property: JsonPropertyName("quest_id")] string QuestId,
+    [property: JsonPropertyName("total_count")] int TotalCount,
+    [property: JsonPropertyName("active_count")] int ActiveCount,
+    [property: JsonPropertyName("completed_count")] int CompletedCount,
+    [property: JsonPropertyName("active_step_ids")] IReadOnlyList<string> ActiveStepIds)
+{
+    public bool HasReferences => TotalCount > 0;
+}

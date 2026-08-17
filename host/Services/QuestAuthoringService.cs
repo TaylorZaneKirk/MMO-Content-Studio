@@ -93,6 +93,11 @@ public sealed class QuestAuthoringService
             var effective = operation == "save_draft" ? requested : FromRecord(existing!);
             var validation = _validator.Validate(stableId, effective, existing, operation == "publish");
             var messages = validation.Messages.ToList();
+            if (operation is "publish" or "disable" or "delete")
+            {
+                var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
+                AddReferenceSafetyDiagnostics(stableId, operation, effective, references, messages);
+            }
             if (operation is "publish" or "disable" or "delete" && !EquivalentDraft(existing!, requested))
             {
                 messages.Add(new ApiError(
@@ -204,10 +209,23 @@ public sealed class QuestAuthoringService
             {
                 return AuthoringOperationResult<QuestDeleteResponse>.Failure(DeleteRequiresDisabledError(stableId));
             }
+            var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
+            if (references.HasReferences)
+            {
+                return AuthoringOperationResult<QuestDeleteResponse>.Failure(ReferenceBlockedError(
+                    stableId,
+                    "delete",
+                    references));
+            }
 
             await _repository.DeleteAsync(stableId, request.ExpectedUpdatedAtUtc, cancellationToken);
+            var messages = _runtimeCatalogPublisher is null
+                ? []
+                : await _runtimeCatalogPublisher.PublishCatalogsAsync(
+                    RuntimeCatalogPublicationScope.Quest,
+                    cancellationToken);
             return AuthoringOperationResult<QuestDeleteResponse>.Success(
-                new QuestDeleteResponse("delete", stableId, []));
+                new QuestDeleteResponse("delete", stableId, messages));
         }
         catch (QuestDefinitionConcurrencyException)
         {
@@ -216,6 +234,13 @@ public sealed class QuestAuthoringService
         catch (QuestDefinitionDeleteRequiresDisabledException)
         {
             return AuthoringOperationResult<QuestDeleteResponse>.Failure(DeleteRequiresDisabledError(questId));
+        }
+        catch (QuestDefinitionReferencedByStateException exception)
+        {
+            return AuthoringOperationResult<QuestDeleteResponse>.Failure(ReferenceBlockedError(
+                exception.QuestId,
+                exception.Operation,
+                exception.References));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -312,9 +337,12 @@ public sealed class QuestAuthoringService
             }
 
             var validation = _validator.Validate(stableId, draft, existing, operation == "publish");
-            if (!validation.ValidForDraft || validation.Messages.Any(message => message.Severity == ValidationSeverity.Error))
+            var messages = validation.Messages.ToList();
+            var references = await _repository.LoadStateReferencesAsync(stableId, cancellationToken);
+            AddReferenceSafetyDiagnostics(stableId, operation, draft, references, messages);
+            if (!validation.ValidForDraft || messages.Any(message => message.Severity == ValidationSeverity.Error))
             {
-                return AuthoringOperationResult<QuestMutationResponse>.Failure(validation.Messages);
+                return AuthoringOperationResult<QuestMutationResponse>.Failure(messages);
             }
 
             var saved = await _repository.SetPublicationAsync(stableId, publicationState, request.ExpectedUpdatedAtUtc, cancellationToken);
@@ -324,8 +352,7 @@ public sealed class QuestAuthoringService
                 return ReloadVerificationFailure<QuestMutationResponse>(stableId);
             }
 
-            var messages = validation.Messages.ToList();
-            if (operation == "publish" && _runtimeCatalogPublisher is not null)
+            if (operation is "publish" or "disable" && _runtimeCatalogPublisher is not null)
             {
                 messages.AddRange(await _runtimeCatalogPublisher.PublishCatalogsAsync(
                     RuntimeCatalogPublicationScope.Quest,
@@ -338,6 +365,20 @@ public sealed class QuestAuthoringService
         catch (QuestDefinitionConcurrencyException)
         {
             return VersionConflict<QuestMutationResponse>(QuestDomainRules.NormalizeStableId(questId));
+        }
+        catch (QuestDefinitionReferencedByStateException exception)
+        {
+            return AuthoringOperationResult<QuestMutationResponse>.Failure(ReferenceBlockedError(
+                exception.QuestId,
+                exception.Operation,
+                exception.References));
+        }
+        catch (QuestDefinitionMissingActiveStepException exception)
+        {
+            return AuthoringOperationResult<QuestMutationResponse>.Failure(MissingActiveStepsError(
+                exception.QuestId,
+                exception.MissingStepIds,
+                exception.References));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -403,6 +444,61 @@ public sealed class QuestAuthoringService
 
     private static ApiError DeleteRequiresDisabledError(string questId) =>
         new("quest_delete_requires_disabled", $"Quest definition '{questId}' must be Disabled before deletion.", ValidationSeverity.Error, "publication_state");
+
+    private static void AddReferenceSafetyDiagnostics(
+        string questId,
+        string operation,
+        QuestDraft draft,
+        QuestStateReferenceSummary references,
+        ICollection<ApiError> messages)
+    {
+        if (operation is "disable" or "delete" && references.HasReferences)
+        {
+            messages.Add(ReferenceBlockedError(questId, operation, references));
+            return;
+        }
+
+        if (operation != "publish")
+        {
+            return;
+        }
+
+        var stepIds = draft.Steps.Select(step => step.StepId).ToHashSet(StringComparer.Ordinal);
+        var missingStepIds = references.ActiveStepIds
+            .Where(stepId => !stepIds.Contains(stepId))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (missingStepIds.Length > 0)
+        {
+            messages.Add(MissingActiveStepsError(questId, missingStepIds, references));
+        }
+    }
+
+    private static ApiError ReferenceBlockedError(
+        string questId,
+        string operation,
+        QuestStateReferenceSummary references)
+    {
+        var activeSteps = references.ActiveStepIds.Count == 0
+            ? "none"
+            : string.Join(", ", references.ActiveStepIds);
+        return new ApiError(
+            "quest_state_reference_blocked",
+            $"Quest definition '{questId}' cannot {operation} because {references.TotalCount} persisted character quest state row(s) reference it ({references.ActiveCount} active, {references.CompletedCount} completed; active steps: {activeSteps}).",
+            ValidationSeverity.Error,
+            "publication_state");
+    }
+
+    private static ApiError MissingActiveStepsError(
+        string questId,
+        IReadOnlyList<string> missingStepIds,
+        QuestStateReferenceSummary references) =>
+        new(
+            "quest_active_step_reference_missing",
+            $"Quest definition '{questId}' cannot publish because active character quest state references missing step id(s): {string.Join(", ", missingStepIds)}.",
+            ValidationSeverity.Error,
+            "steps",
+            $"Active references: {references.ActiveCount}; completed references: {references.CompletedCount}.");
 
     private static AuthoringOperationResult<T> VersionConflict<T>(string questId) =>
         AuthoringOperationResult<T>.Failure(new ApiError("quest_version_conflict", $"Quest definition '{questId}' changed before the mutation could be applied.", ValidationSeverity.Error, "expected_updated_at_utc"));

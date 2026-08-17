@@ -199,6 +199,10 @@ public sealed class QuestDefinitionValidator
             .Select(state => state.StepId!)
             .Order(StringComparer.Ordinal)
             .ToArray();
+        var deadEndStepIds = reachableStepIds
+            .Where(stepId => !CanReachCompleted(("active", stepId), draft.Transitions))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
         var unreachableStepIds = stepIds
             .Except(reachableStepIds, StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
@@ -213,6 +217,7 @@ public sealed class QuestDefinitionValidator
             reachableStepIds,
             unreachableStepIds,
             unreachableTransitionIds,
+            deadEndStepIds,
             draft.Transitions.Any(transition => transition.SourceStatus == "not_started"),
             reachableStates.Any(state => state.Status == "completed"));
     }
@@ -235,6 +240,42 @@ public sealed class QuestDefinitionValidator
         {
             messages.Add(GraphError($"Transition '{transitionId}' is not reachable from a valid start path.", "transitions"));
         }
+        foreach (var stepId in analysis.DeadEndStepIds)
+        {
+            messages.Add(GraphError($"Reachable step '{stepId}' must have at least one path to completed.", "steps"));
+        }
+    }
+
+    private static bool CanReachCompleted(
+        (string Status, string? StepId) start,
+        IReadOnlyList<QuestTransition> transitions)
+    {
+        var visited = new HashSet<(string Status, string? StepId)>();
+        var pending = new Queue<(string Status, string? StepId)>();
+        pending.Enqueue(start);
+        visited.Add(start);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Dequeue();
+            foreach (var transition in transitions.Where(transition =>
+                transition.SourceStatus == current.Status &&
+                string.Equals(transition.SourceStepId, current.StepId, StringComparison.Ordinal)))
+            {
+                if (transition.TargetStatus == "completed")
+                {
+                    return true;
+                }
+
+                var target = (transition.TargetStatus, transition.TargetStepId);
+                if (visited.Add(target))
+                {
+                    pending.Enqueue(target);
+                }
+            }
+        }
+
+        return false;
     }
 
     private static void ValidateState(

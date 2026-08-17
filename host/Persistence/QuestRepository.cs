@@ -9,6 +9,7 @@ public interface IQuestRepository
 {
     Task<IReadOnlyList<QuestDefinitionRecord>> ListAsync(string? search, CancellationToken cancellationToken = default);
     Task<QuestDefinitionRecord?> LoadAsync(string questId, CancellationToken cancellationToken = default);
+    Task<QuestStateReferenceSummary> LoadStateReferencesAsync(string questId, CancellationToken cancellationToken = default);
     Task<QuestDefinitionRecord> ReplaceDraftAsync(string questId, QuestDraft draft, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default);
     Task<QuestDefinitionRecord> SetPublicationAsync(string questId, string publicationState, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default);
     Task DeleteAsync(string questId, DateTimeOffset? expectedUpdatedAtUtc, CancellationToken cancellationToken = default);
@@ -74,6 +75,12 @@ public sealed class QuestRepository : IQuestRepository
         return await LoadAsync(connection, null, questId, false, cancellationToken);
     }
 
+    public async Task<QuestStateReferenceSummary> LoadStateReferencesAsync(string questId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        return await LoadStateReferencesAsync(connection, null, questId, cancellationToken);
+    }
+
     public async Task<QuestDefinitionRecord> ReplaceDraftAsync(
         string questId,
         QuestDraft draft,
@@ -112,6 +119,8 @@ public sealed class QuestRepository : IQuestRepository
         var existing = await LoadAsync(connection, transaction, questId, true, cancellationToken)
             ?? throw new QuestDefinitionNotFoundException(questId);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, questId);
+        var references = await LoadStateReferencesAsync(connection, transaction, questId, cancellationToken);
+        EnsureReferenceSafePublication(questId, publicationState, existing, references);
 
         const string sql = """
             update quest_definitions
@@ -142,6 +151,11 @@ public sealed class QuestRepository : IQuestRepository
         if (existing.PublicationState != "Disabled")
         {
             throw new QuestDefinitionDeleteRequiresDisabledException(questId);
+        }
+        var references = await LoadStateReferencesAsync(connection, transaction, questId, cancellationToken);
+        if (references.HasReferences)
+        {
+            throw new QuestDefinitionReferencedByStateException(questId, "delete", references);
         }
 
         await using var command = new NpgsqlCommand("delete from quest_definitions where quest_id = @quest_id;", connection, transaction);
@@ -195,6 +209,65 @@ public sealed class QuestRepository : IQuestRepository
             StepCount = steps.Count,
             TransitionCount = transitions.Count
         };
+    }
+
+    private static async Task<QuestStateReferenceSummary> LoadStateReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string questId,
+        CancellationToken cancellationToken)
+    {
+        const string countsSql = """
+            select
+                count(*)::integer as total_count,
+                count(*) filter (where status = 'active')::integer as active_count,
+                count(*) filter (where status = 'completed')::integer as completed_count
+            from character_quests
+            where quest_id = @quest_id;
+            """;
+
+        int totalCount;
+        int activeCount;
+        int completedCount;
+        await using (var command = new NpgsqlCommand(countsSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("quest_id", questId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                throw new InvalidOperationException("Quest state reference query returned no count row.");
+            }
+
+            totalCount = reader.GetInt32(reader.GetOrdinal("total_count"));
+            activeCount = reader.GetInt32(reader.GetOrdinal("active_count"));
+            completedCount = reader.GetInt32(reader.GetOrdinal("completed_count"));
+        }
+
+        const string activeStepsSql = """
+            select distinct current_step_id
+            from character_quests
+            where quest_id = @quest_id
+              and status = 'active'
+              and current_step_id is not null
+            order by current_step_id;
+            """;
+        var activeStepIds = new List<string>();
+        await using (var command = new NpgsqlCommand(activeStepsSql, connection, transaction))
+        {
+            command.Parameters.AddWithValue("quest_id", questId);
+            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                activeStepIds.Add(reader.GetString(0));
+            }
+        }
+
+        return new QuestStateReferenceSummary(
+            questId,
+            totalCount,
+            activeCount,
+            completedCount,
+            activeStepIds);
     }
 
     private static async Task<IReadOnlyList<QuestStep>> LoadStepsAsync(
@@ -381,6 +454,33 @@ public sealed class QuestRepository : IQuestRepository
         }
     }
 
+    private static void EnsureReferenceSafePublication(
+        string questId,
+        string publicationState,
+        QuestDefinitionRecord definition,
+        QuestStateReferenceSummary references)
+    {
+        if (publicationState == "Disabled" && references.HasReferences)
+        {
+            throw new QuestDefinitionReferencedByStateException(questId, "disable", references);
+        }
+
+        if (publicationState != "Published")
+        {
+            return;
+        }
+
+        var stepIds = definition.Steps.Select(step => step.StepId).ToHashSet(StringComparer.Ordinal);
+        var missingStepIds = references.ActiveStepIds
+            .Where(stepId => !stepIds.Contains(stepId))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (missingStepIds.Length > 0)
+        {
+            throw new QuestDefinitionMissingActiveStepException(questId, missingStepIds, references);
+        }
+    }
+
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
         reader.GetFieldValue<DateTimeOffset>(reader.GetOrdinal(column)).ToUniversalTime();
 }
@@ -400,3 +500,38 @@ public sealed record QuestDefinitionRecord(
 public sealed class QuestDefinitionNotFoundException(string questId) : Exception($"Quest definition '{questId}' was not found.");
 public sealed class QuestDefinitionConcurrencyException(string questId) : Exception($"Quest definition '{questId}' changed before the mutation could be applied.");
 public sealed class QuestDefinitionDeleteRequiresDisabledException(string questId) : Exception($"Quest definition '{questId}' must be Disabled before deletion.");
+public sealed class QuestDefinitionReferencedByStateException : Exception
+{
+    public QuestDefinitionReferencedByStateException(
+        string questId,
+        string operation,
+        QuestStateReferenceSummary references)
+        : base($"Quest definition '{questId}' cannot {operation} while persisted character quest state exists.")
+    {
+        QuestId = questId;
+        Operation = operation;
+        References = references;
+    }
+
+    public string QuestId { get; }
+    public string Operation { get; }
+    public QuestStateReferenceSummary References { get; }
+}
+
+public sealed class QuestDefinitionMissingActiveStepException : Exception
+{
+    public QuestDefinitionMissingActiveStepException(
+        string questId,
+        IReadOnlyList<string> missingStepIds,
+        QuestStateReferenceSummary references)
+        : base($"Quest definition '{questId}' cannot publish because active character quest state references missing step ids.")
+    {
+        QuestId = questId;
+        MissingStepIds = missingStepIds;
+        References = references;
+    }
+
+    public string QuestId { get; }
+    public IReadOnlyList<string> MissingStepIds { get; }
+    public QuestStateReferenceSummary References { get; }
+}
