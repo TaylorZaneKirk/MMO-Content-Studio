@@ -39,6 +39,12 @@ signal dialogue_preview_received(payload: Dictionary)
 signal dialogue_playthrough_received(payload: Dictionary)
 signal dialogue_mutation_completed(payload: Dictionary)
 signal dialogue_delete_completed(payload: Dictionary)
+signal quest_options_received(payload: Dictionary)
+signal quest_catalog_received(payload: Dictionary)
+signal quest_definition_received(payload: Dictionary)
+signal quest_preview_received(payload: Dictionary)
+signal quest_mutation_completed(payload: Dictionary)
+signal quest_delete_completed(payload: Dictionary)
 signal actor_calibration_received(payload: Dictionary)
 signal actor_calibration_saved(payload: Dictionary)
 signal actor_calibration_frames_received(payload: Dictionary)
@@ -93,6 +99,14 @@ const OP_DIALOGUE_SAVE_DRAFT := "dialogue_save_draft"
 const OP_DIALOGUE_PUBLISH := "dialogue_publish"
 const OP_DIALOGUE_DISABLE := "dialogue_disable"
 const OP_DIALOGUE_DELETE := "dialogue_delete"
+const OP_QUEST_OPTIONS := "quest_options"
+const OP_QUESTS := "quests"
+const OP_QUEST_DEFINITION := "quest_definition"
+const OP_QUEST_PREVIEW := "quest_preview"
+const OP_QUEST_SAVE_DRAFT := "quest_save_draft"
+const OP_QUEST_PUBLISH := "quest_publish"
+const OP_QUEST_DISABLE := "quest_disable"
+const OP_QUEST_DELETE := "quest_delete"
 const OP_ACTOR_CALIBRATION := "actor_calibration"
 const OP_ACTOR_CALIBRATION_SAVE := "actor_calibration_save"
 const OP_ACTOR_CALIBRATION_FRAMES := "actor_calibration_frames"
@@ -321,6 +335,42 @@ func delete_dialogue(dialogue_definition_id: String, expected_updated_at_utc: Va
 		"preview_signature": preview_signature,
 	})
 
+func load_quest_options() -> void:
+	_request(OP_QUEST_OPTIONS, "/api/v1/quests/options")
+
+func load_quests(search: String = "") -> void:
+	var suffix := ""
+	if not search.strip_edges().is_empty():
+		suffix = "?search=%s" % search.strip_edges().uri_encode()
+	_request(OP_QUESTS, "/api/v1/quests%s" % suffix)
+
+func load_quest(quest_id: String) -> void:
+	_request(OP_QUEST_DEFINITION, "/api/v1/quests/%s" % quest_id.uri_encode())
+
+func preview_quest(quest_id: String, payload: Dictionary) -> void:
+	_request(OP_QUEST_PREVIEW, "/api/v1/quests/%s/preview" % quest_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+func save_quest_draft(quest_id: String, payload: Dictionary) -> void:
+	_request(OP_QUEST_SAVE_DRAFT, "/api/v1/quests/%s/draft" % quest_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+func publish_quest(quest_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_QUEST_PUBLISH, "/api/v1/quests/%s/publish" % quest_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+func disable_quest(quest_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_QUEST_DISABLE, "/api/v1/quests/%s/disable" % quest_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
+func delete_quest(quest_id: String, expected_updated_at_utc: Variant, preview_signature: String) -> void:
+	_request(OP_QUEST_DELETE, "/api/v1/quests/%s/delete" % quest_id.uri_encode(), HTTPClient.METHOD_POST, {
+		"expected_updated_at_utc": expected_updated_at_utc,
+		"preview_signature": preview_signature,
+	})
+
 func load_actor_calibration(calibration_id: String) -> void:
 	_request(OP_ACTOR_CALIBRATION, "/api/v1/actor-appearance/calibrations/%s" % calibration_id.uri_encode())
 
@@ -393,6 +443,12 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		OP_DIALOGUES:
 			dialogue_catalog_received.emit(data)
 			_request_next_startup_operation()
+		OP_QUEST_OPTIONS:
+			quest_options_received.emit(data)
+			_request(OP_QUESTS, "/api/v1/quests")
+		OP_QUESTS:
+			quest_catalog_received.emit(data)
+			_request_next_startup_operation()
 		OP_ITEM:
 			item_definition_received.emit(data)
 			item_received.emit(data)
@@ -434,6 +490,14 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			dialogue_delete_completed.emit(data)
 		OP_DIALOGUE_SAVE_DRAFT, OP_DIALOGUE_PUBLISH, OP_DIALOGUE_DISABLE:
 			dialogue_mutation_completed.emit(data)
+		OP_QUEST_DEFINITION:
+			quest_definition_received.emit(data)
+		OP_QUEST_PREVIEW:
+			quest_preview_received.emit(data)
+		OP_QUEST_DELETE:
+			quest_delete_completed.emit(data)
+		OP_QUEST_SAVE_DRAFT, OP_QUEST_PUBLISH, OP_QUEST_DISABLE:
+			quest_mutation_completed.emit(data)
 		OP_ACTOR_CALIBRATION:
 			actor_calibration_received.emit(data)
 		OP_ACTOR_CALIBRATION_SAVE:
@@ -447,11 +511,11 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
-	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES]:
+	if operation in [OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
 		_request_next_startup_operation()
 
 func _start_workspace_initialization() -> void:
-	_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS]
+	_startup_operations = [OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
 	_request_next_startup_operation()
 
 func _request_next_startup_operation() -> void:
@@ -465,3 +529,5 @@ func _request_next_startup_operation() -> void:
 			_request(OP_NPC_OPTIONS, "/api/v1/npcs/options")
 		OP_DIALOGUE_OPTIONS:
 			_request(OP_DIALOGUE_OPTIONS, "/api/v1/dialogues/options")
+		OP_QUEST_OPTIONS:
+			_request(OP_QUEST_OPTIONS, "/api/v1/quests/options")

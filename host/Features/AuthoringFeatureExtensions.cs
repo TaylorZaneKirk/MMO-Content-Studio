@@ -5,6 +5,7 @@ using MMO.ContentStudio.AuthoringHost.Features.Items;
 using MMO.ContentStudio.AuthoringHost.Features.LootTables;
 using MMO.ContentStudio.AuthoringHost.Features.Mobs;
 using MMO.ContentStudio.AuthoringHost.Features.Npcs;
+using MMO.ContentStudio.AuthoringHost.Features.Quests;
 using MMO.ContentStudio.AuthoringHost.Services;
 
 namespace MMO.ContentStudio.AuthoringHost.Features;
@@ -19,6 +20,7 @@ public static class AuthoringFeatureExtensions
         services.AddMobAuthoring();
         services.AddNpcAuthoring();
         services.AddDialogueAuthoring();
+        services.AddQuestAuthoring();
         services.AddSingleton<IRuntimeCatalogPublisher, RuntimeCatalogPublisherService>();
         return services;
     }
@@ -32,6 +34,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapMobAuthoring();
         endpoints.MapNpcAuthoring();
         endpoints.MapDialogueAuthoring();
+        endpoints.MapQuestAuthoring();
         return endpoints;
     }
 }

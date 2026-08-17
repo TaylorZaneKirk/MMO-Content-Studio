@@ -13,6 +13,7 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
         (RuntimeCatalogPublicationScope.Npc, "export-npc-catalog", "NPC", "shared/maps/npcs/catalog.json"),
         (RuntimeCatalogPublicationScope.Mob, "export-mob-catalog", "mob", "shared/maps/mobs/catalog.json"),
         (RuntimeCatalogPublicationScope.Dialogue, "export-dialogue-catalog", "dialogue", "shared/dialogues/catalog.json"),
+        (RuntimeCatalogPublicationScope.Quest, "export-quest-catalog", "quest", "shared/quests/catalog.json"),
         (RuntimeCatalogPublicationScope.EquipmentVisual, "export-equipment-visual-catalog", "equipment visual", "client/actors/appearance/data/equipped_visuals/published_catalog_v1.json")
     ];
 

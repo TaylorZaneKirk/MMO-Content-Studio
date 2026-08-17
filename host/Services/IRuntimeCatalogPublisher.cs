@@ -9,7 +9,8 @@ public enum RuntimeCatalogPublicationScope
     Npc = 1 << 0,
     Mob = 1 << 1,
     Dialogue = 1 << 2,
-    EquipmentVisual = 1 << 3
+    EquipmentVisual = 1 << 3,
+    Quest = 1 << 4
 }
 
 public interface IRuntimeCatalogPublisher
