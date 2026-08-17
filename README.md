@@ -102,9 +102,11 @@ reproducibility. QV3 adds typed read-only `quest_status`, `quest_step`, and
 export, and runtime evaluation. QV4 adds the locked choice-effect vocabulary
 `start_quest`, `advance_quest`, `complete_quest`, `grant_item`,
 `remove_item`, and `grant_experience`; settlement remains server-authoritative
-in MMO Project. Objective progress, story flags, broader rewards, content
-unlocks, hot reload, Quest Studio, and authored first-quest content remain
-deferred until later phases.
+in MMO Project. Unsettled settlements are durable quest/item references and
+block Save Draft, Disable, and Delete lifecycle mutations for referenced
+content. Objective progress, story flags, broader rewards, content unlocks,
+hot reload, Quest Studio, and authored first-quest content remain deferred
+until later phases.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 

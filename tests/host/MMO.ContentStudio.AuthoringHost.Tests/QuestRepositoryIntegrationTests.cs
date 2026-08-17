@@ -160,6 +160,53 @@ public sealed class QuestRepositoryIntegrationTests
         Assert.Equal("first", Assert.Single(reloaded!.Steps).StepId);
     }
 
+    [Fact]
+    public async Task PendingDialogueSettlementReferenceBlocksQuestLifecycleWhenIntegrationDatabaseIsConfigured()
+    {
+        var connectionString = AcceptanceConnectionString();
+        if (connectionString is null)
+        {
+            return;
+        }
+
+        await using var fixture = await QuestRepositoryFixture.CreateAsync(connectionString);
+        await fixture.SeedCharacterAsync();
+        var repository = CreateRepository(connectionString);
+        var questId = fixture.TrackQuestId("quest_pending_settlement_ref_" + Guid.NewGuid().ToString("N"));
+        var saved = await repository.ReplaceDraftAsync(questId, Draft(), null, TestContext.Current.CancellationToken);
+        var published = await repository.SetPublicationAsync(questId, "Published", saved.UpdatedAtUtc, TestContext.Current.CancellationToken);
+        await fixture.InsertPendingQuestSettlementAsync(questId);
+
+        var references = await repository.LoadStateReferencesAsync(questId, TestContext.Current.CancellationToken);
+        var saveError = await Assert.ThrowsAsync<QuestDefinitionReferencedByStateException>(() =>
+            repository.ReplaceDraftAsync(
+                questId,
+                Draft(
+                    steps: [Step("replacement", 0)],
+                    transitions: [
+                        Transition("accept", "not_started", null, "active", "replacement", 0),
+                        Transition("finish", "active", "replacement", "completed", null, 1)
+                    ]),
+                published.UpdatedAtUtc,
+                TestContext.Current.CancellationToken));
+        var disableError = await Assert.ThrowsAsync<QuestDefinitionReferencedByStateException>(() =>
+            repository.SetPublicationAsync(questId, "Disabled", published.UpdatedAtUtc, TestContext.Current.CancellationToken));
+
+        await fixture.ForcePublicationStateAsync(questId, "Disabled");
+        var disabled = await repository.LoadAsync(questId, TestContext.Current.CancellationToken);
+        var deleteError = await Assert.ThrowsAsync<QuestDefinitionReferencedByStateException>(() =>
+            repository.DeleteAsync(questId, disabled!.UpdatedAtUtc, TestContext.Current.CancellationToken));
+
+        Assert.Equal(0, references.TotalCount);
+        Assert.Equal(1, references.PendingSettlementCount);
+        Assert.Equal("save_draft", saveError.Operation);
+        Assert.Equal("disable", disableError.Operation);
+        Assert.Equal("delete", deleteError.Operation);
+        Assert.Equal(1, saveError.References.PendingSettlementCount);
+        Assert.Equal(1, disableError.References.PendingSettlementCount);
+        Assert.Equal(1, deleteError.References.PendingSettlementCount);
+    }
+
     private static QuestRepository CreateRepository(string connectionString) =>
         new(new AuthoringDatabaseConnectionFactory(
             Options.Create(new ConnectionProfilesOptions
@@ -337,6 +384,76 @@ public sealed class QuestRepositoryIntegrationTests
             await command.ExecuteNonQueryAsync();
         }
 
+        public async Task InsertPendingQuestSettlementAsync(string questId)
+        {
+            const string sql = """
+                insert into character_dialogue_choice_effect_settlements (
+                    settlement_id,
+                    character_id,
+                    source_event_id,
+                    dialogue_id,
+                    dialogue_publication_token,
+                    dialogue_instance_id,
+                    source_node_id,
+                    choice_id,
+                    command_sequence,
+                    target_node_id,
+                    settlement_status,
+                    admitted_at
+                ) values (
+                    @settlementId,
+                    @characterId,
+                    @sourceEventId,
+                    'dialogue_pending_ref',
+                    @dialogueToken,
+                    'instance_pending_ref',
+                    'choice_node',
+                    'choice_one',
+                    1,
+                    'end',
+                    'admitted',
+                    now()
+                );
+
+                insert into character_dialogue_choice_effect_plan_rows (
+                    settlement_id,
+                    effect_id,
+                    effect_order,
+                    effect_type,
+                    quest_id,
+                    quest_publication_token,
+                    transition_id,
+                    quest_source_status,
+                    quest_source_step_id,
+                    quest_target_status,
+                    quest_target_step_id
+                ) values (
+                    @settlementId,
+                    'start_quest',
+                    0,
+                    'start_quest',
+                    @questId,
+                    @questToken,
+                    'accept',
+                    'not_started',
+                    null,
+                    'active',
+                    'first'
+                );
+                """;
+
+            await using var connection = new NpgsqlConnection(_connectionString);
+            await connection.OpenAsync();
+            await using var command = new NpgsqlCommand(sql, connection);
+            command.Parameters.AddWithValue("settlementId", Guid.NewGuid());
+            command.Parameters.AddWithValue("characterId", Guid.Parse(CharacterId));
+            command.Parameters.AddWithValue("sourceEventId", $"quest_pending_ref:{questId}");
+            command.Parameters.AddWithValue("dialogueToken", Guid.NewGuid());
+            command.Parameters.AddWithValue("questId", questId);
+            command.Parameters.AddWithValue("questToken", Guid.NewGuid());
+            await command.ExecuteNonQueryAsync();
+        }
+
         public async ValueTask DisposeAsync()
         {
             await using var connection = new NpgsqlConnection(_connectionString);
@@ -378,6 +495,10 @@ public sealed class QuestRepositoryIntegrationTests
             await ApplyMigrationAsync("042_persistent_quest_state_v1.sql");
             await ApplyMigrationAsync("043_quest_transition_evidence_lifecycle_delete.sql");
             await ApplyMigrationAsync("044_quest_definition_authoring_v1.sql");
+            await ApplyMigrationAsync("026_dialogue_authoring_schema.sql");
+            await ApplyMigrationAsync("045_typed_dialogue_conditions_v1.sql");
+            await ApplyMigrationAsync("046_typed_dialogue_choice_effects_v1.sql");
+            await ApplyMigrationAsync("047_dialogue_effect_durable_commitment_closure.sql");
         }
 
         private async Task<bool> TableExistsAsync(string tableName)

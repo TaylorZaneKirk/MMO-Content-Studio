@@ -128,7 +128,8 @@ public sealed record QuestStateReferenceSummary(
     [property: JsonPropertyName("total_count")] int TotalCount,
     [property: JsonPropertyName("active_count")] int ActiveCount,
     [property: JsonPropertyName("completed_count")] int CompletedCount,
-    [property: JsonPropertyName("active_step_ids")] IReadOnlyList<string> ActiveStepIds)
+    [property: JsonPropertyName("active_step_ids")] IReadOnlyList<string> ActiveStepIds,
+    [property: JsonPropertyName("pending_settlement_count")] int PendingSettlementCount = 0)
 {
-    public bool HasReferences => TotalCount > 0;
+    public bool HasReferences => TotalCount + PendingSettlementCount > 0;
 }

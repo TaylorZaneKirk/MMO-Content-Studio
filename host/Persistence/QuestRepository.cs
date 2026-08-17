@@ -281,12 +281,48 @@ public sealed class QuestRepository : IQuestRepository
             }
         }
 
+        var pendingSettlementCount = await LoadPendingSettlementReferenceCountAsync(
+            connection,
+            transaction,
+            questId,
+            cancellationToken);
+
         return new QuestStateReferenceSummary(
             questId,
             totalCount,
             activeCount,
             completedCount,
-            activeStepIds);
+            activeStepIds,
+            pendingSettlementCount);
+    }
+
+    private static async Task<int> LoadPendingSettlementReferenceCountAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string questId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select count(*)::integer
+            from character_dialogue_choice_effect_settlements settlement
+            join character_dialogue_choice_effect_plan_rows plan
+              on plan.settlement_id = settlement.settlement_id
+            where settlement.settlement_status <> 'settled'
+              and plan.effect_type in ('start_quest', 'advance_quest', 'complete_quest')
+              and plan.quest_id = @quest_id;
+            """;
+
+        try
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("quest_id", questId);
+            return (int)(await command.ExecuteScalarAsync(cancellationToken) ?? 0);
+        }
+        catch (PostgresException exception) when (
+            exception.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedColumn)
+        {
+            return 0;
+        }
     }
 
     private static async Task<IReadOnlyList<QuestStep>> LoadStepsAsync(

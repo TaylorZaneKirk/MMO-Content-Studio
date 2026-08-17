@@ -1020,6 +1020,54 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task PendingDialogueSettlementBlocksRuntimeItemLifecycle()
+    {
+        var repository = new InMemoryUnifiedItemRepository
+        {
+            HasPendingDialogueSettlementReferences = true
+        };
+        repository.Put(CompleteRecord() with { RuntimeEnabled = true });
+        var service = CreateService(repository);
+        var expected = repository.Records[ItemId].UpdatedAtUtc;
+        var request = UnifiedSaveRequest(expected) with { DisplayName = "Pending Settlement Pick" };
+
+        var preview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(request, "save_draft"),
+            TestContext.Current.CancellationToken);
+        var saveDraft = await service.SaveDraftAsync(
+            ItemId,
+            request with { PreviewSignature = preview.Value!.PreviewSignature },
+            TestContext.Current.CancellationToken);
+        var disable = await service.DisableAsync(
+            ItemId,
+            new ItemPublicationRequest(expected, null),
+            TestContext.Current.CancellationToken);
+
+        repository.Records[ItemId] = repository.Records[ItemId] with { RuntimeEnabled = false };
+        var disabledAt = repository.Records[ItemId].UpdatedAtUtc;
+        var deletePreview = await service.PreviewAsync(
+            ItemId,
+            ToPreview(UnifiedSaveRequest(disabledAt), "delete"),
+            TestContext.Current.CancellationToken);
+        var delete = await service.DeleteAsync(
+            ItemId,
+            new DeleteMutationRequest(disabledAt, deletePreview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Contains(preview.Value.Messages, error => error.Code == "item_has_pending_dialogue_settlement_references");
+        Assert.False(saveDraft.Succeeded);
+        Assert.Contains(saveDraft.Errors, error => error.Code == "item_has_pending_dialogue_settlement_references");
+        Assert.False(disable.Succeeded);
+        Assert.Contains(disable.Errors, error => error.Code == "item_has_pending_dialogue_settlement_references");
+        AssertSucceeded(deletePreview);
+        Assert.Contains(deletePreview.Value.Messages, error => error.Code == "item_has_pending_dialogue_settlement_references");
+        Assert.False(delete.Succeeded);
+        Assert.Contains(delete.Errors, error => error.Code == "item_has_pending_dialogue_settlement_references");
+    }
+
+    [Fact]
     public async Task PublishRunsRuntimeCatalogPublisher()
     {
         var repository = new InMemoryUnifiedItemRepository();
@@ -1426,6 +1474,8 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
 
         public bool HasPublishedDeathTransformReferences { get; init; }
 
+        public bool HasPendingDialogueSettlementReferences { get; init; }
+
         private bool _corruptNextLoad;
 
         public void Put(UnifiedItemRecord record) => Records[record.ItemId] = record;
@@ -1484,6 +1534,9 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         public Task<IReadOnlyList<string>> LoadPublishedDialogueReferencesAsync(string itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<string>>([]);
 
+        public Task<bool> HasPendingDialogueSettlementReferencesAsync(string itemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(HasPendingDialogueSettlementReferences);
+
         public Task<ReferencedItemRecord?> LoadReferencedItemAsync(string itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult<ReferencedItemRecord?>(null);
 
@@ -1500,6 +1553,10 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                 throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
             }
             EnsureExpectedVersion(itemId, existing, expectedUpdatedAtUtc);
+            if (existing?.RuntimeEnabled == true && HasPendingDialogueSettlementReferences)
+            {
+                throw new UnifiedItemReferencedByPendingDialogueSettlementException(itemId, "save_draft");
+            }
 
             var saved = ToRecord(itemId, draft, false, NextTimestamp());
             Records[itemId] = saved;
@@ -1518,6 +1575,10 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
                 throw new UnifiedItemNotFoundException(itemId);
             }
             EnsureExpectedVersion(itemId, existing, expectedUpdatedAtUtc);
+            if (existing.RuntimeEnabled && !runtimeEnabled && HasPendingDialogueSettlementReferences)
+            {
+                throw new UnifiedItemReferencedByPendingDialogueSettlementException(itemId, "disable");
+            }
 
             var saved = existing with
             {
@@ -1541,6 +1602,10 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             if (existing.RuntimeEnabled)
             {
                 throw new UnifiedItemPublishedDeleteException(itemId);
+            }
+            if (HasPendingDialogueSettlementReferences)
+            {
+                throw new UnifiedItemReferencedByPendingDialogueSettlementException(itemId, "delete");
             }
 
             Records.Remove(itemId);

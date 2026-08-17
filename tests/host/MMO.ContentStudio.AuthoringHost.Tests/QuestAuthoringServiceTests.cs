@@ -106,6 +106,66 @@ public sealed class QuestAuthoringServiceTests
     }
 
     [Fact]
+    public async Task PendingDialogueSettlementReferenceBlocksQuestLifecycle()
+    {
+        var repository = new TestQuestRepository();
+        var record = repository.Upsert("test_quest", "Published", Draft());
+        repository.SetReferences(record.QuestId, new QuestStateReferenceSummary(record.QuestId, 0, 0, 0, [], PendingSettlementCount: 1));
+        var service = CreateService(repository);
+        var draft = Draft(
+            steps: [Step("replacement", 0)],
+            transitions: [
+                Transition("accept", "not_started", null, "active", "replacement", 0),
+                Transition("finish", "active", "replacement", "completed", null, 1)
+            ]);
+
+        var preview = await service.PreviewAsync(
+            record.QuestId,
+            new PreviewQuestRequest(
+                draft.DisplayName,
+                draft.SchemaVersion,
+                draft.Steps,
+                draft.Transitions,
+                record.UpdatedAtUtc,
+                "save_draft"),
+            TestContext.Current.CancellationToken);
+        var save = await service.SaveDraftAsync(
+            record.QuestId,
+            new QuestMutationRequest(
+                draft.DisplayName,
+                draft.SchemaVersion,
+                draft.Steps,
+                draft.Transitions,
+                record.UpdatedAtUtc,
+                preview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+        var disablePreview = await service.PreviewAsync(
+            record.QuestId,
+            new PreviewQuestRequest(
+                record.DisplayName,
+                record.SchemaVersion,
+                record.Steps,
+                record.Transitions,
+                record.UpdatedAtUtc,
+                "disable"),
+            TestContext.Current.CancellationToken);
+        var disable = await service.DisableAsync(
+            record.QuestId,
+            new QuestLifecycleRequest(record.UpdatedAtUtc, disablePreview.Value!.PreviewSignature),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(preview.Succeeded);
+        Assert.False(preview.Value!.ValidForDraft);
+        Assert.Contains(preview.Value.Messages, IsReferenceBlocked);
+        Assert.False(save.Succeeded);
+        Assert.Contains(save.Errors, IsReferenceBlocked);
+        Assert.True(disablePreview.Succeeded);
+        Assert.Contains(disablePreview.Value!.Messages, IsReferenceBlocked);
+        Assert.False(disable.Succeeded);
+        Assert.Contains(disable.Errors, IsReferenceBlocked);
+    }
+
+    [Fact]
     public async Task ReferencedDraftQuestCannotBeStructurallyReplacedBySaveDraft()
     {
         var repository = new TestQuestRepository();

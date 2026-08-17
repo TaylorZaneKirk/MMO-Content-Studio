@@ -538,7 +538,7 @@ public sealed class QuestAuthoringService
             : string.Join(", ", references.ActiveStepIds);
         return new ApiError(
             "quest_state_reference_blocked",
-            $"Quest definition '{questId}' cannot {operation} because {references.TotalCount} persisted character quest state row(s) reference it ({references.ActiveCount} active, {references.CompletedCount} completed; active steps: {activeSteps}).",
+            $"Quest definition '{questId}' cannot {operation} because {references.TotalCount} persisted character quest state row(s) and {references.PendingSettlementCount} pending dialogue settlement(s) reference it ({references.ActiveCount} active, {references.CompletedCount} completed; active steps: {activeSteps}).",
             ValidationSeverity.Error,
             "publication_state");
     }

@@ -43,6 +43,10 @@ public interface IUnifiedItemRepository
         string itemId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> HasPendingDialogueSettlementReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default);
+
     Task<ReferencedItemRecord?> LoadReferencedItemAsync(
         string itemId,
         CancellationToken cancellationToken = default);
@@ -297,6 +301,14 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return await LoadPublishedDialogueReferencesAsync(connection, null, itemId, cancellationToken);
     }
 
+    public async Task<bool> HasPendingDialogueSettlementReferencesAsync(
+        string itemId,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        return await HasPendingDialogueSettlementReferencesAsync(connection, null, itemId, cancellationToken);
+    }
+
     public async Task<ReferencedItemRecord?> LoadReferencedItemAsync(
         string itemId,
         CancellationToken cancellationToken = default)
@@ -330,12 +342,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockItemContentStateAsync(connection, transaction, itemId, cancellationToken);
         var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken);
         if (expectNew && existing is not null)
         {
             throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
         }
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, itemId);
+        if (existing?.RuntimeEnabled == true)
+        {
+            await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, "save_draft", cancellationToken);
+        }
 
         const string sql = """
             insert into item_definitions (
@@ -437,11 +454,13 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockItemContentStateAsync(connection, transaction, itemId, cancellationToken);
         var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken)
             ?? throw new UnifiedItemNotFoundException(itemId);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, itemId);
         if (existing.RuntimeEnabled && !runtimeEnabled)
         {
+            await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, "disable", cancellationToken);
             await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, itemId, "disable", cancellationToken);
         }
         if (existing.RuntimeEnabled != runtimeEnabled)
@@ -471,6 +490,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+        await LockItemContentStateAsync(connection, transaction, itemId, cancellationToken);
         var existing = await LoadAggregateAsync(connection, transaction, itemId, true, cancellationToken)
             ?? throw new UnifiedItemNotFoundException(itemId);
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, itemId);
@@ -478,6 +498,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         {
             throw new UnifiedItemPublishedDeleteException(itemId);
         }
+        await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, "delete", cancellationToken);
         await EnsureNoPublishedDialogueReferencesAsync(connection, transaction, itemId, "delete", cancellationToken);
 
         await ExecuteDeleteAsync(connection, transaction, "item_tool_capabilities", itemId, cancellationToken);
@@ -592,6 +613,69 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         {
             throw new UnifiedItemReferencedByPublishedDialogueException(itemId, operation, dialogueIds);
         }
+    }
+
+    private static async Task<bool> HasPendingDialogueSettlementReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select exists (
+                select 1
+                from character_dialogue_choice_effect_settlements settlement
+                join character_dialogue_choice_effect_plan_rows plan
+                  on plan.settlement_id = settlement.settlement_id
+                where settlement.settlement_status <> 'settled'
+                  and plan.effect_type in ('grant_item', 'remove_item')
+                  and plan.item_id = @item_id
+            );
+            """;
+
+        try
+        {
+            await using var command = new NpgsqlCommand(sql, connection, transaction);
+            command.Parameters.AddWithValue("item_id", itemId);
+            return (bool)(await command.ExecuteScalarAsync(cancellationToken) ?? false);
+        }
+        catch (PostgresException exception) when (
+            exception.SqlState is PostgresErrorCodes.UndefinedTable or PostgresErrorCodes.UndefinedColumn)
+        {
+            return false;
+        }
+    }
+
+    private static async Task EnsureNoPendingDialogueSettlementReferencesAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        if (await HasPendingDialogueSettlementReferencesAsync(
+                connection,
+                transaction,
+                itemId,
+                cancellationToken))
+        {
+            throw new UnifiedItemReferencedByPendingDialogueSettlementException(itemId, operation);
+        }
+    }
+
+    private static async Task LockItemContentStateAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string itemId,
+        CancellationToken cancellationToken)
+    {
+        const string sql = """
+            select pg_advisory_xact_lock(hashtextextended(@identity, 0));
+            """;
+
+        await using var command = new NpgsqlCommand(sql, connection, transaction);
+        command.Parameters.AddWithValue("identity", $"item_content_state_v1|{itemId}");
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<UnifiedItemRecord?> LoadBaseAsync(
@@ -1852,4 +1936,19 @@ public sealed class UnifiedItemReferencedByPublishedDialogueException : Exceptio
     public string ItemId { get; }
     public string Operation { get; }
     public IReadOnlyList<string> DialogueDefinitionIds { get; }
+}
+
+public sealed class UnifiedItemReferencedByPendingDialogueSettlementException : Exception
+{
+    public UnifiedItemReferencedByPendingDialogueSettlementException(
+        string itemId,
+        string operation)
+        : base($"Item '{itemId}' cannot {operation} while referenced by a pending dialogue effect settlement.")
+    {
+        ItemId = itemId;
+        Operation = operation;
+    }
+
+    public string ItemId { get; }
+    public string Operation { get; }
 }

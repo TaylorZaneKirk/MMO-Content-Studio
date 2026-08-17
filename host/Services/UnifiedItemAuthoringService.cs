@@ -240,6 +240,11 @@ public sealed class UnifiedItemAuthoringService
                 exception.ItemId,
                 exception.DialogueDefinitionIds));
         }
+        catch (UnifiedItemReferencedByPendingDialogueSettlementException exception)
+        {
+            return AuthoringOperationResult<ItemMutationResponse>.Failure(PendingDialogueSettlementReferenceError(
+                exception.ItemId));
+        }
         catch (UnifiedItemConcurrencyException)
         {
             return VersionConflict<ItemMutationResponse>(itemId);
@@ -313,6 +318,11 @@ public sealed class UnifiedItemAuthoringService
             return AuthoringOperationResult<DeleteMutationResponse>.Failure(PublishedDialogueReferenceError(
                 exception.ItemId,
                 exception.DialogueDefinitionIds));
+        }
+        catch (UnifiedItemReferencedByPendingDialogueSettlementException exception)
+        {
+            return AuthoringOperationResult<DeleteMutationResponse>.Failure(PendingDialogueSettlementReferenceError(
+                exception.ItemId));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -394,6 +404,11 @@ public sealed class UnifiedItemAuthoringService
                 exception.ItemId,
                 exception.DialogueDefinitionIds));
         }
+        catch (UnifiedItemReferencedByPendingDialogueSettlementException exception)
+        {
+            return AuthoringOperationResult<ItemMutationResponse>.Failure(PendingDialogueSettlementReferenceError(
+                exception.ItemId));
+        }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
             return DatabaseFailure<ItemMutationResponse>(exception);
@@ -411,6 +426,10 @@ public sealed class UnifiedItemAuthoringService
         {
             await AddDisableReferenceErrorsAsync(itemId, messages, cancellationToken);
         }
+        if (operation == "delete")
+        {
+            await AddDisableReferenceErrorsAsync(itemId, messages, cancellationToken);
+        }
         if (operation == "delete" && existing?.RuntimeEnabled == true)
         {
             messages.Add(DeleteRequiresDisabledError(itemId));
@@ -425,6 +444,10 @@ public sealed class UnifiedItemAuthoringService
         if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
         {
             messages.Add(LiveReferenceError(itemId));
+        }
+        if (await _repository.HasPendingDialogueSettlementReferencesAsync(itemId, cancellationToken))
+        {
+            messages.Add(PendingDialogueSettlementReferenceError(itemId));
         }
         if (await _repository.HasPublishedConsumableResultReferencesAsync(itemId, cancellationToken))
         {
@@ -717,6 +740,12 @@ public sealed class UnifiedItemAuthoringService
             ValidationSeverity.Error,
             "publication_state",
             string.Join(", ", dialogueDefinitionIds));
+
+    private static ApiError PendingDialogueSettlementReferenceError(string itemId) => new(
+        "item_has_pending_dialogue_settlement_references",
+        $"Item '{itemId}' is referenced by pending dialogue effect settlement(s).",
+        ValidationSeverity.Error,
+        "publication_state");
 
     private static AuthoringOperationResult<T> VersionConflict<T>(string itemId) =>
         AuthoringOperationResult<T>.Failure(new ApiError(

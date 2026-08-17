@@ -76,7 +76,8 @@ Schema:
 - `dialogue_choices`
 - QV3 adds `dialogue_entry_conditions` and `dialogue_choice_conditions` for
   typed read-only predicates
-- QV4 adds `dialogue_choice_effects` for typed runtime-settled choice effects
+- QV4 adds `dialogue_choice_effects` for typed runtime-settled choice effects;
+  unsettled settlements are durable quest/item references for lifecycle safety
 
 Routes:
 
@@ -226,7 +227,8 @@ Verification targets:
   currently documented
 - disable/delete blocked while published NPC definitions reference a dialogue
 - only supported typed condition and effect rows reach runtime export; effect
-  settlement remains server-authoritative and exact-once
+  settlement remains server-authoritative and exact-once, and pending plans
+  block referenced quest/item lifecycle mutation
 
 Manual playthrough:
 
