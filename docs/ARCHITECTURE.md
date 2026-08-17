@@ -38,7 +38,8 @@ feature-owned in Godot, while the host owns validation, graph analysis,
 preview-signatures, persistence, reference checks, and transactions. The
 Dialogue workspace appears after NPCs and before Environment and uses shell
 routing for NPC cross-navigation. D4 MMO Project runtime catalog handoff is
-implemented, while D1-D5 still provide no quest, condition, or effect authoring.
+implemented. QV3 adds typed read-only quest/item predicates, and QV4 adds typed
+choice effects for MMO Project-owned settlement.
 
 ### .NET Content Authoring Host
 
@@ -419,11 +420,12 @@ Target-node consistency is service validation rather than a database target FK,
 which allows incomplete Draft graphs to persist while publish validation stays
 strict. Child-table mutations advance the root `updated_at_utc`, and mutations
 require both optimistic concurrency and preview signatures. The pure
-playthrough-preview service emulates current session flow without executing
-effects. NPC reference guards read `npc_definitions.default_dialogue_id`:
+playthrough-preview service emulates current session flow and reports QV4
+choice effects without executing them. NPC reference guards read
+`npc_definitions.default_dialogue_id`:
 Published NPC references block disable, and any NPC reference blocks delete.
 
-D1-D5 intentionally do not author quest predicates, quest effects, objective
-progress, rewards, content gates, arbitrary scripts, portraits, localization,
-cutscenes, or hot reload. Those capabilities require MMO Project quest
-foundations and typed runtime contracts before Dialogue Studio exposes them.
+QV3/QV4 intentionally expose only typed predicates and typed choice effects.
+Objective progress, story flags, broader rewards, content gates, arbitrary
+scripts, portraits, localization, cutscenes, hot reload, Quest Studio, and
+authored first-quest content remain deferred.

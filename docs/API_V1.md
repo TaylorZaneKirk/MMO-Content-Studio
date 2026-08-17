@@ -361,8 +361,11 @@ Returns publication states, node types `speaker_text`, `player_choice`, and
 `end`, ID rules/limits, default entry/start IDs, condition types
 `quest_status`, `quest_step`, and `has_item`, published quest references with
 scoped step options, runtime item references, and capability flags. QV3
-conditions are read-only predicates; effects, dialogue quest-state mutation,
-localization, portraits, hot reload, and cutscenes report unsupported.
+conditions are read-only predicates. QV4 choice effects support `start_quest`,
+`advance_quest`, `complete_quest`, `grant_item`, `remove_item`, and
+`grant_experience`; MMO Project owns settlement. Localization, portraits, hot
+reload, cutscenes, arbitrary scripting, story flags, objectives, and unlocks
+report unsupported.
 
 ### `GET /api/v1/dialogues?search=greeting`
 
@@ -395,8 +398,9 @@ already persisted.
 Runs a noncommitting playthrough preview over the submitted draft or saved
 definition. It can start/restart from an entry point, continue from
 `speaker_text`, show ordered choices for `player_choice`, select a choice,
-acknowledge `end`, detect stale node or choice IDs, and report loop-protection
-warnings. It executes no effects because D2 has no effect vocabulary.
+acknowledge `end`, detect stale node or choice IDs, report loop-protection
+warnings, and report the ordered effects that would be applied by the runtime
+settlement path without mutating quest, inventory, or XP state.
 
 ### `PUT /api/v1/dialogues/{dialogueDefinitionId}/draft`
 

@@ -2,7 +2,8 @@
 
 Status: D1-D5 non-quest Dialogue Studio authoring, graph editing, runtime
 catalog export, validator/runtime equivalence, reference safety, and end-to-end
-verification are complete. Quest predicates/effects remain deferred.
+verification are complete. QV3 typed predicates and QV4 typed choice effects
+are implemented; Quest Studio and authored first-quest content remain deferred.
 
 ## Product Boundary
 
@@ -74,22 +75,21 @@ DialogueChoice
   target_node_id
   choice_order
   conditions[]  # QV3 typed read-only predicates
+  effects[]     # QV4 typed choice effects
 ```
 
 `dialogue_definition_id` maps to the current runtime `dialogue_id`. The API may
 use the explicit Content Studio name while export writes `dialogue_id`.
 
-The initial aggregate explicitly excludes:
+The D1-D5 initial aggregate explicitly excluded quest/effect semantics. QV3 and
+QV4 now add only the locked typed condition/effect rows; the aggregate still
+excludes arbitrary quest scripts and broader quest systems:
 
 ```text
-quest_id
 quest_started
 quest_completed
 quest_stage
 quest_stage_equals
-start_quest
-advance_quest
-complete_quest
 objective_progress
 quest_rewards
 quest_variables
@@ -122,15 +122,21 @@ dialogue_entry_conditions
 dialogue_choice_conditions
 ```
 
+Implemented QV4 choice-effect storage:
+
+```text
+dialogue_choice_effects
+```
+
 QV3 supports `quest_status`, `quest_step`, and `has_item` conditions on entry
 points and choices. Conditions are validated during authoring/publication,
 exported to the runtime dialogue catalog, evaluated server-side for entry
 selection and visible choices, and revalidated when a player submits a choice.
 
-Effect tables should be deferred until MMO Project has an implemented effect
-contract. The current runtime has no effect fields, no execution timing, and no
-transaction boundary for effects, so adding effect persistence in D2 would be
-premature.
+QV4 supports `start_quest`, `advance_quest`, `complete_quest`, `grant_item`,
+`remove_item`, and `grant_experience` effects on player choices only. MMO
+Project owns authoritative admission, frozen settlement plans, exact-once
+mutation, and recovery.
 
 ## Implemented Tables
 
@@ -391,20 +397,20 @@ effect
 ```
 
 QV3 registers `quest_status`, `quest_step`, and `has_item` condition types.
-MMO Project owns the authoritative payload validation and runtime evaluation.
-Dialogue Studio must not add dialogue effects or quest-state mutation until MMO
-Project defines the application owner and transaction boundary for those effects.
-
-Future additions may include quest transition effects, objective effects, and
-reward requests, but their payloads are deliberately not defined in QV3.
+QV4 registers `start_quest`, `advance_quest`, `complete_quest`, `grant_item`,
+`remove_item`, and `grant_experience` effect types. MMO Project owns the
+authoritative payload validation, runtime evaluation, settlement transaction
+boundary, and recovery. Dialogue Studio must not add arbitrary scripts,
+node-entry effects, story flags, objectives, unlocks, or broader reward
+requests in QV4.
 
 ## Initial Dialogue Studio UX Requirements
 
 D3 Godot Dialogue Studio implemented the initial UI as a top-level Dialogue
 workspace after NPCs and before Environment. The workspace uses GraphEdit and
 GraphNode for graph editing, now exposes QV3 typed condition controls, keeps
-effect authoring read-only as unsupported, and routes NPC reference summaries
-back to the NPCs workspace.
+QV4 typed choice-effect controls, and routes NPC reference summaries back to
+the NPCs workspace.
 
 Top-level workspace:
 
@@ -466,12 +472,11 @@ Only relevant fields should be visible for each node type:
 - `player_choice`: speaker, text, ordered choices, dismissible
 - `end`: speaker, text, dismissible
 
-Conditions should use typed controls for the QV3 condition registry. Effects
-should remain visible as empty/read-only "not supported by current runtime"
-sections until runtime effect types are implemented.
+Conditions should use typed controls for the QV3 condition registry. Choice
+effects should use typed controls for the QV4 effect registry.
 
 D3 provided no quest, condition, or effect authoring. QV3 adds read-only
-condition predicates only.
+condition predicates, and QV4 adds typed choice effects.
 
 ## Playthrough Preview
 

@@ -114,16 +114,28 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "supports_runtime_dialogue_catalog",
             "supports_conditions",
             "supports_effects",
-            "Not supported in D3",
             "Available",
+        ):
+            self.assertIn(token, editor)
+
+        for token in (
+            'EFFECT_TYPE_START_QUEST := "start_quest"',
+            'EFFECT_TYPE_ADVANCE_QUEST := "advance_quest"',
+            'EFFECT_TYPE_COMPLETE_QUEST := "complete_quest"',
+            'EFFECT_TYPE_GRANT_ITEM := "grant_item"',
+            'EFFECT_TYPE_REMOVE_ITEM := "remove_item"',
+            'EFFECT_TYPE_GRANT_EXPERIENCE := "grant_experience"',
+            "_add_effects_editor",
+            "_default_effect",
+            "_effect_summary_list",
+            '"effects": []',
+            '"would_apply_effects"',
         ):
             self.assertIn(token, editor)
 
         for forbidden in (
             "quest_stage",
             "objective_progress",
-            "start_quest",
-            "complete_quest",
             "portrait",
             "localization",
             "cutscene",
@@ -183,7 +195,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "D4 MMO Project runtime catalog handoff implemented",
             "D1-D5 Dialogue Studio authoring",
             "QV3 typed read-only quest/item predicates",
-            "effects and quest-state mutation remain deferred",
+            "QV4 typed choice effects",
         ):
             self.assertIn(token, docs)
 

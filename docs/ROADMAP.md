@@ -246,7 +246,8 @@ quest editing.
 **Status:** D1-D5 Dialogue Studio authoring, graph editing, runtime catalog
 export, validator/runtime equivalence, reference safety, and end-to-end
 verification are complete. QV3 typed read-only quest/item predicates are
-implemented; effects and quest-state mutation remain deferred.
+implemented, and QV4 typed choice effects are implemented for server-owned
+quest, item, and XP settlement.
 
 Move current non-quest dialogue graph authoring into MMO Content Studio as a
 first-class workspace after NPCs and before Environment. Dialogue Studio is not
@@ -268,10 +269,12 @@ Locked D1-D5 boundaries:
   placement remains in Tiled.
 - D1-D5 author current runtime-compatible dialogue semantics.
 - QV3 condition registries expose `quest_status`, `quest_step`, and `has_item`.
-- Quest effects, objective progress, rewards, broader content gates, arbitrary
+- QV4 effect registries expose `start_quest`, `advance_quest`,
+  `complete_quest`, `grant_item`, `remove_item`, and `grant_experience`.
+- Objective progress, story flags, broader rewards, content gates, arbitrary
   scripting, portraits, cutscenes, localization, and hot reload remain deferred.
 - D3 provided no quest, condition, or effect authoring; QV3 adds typed condition
-  controls only.
+  controls and QV4 adds typed choice-effect controls.
 
 References:
 
@@ -302,14 +305,14 @@ transactionally, reloads inside the transaction, commits, and reloads again.
 Published NPC references through `npc_definitions.default_dialogue_id` block
 disable; any NPC reference blocks delete. Current capabilities report
 `supports_runtime_dialogue_catalog = true`, typed read-only condition
-registries, an empty effect registry, and no localization, portrait, cutscene,
+registries, the locked QV4 effect registry, and no localization, portrait, cutscene,
 or hot-reload support.
 
 D3 Godot Dialogue Studio is implemented over the D2 `/api/v1/dialogues` routes.
 The Dialogue workspace after NPCs and before Environment lists definitions,
 loads complete aggregates, edits `speaker_text`, `player_choice`, and `end`
-nodes on a GraphEdit canvas, exposes typed QV3 condition controls, keeps effect
-controls read-only as unsupported, previews exact logical changes, gates mutations with
+nodes on a GraphEdit canvas, exposes typed QV3 condition controls and QV4
+choice-effect controls, previews exact logical changes, gates mutations with
 preview-signatures, runs host playthrough preview, and routes NPC references
 back to the NPCs workspace. D4 MMO Project runtime catalog handoff now exports
 Published authoring rows to runtime JSON.

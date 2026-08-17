@@ -208,17 +208,19 @@ output for the current all-dismissible dialogue slice.
 The initial handoff must preserve current runtime semantics: prioritized entry
 points, `speaker_text`, `player_choice`, and `end` nodes, node-owned
 transitions, server-filtered choices, end acknowledgement, close/cancellation
-behavior, and the existing dialogue protocol payloads. D1-D5 do not add quest
-predicates, quest effects, objective progress, rewards, content gates, arbitrary
-scripting, or runtime hot reload.
+behavior, and the existing dialogue protocol payloads. QV3 adds typed
+read-only quest/item predicates, and QV4 adds typed choice effects for
+server-owned quest, item, and XP settlement. Objective progress, story flags,
+broader rewards, content gates, arbitrary scripting, and runtime hot reload
+remain deferred.
 
 D2 reference safety reads Content Studio `npc_definitions.default_dialogue_id`.
 Published NPC references block dialogue disable, and any NPC reference blocks
 dialogue delete. NPC publish validation prefers the Content Studio authoring
 state for dialogue references; stale runtime JSON is not sufficient to validate
-a Draft, Disabled, or missing dialogue. Conditions and effects have no
-authorable registry entries, no condition/effect tables are created, and there
-is no quest, condition, or effect authoring. D1-D5 non-quest Dialogue Studio
+a Draft, Disabled, or missing dialogue. QV3 condition rows and QV4 choice-effect
+rows are authored/exported through typed registries only. D1-D5 Dialogue Studio
 authoring, graph editing, runtime catalog export, validator/runtime
-equivalence, reference safety, and end-to-end verification are complete. Quest
-predicates/effects remain deferred.
+equivalence, reference safety, and end-to-end verification are complete; Quest
+Studio, arbitrary scripts, story flags, objectives, broader rewards, unlocks,
+and authored first-quest content remain deferred.

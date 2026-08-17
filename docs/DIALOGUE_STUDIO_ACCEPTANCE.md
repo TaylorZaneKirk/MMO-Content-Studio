@@ -2,8 +2,9 @@
 
 Status: D1-D5 Dialogue Studio authoring, graph editing, runtime catalog export,
 validator/runtime equivalence, reference safety, and end-to-end verification are
-complete. QV3 typed read-only quest/item predicates are implemented; effects and
-quest-state mutation remain deferred.
+complete. QV3 typed read-only quest/item predicates and QV4 typed choice
+effects are implemented; Quest Studio and authored first-quest content remain
+deferred.
 
 ## D1 - Runtime Audit And Domain Lock
 
@@ -24,7 +25,7 @@ D1 is complete when:
 - README, roadmap, architecture, Godot workspace support, and MMO Project
   integration docs name Dialogue Studio as an integrated Content Studio
   workspace.
-- Quest semantics are explicitly deferred.
+- Quest Studio and authored first-quest content are explicitly deferred.
 - Source-contract tests preserve the historical D1 boundary and now guard that
   the Godot Dialogue editor stays within current runtime-compatible semantics.
 - MMO Project remains read-only.
@@ -49,8 +50,10 @@ Status: complete for host-side authoring.
 - Reference guards block disable when Published NPC definitions reference a
   dialogue and block delete when any NPC definition references it.
 - QV3 condition registries expose `quest_status`, `quest_step`, and `has_item`.
-- Quest fields are accepted only through typed read-only conditions.
-- Effect registries expose no authorable runtime types.
+- Quest fields are accepted only through typed read-only conditions and typed
+  QV4 quest-transition effects.
+- Effect registries expose only `start_quest`, `advance_quest`,
+  `complete_quest`, `grant_item`, `remove_item`, and `grant_experience`.
 
 ## D3 - Godot Dialogue Studio
 
@@ -72,7 +75,8 @@ Status: complete for the Content Studio Godot workspace.
 - Preview/apply lifecycle uses `AuthoringWorkspaceSupport`.
 - Dialogue references can route back to NPC definitions through shell-level
   NPC cross-navigation.
-- D3 provides no quest, condition, or effect authoring.
+- D3 provided no quest, condition, or effect authoring; QV3/QV4 add the typed
+  condition and choice-effect controls.
 
 ## D4 - MMO Project Runtime Handoff
 
@@ -86,8 +90,8 @@ Status: complete for the generated runtime catalog handoff.
 - NPC `default_dialogue_id` validation resolves against the exported catalog.
 - Runtime client protocol payloads remain backward-compatible.
 - Active runtime sessions are not hot-reloaded.
-- Typed QV3 predicates may be exported. Quest effects, rewards, objective
-  progress, and content locks are not exported.
+- Typed QV3 predicates and QV4 choice effects may be exported. Objective
+  progress, story flags, arbitrary scripts, and content locks are not exported.
 
 ## D5 - Hardening And Verification
 
@@ -113,9 +117,10 @@ Status: complete for the non-quest runtime-compatible dialogue slice.
 - No quest authoring.
 - No additional quest condition types beyond QV3 `quest_status`, `quest_step`,
   and `has_item`.
-- No quest effects.
+- No quest effects beyond QV4 `start_quest`, `advance_quest`, and
+  `complete_quest`.
 - No objective progress.
-- No quest rewards.
+- No quest rewards beyond QV4 item and XP choice effects.
 - No quest journal.
 - No content-access lock authoring.
 - No arbitrary scripting or executable payloads.

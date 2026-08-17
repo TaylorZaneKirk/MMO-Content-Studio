@@ -127,12 +127,21 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             self.assertIn(token, registry + (HOST / "Contracts" / "DialogueContracts.cs").read_text())
 
         self.assertIn("LoadConditionTypes() => ConditionTypes", registry)
-        self.assertIn("LoadEffectTypes() => []", registry)
+        self.assertIn("LoadEffectTypes() => EffectTypes", registry)
         self.assertIn('JsonPropertyName("quest_references")', (HOST / "Contracts" / "DialogueContracts.cs").read_text())
         self.assertIn('JsonPropertyName("item_references")', (HOST / "Contracts" / "DialogueContracts.cs").read_text())
         self.assertIn("quest_status", registry)
         self.assertIn("quest_step", registry)
         self.assertIn("has_item", registry)
+        for effect_type in (
+            "start_quest",
+            "advance_quest",
+            "complete_quest",
+            "grant_item",
+            "remove_item",
+            "grant_experience",
+        ):
+            self.assertIn(effect_type, registry)
         self.assertIn("dialogue_definitions", schema)
         self.assertIn("dialogue_entry_points", schema)
         self.assertIn("dialogue_nodes", schema)
@@ -166,11 +175,18 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             self.assertIn(route, (ROOT / "content-studio" / "scripts" / "authoring_host_client.gd").read_text())
         self.assertNotIn("/api/v1/quests", editor)
         for token in (
+            "start_quest",
+            "advance_quest",
+            "complete_quest",
+            "grant_item",
+            "remove_item",
+            "grant_experience",
+        ):
+            self.assertIn(token, host_text)
+        for token in (
             "quest_stage",
             "quest_rewards",
             "objective_progress",
-            "start_quest",
-            "complete_quest",
             "arbitrary_script",
         ):
             self.assertNotIn(token, host_text)
@@ -197,13 +213,14 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "/api/v1/dialogues",
             "supports_runtime_dialogue_catalog = true",
             "typed read-only condition",
-            "empty effect registry",
+            "locked QV4 effect registry",
             "Published NPC references block disable",
             "any NPC reference blocks delete",
             "Godot Dialogue Studio",
             "D4 MMO Project runtime catalog handoff implemented",
             "D1-D5 Dialogue Studio authoring",
             "QV3 typed read-only quest/item predicates",
+            "QV4 typed choice effects",
         ):
             self.assertIn(token, docs)
 

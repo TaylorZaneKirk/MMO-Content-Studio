@@ -109,7 +109,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         integration = (ROOT / "integrations" / "mmo-project" / "README.md").read_text()
 
         for token in (
-            "D1-D5 + QV3 — Dialogue Studio",
+            "D1-D5 + QV3/QV4 — Dialogue Studio",
             "MMO Project quest foundations",
             "Dialogue Studio quest integration",
             "DIALOGUE_STUDIO_RUNTIME_AUDIT.md",
@@ -133,22 +133,16 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn("D3 Dialogue Studio uses the same support boundary", workspace)
         self.assertIn("## D Dialogue Studio runtime handoff plan", integration)
 
-    def test_initial_schema_excludes_quest_effect_semantics(self) -> None:
+    def test_dialogue_schema_exposes_only_locked_qv3_qv4_semantics(self) -> None:
         domain = (ROOT / "docs" / "DIALOGUE_STUDIO_DOMAIN_MODEL.md").read_text()
         table_heading = "## Implemented Tables" if "## Implemented Tables" in domain else "## Proposed Tables"
         proposed_tables = domain.split(table_heading, 1)[1].split("## Identity Rules", 1)[0]
-        deferred = domain.split("The initial aggregate explicitly excludes:", 1)[1].split(
-            "It also excludes", 1
-        )[0]
 
         forbidden_schema_tokens = (
             "quest_started",
             "quest_completed",
             "quest_stage",
             "quest_stage_equals",
-            "start_quest",
-            "advance_quest",
-            "complete_quest",
             "objective_progress",
             "quest_rewards",
             "quest_variables",
@@ -157,16 +151,32 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         )
         for token in forbidden_schema_tokens:
             self.assertNotIn(token, proposed_tables)
-            self.assertIn(token, deferred)
 
         self.assertIn("dialogue_entry_conditions", domain)
         self.assertIn("dialogue_choice_conditions", domain)
+        self.assertIn("dialogue_choice_effects", domain)
         self.assertIn("quest_id", proposed_tables)
         self.assertIn("quest_status", proposed_tables)
         self.assertIn("quest_step", domain)
         self.assertIn("has_item", domain)
-        self.assertIn("Effect tables should be deferred", domain)
-        self.assertIn("Dialogue Studio must not add dialogue effects or quest-state mutation", domain)
+        for effect_type in (
+            "start_quest",
+            "advance_quest",
+            "complete_quest",
+            "grant_item",
+            "remove_item",
+            "grant_experience",
+        ):
+            self.assertIn(effect_type, domain)
+        for forbidden in (
+            "arbitrary scripts",
+            "node-entry effects",
+            "story flags",
+            "objectives",
+            "unlocks",
+            "broader reward",
+        ):
+            self.assertIn(forbidden, domain)
 
     def test_godot_dialogue_editor_keeps_d1_runtime_boundary(self) -> None:
         main_scene = (ROOT / "content-studio" / "scenes" / "Main.tscn").read_text()
@@ -241,7 +251,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
         self.assertIn("DialogueConditionTypes", catalog_source)
         self.assertIn("quest_status", catalog_source)
         self.assertIn("IDialogueConditionEvaluator", session)
-        self.assertIn("IsChoiceEligible", session)
+        self.assertIn("BuildChoicePresentationsAsync", session)
         self.assertIn("EvaluateConditionSets", session)
         self.assertIn('"default_dialogue_id": "test_npc_greeting"', npc_catalog)
         self.assertIn("dialogue_continue_request", protocol)
@@ -271,10 +281,18 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             "M docs/design/OSRS_STYLE_NPC_CONVERSATIONS_AND_QUEST_GATES.md",
             "M prototype/importer/README.md",
             "M prototype/server/Program.cs",
+            "M prototype/server/features/dialogue/application/DialogueChoiceEffectSettlementService.cs",
             "M prototype/server/features/dialogue/application/DialogueDefinitionCatalog.cs",
             "M prototype/server/features/dialogue/application/DialogueSessionService.cs",
+            "M prototype/server/features/dialogue/host/DialogueChoiceEffectSettlementRecoveryWorker.cs",
             "M prototype/server/features/dialogue/host/DialogueCommandHandlers.cs",
+            "M prototype/server/features/dialogue/persistence/DialogueChoiceEffectSettlementRepository.cs",
+            "M prototype/server/features/inventory/persistence/CharacterInventoryRecord.cs",
             "M prototype/server/features/inventory/persistence/CharacterInventoryRepository.cs",
+            "M prototype/server/features/quests/application/QuestDefinitionCatalog.cs",
+            "M prototype/server/features/runtime/application/GameRuntimeEvent.cs",
+            "M prototype/server/features/runtime/host/GameRuntimeEventProjector.cs",
+            "M prototype/server/features/session/host/SessionHandshakeCoordinator.cs",
             "M prototype/shared/dialogues/catalog.json",
             "M prototype/sql/MODULE_OWNERSHIP.md",
             "M prototype/sql/027_seed_existing_dialogue_definitions.sql",
@@ -284,6 +302,8 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             "M prototype/tools/MapPublisher/DialogueCatalogExporter.cs",
             "M prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/DialogueCatalogExporterTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueDefinitionCatalogTests.cs",
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueChoiceEffectSettlementPathTests.cs",
+            "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueEffectLifecycleLockContractTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/DialogueSessionServiceTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/GeneratedRegionRuntimeAdapterTests.cs",
             "M prototype/tests/MMO.Project.Prototype.Server.Tests/QuestStatePersistenceAcceptanceTests.cs",

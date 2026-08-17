@@ -99,9 +99,12 @@ implemented through deterministic Published dialogue export to
 equivalence, playthrough/session behavior, reference safety, and export
 reproducibility. QV3 adds typed read-only `quest_status`, `quest_step`, and
 `has_item` dialogue conditions across schema, host validation, Studio controls,
-export, and runtime evaluation. Dialogue effects, quest-state mutation,
-objective progress, rewards, broader content gates, hot reload, and Quest
-Studio remain deferred until later phases.
+export, and runtime evaluation. QV4 adds the locked choice-effect vocabulary
+`start_quest`, `advance_quest`, `complete_quest`, `grant_item`,
+`remove_item`, and `grant_experience`; settlement remains server-authoritative
+in MMO Project. Objective progress, story flags, broader rewards, content
+unlocks, hot reload, Quest Studio, and authored first-quest content remain
+deferred until later phases.
 
 T0 through T4D still require runtime verification on a machine with .NET 10, Godot 4, the MMO Project development database, and the game asset directory available.
 
@@ -179,7 +182,7 @@ The default API address is `http://127.0.0.1:5187`.
 5. **T3B — Weapons and tools workspace** — implemented; runtime verification pending
 6. **T4 — Mobs** — T4D runtime catalog export implemented; reference hardening pending
 7. **T5 — Minimal NPC authoring** — T5F runtime/reference hardening implemented
-8. **D1-D5 + QV3 — Dialogue Studio** — authoring, runtime export, equivalence, reference safety, and typed read-only conditions implemented
+8. **D1-D5 + QV3/QV4 — Dialogue Studio** — authoring, runtime export, equivalence, reference safety, typed read-only conditions, and typed choice effects implemented
 9. **R4D.1B.1 — Actor appearance discovery and socket editor loading repair** — implemented
 10. **R4D.2 — Equipment grip anchor editor hardening** — implemented
 11. **R4D.3 — Foreground grip overlay editor** — implemented
