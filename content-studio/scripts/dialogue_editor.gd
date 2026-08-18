@@ -57,6 +57,7 @@ var _speaker: LineEdit
 var _text: TextEdit
 var _next_node: OptionButton
 var _dismissible: CheckBox
+var _delete_node_button: Button
 var _editor_notes: TextEdit
 var _choices: VBoxContainer
 var _add_choice_button: Button
@@ -197,6 +198,11 @@ func _add_node_section(parent: VBoxContainer) -> void:
 	_dismissible.text = "Dismissible"
 	_dismissible.toggled.connect(_on_selected_node_changed.unbind(1))
 	parent.add_child(_dismissible)
+	_delete_node_button = Button.new()
+	_delete_node_button.text = "Delete Selected Node"
+	_delete_node_button.disabled = true
+	_delete_node_button.pressed.connect(_delete_selected_node)
+	parent.add_child(_delete_node_button)
 	_add_heading(parent, "Text", 16)
 	_text = _text_field(parent, "Dialogue text", 120)
 	_add_heading(parent, "Choices", 16)
@@ -224,7 +230,7 @@ func _add_operation_section(parent: VBoxContainer) -> void:
 	_add_operation("Save as Draft", "save_draft")
 	_add_operation("Publish", "publish")
 	_add_operation("Disable", "disable")
-	_add_operation("Delete", "delete")
+	_add_operation("Delete Dialogue", "delete")
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
 	parent.add_child(_operation)
 	_preview_button = Button.new()
@@ -232,7 +238,7 @@ func _add_operation_section(parent: VBoxContainer) -> void:
 	_preview_button.pressed.connect(_preview)
 	parent.add_child(_preview_button)
 	_delete_button = Button.new()
-	_delete_button.text = "Delete"
+	_delete_button.text = "Preview Dialogue Delete"
 	_delete_button.disabled = true
 	_delete_button.pressed.connect(_preview_delete)
 	parent.add_child(_delete_button)
@@ -292,7 +298,7 @@ func _on_dialogue_preview_received(payload: Dictionary) -> void:
 		str(payload.get("preview_signature", "")),
 		applicable,
 		_apply_button,
-		"Apply %s" % _workspace_support.operation_name(operation)
+		"Apply %s" % _dialogue_operation_name(operation)
 	)
 	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
 	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
@@ -316,7 +322,7 @@ func _on_dialogue_mutation_completed(payload: Dictionary) -> void:
 	_current_dialogue = dialogue
 	_is_new = false
 	_clear_preview()
-	_status.text = "%s completed. Reloading dialogue definition..." % _workspace_support.operation_name(operation)
+	_status.text = "%s completed. Reloading dialogue definition..." % _dialogue_operation_name(operation)
 	_client.load_dialogues(_search.text)
 
 
@@ -324,7 +330,7 @@ func _on_dialogue_delete_completed(payload: Dictionary) -> void:
 	var deleted_id := str(payload.get("deleted_id", _dialogue_id.text))
 	_reload_dialogue_id = ""
 	_start_new_dialogue()
-	_status.text = "Deleted %s." % deleted_id
+	_status.text = "Deleted dialogue %s." % deleted_id
 	_client.load_dialogues(_search.text)
 
 
@@ -464,6 +470,10 @@ func _rebuild_list() -> void:
 func _load_dialogue_id(dialogue_definition_id: String) -> void:
 	if not dialogue_definition_id.is_empty():
 		_client.load_dialogue(dialogue_definition_id)
+
+
+func _dialogue_operation_name(operation: String) -> String:
+	return "Delete Dialogue" if operation == "delete" else _workspace_support.operation_name(operation)
 
 
 func _preview() -> void:
@@ -712,6 +722,7 @@ func _add_node(node_type: String) -> void:
 func _delete_selected_node() -> void:
 	if not _form_editable or _selected_node_id.is_empty():
 		return
+	var deleted_node_id := _selected_node_id
 	var nodes := _current_dialogue.get("nodes", []) as Array
 	var remaining: Array = []
 	for variant in nodes:
@@ -732,6 +743,7 @@ func _delete_selected_node() -> void:
 	_rebuild_graph()
 	_load_selected_node()
 	_on_form_changed()
+	_status.text = "Deleted node %s from the draft. Save the dialogue draft to persist this change." % deleted_node_id
 
 
 func _rebuild_graph() -> void:
@@ -1759,6 +1771,7 @@ func _set_form_enabled(enabled: bool) -> void:
 		_text,
 		_next_node,
 		_dismissible,
+		_delete_node_button,
 		_editor_notes,
 		_operation,
 		_preview_button,
@@ -1791,6 +1804,7 @@ func _set_node_controls_enabled(enabled: bool) -> void:
 	_node_type.disabled = not enabled
 	_next_node.disabled = not enabled
 	_dismissible.disabled = not enabled
+	_delete_node_button.disabled = not enabled
 	_add_choice_button.disabled = not enabled
 
 

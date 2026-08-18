@@ -103,6 +103,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_payload_numeric_normalization(main_scene)
 	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
+	await _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
@@ -295,6 +296,62 @@ func _verify_dialogue_graph_selection_uses_selected_node(main_scene: PackedScene
 	await process_frame
 	if dialogue._selected_node_id != "farmer_greeting_003" or dialogue._node_id.text != "farmer_greeting_003":
 		_fail("Dialogue graph selection must load the actually selected node, not a stale previous signal")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue node-delete fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "node_delete_fixture",
+		"display_name": "Node Delete Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "farmer_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "farmer_greeting", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Mornin'.", "next_node_id": "farmer_greeting_003", "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "farmer_greeting_003", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Still here?", "next_node_id": "end", "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "end", "node_type": "end", "speaker": null, "text": null, "next_node_id": null, "dismissible": true, "canvas_x": 300.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T16:10:00+00:00",
+	})
+	var target_node := dialogue._graph.get_node_or_null("farmer_greeting_003") as GraphNode
+	if target_node == null:
+		_fail("Dialogue node-delete fixture expected the target graph node")
+		return
+	if str(dialogue._delete_button.text) != "Preview Dialogue Delete":
+		_fail("Dialogue aggregate delete action must be labeled separately from node deletion")
+		return
+	dialogue._graph.emit_signal("node_selected", target_node)
+	if dialogue._delete_node_button.disabled:
+		_fail("Delete Selected Node must be enabled when an editable node is selected")
+		return
+	dialogue._delete_node_button.emit_signal("pressed")
+	var nodes := dialogue._current_dialogue.get("nodes", []) as Array
+	if str(dialogue._current_dialogue.get("dialogue_definition_id", "")) != "node_delete_fixture" or nodes.size() != 2:
+		_fail("Delete Selected Node must keep the dialogue aggregate loaded and remove only one node")
+		return
+	if not dialogue._find_node("farmer_greeting_003").is_empty():
+		_fail("Delete Selected Node must remove the selected node from the draft graph")
+		return
+	var start_node: Dictionary = dialogue._find_node("farmer_greeting")
+	if start_node.is_empty() or start_node.get("next_node_id", "not-null") != null:
+		_fail("Delete Selected Node must clear links that pointed at the removed node")
+		return
+	if not str(dialogue._status.text).contains("Deleted node farmer_greeting_003"):
+		_fail("Delete Selected Node must report a node-level draft deletion")
 		return
 	scene.queue_free()
 	await process_frame
