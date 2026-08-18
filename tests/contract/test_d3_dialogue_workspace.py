@@ -33,6 +33,8 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "GraphNode.new()",
             "connection_request",
             "disconnection_request",
+            "node_selected",
+            "_on_graph_edit_node_selected",
             "_workspace_support.clear_preview",
             "_workspace_support.accept_preview",
             "_workspace_support.can_apply",

@@ -271,9 +271,15 @@ func _verify_dialogue_graph_selection_uses_selected_node(main_scene: PackedScene
 	if previous_node == null or target_node == null:
 		_fail("Dialogue graph-selection fixture expected both graph nodes")
 		return
+	if not dialogue._graph.has_signal("node_selected"):
+		_fail("Dialogue graph-selection fixture requires the GraphEdit node_selected signal")
+		return
 	previous_node.set("selected", false)
 	target_node.set("selected", true)
-	dialogue._on_graph_node_selected(&"farmer_greeting_003")
+	var emit_result = dialogue._graph.emit_signal("node_selected", target_node)
+	if emit_result != OK:
+		_fail("Dialogue graph-selection fixture could not emit GraphEdit node_selected")
+		return
 	dialogue._on_graph_node_selected(&"farmer_greeting")
 	await process_frame
 	if dialogue._selected_node_id != "farmer_greeting_003" or dialogue._node_id.text != "farmer_greeting_003":

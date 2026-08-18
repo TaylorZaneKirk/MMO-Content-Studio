@@ -144,6 +144,8 @@ func _build_ui() -> void:
 		_graph.connect("disconnection_request", Callable(self, "_on_disconnection_request"))
 	if _graph.has_signal("delete_nodes_request"):
 		_graph.connect("delete_nodes_request", Callable(self, "_on_delete_nodes_request"))
+	if _graph.has_signal("node_selected"):
+		_graph.connect("node_selected", Callable(self, "_on_graph_edit_node_selected"))
 	graph_content.add_child(_graph)
 
 	var inspector_panel := _panel(Vector2(390, 0))
@@ -758,7 +760,7 @@ func _rebuild_graph() -> void:
 		graph_node.set_slot(0, true, 0, Color(0.42, 0.7, 0.9), str(node.get("node_type", "")) != NODE_TYPE_END, 0, Color(0.85, 0.67, 0.35))
 		if graph_node.has_signal("position_offset_changed"):
 			graph_node.connect("position_offset_changed", Callable(self, "_on_graph_node_moved").bind(graph_node.name))
-		if graph_node.has_signal("selected"):
+		if not _graph.has_signal("node_selected") and graph_node.has_signal("selected"):
 			graph_node.connect("selected", Callable(self, "_on_graph_node_selected").bind(graph_node.name))
 		if graph_node.has_signal("close_request"):
 			graph_node.connect("close_request", Callable(self, "_on_graph_node_delete_requested").bind(graph_node.name))
@@ -844,14 +846,24 @@ func _on_graph_node_selected(node_name: StringName) -> void:
 	call_deferred("_apply_graph_node_selection")
 
 
+func _on_graph_edit_node_selected(node: Node) -> void:
+	if node is not GraphNode:
+		return
+	_select_graph_node(str(node.name))
+
+
 func _apply_graph_node_selection() -> void:
 	_graph_selection_update_queued = false
 	var selected_node_id := _selected_graph_node_id()
 	_pending_graph_node_selection = ""
-	if selected_node_id.is_empty() or selected_node_id == _selected_node_id:
+	_select_graph_node(selected_node_id)
+
+
+func _select_graph_node(node_id: String) -> void:
+	if node_id.is_empty() or node_id == _selected_node_id:
 		return
 	_sync_selected_node_from_form()
-	_selected_node_id = selected_node_id
+	_selected_node_id = node_id
 	_load_selected_node()
 
 
