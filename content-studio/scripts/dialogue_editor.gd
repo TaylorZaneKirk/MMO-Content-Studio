@@ -51,6 +51,7 @@ var _schema_version: SpinBox
 var _metadata_description: TextEdit
 var _notes: TextEdit
 var _entry_points: VBoxContainer
+var _add_entry_button: Button
 var _graph: GraphEdit
 var _node_title: Label
 var _node_id: LineEdit
@@ -177,7 +178,14 @@ func _add_definition_section(parent: VBoxContainer) -> void:
 	_publication = _value_label(grid, "Publication", "Unknown")
 	_updated = _value_label(grid, "Updated", "Unknown")
 	_schema_version = _spin_field(grid, "Schema version", 1, 100, 1, 1)
-	_add_heading(parent, "Entry Points", 16)
+	var entry_header := HBoxContainer.new()
+	entry_header.add_theme_constant_override("separation", 6)
+	parent.add_child(entry_header)
+	_add_heading(entry_header, "Entry Points", 16)
+	_add_entry_button = Button.new()
+	_add_entry_button.text = "+ Entry Point"
+	_add_entry_button.pressed.connect(_add_entry_point)
+	entry_header.add_child(_add_entry_button)
 	_entry_points = VBoxContainer.new()
 	parent.add_child(_entry_points)
 	_add_heading(parent, "Metadata", 16)
@@ -552,15 +560,15 @@ func _payload() -> Dictionary:
 
 func _entry_points_payload(entries: Array) -> Array:
 	var payload := []
-	for variant in entries:
-		if variant is not Dictionary:
+	for index in range(entries.size()):
+		if entries[index] is not Dictionary:
 			continue
-		var entry := variant as Dictionary
+		var entry := entries[index] as Dictionary
 		payload.append({
 			"entry_id": str(entry.get("entry_id", "")),
 			"node_id": str(entry.get("node_id", "")),
 			"priority": int(entry.get("priority", 0)),
-			"entry_order": int(entry.get("entry_order", 0)),
+			"entry_order": index,
 			"conditions": _conditions_payload(entry.get("conditions", []) as Array),
 		})
 	return payload
@@ -729,6 +737,41 @@ func _add_node(node_type: String) -> void:
 	_rebuild_entry_points()
 	_rebuild_graph()
 	_load_selected_node()
+	_on_form_changed()
+
+
+func _add_entry_point() -> void:
+	if not _form_editable:
+		return
+	_sync_selected_node_from_form()
+	var entries := _current_dialogue.get("entry_points", []) as Array
+	var node_id := _selected_node_id
+	if node_id.is_empty():
+		node_id = _first_node_id()
+	var entry_id_seed := "%s_entry" % node_id if not node_id.is_empty() else "entry"
+	entries.append({
+		"entry_id": _unique_entry_id(entry_id_seed),
+		"node_id": node_id,
+		"priority": 10 if not entries.is_empty() else 0,
+		"entry_order": entries.size(),
+		"conditions": [],
+	})
+	_current_dialogue["entry_points"] = entries
+	_normalize_entry_orders()
+	_rebuild_entry_points()
+	_on_form_changed()
+
+
+func _remove_entry_point(index: int) -> void:
+	if not _form_editable:
+		return
+	var entries := _current_dialogue.get("entry_points", []) as Array
+	if entries.size() <= 1 or index < 0 or index >= entries.size():
+		return
+	entries.remove_at(index)
+	_current_dialogue["entry_points"] = entries
+	_normalize_entry_orders()
+	_rebuild_entry_points()
 	_on_form_changed()
 
 
@@ -1677,14 +1720,42 @@ func _rebuild_entry_points() -> void:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
 		entry_container.add_child(row)
-		var label := _wrapped_label("%s ->" % str(entry.get("entry_id", "entry")))
-		row.add_child(label)
+		var entry_id := LineEdit.new()
+		entry_id.custom_minimum_size = Vector2(150, 0)
+		entry_id.placeholder_text = "entry_id"
+		entry_id.text = str(entry.get("entry_id", ""))
+		entry_id.editable = _form_editable
+		entry_id.text_changed.connect(_on_entry_id_changed.bind(index))
+		row.add_child(entry_id)
 		var target := OptionButton.new()
 		target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_fill_node_options(target, str(entry.get("node_id", "")), "Choose entry node")
+		target.disabled = not _form_editable
 		target.item_selected.connect(_on_entry_target_selected.bind(index, target))
 		row.add_child(target)
+		var priority := SpinBox.new()
+		priority.min_value = -999
+		priority.max_value = 999
+		priority.step = 1
+		priority.value = int(entry.get("priority", 0))
+		priority.custom_minimum_size = Vector2(76, 0)
+		priority.editable = _form_editable
+		priority.value_changed.connect(_on_entry_priority_changed.bind(index))
+		row.add_child(priority)
+		var remove := Button.new()
+		remove.text = "Remove"
+		remove.disabled = not _form_editable or entries.size() <= 1
+		remove.pressed.connect(_remove_entry_point.bind(index))
+		row.add_child(remove)
 		_add_conditions_editor(entry_container, entry.get("conditions", []) as Array, "entry", index, -1)
+
+
+func _on_entry_id_changed(value: String, index: int) -> void:
+	var entries := _current_dialogue.get("entry_points", []) as Array
+	if index < 0 or index >= entries.size() or entries[index] is not Dictionary:
+		return
+	(entries[index] as Dictionary)["entry_id"] = value.strip_edges()
+	_on_form_changed()
 
 
 func _on_entry_target_selected(_selected_index: int, index: int, target: OptionButton) -> void:
@@ -1692,6 +1763,14 @@ func _on_entry_target_selected(_selected_index: int, index: int, target: OptionB
 	if index < 0 or index >= entries.size() or entries[index] is not Dictionary:
 		return
 	(entries[index] as Dictionary)["node_id"] = _selected_metadata(target)
+	_on_form_changed()
+
+
+func _on_entry_priority_changed(value: float, index: int) -> void:
+	var entries := _current_dialogue.get("entry_points", []) as Array
+	if index < 0 or index >= entries.size() or entries[index] is not Dictionary:
+		return
+	(entries[index] as Dictionary)["priority"] = int(value)
 	_on_form_changed()
 
 
@@ -1817,6 +1896,7 @@ func _set_form_enabled(enabled: bool) -> void:
 		_schema_version,
 		_metadata_description,
 		_notes,
+		_add_entry_button,
 		_node_id,
 		_node_type,
 		_speaker,
@@ -2211,6 +2291,37 @@ func _unique_node_id(node_type: String) -> String:
 		index += 1
 		candidate = "%s_%d" % [prefix, index]
 	return candidate
+
+
+func _first_node_id() -> String:
+	var nodes := _current_dialogue.get("nodes", []) as Array
+	for variant in nodes:
+		if variant is Dictionary:
+			return str((variant as Dictionary).get("node_id", ""))
+	return ""
+
+
+func _unique_entry_id(prefix: String) -> String:
+	var normalized := prefix.strip_edges()
+	if normalized.is_empty():
+		normalized = "entry"
+	var existing := {}
+	for entry_variant in _current_dialogue.get("entry_points", []) as Array:
+		if entry_variant is Dictionary:
+			existing[str((entry_variant as Dictionary).get("entry_id", ""))] = true
+	var candidate := normalized
+	var index := 2
+	while existing.has(candidate):
+		candidate = "%s_%d" % [normalized, index]
+		index += 1
+	return candidate
+
+
+func _normalize_entry_orders() -> void:
+	var entries := _current_dialogue.get("entry_points", []) as Array
+	for index in range(entries.size()):
+		if entries[index] is Dictionary:
+			(entries[index] as Dictionary)["entry_order"] = index
 
 
 func _unique_choice_id(node: Dictionary, prefix: String) -> String:

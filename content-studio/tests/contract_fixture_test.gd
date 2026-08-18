@@ -105,6 +105,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
 	await _verify_dialogue_graph_nodes_fit_content_height(main_scene)
 	await _verify_dialogue_condition_status_alias_round_trip(main_scene)
+	await _verify_dialogue_entry_point_authoring_workflow(main_scene)
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
 	await _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene)
@@ -415,6 +416,95 @@ func _verify_dialogue_condition_status_alias_round_trip(main_scene: PackedScene)
 	payload_condition = (((dialogue._payload().get("entry_points", []) as Array)[0] as Dictionary).get("conditions", []) as Array)[0] as Dictionary
 	if str(payload_condition.get("status", "")) != "not_started":
 		_fail("Loaded API-shaped not_started quest_status conditions must round-trip without defaulting to active")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_entry_point_authoring_workflow(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue entry-point fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._options = {
+		"condition_types": [
+			{"id": "quest_status", "display_name": "Quest Status"},
+			{"id": "quest_step", "display_name": "Quest Step"},
+			{"id": "has_item", "display_name": "Has Item"},
+		],
+		"quest_references": [
+			{
+				"quest_id": "a_meal_delayed",
+				"display_name": "A Meal Delayed",
+				"steps": [
+					{"id": "speak_to_harlan", "display_name": "Speak with Harlan Wick"},
+				],
+			},
+		],
+	}
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "entry_point_fixture",
+		"display_name": "Entry Point Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "general_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Morning.", "next_node_id": "general_goodbye", "dismissible": true, "canvas_x": 20.0, "canvas_y": 40.0, "editor_notes": null, "choices": []},
+			{"node_id": "quest_delivery_greeting", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "You've got the look of someone Corren sent down the road.", "next_node_id": "general_goodbye", "dismissible": true, "canvas_x": 20.0, "canvas_y": 180.0, "editor_notes": null, "choices": []},
+			{"node_id": "general_goodbye", "node_type": "end", "speaker": null, "text": null, "next_node_id": null, "dismissible": true, "canvas_x": 280.0, "canvas_y": 80.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T17:35:00+00:00",
+	})
+	dialogue._select_graph_node("quest_delivery_greeting")
+	dialogue._add_entry_button.emit_signal("pressed")
+	var entries := dialogue._current_dialogue.get("entry_points", []) as Array
+	if entries.size() != 2 or entries[1] is not Dictionary:
+		_fail("Adding a dialogue entry point must append a new authorable entry")
+		return
+	var quest_entry := entries[1] as Dictionary
+	if str(quest_entry.get("node_id", "")) != "quest_delivery_greeting" or int(quest_entry.get("priority", 0)) != 10:
+		_fail("New dialogue entry points must target the selected node with quest-first priority")
+		return
+	dialogue._add_condition("entry", 1, -1)
+	var condition_type := OptionButton.new()
+	condition_type.add_item("Quest Step")
+	condition_type.set_item_metadata(0, "quest_step")
+	condition_type.select(0)
+	dialogue._on_condition_type_selected(0, "entry", 1, -1, 0, condition_type)
+	condition_type.queue_free()
+	var payload: Dictionary = dialogue._payload()
+	var payload_entries := payload.get("entry_points", []) as Array
+	if payload_entries.size() != 2:
+		_fail("Dialogue Save Draft payload must include fallback and quest-specific entry points")
+		return
+	var fallback := payload_entries[0] as Dictionary
+	var authored := payload_entries[1] as Dictionary
+	var authored_conditions := authored.get("conditions", []) as Array
+	if str(fallback.get("entry_id", "")) != "default" or int(fallback.get("priority", -1)) != 0 or int(fallback.get("entry_order", -1)) != 0:
+		_fail("Existing fallback entry point must remain first at priority 0")
+		return
+	if str(authored.get("node_id", "")) != "quest_delivery_greeting" or int(authored.get("priority", 0)) != 10 or int(authored.get("entry_order", -1)) != 1:
+		_fail("Quest-specific entry point payload must target the quest node with higher priority")
+		return
+	if authored_conditions.size() != 1 or authored_conditions[0] is not Dictionary:
+		_fail("Quest-specific entry point payload must include its authored condition")
+		return
+	var condition := authored_conditions[0] as Dictionary
+	if str(condition.get("condition_type", "")) != "quest_step" or str(condition.get("quest_id", "")) != "a_meal_delayed" or str(condition.get("step_id", "")) != "speak_to_harlan":
+		_fail("Quest-specific entry point condition must preserve the selected quest step predicate")
+		return
+	dialogue._remove_entry_point(1)
+	payload_entries = (dialogue._payload().get("entry_points", []) as Array)
+	if payload_entries.size() != 1 or int((payload_entries[0] as Dictionary).get("entry_order", -1)) != 0:
+		_fail("Removing a dialogue entry point must normalize remaining entry order")
 		return
 	scene.queue_free()
 	await process_frame
