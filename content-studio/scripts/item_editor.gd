@@ -950,15 +950,15 @@ func _economy_payload() -> Dictionary:
 
 func _apply_economy(value: Variant) -> void:
 	var economy: Dictionary = value as Dictionary if value is Dictionary else {}
-	_reference_value.text = str(economy.get("reference_value", 0))
+	_reference_value.text = _integer_text(economy.get("reference_value", 0))
 	_select_option(_trade_policy, str(economy.get("trade_policy", "tradeable")))
 	_select_option(_death_behavior, str(economy.get("death_behavior", "ordinary")))
 	_death_transform_item_id.text = _nullable_string(economy.get("death_transform_item_id", null))
 	_select_option(_shop_policy, str(economy.get("shop_policy", "not_shop_traded")))
-	_npc_buy_price.text = _nullable_string(economy.get("npc_buy_price", null))
-	_npc_sell_price.text = _nullable_string(economy.get("npc_sell_price", null))
+	_npc_buy_price.text = _integer_text(economy.get("npc_buy_price", null))
+	_npc_sell_price.text = _integer_text(economy.get("npc_sell_price", null))
 	_select_option(_reclaim_policy, str(economy.get("reclaim_policy", "none")))
-	_reclaim_value.text = _nullable_string(economy.get("reclaim_value", null))
+	_reclaim_value.text = _integer_text(economy.get("reclaim_value", null))
 	_condition_policy_id.text = _nullable_string(economy.get("condition_policy_id", null))
 	_repair_policy_id.text = _nullable_string(economy.get("repair_policy_id", null))
 	_update_economy_controls()
@@ -2284,6 +2284,16 @@ func _is_weapon_capable_slot(slot_id: String) -> bool:
 
 func _nullable_string(value: Variant) -> String:
 	return "" if value == null else str(value)
+
+
+func _integer_text(value: Variant) -> String:
+	if value == null:
+		return ""
+	if value is int:
+		return str(value)
+	if value is float and is_equal_approx(float(value), float(int(value))):
+		return str(int(value))
+	return str(value)
 
 
 func _optional_payload(value: String) -> Variant:

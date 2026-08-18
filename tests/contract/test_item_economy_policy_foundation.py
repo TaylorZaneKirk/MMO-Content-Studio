@@ -29,12 +29,17 @@ class ItemEconomyPolicyFoundationTests(unittest.TestCase):
         self.assertIn("func _apply_economy", editor)
         self.assertIn("func _update_economy_controls", editor)
         self.assertIn("func _has_valid_economy_integers", editor)
+        self.assertIn("func _integer_text", editor)
         self.assertIn("_apply_economy({})", editor)
         self.assertIn('"death_transform_item_id": _optional_payload(_death_transform_item_id.text) if transform else null', editor)
         self.assertIn('"npc_buy_price": _economic_integer(_npc_buy_price) if shop == "npc_buys" or shop == "npc_buys_and_sells" else null', editor)
         self.assertIn('"reclaim_policy": _selected_metadata(_reclaim_policy) if reclaim else "none"', editor)
         self.assertIn("_condition_policy_id", editor)
         self.assertIn("_repair_policy_id", editor)
+        self.assertIn('_reference_value.text = _integer_text(economy.get("reference_value", 0))', editor)
+        self.assertIn('_npc_buy_price.text = _integer_text(economy.get("npc_buy_price", null))', editor)
+        self.assertIn('_npc_sell_price.text = _integer_text(economy.get("npc_sell_price", null))', editor)
+        self.assertIn('_reclaim_value.text = _integer_text(economy.get("reclaim_value", null))', editor)
 
     def test_migration_029_contains_the_required_runtime_guards(self) -> None:
         migration = (ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "029_item_economy_policy.sql").read_text()

@@ -100,6 +100,7 @@ func _run_fixture() -> void:
 	await _verify_catalog_pane_toggle(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
+	await _verify_item_editor_integral_economy_values(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
 	await _verify_per_pose_flip_payload_and_preview_math(main_scene)
@@ -484,6 +485,38 @@ func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void
 		return
 	if items._paper_doll_preview.get_fit_zoom_percent() != 200:
 		_fail("Changing item/new item should not corrupt the preview zoom state")
+		return
+
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_item_editor_integral_economy_values(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+
+	var items := scene.get_node("Margin/Root/Tabs/Items")
+	if items == null:
+		_fail("Unified item editor fixture could not locate the Items workspace for economy values")
+		return
+
+	items._on_options_received(_available_rig_catalog())
+	items._apply_economy({
+		"reference_value": 1.0,
+		"trade_policy": "tradeable",
+		"death_behavior": "ordinary",
+		"shop_policy": "npc_buys_and_sells",
+		"npc_buy_price": 1.0,
+		"npc_sell_price": 2.0,
+		"reclaim_policy": "none",
+		"reclaim_value": null,
+	})
+	if items._reference_value.text != "1" or items._npc_buy_price.text != "1" or items._npc_sell_price.text != "2":
+		_fail("Integral economy values loaded from JSON must render as integer text")
+		return
+	if not items._has_valid_economy_integers():
+		_fail("Integral economy values loaded from JSON must remain valid for Save Draft")
 		return
 
 	scene.queue_free()
