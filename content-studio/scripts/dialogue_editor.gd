@@ -535,6 +535,7 @@ func _apply() -> void:
 
 func _payload() -> Dictionary:
 	_sync_selected_node_from_form()
+	_sync_graph_connections_to_draft()
 	return {
 		"display_name": _display_name.text,
 		"schema_version": int(_schema_version.value),
@@ -953,6 +954,38 @@ func _sync_selected_node_from_form() -> void:
 	_apply_node_type_transition_shape(node)
 	node["dismissible"] = _dismissible.button_pressed
 	node["editor_notes"] = _optional_payload(_editor_notes.text)
+
+
+func _sync_graph_connections_to_draft() -> void:
+	if _graph == null or not _graph.has_method("get_connection_list"):
+		return
+	var speaker_next_nodes := {}
+	for variant in _current_dialogue.get("nodes", []) as Array:
+		if variant is not Dictionary:
+			continue
+		var node := variant as Dictionary
+		if str(node.get("node_type", "")) == NODE_TYPE_SPEAKER_TEXT:
+			speaker_next_nodes[str(node.get("node_id", ""))] = null
+	for connection_variant in _graph.call("get_connection_list") as Array:
+		if connection_variant is not Dictionary:
+			continue
+		var connection := connection_variant as Dictionary
+		var from_node_id := str(connection.get("from_node", ""))
+		var to_node_id := str(connection.get("to_node", ""))
+		if from_node_id.is_empty() or to_node_id.is_empty():
+			continue
+		if not _has_node_id(from_node_id) or not _has_node_id(to_node_id):
+			continue
+		if speaker_next_nodes.has(from_node_id) and speaker_next_nodes[from_node_id] == null:
+			speaker_next_nodes[from_node_id] = to_node_id
+	for from_node_id in speaker_next_nodes.keys():
+		var node := _find_node(str(from_node_id))
+		if node.is_empty():
+			continue
+		node["next_node_id"] = speaker_next_nodes[from_node_id]
+		node["choices"] = []
+	if speaker_next_nodes.has(_selected_node_id):
+		_select_option(_next_node, _nullable_string(speaker_next_nodes[_selected_node_id]))
 
 
 func _on_selected_node_changed(_value: Variant = null) -> void:

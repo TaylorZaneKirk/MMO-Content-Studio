@@ -104,6 +104,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
+	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
 	await _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
@@ -343,6 +344,56 @@ func _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene: PackedSce
 			found_entry_link = str((variant as Dictionary).get("next_node_id", "")) == "ask_about_work"
 	if not found_entry_link:
 		_fail("Dialogue graph-level Save Draft payload must include graph connections from the entry node")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_payload_uses_visible_graph_connections(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue visible-connection fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "visible_connection_fixture",
+		"display_name": "Visible Connection Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "general_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Corren", "text": "Morning.", "next_node_id": "ask_about_work", "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "ask_about_work", "node_type": "speaker_text", "speaker": "Corren", "text": "Keeping busy?", "next_node_id": "general_work_reply", "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "general_work_reply", "node_type": "speaker_text", "speaker": "Corren", "text": "Always.", "next_node_id": null, "dismissible": true, "canvas_x": 300.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "leave_conversation", "node_type": "speaker_text", "speaker": "Corren", "text": "I'll let you get back to it.", "next_node_id": null, "dismissible": true, "canvas_x": 480.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T16:35:00+00:00",
+	})
+	dialogue._select_graph_node("general_work_reply")
+	var node: Dictionary = dialogue._find_node("general_work_reply")
+	node["next_node_id"] = null
+	dialogue._select_option(dialogue._next_node, "")
+	var connect_result = dialogue._graph.call("connect_node", "general_work_reply", 0, "leave_conversation", 0)
+	if connect_result != OK and connect_result != ERR_ALREADY_EXISTS:
+		_fail("Dialogue visible-connection fixture could not create a graph-only connection")
+		return
+	var payload: Dictionary = dialogue._payload()
+	var found_visible_link := false
+	for variant in payload.get("nodes", []) as Array:
+		if variant is Dictionary and str((variant as Dictionary).get("node_id", "")) == "general_work_reply":
+			found_visible_link = str((variant as Dictionary).get("next_node_id", "")) == "leave_conversation"
+	if not found_visible_link:
+		_fail("Save Draft payload must preserve visible graph connections even when the selected-node form is stale")
+		return
+	if dialogue._selected_metadata(dialogue._next_node) != "leave_conversation":
+		_fail("Visible graph connection sync must refresh the selected node's Next node control")
 		return
 	scene.queue_free()
 	await process_frame
