@@ -100,6 +100,7 @@ func _run_fixture() -> void:
 	await _verify_catalog_pane_toggle(main_scene)
 	await _verify_dialogue_payload_numeric_normalization(main_scene)
 	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
+	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
@@ -235,6 +236,48 @@ func _verify_dialogue_end_node_clears_outgoing_transitions(main_scene: PackedSce
 		return
 	if payload_node.get("next_node_id", "not-null") != null or not (payload_node.get("choices", []) as Array).is_empty():
 		_fail("End-node preview payload must not include outgoing transitions")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_graph_selection_uses_selected_node(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue graph-selection fixture could not locate the Dialogue workspace")
+		return
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "selection_fixture",
+		"display_name": "Selection Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "farmer_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "farmer_greeting", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Mornin'.", "next_node_id": "farmer_greeting_003", "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "farmer_greeting_003", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Still here?", "next_node_id": "end", "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "end", "node_type": "end", "speaker": null, "text": null, "next_node_id": null, "dismissible": true, "canvas_x": 300.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T15:50:00+00:00",
+	})
+	var previous_node := dialogue._graph.get_node_or_null("farmer_greeting") as GraphNode
+	var target_node := dialogue._graph.get_node_or_null("farmer_greeting_003") as GraphNode
+	if previous_node == null or target_node == null:
+		_fail("Dialogue graph-selection fixture expected both graph nodes")
+		return
+	previous_node.set("selected", false)
+	target_node.set("selected", true)
+	dialogue._on_graph_node_selected(&"farmer_greeting_003")
+	dialogue._on_graph_node_selected(&"farmer_greeting")
+	await process_frame
+	if dialogue._selected_node_id != "farmer_greeting_003" or dialogue._node_id.text != "farmer_greeting_003":
+		_fail("Dialogue graph selection must load the actually selected node, not a stale previous signal")
 		return
 	scene.queue_free()
 	await process_frame

@@ -35,6 +35,8 @@ var _form_editable := false
 var _reload_dialogue_id := ""
 var _visited_node_ids: Array = []
 var _playthrough_node_id := ""
+var _pending_graph_node_selection := ""
+var _graph_selection_update_queued := false
 
 var _search: LineEdit
 var _list: VBoxContainer
@@ -835,9 +837,37 @@ func _on_delete_nodes_request(nodes: Array) -> void:
 
 
 func _on_graph_node_selected(node_name: StringName) -> void:
+	_pending_graph_node_selection = str(node_name)
+	if _graph_selection_update_queued:
+		return
+	_graph_selection_update_queued = true
+	call_deferred("_apply_graph_node_selection")
+
+
+func _apply_graph_node_selection() -> void:
+	_graph_selection_update_queued = false
+	var selected_node_id := _selected_graph_node_id()
+	_pending_graph_node_selection = ""
+	if selected_node_id.is_empty() or selected_node_id == _selected_node_id:
+		return
 	_sync_selected_node_from_form()
-	_selected_node_id = str(node_name)
+	_selected_node_id = selected_node_id
 	_load_selected_node()
+
+
+func _selected_graph_node_id() -> String:
+	var selected_ids := []
+	for child in _graph.get_children():
+		if child is not GraphNode:
+			continue
+		var graph_node := child as GraphNode
+		if bool(graph_node.get("selected")):
+			selected_ids.append(str(graph_node.name))
+	if _pending_graph_node_selection in selected_ids:
+		return _pending_graph_node_selection
+	if selected_ids.size() == 1:
+		return str(selected_ids[0])
+	return _pending_graph_node_selection
 
 
 func _on_graph_node_moved(node_name: StringName) -> void:
