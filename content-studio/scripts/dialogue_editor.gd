@@ -769,6 +769,8 @@ func _connect_graph_nodes() -> void:
 		if node_variant is not Dictionary:
 			continue
 		var node := node_variant as Dictionary
+		if str(node.get("node_type", "")) == NODE_TYPE_END:
+			continue
 		var from_node := str(node.get("node_id", ""))
 		var next_node := str(node.get("next_node_id", ""))
 		if not next_node.is_empty():
@@ -884,7 +886,7 @@ func _sync_selected_node_from_form() -> void:
 	node["node_type"] = _selected_metadata(_node_type)
 	node["speaker"] = _optional_payload(_speaker.text)
 	node["text"] = _optional_payload(_text.text)
-	node["next_node_id"] = _optional_payload(_selected_metadata(_next_node))
+	_apply_node_type_transition_shape(node)
 	node["dismissible"] = _dismissible.button_pressed
 	node["editor_notes"] = _optional_payload(_editor_notes.text)
 
@@ -904,11 +906,23 @@ func _on_node_type_selected() -> void:
 	if node.is_empty():
 		return
 	node["node_type"] = _selected_metadata(_node_type)
-	if str(node.get("node_type", "")) != NODE_TYPE_PLAYER_CHOICE:
-		node["choices"] = []
+	_apply_node_type_transition_shape(node)
 	_rebuild_graph()
 	_load_selected_node()
 	_on_form_changed()
+
+
+func _apply_node_type_transition_shape(node: Dictionary) -> void:
+	var node_type := str(node.get("node_type", NODE_TYPE_SPEAKER_TEXT))
+	match node_type:
+		NODE_TYPE_END:
+			node["next_node_id"] = null
+			node["choices"] = []
+		NODE_TYPE_PLAYER_CHOICE:
+			node["next_node_id"] = null
+		_:
+			node["next_node_id"] = _optional_payload(_selected_metadata(_next_node))
+			node["choices"] = []
 
 
 func _on_next_node_selected() -> void:

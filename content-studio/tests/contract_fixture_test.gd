@@ -99,6 +99,7 @@ func _run_fixture() -> void:
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_catalog_pane_toggle(main_scene)
 	await _verify_dialogue_payload_numeric_normalization(main_scene)
+	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
@@ -194,6 +195,46 @@ func _verify_dialogue_payload_numeric_normalization(main_scene: PackedScene) -> 
 	var effect := (choice.get("effects", []) as Array)[0] as Dictionary
 	if str(entry.get("node_id", "")) != "farmer_greeting" or str(node.get("node_id", "")) != "farmer_greeting" or int(condition.get("quantity", 0)) != 1 or int(effect.get("xp_amount", 0)) != 1:
 		_fail("Dialogue payload normalization must preserve node rename and typed condition/effect values")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_end_node_clears_outgoing_transitions(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue End-node fixture could not locate the Dialogue workspace")
+		return
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "end_node_fixture",
+		"display_name": "End Node Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "start", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "start", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Mornin'.", "next_node_id": "end", "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": [
+				{"choice_id": "stale_choice", "text": "Stale", "target_node_id": "end", "choice_order": 0, "conditions": [], "effects": []},
+			]},
+			{"node_id": "end", "node_type": "end", "speaker": null, "text": null, "next_node_id": null, "dismissible": true, "canvas_x": 260.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T15:44:00+00:00",
+	})
+	dialogue._select_option(dialogue._node_type, "end")
+	dialogue._on_node_type_selected()
+	var node: Dictionary = dialogue._find_node("start")
+	var payload_node := ((dialogue._payload().get("nodes", []) as Array)[0] as Dictionary)
+	if node.get("next_node_id", "not-null") != null or not (node.get("choices", []) as Array).is_empty():
+		_fail("Selecting End must clear outgoing next node and choices from editor state")
+		return
+	if payload_node.get("next_node_id", "not-null") != null or not (payload_node.get("choices", []) as Array).is_empty():
+		_fail("End-node preview payload must not include outgoing transitions")
 		return
 	scene.queue_free()
 	await process_frame
