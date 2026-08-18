@@ -54,6 +54,10 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "_workspace_support.render_changes",
             "_workspace_support.render_validation",
             "_workspace_support.operation_name",
+            "func _condition_value",
+            "func _condition_string_value",
+            '"status": _optional_variant_payload(_condition_value(condition, "quest_status", "status", null))',
+            'condition["status"] = condition["quest_status"]',
         ):
             self.assertIn(token, editor)
 

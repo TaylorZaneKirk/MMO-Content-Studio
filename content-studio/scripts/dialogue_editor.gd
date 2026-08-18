@@ -613,10 +613,10 @@ func _conditions_payload(conditions: Array) -> Array:
 		payload.append({
 			"condition_type": str(condition.get("condition_type", CONDITION_TYPE_QUEST_STATUS)),
 			"quest_id": _optional_variant_payload(condition.get("quest_id", null)),
-			"status": _optional_variant_payload(condition.get("status", condition.get("quest_status", null))),
-			"step_id": _optional_variant_payload(condition.get("step_id", condition.get("quest_step_id", null))),
+			"status": _optional_variant_payload(_condition_value(condition, "quest_status", "status", null)),
+			"step_id": _optional_variant_payload(_condition_value(condition, "quest_step_id", "step_id", null)),
 			"item_id": _optional_variant_payload(condition.get("item_id", null)),
-			"quantity": _optional_int_payload(condition.get("quantity", condition.get("item_quantity", null))),
+			"quantity": _optional_int_payload(_condition_value(condition, "item_quantity", "quantity", null)),
 		})
 	return payload
 
@@ -1177,13 +1177,13 @@ func _add_condition_row(parent: VBoxContainer, condition: Dictionary, owner_kind
 	match condition_type:
 		CONDITION_TYPE_QUEST_STEP:
 			_add_condition_quest_field(grid, str(condition.get("quest_id", "")), owner_kind, owner_index, choice_index, condition_index)
-			_add_condition_step_field(grid, str(condition.get("quest_id", "")), str(condition.get("quest_step_id", "")), owner_kind, owner_index, choice_index, condition_index)
+			_add_condition_step_field(grid, str(condition.get("quest_id", "")), _condition_string_value(condition, "quest_step_id", "step_id", ""), owner_kind, owner_index, choice_index, condition_index)
 		CONDITION_TYPE_HAS_ITEM:
 			_add_condition_item_field(grid, str(condition.get("item_id", "")), owner_kind, owner_index, choice_index, condition_index)
-			_add_condition_quantity_field(grid, int(condition.get("item_quantity", 1)), owner_kind, owner_index, choice_index, condition_index)
+			_add_condition_quantity_field(grid, int(_condition_value(condition, "item_quantity", "quantity", 1)), owner_kind, owner_index, choice_index, condition_index)
 		_:
 			_add_condition_quest_field(grid, str(condition.get("quest_id", "")), owner_kind, owner_index, choice_index, condition_index)
-			_add_condition_status_field(grid, str(condition.get("quest_status", "active")), owner_kind, owner_index, choice_index, condition_index)
+			_add_condition_status_field(grid, _condition_string_value(condition, "quest_status", "status", "active"), owner_kind, owner_index, choice_index, condition_index)
 
 
 func _add_condition_text_field(grid: GridContainer, label_text: String, value: String, placeholder: String, callback: Callable) -> void:
@@ -1434,6 +1434,7 @@ func _on_condition_quest_selected(_selected_index: int, owner_kind: String, owne
 	condition["quest_id"] = quest_id
 	if str(condition.get("condition_type", "")) == CONDITION_TYPE_QUEST_STEP:
 		condition["quest_step_id"] = _first_step_id_for_quest(quest_id)
+		condition["step_id"] = condition["quest_step_id"]
 		_refresh_condition_owner(owner_kind)
 	_on_form_changed()
 
@@ -1443,6 +1444,7 @@ func _on_condition_step_id_changed(value: String, owner_kind: String, owner_inde
 	if condition.is_empty():
 		return
 	condition["quest_step_id"] = value.strip_edges()
+	condition["step_id"] = condition["quest_step_id"]
 	_on_form_changed()
 
 
@@ -1451,6 +1453,7 @@ func _on_condition_step_selected(_selected_index: int, owner_kind: String, owner
 	if condition.is_empty():
 		return
 	condition["quest_step_id"] = _selected_metadata(control)
+	condition["step_id"] = condition["quest_step_id"]
 	_on_form_changed()
 
 
@@ -1475,6 +1478,7 @@ func _on_condition_status_selected(_selected_index: int, owner_kind: String, own
 	if condition.is_empty():
 		return
 	condition["quest_status"] = _selected_metadata(control)
+	condition["status"] = condition["quest_status"]
 	_on_form_changed()
 
 
@@ -1483,6 +1487,7 @@ func _on_condition_quantity_changed(value: float, owner_kind: String, owner_inde
 	if condition.is_empty():
 		return
 	condition["item_quantity"] = int(value)
+	condition["quantity"] = condition["item_quantity"]
 	_on_form_changed()
 
 
@@ -2378,6 +2383,16 @@ func _optional_int_payload(value: Variant) -> Variant:
 	if value == null:
 		return null
 	return int(value)
+
+
+func _condition_string_value(condition: Dictionary, preferred_key: String, fallback_key: String, default_value: String) -> String:
+	return str(_condition_value(condition, preferred_key, fallback_key, default_value))
+
+
+func _condition_value(condition: Dictionary, preferred_key: String, fallback_key: String, default_value: Variant) -> Variant:
+	if condition.has(preferred_key):
+		return condition.get(preferred_key)
+	return condition.get(fallback_key, default_value)
 
 
 func _nullable_string(value: Variant) -> String:

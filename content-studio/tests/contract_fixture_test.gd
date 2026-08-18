@@ -104,6 +104,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
 	await _verify_dialogue_graph_nodes_fit_content_height(main_scene)
+	await _verify_dialogue_condition_status_alias_round_trip(main_scene)
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
 	await _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene)
@@ -341,6 +342,79 @@ func _verify_dialogue_graph_nodes_fit_content_height(main_scene: PackedScene) ->
 		return
 	if graph_node.size.y > 96.0:
 		_fail("Dialogue graph nodes should fit short text without excessive vertical height")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_condition_status_alias_round_trip(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue condition-status fixture could not locate the Dialogue workspace")
+		return
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "condition_status_fixture",
+		"display_name": "Condition Status Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{
+				"entry_id": "default",
+				"node_id": "general_greeting",
+				"priority": 0,
+				"entry_order": 0,
+				"conditions": [
+					{"condition_type": "quest_status", "quest_id": "a_meal_delayed", "status": "active"},
+				],
+			},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Morning.", "next_node_id": null, "dismissible": true, "canvas_x": 20.0, "canvas_y": 40.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T17:20:00+00:00",
+	})
+	var status := OptionButton.new()
+	status.add_item("not_started")
+	status.set_item_metadata(0, "not_started")
+	status.select(0)
+	dialogue._on_condition_status_selected(0, "entry", 0, -1, 0, status)
+	status.queue_free()
+	var payload_condition := (((dialogue._payload().get("entry_points", []) as Array)[0] as Dictionary).get("conditions", []) as Array)[0] as Dictionary
+	if str(payload_condition.get("status", "")) != "not_started":
+		_fail("Changing an API-shaped quest_status condition to not_started must not serialize the stale active value")
+		return
+
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "condition_status_fixture",
+		"display_name": "Condition Status Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{
+				"entry_id": "default",
+				"node_id": "general_greeting",
+				"priority": 0,
+				"entry_order": 0,
+				"conditions": [
+					{"condition_type": "quest_status", "quest_id": "a_meal_delayed", "status": "not_started"},
+				],
+			},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Morning.", "next_node_id": null, "dismissible": true, "canvas_x": 20.0, "canvas_y": 40.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T17:21:00+00:00",
+	})
+	payload_condition = (((dialogue._payload().get("entry_points", []) as Array)[0] as Dictionary).get("conditions", []) as Array)[0] as Dictionary
+	if str(payload_condition.get("status", "")) != "not_started":
+		_fail("Loaded API-shaped not_started quest_status conditions must round-trip without defaulting to active")
 		return
 	scene.queue_free()
 	await process_frame
