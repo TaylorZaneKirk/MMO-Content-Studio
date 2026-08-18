@@ -103,6 +103,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_payload_numeric_normalization(main_scene)
 	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
+	await _verify_dialogue_graph_nodes_fit_content_height(main_scene)
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
 	await _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene)
@@ -299,6 +300,47 @@ func _verify_dialogue_graph_selection_uses_selected_node(main_scene: PackedScene
 	await process_frame
 	if dialogue._selected_node_id != "farmer_greeting_003" or dialogue._node_id.text != "farmer_greeting_003":
 		_fail("Dialogue graph selection must load the actually selected node, not a stale previous signal")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_graph_nodes_fit_content_height(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue graph-size fixture could not locate the Dialogue workspace")
+		return
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "graph_size_fixture",
+		"display_name": "Graph Size Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "compact_node", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "compact_node", "node_type": "speaker_text", "speaker": "Harlan Wick", "text": "Mornin'.", "next_node_id": null, "dismissible": true, "canvas_x": 20.0, "canvas_y": 40.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T17:05:00+00:00",
+	})
+	await process_frame
+	var graph_node := dialogue._graph.get_node_or_null("compact_node") as GraphNode
+	if graph_node == null:
+		_fail("Dialogue graph-size fixture expected a compact graph node")
+		return
+	if graph_node.resizable:
+		_fail("Dialogue graph nodes should not expose manual resizing for normal text fit")
+		return
+	if graph_node.custom_minimum_size.y > 0.0:
+		_fail("Dialogue graph nodes must not carry a fixed vertical minimum")
+		return
+	if graph_node.size.y > 96.0:
+		_fail("Dialogue graph nodes should fit short text without excessive vertical height")
 		return
 	scene.queue_free()
 	await process_frame

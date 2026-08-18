@@ -67,6 +67,21 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
         self.assertIn("if child is not GraphNode:", editor)
         self.assertIn("continue\n\t\t_graph.remove_child(child)", editor)
 
+    def test_graph_nodes_fit_content_without_fixed_height(self) -> None:
+        editor = (ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").read_text()
+
+        for token in (
+            "const GRAPH_NODE_MIN_WIDTH := 190.0",
+            "const GRAPH_NODE_SUMMARY_WIDTH := 150.0",
+            "graph_node.resizable = false",
+            "graph_node.custom_minimum_size = Vector2(GRAPH_NODE_MIN_WIDTH, 0)",
+            "summary.custom_minimum_size = Vector2(GRAPH_NODE_SUMMARY_WIDTH, 0)",
+        ):
+            self.assertIn(token, editor)
+
+        self.assertNotIn("graph_node.resizable = true", editor)
+        self.assertNotIn("graph_node.custom_minimum_size = Vector2(190, 120)", editor)
+
     def test_inspector_form_labels_do_not_collapse_to_vertical_text(self) -> None:
         editor = (ROOT / "content-studio" / "scripts" / "dialogue_editor.gd").read_text()
 

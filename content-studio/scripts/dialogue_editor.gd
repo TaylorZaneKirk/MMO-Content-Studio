@@ -10,6 +10,8 @@ const NODE_TYPE_SPEAKER_TEXT := "speaker_text"
 const NODE_TYPE_PLAYER_CHOICE := "player_choice"
 const NODE_TYPE_END := "end"
 const FORM_LABEL_WIDTH := 132.0
+const GRAPH_NODE_MIN_WIDTH := 190.0
+const GRAPH_NODE_SUMMARY_WIDTH := 150.0
 const CONDITION_TYPE_QUEST_STATUS := "quest_status"
 const CONDITION_TYPE_QUEST_STEP := "quest_step"
 const CONDITION_TYPE_HAS_ITEM := "has_item"
@@ -774,11 +776,12 @@ func _rebuild_graph() -> void:
 		graph_node.name = str(node.get("node_id", "node"))
 		graph_node.title = "%s  [%s]" % [str(node.get("node_id", "node")), _node_type_label(str(node.get("node_type", "")))]
 		graph_node.position_offset = Vector2(float(node.get("canvas_x", 0)), float(node.get("canvas_y", 0)))
-		graph_node.resizable = true
-		graph_node.custom_minimum_size = Vector2(190, 120)
+		graph_node.resizable = false
+		graph_node.custom_minimum_size = Vector2(GRAPH_NODE_MIN_WIDTH, 0)
 		var summary := Label.new()
 		summary.text = _graph_summary(node)
 		summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		summary.custom_minimum_size = Vector2(GRAPH_NODE_SUMMARY_WIDTH, 0)
 		graph_node.add_child(summary)
 		graph_node.set_slot(0, true, 0, Color(0.42, 0.7, 0.9), str(node.get("node_type", "")) != NODE_TYPE_END, 0, Color(0.85, 0.67, 0.35))
 		if graph_node.has_signal("position_offset_changed"):
