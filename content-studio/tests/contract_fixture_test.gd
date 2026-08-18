@@ -98,6 +98,7 @@ func _run_fixture() -> void:
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_catalog_pane_toggle(main_scene)
+	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
@@ -143,6 +144,38 @@ func _verify_catalog_pane_toggle(main_scene: PackedScene) -> void:
 		if not catalog_panel.visible:
 			_fail("%s catalog pane did not expand" % workspace_name)
 			return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_quest_definition_fields_expand(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	if scene is Control:
+		(scene as Control).set_deferred("size", Vector2(1280, 720))
+	await process_frame
+	await process_frame
+
+	var tabs := scene.get_node("Margin/Root/Tabs") as TabContainer
+	var quests := tabs.get_node("Quests") as HBoxContainer
+	if tabs == null or quests == null:
+		_fail("Quest layout fixture could not locate the Quests workspace")
+		return
+	tabs.current_tab = quests.get_index()
+	await process_frame
+
+	var quest_id := quests._quest_id as LineEdit
+	var display_name := quests._display_name as LineEdit
+	if quest_id == null or display_name == null:
+		_fail("Quest layout fixture could not locate definition fields")
+		return
+	if quest_id.size.x < 240.0 or display_name.size.x < 240.0:
+		_fail("Quest ID and Display name fields must expand to a usable Definition width")
+		return
+	if quest_id.size_flags_horizontal != Control.SIZE_EXPAND_FILL or display_name.size_flags_horizontal != Control.SIZE_EXPAND_FILL:
+		_fail("Quest definition LineEdit controls must use horizontal expand-fill flags")
+		return
+
 	scene.queue_free()
 	await process_frame
 

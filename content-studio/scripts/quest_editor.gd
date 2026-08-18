@@ -69,6 +69,7 @@ func _build_ui() -> void:
 	_heading(editor, "Definition", 20)
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 10)
 	grid.add_theme_constant_override("v_separation", 8)
 	editor.add_child(grid)
@@ -360,6 +361,7 @@ func _line(parent: GridContainer, label_text: String, placeholder: String) -> Li
 	parent.add_child(label)
 	var edit := LineEdit.new()
 	edit.placeholder_text = placeholder
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(edit)
 	return edit
 
