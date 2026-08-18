@@ -294,9 +294,9 @@ func _format_transitions(items: Array) -> String:
 		return "%s|%s|%s|%s|%s|%d" % [
 			item.get("transition_id", ""),
 			item.get("source_status", ""),
-			item.get("source_step_id", ""),
+			_format_optional(item.get("source_step_id", null)),
 			item.get("target_status", ""),
-			item.get("target_step_id", ""),
+			_format_optional(item.get("target_step_id", null)),
 			int(item.get("transition_order", 0))
 		]
 	))
@@ -309,6 +309,10 @@ func _selected_operation() -> String:
 func _optional(value: String) -> Variant:
 	var text := value.strip_edges()
 	return null if text.is_empty() else text
+
+
+func _format_optional(value: Variant) -> String:
+	return "" if value == null else str(value)
 
 
 func _has_errors(messages: Array) -> bool:

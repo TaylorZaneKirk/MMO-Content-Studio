@@ -99,6 +99,7 @@ func _run_fixture() -> void:
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_catalog_pane_toggle(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
+	await _verify_quest_nullable_transition_round_trip(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
 	await _verify_item_editor_integral_economy_values(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
@@ -175,6 +176,77 @@ func _verify_quest_definition_fields_expand(main_scene: PackedScene) -> void:
 		return
 	if quest_id.size_flags_horizontal != Control.SIZE_EXPAND_FILL or display_name.size_flags_horizontal != Control.SIZE_EXPAND_FILL:
 		_fail("Quest definition LineEdit controls must use horizontal expand-fill flags")
+		return
+
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_quest_nullable_transition_round_trip(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+
+	var tabs := scene.get_node("Margin/Root/Tabs") as TabContainer
+	var quests := tabs.get_node("Quests") as HBoxContainer
+	if tabs == null or quests == null:
+		_fail("Quest transition fixture could not locate the Quests workspace")
+		return
+
+	quests._on_quest_definition_received({
+		"quest_id": "meal_delayed",
+		"display_name": "A Meal Delayed",
+		"publication_state": "Draft",
+		"updated_at_utc": "2026-08-18T00:00:00+00:00",
+		"steps": [
+			{"step_id": "speak_to_harlan", "display_name": "Speak to Harlan", "step_order": 0},
+			{"step_id": "return_to_corren", "display_name": "Return to Corren", "step_order": 1},
+		],
+		"transitions": [
+			{
+				"transition_id": "accept",
+				"source_status": "not_started",
+				"source_step_id": null,
+				"target_status": "active",
+				"target_step_id": "speak_to_harlan",
+				"transition_order": 0,
+			},
+			{
+				"transition_id": "turn_in",
+				"source_status": "active",
+				"source_step_id": "return_to_corren",
+				"target_status": "completed",
+				"target_step_id": null,
+				"transition_order": 2,
+			},
+		],
+	})
+	var formatted: String = quests._transitions.text
+	if formatted.contains("<null>"):
+		_fail("Quest transition nullable step endpoints must not render as <null>")
+		return
+	if not formatted.contains("accept|not_started||active|speak_to_harlan|0"):
+		_fail("Null source_step_id must render as an empty transition field")
+		return
+	if not formatted.contains("turn_in|active|return_to_corren|completed||2"):
+		_fail("Null target_step_id must render as an empty transition field")
+		return
+
+	var payload: Dictionary = quests._build_payload("publish", false)
+	var transitions: Array = payload.get("transitions", []) as Array
+	if transitions.size() != 2:
+		_fail("Quest transition round-trip should preserve the transition count")
+		return
+	var accept := transitions[0] as Dictionary
+	var turn_in := transitions[1] as Dictionary
+	if accept.get("source_step_id", "not-null") != null or str(accept.get("target_step_id", "")) != "speak_to_harlan":
+		_fail("Formatted null source_step_id must parse back to null without changing target_step_id")
+		return
+	if str(turn_in.get("source_step_id", "")) != "return_to_corren" or turn_in.get("target_step_id", "not-null") != null:
+		_fail("Formatted null target_step_id must parse back to null without changing source_step_id")
+		return
+	if str(payload.get("target_operation", "")) != "publish":
+		_fail("Quest transition round-trip fixture should preserve the requested preview operation")
 		return
 
 	scene.queue_free()
