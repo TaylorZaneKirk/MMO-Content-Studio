@@ -90,6 +90,8 @@ func _run_fixture() -> void:
 		_fail("T3A equipment-preview fixture mismatch")
 		return
 
+	_verify_window_resize_contract()
+
 	var preview := PaperDollPreview.new()
 	var offset := preview.resolve_source_pixel_offset(Vector2i(80, 60), Vector2i(30, 20), Vector2i(1, -2))
 	if offset != Vector2(51, 38):
@@ -123,6 +125,15 @@ func _run_fixture() -> void:
 
 	print("[content-studio-contract-fixture] passed")
 	quit(0)
+
+
+func _verify_window_resize_contract() -> void:
+	if ProjectSettings.get_setting("display/window/stretch/mode", "") != "disabled":
+		_fail("Content Studio window resize must expose more workspace instead of scaling canvas items")
+		return
+	if bool(ProjectSettings.get_setting("display/window/size/resizable", false)) != true:
+		_fail("Content Studio window must remain resizable so it can be maximized")
+		return
 
 
 func _verify_catalog_pane_toggle(main_scene: PackedScene) -> void:

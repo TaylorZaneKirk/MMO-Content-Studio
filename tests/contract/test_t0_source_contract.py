@@ -49,6 +49,13 @@ class T0SourceContractTests(unittest.TestCase):
         self.assertIn('run/main_scene="res://scenes/Main.tscn"', project)
         self.assertTrue((ROOT / "content-studio" / "scenes" / "Main.tscn").is_file())
 
+    def test_godot_window_resizes_without_scaling_ui(self) -> None:
+        project = (ROOT / "content-studio" / "project.godot").read_text()
+        self.assertIn("window/size/resizable=true", project)
+        self.assertIn('window/stretch/mode="disabled"', project)
+        self.assertNotIn('window/stretch/mode="canvas_items"', project)
+        self.assertNotIn('window/stretch/mode="viewport"', project)
+
     def test_secrets_are_not_committed(self) -> None:
         gitignore = (ROOT / ".gitignore").read_text()
         self.assertIn("appsettings.Local.json", gitignore)
