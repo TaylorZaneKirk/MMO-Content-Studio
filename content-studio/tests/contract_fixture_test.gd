@@ -103,6 +103,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_payload_numeric_normalization(main_scene)
 	await _verify_dialogue_end_node_clears_outgoing_transitions(main_scene)
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
+	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
@@ -296,6 +297,52 @@ func _verify_dialogue_graph_selection_uses_selected_node(main_scene: PackedScene
 	await process_frame
 	if dialogue._selected_node_id != "farmer_greeting_003" or dialogue._node_id.text != "farmer_greeting_003":
 		_fail("Dialogue graph selection must load the actually selected node, not a stale previous signal")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue lifecycle fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "lifecycle_fixture",
+		"display_name": "Lifecycle Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "general_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Corren", "text": "Morning.", "next_node_id": null, "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "ask_about_work", "node_type": "speaker_text", "speaker": "Corren", "text": "Keeping busy?", "next_node_id": null, "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T16:20:00+00:00",
+	})
+	var graph_content: Node = dialogue._graph.get_parent()
+	if dialogue._operation.get_parent().get_parent() != graph_content or dialogue._preview_button.get_parent().get_parent() != graph_content:
+		_fail("Dialogue lifecycle controls must be graph-level controls above the graph canvas")
+		return
+	if str(dialogue._operation.get_item_text(0)) != "Save as Draft":
+		_fail("Dialogue lifecycle controls must expose Save as Draft for the whole graph")
+		return
+	dialogue._on_connection_request(&"general_greeting", 0, &"ask_about_work", 0)
+	var payload: Dictionary = dialogue._payload()
+	var nodes := payload.get("nodes", []) as Array
+	var found_entry_link := false
+	for variant in nodes:
+		if variant is Dictionary and str((variant as Dictionary).get("node_id", "")) == "general_greeting":
+			found_entry_link = str((variant as Dictionary).get("next_node_id", "")) == "ask_about_work"
+	if not found_entry_link:
+		_fail("Dialogue graph-level Save Draft payload must include graph connections from the entry node")
 		return
 	scene.queue_free()
 	await process_frame

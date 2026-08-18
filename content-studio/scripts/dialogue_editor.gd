@@ -135,6 +135,7 @@ func _build_ui() -> void:
 	restart_button.text = "Play"
 	restart_button.pressed.connect(_restart_playthrough)
 	graph_toolbar.add_child(restart_button)
+	_add_lifecycle_section(graph_content)
 	_graph = GraphEdit.new()
 	_graph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -163,7 +164,7 @@ func _build_ui() -> void:
 	_add_definition_section(inspector)
 	_add_node_section(inspector)
 	_add_capability_section(inspector)
-	_add_operation_section(inspector)
+	_add_operation_results_section(inspector)
 
 
 func _add_definition_section(parent: VBoxContainer) -> void:
@@ -224,31 +225,40 @@ func _add_capability_section(parent: VBoxContainer) -> void:
 	_effect_status = _value_label(grid, "Effects", "Unavailable")
 
 
-func _add_operation_section(parent: VBoxContainer) -> void:
-	_add_heading(parent, "Operation", 20)
+func _add_lifecycle_section(parent: VBoxContainer) -> void:
+	_add_heading(parent, "Dialogue Lifecycle", 16)
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 8)
+	parent.add_child(row)
 	_operation = OptionButton.new()
+	_operation.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_add_operation("Save as Draft", "save_draft")
 	_add_operation("Publish", "publish")
 	_add_operation("Disable", "disable")
 	_add_operation("Delete Dialogue", "delete")
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
-	parent.add_child(_operation)
+	row.add_child(_operation)
 	_preview_button = Button.new()
 	_preview_button.text = "Validate and Preview Changes"
 	_preview_button.pressed.connect(_preview)
-	parent.add_child(_preview_button)
-	_delete_button = Button.new()
-	_delete_button.text = "Preview Dialogue Delete"
-	_delete_button.disabled = true
-	_delete_button.pressed.connect(_preview_delete)
-	parent.add_child(_delete_button)
+	row.add_child(_preview_button)
 	_apply_button = Button.new()
 	_apply_button.text = "Apply Previewed Operation"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
-	parent.add_child(_apply_button)
+	row.add_child(_apply_button)
+	_delete_button = Button.new()
+	_delete_button.text = "Preview Dialogue Delete"
+	_delete_button.disabled = true
+	_delete_button.pressed.connect(_preview_delete)
+	row.add_child(_delete_button)
 	_status = _wrapped_label("Load or create a dialogue definition.")
 	parent.add_child(_status)
+
+
+func _add_operation_results_section(parent: VBoxContainer) -> void:
+	_add_heading(parent, "Operation Results", 20)
 	_add_heading(parent, "Graph Analysis", 16)
 	_analysis = VBoxContainer.new()
 	parent.add_child(_analysis)
