@@ -298,6 +298,7 @@ class D1DialogueStudioDocumentationTests(unittest.TestCase):
             "M prototype/server/features/session/host/SessionHandshakeCoordinator.cs",
             "M prototype/shared/dialogues/catalog.json",
             "M prototype/sql/MODULE_OWNERSHIP.md",
+            "M prototype/sql/024_npc_authoring_schema.sql",
             "M prototype/sql/027_seed_existing_dialogue_definitions.sql",
             "M prototype/sql/README.md",
             "M prototype/sql/043_quest_transition_evidence_lifecycle_delete.sql",

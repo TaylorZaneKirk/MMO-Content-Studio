@@ -12,6 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 HOST = ROOT / "host"
 MIGRATION = ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "024_npc_authoring_schema.sql"
+LIFECYCLE_MIGRATION = ROOT / "integrations" / "mmo-project" / "prototype" / "sql" / "049_npc_draft_dialogue_reference_lifecycle.sql"
 
 
 def _mmo_project_candidates() -> list[Path]:
@@ -78,6 +79,22 @@ class T5BNpcSchemaContractsTests(unittest.TestCase):
             "npc_definitions_default_interaction_check",
             "npc_definitions_dialogue_reference_check",
             "npc_definitions_timestamp_order_check",
+        ):
+            self.assertIn(token, source)
+
+        self.assertIn("OR publication_state <> 'Published'", source)
+
+    def test_lifecycle_migration_allows_incomplete_draft_dialogue_and_preserves_publish_gate(self) -> None:
+        self.assertTrue(LIFECYCLE_MIGRATION.exists())
+        source = LIFECYCLE_MIGRATION.read_text()
+
+        for token in (
+            "ALTER TABLE npc_definitions",
+            "DROP CONSTRAINT IF EXISTS npc_definitions_dialogue_reference_check",
+            "ADD CONSTRAINT npc_definitions_dialogue_reference_check",
+            "interaction_enabled = FALSE",
+            "OR publication_state <> 'Published'",
+            "default_dialogue_id IS NOT NULL",
         ):
             self.assertIn(token, source)
 
