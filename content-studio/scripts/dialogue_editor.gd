@@ -514,13 +514,104 @@ func _payload() -> Dictionary:
 	return {
 		"display_name": _display_name.text,
 		"schema_version": int(_schema_version.value),
-		"entry_points": _current_dialogue.get("entry_points", []) as Array,
-		"nodes": _current_dialogue.get("nodes", []) as Array,
+		"entry_points": _entry_points_payload(_current_dialogue.get("entry_points", []) as Array),
+		"nodes": _nodes_payload(_current_dialogue.get("nodes", []) as Array),
 		"metadata_description": _optional_payload(_metadata_description.text),
 		"notes": _optional_payload(_notes.text),
 		"expected_updated_at_utc": _current_dialogue.get("updated_at_utc", null),
 		"preview_signature": null,
 	}
+
+
+func _entry_points_payload(entries: Array) -> Array:
+	var payload := []
+	for variant in entries:
+		if variant is not Dictionary:
+			continue
+		var entry := variant as Dictionary
+		payload.append({
+			"entry_id": str(entry.get("entry_id", "")),
+			"node_id": str(entry.get("node_id", "")),
+			"priority": int(entry.get("priority", 0)),
+			"entry_order": int(entry.get("entry_order", 0)),
+			"conditions": _conditions_payload(entry.get("conditions", []) as Array),
+		})
+	return payload
+
+
+func _nodes_payload(nodes: Array) -> Array:
+	var payload := []
+	for variant in nodes:
+		if variant is not Dictionary:
+			continue
+		var node := variant as Dictionary
+		payload.append({
+			"node_id": str(node.get("node_id", "")),
+			"node_type": str(node.get("node_type", NODE_TYPE_SPEAKER_TEXT)),
+			"speaker": _optional_variant_payload(node.get("speaker", null)),
+			"text": _optional_variant_payload(node.get("text", null)),
+			"next_node_id": _optional_variant_payload(node.get("next_node_id", null)),
+			"dismissible": bool(node.get("dismissible", true)),
+			"canvas_x": float(node.get("canvas_x", 0)),
+			"canvas_y": float(node.get("canvas_y", 0)),
+			"editor_notes": _optional_variant_payload(node.get("editor_notes", null)),
+			"choices": _choices_payload(node.get("choices", []) as Array),
+		})
+	return payload
+
+
+func _choices_payload(choices: Array) -> Array:
+	var payload := []
+	for variant in choices:
+		if variant is not Dictionary:
+			continue
+		var choice := variant as Dictionary
+		payload.append({
+			"choice_id": str(choice.get("choice_id", "")),
+			"text": str(choice.get("text", "")),
+			"target_node_id": str(choice.get("target_node_id", "")),
+			"choice_order": int(choice.get("choice_order", 0)),
+			"conditions": _conditions_payload(choice.get("conditions", []) as Array),
+			"effects": _effects_payload(choice.get("effects", []) as Array),
+		})
+	return payload
+
+
+func _conditions_payload(conditions: Array) -> Array:
+	var payload := []
+	for variant in conditions:
+		if variant is not Dictionary:
+			continue
+		var condition := variant as Dictionary
+		payload.append({
+			"condition_type": str(condition.get("condition_type", CONDITION_TYPE_QUEST_STATUS)),
+			"quest_id": _optional_variant_payload(condition.get("quest_id", null)),
+			"status": _optional_variant_payload(condition.get("status", condition.get("quest_status", null))),
+			"step_id": _optional_variant_payload(condition.get("step_id", condition.get("quest_step_id", null))),
+			"item_id": _optional_variant_payload(condition.get("item_id", null)),
+			"quantity": _optional_int_payload(condition.get("quantity", condition.get("item_quantity", null))),
+		})
+	return payload
+
+
+func _effects_payload(effects: Array) -> Array:
+	var payload := []
+	for variant in effects:
+		if variant is not Dictionary:
+			continue
+		var effect := variant as Dictionary
+		payload.append({
+			"effect_id": str(effect.get("effect_id", "")),
+			"effect_order": int(effect.get("effect_order", 0)),
+			"effect_type": str(effect.get("effect_type", EFFECT_TYPE_GRANT_ITEM)),
+			"quest_id": _optional_variant_payload(effect.get("quest_id", null)),
+			"transition_id": _optional_variant_payload(effect.get("transition_id", null)),
+			"item_id": _optional_variant_payload(effect.get("item_id", null)),
+			"quantity": _optional_int_payload(effect.get("quantity", null)),
+			"skill_id": _optional_variant_payload(effect.get("skill_id", null)),
+			"xp_amount": _optional_int_payload(effect.get("xp_amount", null)),
+		})
+	return payload
 
 
 func _restart_playthrough() -> void:
@@ -2151,6 +2242,19 @@ func _select_option(control: OptionButton, metadata: String) -> void:
 func _optional_payload(value: String) -> Variant:
 	var normalized := value.strip_edges()
 	return null if normalized.is_empty() else normalized
+
+
+func _optional_variant_payload(value: Variant) -> Variant:
+	if value == null:
+		return null
+	var normalized := str(value).strip_edges()
+	return null if normalized.is_empty() else normalized
+
+
+func _optional_int_payload(value: Variant) -> Variant:
+	if value == null:
+		return null
+	return int(value)
 
 
 func _nullable_string(value: Variant) -> String:

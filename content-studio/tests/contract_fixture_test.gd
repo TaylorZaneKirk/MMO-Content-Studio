@@ -98,6 +98,7 @@ func _run_fixture() -> void:
 
 	await _verify_item_editor_rig_catalog_behavior(main_scene)
 	await _verify_catalog_pane_toggle(main_scene)
+	await _verify_dialogue_payload_numeric_normalization(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
@@ -146,6 +147,54 @@ func _verify_catalog_pane_toggle(main_scene: PackedScene) -> void:
 		if not catalog_panel.visible:
 			_fail("%s catalog pane did not expand" % workspace_name)
 			return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_payload_numeric_normalization(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue payload fixture could not locate the Dialogue workspace")
+		return
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "harlan_wick_dialogue",
+		"display_name": "Harlan Wick Dialogue",
+		"publication_state": "Draft",
+		"schema_version": 1.0,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "start", "priority": 0.0, "entry_order": 0.0, "conditions": [
+				{"condition_type": "has_item", "item_id": "inventory_316_herb", "item_quantity": 1.0},
+			]},
+		],
+		"nodes": [
+			{"node_id": "start", "node_type": "player_choice", "speaker": "Harlan Wick", "text": "Mornin'.", "next_node_id": null, "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": [
+				{"choice_id": "continue", "text": "Continue", "target_node_id": "end", "choice_order": 0.0, "conditions": [], "effects": [
+					{"effect_id": "grant_xp", "effect_order": 0.0, "effect_type": "grant_experience", "skill_id": "farming", "xp_amount": 1.0},
+				]},
+			]},
+			{"node_id": "end", "node_type": "end", "speaker": null, "text": null, "next_node_id": null, "dismissible": true, "canvas_x": 260.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T15:27:00+00:00",
+	})
+	dialogue._node_id.text = "farmer_greeting"
+	var payload: Dictionary = dialogue._payload()
+	var serialized := JSON.stringify(payload)
+	if serialized.contains("\"entry_order\":0.0") or serialized.contains("\"priority\":0.0") or serialized.contains("\"choice_order\":0.0") or serialized.contains("\"effect_order\":0.0") or serialized.contains("\"quantity\":1.0") or serialized.contains("\"xp_amount\":1.0"):
+		_fail("Dialogue preview payload must normalize integer DTO fields before JSON serialization")
+		return
+	var entry := (payload.get("entry_points", []) as Array)[0] as Dictionary
+	var condition := (entry.get("conditions", []) as Array)[0] as Dictionary
+	var node := (payload.get("nodes", []) as Array)[0] as Dictionary
+	var choice := (node.get("choices", []) as Array)[0] as Dictionary
+	var effect := (choice.get("effects", []) as Array)[0] as Dictionary
+	if str(entry.get("node_id", "")) != "farmer_greeting" or str(node.get("node_id", "")) != "farmer_greeting" or int(condition.get("quantity", 0)) != 1 or int(effect.get("xp_amount", 0)) != 1:
+		_fail("Dialogue payload normalization must preserve node rename and typed condition/effect values")
+		return
 	scene.queue_free()
 	await process_frame
 
