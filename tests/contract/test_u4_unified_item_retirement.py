@@ -159,6 +159,7 @@ class U4UnifiedItemRetirementTests(unittest.TestCase):
             "prototype/sql/043_quest_transition_evidence_lifecycle_delete.sql",
             "prototype/sql/045_typed_dialogue_conditions_v1.sql",
             "prototype/sql/047_dialogue_effect_durable_commitment_closure.sql",
+            "prototype/sql/048_item_consumable_child_timestamps.sql",
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/DialogueCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.MapPublisher.Tests/MapPublisher/NpcCatalogExporterTests.cs",
             "prototype/tests/MMO.Project.Prototype.Server.Tests/CombatActorRuntimeProviderTests.cs",
