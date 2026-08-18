@@ -1785,6 +1785,7 @@ func _on_form_changed(_value: Variant = null) -> void:
 	if _is_loading:
 		return
 	_clear_preview()
+	_reset_playthrough_preview()
 
 
 func _apply_options() -> void:
@@ -1855,6 +1856,12 @@ func _clear_preview() -> void:
 	_workspace_support.clear_preview(_apply_button, _changes, _validation)
 	_workspace_support.clear_container(_analysis)
 	_workspace_support.clear_container(_reference_summary)
+
+
+func _reset_playthrough_preview() -> void:
+	_visited_node_ids = []
+	_playthrough_node_id = ""
+	_render_empty_playthrough()
 
 
 func _update_operation_default() -> void:

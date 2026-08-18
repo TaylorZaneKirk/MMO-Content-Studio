@@ -105,6 +105,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_graph_selection_uses_selected_node(main_scene)
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
+	await _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene)
 	await _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
@@ -394,6 +395,60 @@ func _verify_dialogue_payload_uses_visible_graph_connections(main_scene: PackedS
 		return
 	if dialogue._selected_metadata(dialogue._next_node) != "leave_conversation":
 		_fail("Visible graph connection sync must refresh the selected node's Next node control")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue stale-playthrough fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "stale_playthrough_fixture",
+		"display_name": "Stale Playthrough Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "general_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Corren", "text": "Morning.", "next_node_id": null, "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "ask_about_work", "node_type": "speaker_text", "speaker": "Corren", "text": "Keeping busy?", "next_node_id": null, "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T16:45:00+00:00",
+	})
+	dialogue._on_dialogue_playthrough_received({
+		"current_node": {"node_id": "general_greeting"},
+		"speaker": null,
+		"text": null,
+		"visible_choices": [],
+		"can_continue": false,
+		"is_end": false,
+		"next_node_id": null,
+		"would_apply_effects": [],
+		"visited_node_ids": ["general_greeting", "general_greeting"],
+		"warnings": [
+			{"code": "dialogue_playthrough_invalid_state", "severity": "Warning", "field": "visited_node_ids", "message": "Playthrough loop protection detected a repeated node or maximum-step overflow."},
+		],
+	})
+	if not str(_joined_label_text(dialogue._playthrough)).contains("loop protection"):
+		_fail("Dialogue stale-playthrough fixture expected a loop warning before graph edit")
+		return
+	dialogue._on_connection_request(&"general_greeting", 0, &"ask_about_work", 0)
+	var playthrough_text := str(_joined_label_text(dialogue._playthrough))
+	if playthrough_text.contains("loop protection") or not playthrough_text.contains("Use Play to preview"):
+		_fail("Editing the dialogue graph must clear stale playthrough loop warnings")
+		return
+	if not dialogue._visited_node_ids.is_empty() or not dialogue._playthrough_node_id.is_empty():
+		_fail("Editing the dialogue graph must reset playthrough history")
 		return
 	scene.queue_free()
 	await process_frame
@@ -1972,6 +2027,19 @@ func _make_rig_layer_visual(asset_key: String = "dark_sword", render_layer_id: S
 		"nudge": {"x": 0, "y": 0},
 		"grip_anchors": {},
 	}
+
+
+func _joined_label_text(node: Node) -> String:
+	var parts: Array = []
+	_collect_label_text(node, parts)
+	return " ".join(parts)
+
+
+func _collect_label_text(node: Node, parts: Array) -> void:
+	if node is Label:
+		parts.append(str((node as Label).text))
+	for child in node.get_children():
+		_collect_label_text(child, parts)
 
 
 func _fail(message: String) -> void:
