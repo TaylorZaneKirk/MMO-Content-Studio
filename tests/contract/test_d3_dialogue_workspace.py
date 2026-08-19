@@ -61,6 +61,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "func _remove_entry_point",
             "func _on_entry_id_changed",
             "func _on_entry_priority_changed",
+            '"Entry Conditions" if owner_kind == "entry" else "Conditions"',
             '"priority": 10 if not entries.is_empty() else 0',
             '"entry_order": index',
             "_workspace_support.clear_preview",

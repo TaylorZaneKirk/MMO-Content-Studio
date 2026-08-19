@@ -476,6 +476,9 @@ func _verify_dialogue_entry_point_authoring_workflow(main_scene: PackedScene) ->
 		_fail("New dialogue entry points must target the selected node with quest-first priority")
 		return
 	dialogue._add_condition("entry", 1, -1)
+	if not str(_joined_label_text(dialogue._entry_points)).contains("Entry Conditions (1)"):
+		_fail("Entry-point predicates must be labeled as entry conditions, not dialogue-wide conditions")
+		return
 	var condition_type := OptionButton.new()
 	condition_type.add_item("Quest Step")
 	condition_type.set_item_metadata(0, "quest_step")

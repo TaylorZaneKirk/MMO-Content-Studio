@@ -1315,7 +1315,8 @@ func _add_conditions_editor(parent: VBoxContainer, conditions: Array, owner_kind
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 6)
 	parent.add_child(header)
-	var label := _wrapped_label("Conditions (%d)" % conditions.size())
+	var condition_label := "Entry Conditions" if owner_kind == "entry" else "Conditions"
+	var label := _wrapped_label("%s (%d)" % [condition_label, conditions.size()])
 	header.add_child(label)
 	var add_button := Button.new()
 	add_button.text = "+ Condition"
