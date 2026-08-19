@@ -331,7 +331,7 @@ public sealed class DialogueRepository : IDialogueRepository
 
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("quest_ids", questIds.ToArray());
+        command.Parameters.Add("quest_ids", NpgsqlDbType.Array | NpgsqlDbType.Text).Value = questIds.ToArray();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var builders = new Dictionary<string, DialogueQuestReferenceBuilder>(StringComparer.Ordinal);
         while (await reader.ReadAsync(cancellationToken))
@@ -381,7 +381,7 @@ public sealed class DialogueRepository : IDialogueRepository
 
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("item_ids", itemIds.ToArray());
+        command.Parameters.Add("item_ids", NpgsqlDbType.Array | NpgsqlDbType.Text).Value = itemIds.ToArray();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var records = new Dictionary<string, DialogueItemReferenceRecord>(StringComparer.Ordinal);
         while (await reader.ReadAsync(cancellationToken))
@@ -413,7 +413,7 @@ public sealed class DialogueRepository : IDialogueRepository
 
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand(sql, connection);
-        command.Parameters.AddWithValue("skill_ids", skillIds.ToArray());
+        command.Parameters.Add("skill_ids", NpgsqlDbType.Array | NpgsqlDbType.Text).Value = skillIds.ToArray();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var records = new HashSet<string>(StringComparer.Ordinal);
         while (await reader.ReadAsync(cancellationToken))

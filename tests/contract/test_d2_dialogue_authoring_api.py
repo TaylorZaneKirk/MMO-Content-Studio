@@ -60,6 +60,9 @@ class D2DialogueAuthoringApiTests(unittest.TestCase):
             "LoadItemReferencesAsync",
             "LoadPublishedQuestConditionOptionsAsync",
             "LoadRuntimeItemConditionOptionsAsync",
+            'command.Parameters.Add("quest_ids", NpgsqlDbType.Array | NpgsqlDbType.Text)',
+            'command.Parameters.Add("item_ids", NpgsqlDbType.Array | NpgsqlDbType.Text)',
+            'command.Parameters.Add("skill_ids", NpgsqlDbType.Array | NpgsqlDbType.Text)',
             "dialogue_entry_conditions",
             "dialogue_choice_conditions",
         ):
