@@ -867,6 +867,7 @@ func _connect_graph_node(from_node: String, to_node: String) -> void:
 func _on_connection_request(from_node: StringName, from_port: int, to_node: StringName, to_port: int) -> void:
 	var from_node_id := str(from_node)
 	var to_node_id := str(to_node)
+	_sync_selected_node_from_form()
 	var node := _find_node(from_node_id)
 	if node.is_empty():
 		CONTENT_STUDIO_LOGGER.debug("Dialogue graph connection requested for missing source node", {
@@ -917,6 +918,7 @@ func _on_connection_request(from_node: StringName, from_port: int, to_node: Stri
 func _on_disconnection_request(from_node: StringName, from_port: int, to_node: StringName, to_port: int) -> void:
 	var from_node_id := str(from_node)
 	var to_node_id := str(to_node)
+	_sync_selected_node_from_form()
 	var node := _find_node(from_node_id)
 	if node.is_empty():
 		CONTENT_STUDIO_LOGGER.debug("Dialogue graph disconnection requested for missing source node", {

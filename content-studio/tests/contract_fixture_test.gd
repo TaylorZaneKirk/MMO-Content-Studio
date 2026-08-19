@@ -679,14 +679,22 @@ func _verify_dialogue_connection_logging_and_effect_guidance(main_scene: PackedS
 	if not str(_joined_label_text(dialogue._choices)).contains("Effects are attached to player choices"):
 		_fail("Dialogue choices panel must explain where quest/item effects are authored")
 		return
+	dialogue._text.text = "Edited text before graph connection."
 	dialogue._on_connection_request(&"general_greeting", 0, &"ask_about_work", 0)
 	var node: Dictionary = dialogue._find_node("general_greeting")
 	if str(node.get("next_node_id", "")) != "ask_about_work":
 		_fail("Dialogue connection request must update the model link")
 		return
+	if dialogue._text.text != "Edited text before graph connection." or str(node.get("text", "")) != "Edited text before graph connection.":
+		_fail("Dialogue connection request must preserve unsaved selected-node text")
+		return
+	dialogue._text.text = "Edited text before graph disconnection."
 	dialogue._on_disconnection_request(&"general_greeting", 0, &"ask_about_work", 0)
 	if node.get("next_node_id", null) != null:
 		_fail("Dialogue disconnection request must clear the model link")
+		return
+	if dialogue._text.text != "Edited text before graph disconnection." or str(node.get("text", "")) != "Edited text before graph disconnection.":
+		_fail("Dialogue disconnection request must preserve unsaved selected-node text")
 		return
 	scene.queue_free()
 	await process_frame
