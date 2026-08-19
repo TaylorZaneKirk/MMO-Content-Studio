@@ -109,6 +109,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
 	await _verify_dialogue_payload_preserves_model_links_without_graph_connections(main_scene)
+	await _verify_dialogue_connection_logging_and_effect_guidance(main_scene)
 	await _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene)
 	await _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
@@ -645,6 +646,47 @@ func _verify_dialogue_payload_preserves_model_links_without_graph_connections(ma
 			next_by_node[str(node.get("node_id", ""))] = node.get("next_node_id", null)
 	if str(next_by_node.get("general_greeting", "")) != "ask_about_work" or str(next_by_node.get("general_work_reply", "")) != "leave_conversation" or str(next_by_node.get("leave_conversation", "")) != "general_goodbye":
 		_fail("Dialogue payload sync must preserve existing model links when GraphEdit reports no connections")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_connection_logging_and_effect_guidance(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue connection-log fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "connection_log_fixture",
+		"display_name": "Connection Log Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "general_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Corren", "text": "Morning.", "next_node_id": null, "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "ask_about_work", "node_type": "speaker_text", "speaker": "Corren", "text": "Keeping busy?", "next_node_id": null, "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T18:30:00+00:00",
+	})
+	if not str(_joined_label_text(dialogue._choices)).contains("Effects are attached to player choices"):
+		_fail("Dialogue choices panel must explain where quest/item effects are authored")
+		return
+	dialogue._on_connection_request(&"general_greeting", 0, &"ask_about_work", 0)
+	var node: Dictionary = dialogue._find_node("general_greeting")
+	if str(node.get("next_node_id", "")) != "ask_about_work":
+		_fail("Dialogue connection request must update the model link")
+		return
+	dialogue._on_disconnection_request(&"general_greeting", 0, &"ask_about_work", 0)
+	if node.get("next_node_id", null) != null:
+		_fail("Dialogue disconnection request must clear the model link")
 		return
 	scene.queue_free()
 	await process_frame

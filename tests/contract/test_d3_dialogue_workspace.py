@@ -28,7 +28,9 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
 
         for token in (
             'preload("res://scripts/authoring_workspace_support.gd")',
+            'preload("res://scripts/content_studio_logger.gd")',
             "@onready var _client: AuthoringHostClient = %AuthoringHostClient",
+            "_apply_options()",
             "GraphEdit.new()",
             "GraphNode.new()",
             "connection_request",
@@ -42,7 +44,12 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "func _sync_graph_connections_to_draft",
             'if _graph == null or not _graph.has_method("get_connection_list"):',
             '_graph.call("get_connection_list")',
-            'speaker_next_nodes[str(node.get("node_id", ""))] = _optional_variant_payload(node.get("next_node_id", null))',
+            'var next_node = _optional_variant_payload(node.get("next_node_id", null))',
+            'speaker_next_nodes[str(node.get("node_id", ""))] = next_node',
+            '"Dialogue graph connection requested"',
+            '"Dialogue graph disconnection requested"',
+            '"Dialogue graph sync preserved model links without reported graph connections"',
+            '"Dialogue graph sync observed reported connections"',
             "func _reset_playthrough_preview",
             "_reset_playthrough_preview()",
             '_add_operation("Delete Dialogue", "delete")',
@@ -66,6 +73,10 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "func _condition_string_value",
             '"status": _optional_variant_payload(_condition_value(condition, "quest_status", "status", null))',
             'condition["status"] = condition["quest_status"]',
+            'if node_types.is_empty():',
+            '{"id": NODE_TYPE_SPEAKER_TEXT, "display_name": "Speaker Text"}',
+            '{"id": NODE_TYPE_PLAYER_CHOICE, "display_name": "Player Choice"}',
+            '{"id": NODE_TYPE_END, "display_name": "End"}',
         ):
             self.assertIn(token, editor)
 
@@ -170,6 +181,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "_add_effects_editor",
             "_default_effect",
             "_effect_summary_list",
+            "Effects are attached to player choices",
             '"effects": []',
             '"would_apply_effects"',
         ):

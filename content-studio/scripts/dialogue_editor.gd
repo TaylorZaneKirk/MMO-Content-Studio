@@ -6,6 +6,7 @@ const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 signal workspace_open_requested(workspace_id: String, resource_id: String)
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
+const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
 const NODE_TYPE_SPEAKER_TEXT := "speaker_text"
 const NODE_TYPE_PLAYER_CHOICE := "player_choice"
 const NODE_TYPE_END := "end"
@@ -82,6 +83,7 @@ var _runtime_status: Label
 func _ready() -> void:
 	_workspace_support = WORKSPACE_SUPPORT_SCRIPT.new()
 	_build_ui()
+	_apply_options()
 	_connect_client()
 	_set_form_enabled(false)
 	_clear_preview()
@@ -862,40 +864,85 @@ func _connect_graph_node(from_node: String, to_node: String) -> void:
 			return
 
 
-func _on_connection_request(from_node: StringName, _from_port: int, to_node: StringName, _to_port: int) -> void:
-	var node := _find_node(str(from_node))
+func _on_connection_request(from_node: StringName, from_port: int, to_node: StringName, to_port: int) -> void:
+	var from_node_id := str(from_node)
+	var to_node_id := str(to_node)
+	var node := _find_node(from_node_id)
 	if node.is_empty():
+		CONTENT_STUDIO_LOGGER.debug("Dialogue graph connection requested for missing source node", {
+			"from_node": from_node_id,
+			"from_port": from_port,
+			"to_node": to_node_id,
+			"to_port": to_port,
+		})
 		return
-	if str(node.get("node_type", "")) == NODE_TYPE_PLAYER_CHOICE:
+	var node_type := str(node.get("node_type", ""))
+	var changed_field := "next_node_id"
+	var previous_target := _nullable_string(node.get("next_node_id", null))
+	if node_type == NODE_TYPE_PLAYER_CHOICE:
 		var choices := node.get("choices", []) as Array
 		if choices.is_empty():
+			changed_field = "choices[0].target_node_id"
+			previous_target = ""
 			choices.append({
 				"choice_id": "choice_1",
 				"text": "Continue",
-				"target_node_id": str(to_node),
+				"target_node_id": to_node_id,
 				"choice_order": 0,
 				"conditions": [],
 				"effects": [],
 			})
 		else:
-			(choices[0] as Dictionary)["target_node_id"] = str(to_node)
+			changed_field = "choices[0].target_node_id"
+			previous_target = str((choices[0] as Dictionary).get("target_node_id", ""))
+			(choices[0] as Dictionary)["target_node_id"] = to_node_id
 		node["choices"] = choices
 	else:
-		node["next_node_id"] = str(to_node)
+		node["next_node_id"] = to_node_id
+	CONTENT_STUDIO_LOGGER.debug("Dialogue graph connection requested", {
+		"changed_field": changed_field,
+		"from_node": from_node_id,
+		"from_port": from_port,
+		"new_target": to_node_id,
+		"node_type": node_type,
+		"previous_target": previous_target,
+		"to_node": to_node_id,
+		"to_port": to_port,
+	})
 	_rebuild_graph()
 	_load_selected_node()
 	_on_form_changed()
 
 
-func _on_disconnection_request(from_node: StringName, _from_port: int, to_node: StringName, _to_port: int) -> void:
-	var node := _find_node(str(from_node))
+func _on_disconnection_request(from_node: StringName, from_port: int, to_node: StringName, to_port: int) -> void:
+	var from_node_id := str(from_node)
+	var to_node_id := str(to_node)
+	var node := _find_node(from_node_id)
 	if node.is_empty():
+		CONTENT_STUDIO_LOGGER.debug("Dialogue graph disconnection requested for missing source node", {
+			"from_node": from_node_id,
+			"from_port": from_port,
+			"to_node": to_node_id,
+			"to_port": to_port,
+		})
 		return
-	if str(node.get("next_node_id", "")) == str(to_node):
+	var cleared_fields: Array[String] = []
+	if str(node.get("next_node_id", "")) == to_node_id:
 		node["next_node_id"] = null
+		cleared_fields.append("next_node_id")
 	for choice_variant in node.get("choices", []) as Array:
 		if choice_variant is Dictionary and str((choice_variant as Dictionary).get("target_node_id", "")) == str(to_node):
 			(choice_variant as Dictionary)["target_node_id"] = ""
+			cleared_fields.append("choice.target_node_id")
+	CONTENT_STUDIO_LOGGER.debug("Dialogue graph disconnection requested", {
+		"cleared": not cleared_fields.is_empty(),
+		"cleared_fields": ", ".join(cleared_fields),
+		"from_node": from_node_id,
+		"from_port": from_port,
+		"node_type": str(node.get("node_type", "")),
+		"to_node": to_node_id,
+		"to_port": to_port,
+	})
 	_rebuild_graph()
 	_load_selected_node()
 	_on_form_changed()
@@ -975,6 +1022,7 @@ func _load_selected_node() -> void:
 	_select_option(_node_type, str(node.get("node_type", NODE_TYPE_SPEAKER_TEXT)))
 	_speaker.text = _nullable_string(node.get("speaker", ""))
 	_text.text = _nullable_string(node.get("text", ""))
+	_fill_node_options(_next_node, _nullable_string(node.get("next_node_id", "")), "No automatic next node")
 	_select_option(_next_node, _nullable_string(node.get("next_node_id", "")))
 	_dismissible.button_pressed = bool(node.get("dismissible", true))
 	_editor_notes.text = _nullable_string(node.get("editor_notes", ""))
@@ -1006,13 +1054,25 @@ func _sync_graph_connections_to_draft() -> void:
 	if _graph == null or not _graph.has_method("get_connection_list"):
 		return
 	var speaker_next_nodes := {}
+	var existing_model_link_count := 0
 	for variant in _current_dialogue.get("nodes", []) as Array:
 		if variant is not Dictionary:
 			continue
 		var node := variant as Dictionary
 		if str(node.get("node_type", "")) == NODE_TYPE_SPEAKER_TEXT:
-			speaker_next_nodes[str(node.get("node_id", ""))] = _optional_variant_payload(node.get("next_node_id", null))
-	for connection_variant in _graph.call("get_connection_list") as Array:
+			var next_node = _optional_variant_payload(node.get("next_node_id", null))
+			speaker_next_nodes[str(node.get("node_id", ""))] = next_node
+			if next_node != null:
+				existing_model_link_count += 1
+	var reported_connections := _graph.call("get_connection_list") as Array
+	var valid_connection_count := 0
+	var applied_visible_connection_count := 0
+	var ignored_visible_connection_count := 0
+	if reported_connections.is_empty() and existing_model_link_count > 0:
+		CONTENT_STUDIO_LOGGER.debug("Dialogue graph sync preserved model links without reported graph connections", {
+			"existing_model_links": existing_model_link_count,
+		})
+	for connection_variant in reported_connections:
 		if connection_variant is not Dictionary:
 			continue
 		var connection := connection_variant as Dictionary
@@ -1022,14 +1082,26 @@ func _sync_graph_connections_to_draft() -> void:
 			continue
 		if not _has_node_id(from_node_id) or not _has_node_id(to_node_id):
 			continue
-		if speaker_next_nodes.has(from_node_id) and speaker_next_nodes[from_node_id] == null:
-			speaker_next_nodes[from_node_id] = to_node_id
+		valid_connection_count += 1
+		if speaker_next_nodes.has(from_node_id):
+			if speaker_next_nodes[from_node_id] == null or str(speaker_next_nodes[from_node_id]) != to_node_id:
+				speaker_next_nodes[from_node_id] = to_node_id
+				applied_visible_connection_count += 1
+		else:
+			ignored_visible_connection_count += 1
+	if not reported_connections.is_empty():
+		CONTENT_STUDIO_LOGGER.debug("Dialogue graph sync observed reported connections", {
+			"applied_visible_connections": applied_visible_connection_count,
+			"existing_model_links": existing_model_link_count,
+			"ignored_visible_connections": ignored_visible_connection_count,
+			"reported_connections": reported_connections.size(),
+			"valid_connections": valid_connection_count,
+		})
 	for from_node_id in speaker_next_nodes.keys():
 		var node := _find_node(str(from_node_id))
 		if node.is_empty():
 			continue
 		node["next_node_id"] = speaker_next_nodes[from_node_id]
-		node["choices"] = []
 	if speaker_next_nodes.has(_selected_node_id):
 		_select_option(_next_node, _nullable_string(speaker_next_nodes[_selected_node_id]))
 
@@ -1102,7 +1174,7 @@ func _rebuild_choices(node: Dictionary) -> void:
 		return
 	var choices := node.get("choices", []) as Array
 	if choices.is_empty():
-		_workspace_support.add_wrapped_label(_choices, "No choices on this node.")
+		_workspace_support.add_wrapped_label(_choices, "No choices on this node. Effects are attached to player choices; use + Choice to author item or quest effects.")
 		return
 	for index in range(choices.size()):
 		if choices[index] is not Dictionary:
@@ -1876,7 +1948,14 @@ func _on_form_changed(_value: Variant = null) -> void:
 
 
 func _apply_options() -> void:
-	_fill_authoring_options(_node_type, _options.get("node_types", []) as Array)
+	var node_types := _options.get("node_types", []) as Array
+	if node_types.is_empty():
+		node_types = [
+			{"id": NODE_TYPE_SPEAKER_TEXT, "display_name": "Speaker Text"},
+			{"id": NODE_TYPE_PLAYER_CHOICE, "display_name": "Player Choice"},
+			{"id": NODE_TYPE_END, "display_name": "End"},
+		]
+	_fill_authoring_options(_node_type, node_types)
 	_fill_node_options(_next_node, "", "No automatic next node")
 	var limits := _options.get("supported_limits", {}) as Dictionary
 	_set_spin_limits(_schema_version, 1, max(1, int(limits.get("max_schema_version", 100))))
