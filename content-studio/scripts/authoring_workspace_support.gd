@@ -1,6 +1,8 @@
 extends RefCounted
 class_name AuthoringWorkspaceSupport
 
+const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
+
 var preview_signature := ""
 var preview_operation := ""
 var preview_applicable := false
@@ -68,6 +70,12 @@ func render_validation(container: Node, values: Array) -> void:
 		if variant is not Dictionary:
 			continue
 		var message := variant as Dictionary
+		CONTENT_STUDIO_LOGGER.info("Validation message rendered", {
+			"severity": str(message.get("severity", "Info")),
+			"code": str(message.get("code", "")),
+			"field": str(message.get("field", "")),
+			"message": str(message.get("message", "Validation message")),
+		})
 		add_wrapped_label(container, "[%s] %s" % [
 			str(message.get("severity", "Info")).to_upper(),
 			str(message.get("message", "Validation message")),
@@ -95,7 +103,10 @@ func clear_container(container: Node) -> void:
 
 
 func add_wrapped_label(container: Node, value: String) -> void:
-	var label := Label.new()
+	var label := RichTextLabel.new()
 	label.text = value
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.selection_enabled = true
+	label.fit_content = true
+	label.scroll_active = false
 	container.add_child(label)

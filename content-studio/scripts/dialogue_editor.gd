@@ -1011,7 +1011,7 @@ func _sync_graph_connections_to_draft() -> void:
 			continue
 		var node := variant as Dictionary
 		if str(node.get("node_type", "")) == NODE_TYPE_SPEAKER_TEXT:
-			speaker_next_nodes[str(node.get("node_id", ""))] = null
+			speaker_next_nodes[str(node.get("node_id", ""))] = _optional_variant_payload(node.get("next_node_id", null))
 	for connection_variant in _graph.call("get_connection_list") as Array:
 		if connection_variant is not Dictionary:
 			continue

@@ -108,6 +108,7 @@ func _run_fixture() -> void:
 	await _verify_dialogue_entry_point_authoring_workflow(main_scene)
 	await _verify_dialogue_graph_lifecycle_controls_and_payload(main_scene)
 	await _verify_dialogue_payload_uses_visible_graph_connections(main_scene)
+	await _verify_dialogue_payload_preserves_model_links_without_graph_connections(main_scene)
 	await _verify_dialogue_graph_edits_clear_stale_playthrough_warning(main_scene)
 	await _verify_dialogue_selected_node_delete_is_not_dialogue_delete(main_scene)
 	await _verify_quest_definition_fields_expand(main_scene)
@@ -601,6 +602,49 @@ func _verify_dialogue_payload_uses_visible_graph_connections(main_scene: PackedS
 		return
 	if dialogue._selected_metadata(dialogue._next_node) != "leave_conversation":
 		_fail("Visible graph connection sync must refresh the selected node's Next node control")
+		return
+	scene.queue_free()
+	await process_frame
+
+
+func _verify_dialogue_payload_preserves_model_links_without_graph_connections(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var dialogue = scene.get_node("Margin/Root/Tabs/Dialogue")
+	if dialogue == null:
+		_fail("Dialogue link-preservation fixture could not locate the Dialogue workspace")
+		return
+	dialogue._schema_available = true
+	dialogue._on_dialogue_definition_received({
+		"dialogue_definition_id": "link_preservation_fixture",
+		"display_name": "Link Preservation Fixture",
+		"publication_state": "Draft",
+		"schema_version": 1,
+		"entry_points": [
+			{"entry_id": "default", "node_id": "general_greeting", "priority": 0, "entry_order": 0, "conditions": []},
+		],
+		"nodes": [
+			{"node_id": "general_greeting", "node_type": "speaker_text", "speaker": "Corren", "text": "Morning.", "next_node_id": "ask_about_work", "dismissible": true, "canvas_x": -60.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "ask_about_work", "node_type": "speaker_text", "speaker": "Corren", "text": "Keeping busy?", "next_node_id": "general_work_reply", "dismissible": true, "canvas_x": 120.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "general_work_reply", "node_type": "speaker_text", "speaker": "Corren", "text": "Always.", "next_node_id": "leave_conversation", "dismissible": true, "canvas_x": 300.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "leave_conversation", "node_type": "speaker_text", "speaker": "Corren", "text": "I'll let you go.", "next_node_id": "general_goodbye", "dismissible": true, "canvas_x": 480.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+			{"node_id": "general_goodbye", "node_type": "end", "speaker": null, "text": null, "next_node_id": null, "dismissible": true, "canvas_x": 660.0, "canvas_y": 100.0, "editor_notes": null, "choices": []},
+		],
+		"metadata_description": null,
+		"notes": null,
+		"updated_at_utc": "2026-08-18T18:05:00+00:00",
+	})
+	if dialogue._graph.has_method("clear_connections"):
+		dialogue._graph.call("clear_connections")
+	var payload: Dictionary = dialogue._payload()
+	var next_by_node := {}
+	for variant in payload.get("nodes", []) as Array:
+		if variant is Dictionary:
+			var node := variant as Dictionary
+			next_by_node[str(node.get("node_id", ""))] = node.get("next_node_id", null)
+	if str(next_by_node.get("general_greeting", "")) != "ask_about_work" or str(next_by_node.get("general_work_reply", "")) != "leave_conversation" or str(next_by_node.get("leave_conversation", "")) != "general_goodbye":
+		_fail("Dialogue payload sync must preserve existing model links when GraphEdit reports no connections")
 		return
 	scene.queue_free()
 	await process_frame
@@ -2244,6 +2288,8 @@ func _joined_label_text(node: Node) -> String:
 func _collect_label_text(node: Node, parts: Array) -> void:
 	if node is Label:
 		parts.append(str((node as Label).text))
+	elif node is RichTextLabel:
+		parts.append(str((node as RichTextLabel).text))
 	for child in node.get_children():
 		_collect_label_text(child, parts)
 

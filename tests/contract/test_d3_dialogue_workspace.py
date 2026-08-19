@@ -42,6 +42,7 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "func _sync_graph_connections_to_draft",
             'if _graph == null or not _graph.has_method("get_connection_list"):',
             '_graph.call("get_connection_list")',
+            'speaker_next_nodes[str(node.get("node_id", ""))] = _optional_variant_payload(node.get("next_node_id", null))',
             "func _reset_playthrough_preview",
             "_reset_playthrough_preview()",
             '_add_operation("Delete Dialogue", "delete")',
