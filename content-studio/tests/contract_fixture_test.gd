@@ -716,6 +716,10 @@ func _verify_dialogue_connection_logging_and_effect_guidance(main_scene: PackedS
 	dialogue._node_id.text = "quest_herb_offer"
 	dialogue._speaker.text = "Harlan Wick"
 	dialogue._text.text = "I've got herb to spare."
+	dialogue._select_graph_node("speaker_1")
+	if dialogue._selected_node_id != "quest_herb_offer" or dialogue._node_id.text != "quest_herb_offer" or dialogue._text.text != "I've got herb to spare.":
+		_fail("Dialogue graph selection must remap stale temporary node IDs after selected-node rename")
+		return
 	dialogue._on_connection_request(&"ask_about_work", 0, &"speaker_1", 0)
 	var source: Dictionary = dialogue._find_node("ask_about_work")
 	var renamed_target: Dictionary = dialogue._find_node("quest_herb_offer")

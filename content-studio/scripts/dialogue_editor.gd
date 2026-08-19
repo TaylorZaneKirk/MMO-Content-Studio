@@ -40,6 +40,7 @@ var _visited_node_ids: Array = []
 var _playthrough_node_id := ""
 var _pending_graph_node_selection := ""
 var _graph_selection_update_queued := false
+var _renamed_graph_node_ids: Dictionary = {}
 
 var _search: LineEdit
 var _list: VBoxContainer
@@ -382,6 +383,7 @@ func _start_new_dialogue() -> void:
 	_is_loading = true
 	var defaults := _options.get("defaults", {}) as Dictionary
 	_current_dialogue = {}
+	_renamed_graph_node_ids.clear()
 	_is_new = true
 	_selected_node_id = str(defaults.get("start_node_id", "start"))
 	_dialogue_id.text = ""
@@ -440,6 +442,7 @@ func _start_new_dialogue() -> void:
 func _load_dialogue(payload: Dictionary) -> void:
 	_is_loading = true
 	_current_dialogue = payload.duplicate(true)
+	_renamed_graph_node_ids.clear()
 	_is_new = false
 	_dialogue_id.text = str(payload.get("dialogue_definition_id", ""))
 	_dialogue_id.editable = false
@@ -956,7 +959,8 @@ func _on_disconnection_request(from_node: StringName, from_port: int, to_node: S
 
 func _on_delete_nodes_request(nodes: Array) -> void:
 	if not nodes.is_empty():
-		_selected_node_id = str(nodes[0])
+		var sync_result := _sync_selected_node_from_form()
+		_selected_node_id = _remap_graph_node_id_after_form_sync(str(nodes[0]), sync_result)
 		_delete_selected_node()
 
 
@@ -982,9 +986,12 @@ func _apply_graph_node_selection() -> void:
 
 
 func _select_graph_node(node_id: String) -> void:
-	if node_id.is_empty() or node_id == _selected_node_id:
+	if node_id.is_empty():
 		return
-	_sync_selected_node_from_form()
+	var sync_result := _sync_selected_node_from_form()
+	node_id = _remap_graph_node_id_after_form_sync(node_id, sync_result)
+	if node_id == _selected_node_id:
+		return
 	_selected_node_id = node_id
 	_load_selected_node()
 
@@ -1005,7 +1012,9 @@ func _selected_graph_node_id() -> String:
 
 
 func _on_graph_node_moved(node_name: StringName) -> void:
-	var node := _find_node(str(node_name))
+	var sync_result := _sync_selected_node_from_form()
+	var node_id := _remap_graph_node_id_after_form_sync(str(node_name), sync_result)
+	var node := _find_node(node_id)
 	var graph_node := _graph.get_node_or_null(str(node_name)) as GraphNode
 	if node.is_empty() or graph_node == null:
 		return
@@ -1015,7 +1024,8 @@ func _on_graph_node_moved(node_name: StringName) -> void:
 
 
 func _on_graph_node_delete_requested(node_name: StringName) -> void:
-	_selected_node_id = str(node_name)
+	var sync_result := _sync_selected_node_from_form()
+	_selected_node_id = _remap_graph_node_id_after_form_sync(str(node_name), sync_result)
 	_delete_selected_node()
 
 
@@ -1098,6 +1108,10 @@ func _sync_selected_node_from_form() -> Dictionary:
 func _remap_graph_node_id_after_form_sync(node_id: String, sync_result: Dictionary) -> String:
 	if bool(sync_result.get("renamed", false)) and node_id == str(sync_result.get("old_node_id", "")):
 		return str(sync_result.get("new_node_id", node_id))
+	if not _has_node_id(node_id) and _renamed_graph_node_ids.has(node_id):
+		var mapped_node_id := str(_renamed_graph_node_ids.get(node_id, node_id))
+		if _has_node_id(mapped_node_id):
+			return mapped_node_id
 	return node_id
 
 
@@ -2110,6 +2124,10 @@ func _rename_node(old_id: String, new_id: String) -> void:
 	if node.is_empty():
 		return
 	node["node_id"] = new_id
+	_renamed_graph_node_ids[old_id] = new_id
+	for old_graph_node_id in _renamed_graph_node_ids.keys():
+		if str(_renamed_graph_node_ids[old_graph_node_id]) == old_id:
+			_renamed_graph_node_ids[old_graph_node_id] = new_id
 	for entry_variant in _current_dialogue.get("entry_points", []) as Array:
 		if entry_variant is Dictionary and str((entry_variant as Dictionary).get("node_id", "")) == old_id:
 			(entry_variant as Dictionary)["node_id"] = new_id
