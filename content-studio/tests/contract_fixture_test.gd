@@ -696,6 +696,38 @@ func _verify_dialogue_connection_logging_and_effect_guidance(main_scene: PackedS
 	if dialogue._text.text != "Edited text before graph disconnection." or str(node.get("text", "")) != "Edited text before graph disconnection.":
 		_fail("Dialogue disconnection request must preserve unsaved selected-node text")
 		return
+	var nodes := dialogue._current_dialogue.get("nodes", []) as Array
+	nodes.append({
+		"node_id": "speaker_1",
+		"node_type": "speaker_text",
+		"speaker": "",
+		"text": "",
+		"next_node_id": null,
+		"dismissible": true,
+		"canvas_x": 300.0,
+		"canvas_y": 120.0,
+		"editor_notes": null,
+		"choices": [],
+	})
+	dialogue._current_dialogue["nodes"] = nodes
+	dialogue._selected_node_id = "speaker_1"
+	dialogue._rebuild_graph()
+	dialogue._load_selected_node()
+	dialogue._node_id.text = "quest_herb_offer"
+	dialogue._speaker.text = "Harlan Wick"
+	dialogue._text.text = "I've got herb to spare."
+	dialogue._on_connection_request(&"ask_about_work", 0, &"speaker_1", 0)
+	var source: Dictionary = dialogue._find_node("ask_about_work")
+	var renamed_target: Dictionary = dialogue._find_node("quest_herb_offer")
+	if renamed_target.is_empty() or not dialogue._find_node("speaker_1").is_empty():
+		_fail("Dialogue connection request must preserve selected-node rename when GraphEdit emits the stale temporary node ID")
+		return
+	if str(source.get("next_node_id", "")) != "quest_herb_offer":
+		_fail("Dialogue connection request must remap stale graph connection target IDs after selected-node rename")
+		return
+	if str(renamed_target.get("speaker", "")) != "Harlan Wick" or str(renamed_target.get("text", "")) != "I've got herb to spare.":
+		_fail("Dialogue connection request must preserve selected-node speaker and text during stale-ID remap")
+		return
 	scene.queue_free()
 	await process_frame
 

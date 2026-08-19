@@ -71,6 +71,8 @@ class D3DialogueWorkspaceTests(unittest.TestCase):
             "_workspace_support.operation_name",
             "func _condition_value",
             "func _condition_string_value",
+            "func _remap_graph_node_id_after_form_sync",
+            '"Dialogue selected node form synced"',
             '"status": _optional_variant_payload(_condition_value(condition, "quest_status", "status", null))',
             'condition["status"] = condition["quest_status"]',
             'if node_types.is_empty():',

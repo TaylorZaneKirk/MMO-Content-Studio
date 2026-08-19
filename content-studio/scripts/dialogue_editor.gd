@@ -867,7 +867,9 @@ func _connect_graph_node(from_node: String, to_node: String) -> void:
 func _on_connection_request(from_node: StringName, from_port: int, to_node: StringName, to_port: int) -> void:
 	var from_node_id := str(from_node)
 	var to_node_id := str(to_node)
-	_sync_selected_node_from_form()
+	var sync_result := _sync_selected_node_from_form()
+	from_node_id = _remap_graph_node_id_after_form_sync(from_node_id, sync_result)
+	to_node_id = _remap_graph_node_id_after_form_sync(to_node_id, sync_result)
 	var node := _find_node(from_node_id)
 	if node.is_empty():
 		CONTENT_STUDIO_LOGGER.debug("Dialogue graph connection requested for missing source node", {
@@ -918,7 +920,9 @@ func _on_connection_request(from_node: StringName, from_port: int, to_node: Stri
 func _on_disconnection_request(from_node: StringName, from_port: int, to_node: StringName, to_port: int) -> void:
 	var from_node_id := str(from_node)
 	var to_node_id := str(to_node)
-	_sync_selected_node_from_form()
+	var sync_result := _sync_selected_node_from_form()
+	from_node_id = _remap_graph_node_id_after_form_sync(from_node_id, sync_result)
+	to_node_id = _remap_graph_node_id_after_form_sync(to_node_id, sync_result)
 	var node := _find_node(from_node_id)
 	if node.is_empty():
 		CONTENT_STUDIO_LOGGER.debug("Dialogue graph disconnection requested for missing source node", {
@@ -1033,23 +1037,68 @@ func _load_selected_node() -> void:
 	_is_loading = false
 
 
-func _sync_selected_node_from_form() -> void:
+func _sync_selected_node_from_form() -> Dictionary:
 	if _is_loading or _selected_node_id.is_empty():
-		return
+		return {}
+	var old_node_id := _selected_node_id
 	var node := _find_node(_selected_node_id)
 	if node.is_empty():
-		return
+		return {}
+	var previous_node_type := str(node.get("node_type", NODE_TYPE_SPEAKER_TEXT))
+	var previous_speaker := _nullable_string(node.get("speaker", null))
+	var previous_text := _nullable_string(node.get("text", null))
+	var previous_next_node := _nullable_string(node.get("next_node_id", null))
+	var previous_dismissible := bool(node.get("dismissible", true))
+	var previous_editor_notes := _nullable_string(node.get("editor_notes", null))
 	var next_id := _node_id.text.strip_edges()
 	if not next_id.is_empty() and next_id != _selected_node_id and not _has_node_id(next_id):
 		_rename_node(_selected_node_id, next_id)
 		_selected_node_id = next_id
 		node = _find_node(_selected_node_id)
-	node["node_type"] = _selected_metadata(_node_type)
+	var selected_node_type := _selected_metadata(_node_type)
+	if selected_node_type.is_empty():
+		selected_node_type = previous_node_type
+	node["node_type"] = selected_node_type
 	node["speaker"] = _optional_payload(_speaker.text)
 	node["text"] = _optional_payload(_text.text)
 	_apply_node_type_transition_shape(node)
 	node["dismissible"] = _dismissible.button_pressed
 	node["editor_notes"] = _optional_payload(_editor_notes.text)
+	var changed_fields: Array[String] = []
+	if old_node_id != _selected_node_id:
+		changed_fields.append("node_id")
+	if previous_node_type != str(node.get("node_type", NODE_TYPE_SPEAKER_TEXT)):
+		changed_fields.append("node_type")
+	if previous_speaker != _nullable_string(node.get("speaker", null)):
+		changed_fields.append("speaker")
+	if previous_text != _nullable_string(node.get("text", null)):
+		changed_fields.append("text")
+	if previous_next_node != _nullable_string(node.get("next_node_id", null)):
+		changed_fields.append("next_node_id")
+	if previous_dismissible != bool(node.get("dismissible", true)):
+		changed_fields.append("dismissible")
+	if previous_editor_notes != _nullable_string(node.get("editor_notes", null)):
+		changed_fields.append("editor_notes")
+	if not changed_fields.is_empty():
+		CONTENT_STUDIO_LOGGER.debug("Dialogue selected node form synced", {
+			"changed_fields": ", ".join(changed_fields),
+			"new_node_id": _selected_node_id,
+			"new_text_length": _nullable_string(node.get("text", null)).length(),
+			"node_type": str(node.get("node_type", NODE_TYPE_SPEAKER_TEXT)),
+			"old_node_id": old_node_id,
+			"speaker": _nullable_string(node.get("speaker", null)),
+		})
+	return {
+		"old_node_id": old_node_id,
+		"new_node_id": _selected_node_id,
+		"renamed": old_node_id != _selected_node_id,
+	}
+
+
+func _remap_graph_node_id_after_form_sync(node_id: String, sync_result: Dictionary) -> String:
+	if bool(sync_result.get("renamed", false)) and node_id == str(sync_result.get("old_node_id", "")):
+		return str(sync_result.get("new_node_id", node_id))
+	return node_id
 
 
 func _sync_graph_connections_to_draft() -> void:
