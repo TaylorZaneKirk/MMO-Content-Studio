@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 SQL = ROOT / "integrations/mmo-project/prototype/sql"
 FRESH = (SQL / "017_item_consumable_profiles.sql").read_text()
 TIMESTAMPS = (SQL / "048_item_consumable_child_timestamps.sql").read_text()
-FORWARD = (SQL / "050_item_consumable_deterministic_amount.sql").read_text()
+FORWARD = (SQL / "056_item_consumable_deterministic_amount.sql").read_text()
 DSN = os.environ.get("CONTENT_STUDIO_MIGRATION_DSN")
 
 

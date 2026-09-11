@@ -24,14 +24,14 @@ schema used by the unified Items workspace:
 - no seeded food profiles or guessed food balance
 
 Existing databases that applied the old T2 schema must run
-`prototype/sql/050_item_consumable_deterministic_amount.sql` before using the
+`prototype/sql/056_item_consumable_deterministic_amount.sql` before using the
 updated host. It preserves already-fixed values, effect identities/order/targets,
 timestamps, and unrelated constraints. If any effect has a true historical range,
 it aborts atomically and identifies a blocking item/effect. Intentionally reauthor
 all such content to fixed values using the old schema before retrying; the migration
 never chooses a value. Do not run the updated editor against the old schema.
-After success only `amount` remains. Running `050` after corrected `017`, or
-rerunning `050`, is safe. The old food seed is removed from fresh installations;
+After success only `amount` remains. Running `056` after corrected `017`, or
+rerunning `056`, is safe. The old food seed is removed from fresh installations;
 existing seeded content is subject to the same deliberate reauthoring rule.
 
 The supported vocabulary remains:

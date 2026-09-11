@@ -24,7 +24,7 @@ BEGIN
             RAISE EXCEPTION 'Consumable item % effect % has a true restore range (% to %).',
                 ranged_effect.item_id, ranged_effect.effect_index,
                 ranged_effect.minimum_amount, ranged_effect.maximum_amount
-                USING HINT = 'Intentionally reauthor every true range to a fixed value before retrying migration 050. No amount was chosen automatically.';
+                USING HINT = 'Intentionally reauthor every true range to a fixed value before retrying migration 056. No amount was chosen automatically.';
         END IF;
 
         -- Equality proves this rename is lossless. No row update means existing

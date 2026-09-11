@@ -11,7 +11,7 @@ foundation.
   `016_ground_item_ownership_kind.sql`
 - T2 integration migration applied from
   `integrations/mmo-project/prototype/sql/017_item_consumable_profiles.sql`
-- Existing databases also require `050_item_consumable_deterministic_amount.sql`;
+- Existing databases also require `056_item_consumable_deterministic_amount.sql`;
   unified item saves require child timestamps from `048_item_consumable_child_timestamps.sql`
 - `game_client_assets` configured to the MMO Project
   `prototype/client/assets` directory
@@ -20,7 +20,7 @@ foundation.
 
 1. Run `./tools/test.sh`.
 2. Apply corrected `017` for a fresh installation, followed by the normal migration
-   chain including `048` and `050`. For an existing installation, apply `050` only
+   chain including `048` and `056`. For an existing installation, apply `056` only
    after deliberately reauthoring any historical true ranges it reports. See the
    [integration notes](../integrations/mmo-project/README.md#t2-consumable-migration).
 3. Start the host and confirm the Environment tab reports
