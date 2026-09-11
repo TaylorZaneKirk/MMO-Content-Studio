@@ -21,7 +21,7 @@ food balance, timing, and Items I2 acceptance remain separate work.
   New effects default to 1. Targets and all other consumable semantics are unchanged.
 - Corrected integration migration `017` creates the deterministic schema with the
   existing 1–1,000,000 limit and seeds no food profiles or effects.
-- Forward migration `050` checks every historical effect before changing the table.
+- Forward migration `056` checks every historical effect before changing the table.
   Equal values migrate by column rename, preserving rows and timestamps. Any true
   range aborts the entire block with an item/effect diagnostic and a reauthoring hint.
   Successful migration removes the old axis and range constraint. Fresh schemas and
@@ -76,7 +76,7 @@ effects**, all effect index 0 targeting health. Examples include
 `inventory_33_fish` (6–9). The first blocking row in migration order is
 `inventory_257_trout` (3–5).
 
-Migration `050` cannot succeed on that content until all true ranges are deliberately
+Migration `056` cannot succeed on that content until all true ranges are deliberately
 reauthored. No fixed values were selected, no authored rows were changed, and the
 migration was not applied to that database. Restarting the updated host against the
 unmigrated database will correctly report the missing deterministic schema.
