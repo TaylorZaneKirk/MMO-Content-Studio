@@ -1,3 +1,4 @@
+using System.Text.Json;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Xunit;
@@ -24,6 +25,24 @@ public sealed class UnifiedItemDomainRulesTests
         Assert.Equal(2, capability.PowerTier);
         Assert.Equal("swing", capability.ActionAnimationId);
         Assert.Equal("spark", capability.EffectResourceId);
+    }
+
+    [Fact]
+    public void NormalizeAndSerializePreserveOneAuthoredRestoreAmount()
+    {
+        var draft = UnifiedItemDomainRules.Normalize(
+            "Fixture", "res://assets/items/fixture.png",
+            new ItemConsumableBehaviorDraft(" eat ", 1, null, null, false, 0, null, null, [],
+                [new ConsumableEffectDefinition(0, " restore_resource ", " health ", 17)]),
+            null, []);
+
+        var effect = Assert.Single(draft.ConsumableBehavior!.Effects);
+        Assert.Equal(new ConsumableEffectDefinition(0, "restore_resource", "health", 17), effect);
+        var json = JsonSerializer.SerializeToElement(effect);
+        Assert.Equal(new[] { "effect_index", "effect_type", "target_id", "amount" },
+            json.EnumerateObject().Select(property => property.Name).ToArray());
+        Assert.Equal(17, json.GetProperty("amount").GetInt32());
+        Assert.Equal(effect, json.Deserialize<ConsumableEffectDefinition>());
     }
 
     [Fact]

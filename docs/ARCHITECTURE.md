@@ -148,7 +148,7 @@ semantic equality before reporting success.
 The first declarative vocabulary is deliberately narrow:
 
 - `skill_minimum` requirement
-- `restore_resource` effect with an inclusive minimum/maximum range
+- `restore_resource` effect with one deterministic positive integer `amount`
 - health, concentration, and Special resources
 - eat, drink, and use actions
 
@@ -161,8 +161,11 @@ extension.
 per-instance state. True charges remain deferred until inventory instances can
 store authoritative metadata beyond `item_id` and `stack_count`.
 
-T2 includes a migration artifact and an idempotent translation of the current hard-coded food dictionary into equivalent inclusive restore ranges, but intentionally does not mutate the separate
-MMO Project repository. Applying the migration enables authoring; the game
+T2 includes a deterministic fresh-install schema in migration `017` and a forward
+correction in `050`. No food balance is seeded. The forward correction preserves
+already-fixed values and refuses true historical ranges until deliberate content
+reauthoring. These artifacts do not mutate the separate MMO Project repository.
+Applying the migrations enables authoring; the game
 server still requires an explicit consumer that executes the declarative profile
 through its authoritative inventory/runtime-state mutation boundary.
 

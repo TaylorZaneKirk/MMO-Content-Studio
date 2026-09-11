@@ -12,7 +12,7 @@ repository does not silently modify the game repository.
 ## T2 consumable migration
 
 `prototype/sql/017_item_consumable_profiles.sql` adds the declarative consumable
-schema used by the Content Studio's Consumables workspace:
+schema used by the unified Items workspace:
 
 - one profile per item
 - ordered requirements
@@ -20,9 +20,21 @@ schema used by the Content Studio's Consumables workspace:
 - optional result-item transformation
 - use action, combat availability, cooldown, message, animation, and sound metadata
 - publication guards that prevent a published consumable from producing a disabled result item and prevent disabling result items still used by published consumables
-- an idempotent seed that translates the current hard-coded food restore ranges and messages into declarative profiles without overwriting existing authored profiles
+- one positive integer `amount` per restore effect, bounded at 1,000,000
+- no seeded food profiles or guessed food balance
 
-The first schema version intentionally supports only:
+Existing databases that applied the old T2 schema must run
+`prototype/sql/050_item_consumable_deterministic_amount.sql` before using the
+updated host. It preserves already-fixed values, effect identities/order/targets,
+timestamps, and unrelated constraints. If any effect has a true historical range,
+it aborts atomically and identifies a blocking item/effect. Intentionally reauthor
+all such content to fixed values using the old schema before retrying; the migration
+never chooses a value. Do not run the updated editor against the old schema.
+After success only `amount` remains. Running `050` after corrected `017`, or
+rerunning `050`, is safe. The old food seed is removed from fresh installations;
+existing seeded content is subject to the same deliberate reauthoring rule.
+
+The supported vocabulary remains:
 
 - requirement: `skill_minimum`
 - effect: `restore_resource`

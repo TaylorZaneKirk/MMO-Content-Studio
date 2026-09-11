@@ -26,7 +26,7 @@ Capabilities:
 - Configure consumed stack quantity and optional result-item transformation
 - Configure combat availability, cooldown, messages, animation, and sound references
 - Author ordered `skill_minimum` requirements
-- Author ordered `restore_resource` effects with inclusive minimum/maximum ranges for health, concentration, and Special
+- Author ordered `restore_resource` effects with one deterministic positive integer `amount` for health, concentration, and Special
 - Preview exact base/profile/requirement/effect replacements
 - Save, publish, and disable transactionally with aggregate concurrency
 - Preserve live-reference publication guards
