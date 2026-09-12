@@ -1,6 +1,6 @@
 -- T2 Content Studio integration migration for declarative consumable authoring.
 -- Apply this migration to the MMO Project development database before using
--- the Consumables workspace.
+-- the unified Items workspace. Existing installations also need migration 050.
 
 CREATE TABLE IF NOT EXISTS item_consumable_profiles (
     item_id TEXT PRIMARY KEY REFERENCES item_definitions(item_id) ON DELETE CASCADE,
@@ -47,8 +47,7 @@ CREATE TABLE IF NOT EXISTS item_consumable_effects (
     effect_index INTEGER NOT NULL,
     effect_type TEXT NOT NULL,
     target_id TEXT NOT NULL,
-    minimum_amount INTEGER NOT NULL,
-    maximum_amount INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
     PRIMARY KEY (item_id, effect_index),
     CONSTRAINT item_consumable_effects_identity_key
         UNIQUE (item_id, effect_type, target_id),
@@ -58,11 +57,8 @@ CREATE TABLE IF NOT EXISTS item_consumable_effects (
         CHECK (effect_type IN ('restore_resource')),
     CONSTRAINT item_consumable_effects_resource_check
         CHECK (target_id IN ('health', 'concentration', 'special')),
-    CONSTRAINT item_consumable_effects_amount_range_check
-        CHECK (
-            minimum_amount BETWEEN 1 AND 1000000
-            AND maximum_amount BETWEEN minimum_amount AND 1000000
-        )
+    CONSTRAINT item_consumable_effects_amount_check
+        CHECK (amount BETWEEN 1 AND 1000000)
 );
 
 CREATE INDEX IF NOT EXISTS item_consumable_profiles_result_item_id_idx
@@ -73,88 +69,7 @@ CREATE INDEX IF NOT EXISTS item_consumable_requirements_target_id_idx
     ON item_consumable_requirements(target_id);
 
 
--- Preserve the current hard-coded food behavior as initial declarative data.
--- The existing runtime computes BaseHealthRestore + Random.Next(1, Inclusive + 1),
--- so the authored minimum/maximum values below are the exact resulting ranges.
-WITH legacy_food (
-    display_name,
-    use_action,
-    minimum_amount,
-    maximum_amount,
-    success_message
-) AS (
-    VALUES
-        ('Apple', 'eat', 2, 4, 'You eat an apple.'),
-        ('Pie', 'eat', 6, 10, 'You eat a pie.'),
-        ('Fish', 'eat', 6, 9, 'You eat some raw fish. *yeck*'),
-        ('Corn', 'eat', 5, 7, 'You eat some corn.'),
-        ('Watermelon', 'eat', 7, 10, 'You eat the watermelon.'),
-        ('Ale', 'drink', 2, 4, 'You drink the ale. *burp*'),
-        ('Orc Meat', 'eat', 4, 6, 'You eat some raw orc meat. You''re disgusting.'),
-        ('Cyclops Meat', 'eat', 4, 6, 'You eat some raw cyclops meat. You''re disgusting.'),
-        ('Yeti Meat', 'eat', 4, 6, 'You eat some raw yeti meat. You''re disgusting.'),
-        ('Raw Fish', 'eat', 2, 3, 'You eat some raw fish. You''re disgusting.'),
-        ('Fish Sticks', 'eat', 7, 11, 'You eat some fish sticks.'),
-        ('Orc Burger', 'eat', 10, 15, 'You eat an orc burger.'),
-        ('Cyclops Burger', 'eat', 13, 19, 'You eat a cyclops burger.'),
-        ('Yeti Burger', 'eat', 18, 25, 'You eat a yeti burger.'),
-        ('Orc Pot Pie', 'eat', 10, 14, 'You eat an orc pot pie.'),
-        ('Trout', 'eat', 3, 5, 'You eat the trout.'),
-        ('Catfish', 'eat', 4, 6, 'You eat the catfish.'),
-        ('Swordfish', 'eat', 5, 7, 'You eat the swordfish.'),
-        ('Squid', 'eat', 6, 8, 'You eat the squid.'),
-        ('Trout Fillet', 'eat', 4, 6, 'You eat the trout fillet.'),
-        ('Catfish Sandwich', 'eat', 5, 8, 'You eat the catfish sandwich.'),
-        ('Swordfish Steak', 'eat', 8, 11, 'You eat the swordfish steak.'),
-        ('Squid Platter', 'eat', 9, 13, 'You eat the squid platter.'),
-        ('Cooked Pig', 'eat', 21, 28, 'You eat the cooked pig.')
-),
-inserted_profiles AS (
-    INSERT INTO item_consumable_profiles (
-        item_id,
-        use_action,
-        consume_quantity,
-        result_item_id,
-        success_message,
-        usable_in_combat,
-        cooldown_ms,
-        use_animation_id,
-        use_sound_resource_path
-    )
-    SELECT
-        item.item_id,
-        legacy.use_action,
-        1,
-        NULL,
-        legacy.success_message,
-        TRUE,
-        0,
-        NULL,
-        NULL
-    FROM legacy_food legacy
-    JOIN item_definitions item ON item.item_name = legacy.display_name
-    ON CONFLICT (item_id) DO NOTHING
-    RETURNING item_id
-)
-INSERT INTO item_consumable_effects (
-    item_id,
-    effect_index,
-    effect_type,
-    target_id,
-    minimum_amount,
-    maximum_amount
-)
-SELECT
-    item.item_id,
-    0,
-    'restore_resource',
-    'health',
-    legacy.minimum_amount,
-    legacy.maximum_amount
-FROM legacy_food legacy
-JOIN item_definitions item ON item.item_name = legacy.display_name
-JOIN inserted_profiles inserted ON inserted.item_id = item.item_id
-ON CONFLICT (item_id, effect_index) DO NOTHING;
+-- Consumable values are intentionally authored in Studio; no food balance is seeded.
 
 CREATE OR REPLACE FUNCTION enforce_consumable_result_publication_on_item()
 RETURNS trigger

@@ -11,22 +11,29 @@ foundation.
   `016_ground_item_ownership_kind.sql`
 - T2 integration migration applied from
   `integrations/mmo-project/prototype/sql/017_item_consumable_profiles.sql`
+- Existing databases also require `056_item_consumable_deterministic_amount.sql`;
+  unified item saves require child timestamps from `048_item_consumable_child_timestamps.sql`
 - `game_client_assets` configured to the MMO Project
   `prototype/client/assets` directory
 
 ## Acceptance flow
 
 1. Run `./tools/test.sh`.
-2. Apply migration `017_item_consumable_profiles.sql` to the development database.
+2. Apply corrected `017` for a fresh installation, followed by the normal migration
+   chain including `048` and `056`. For an existing installation, apply `056` only
+   after deliberately reauthoring any historical true ranges it reports. See the
+   [integration notes](../integrations/mmo-project/README.md#t2-consumable-migration).
 3. Start the host and confirm the Environment tab reports
-   `prototype-consumable-authoring-v1` as healthy.
-4. Open **Consumables** and confirm existing item definitions are searchable and the current hard-coded food set appears as seeded Consumable definitions with equivalent inclusive restore ranges.
+   unified item schema as healthy, including the consumable `amount` column.
+4. Open **Items** and confirm existing definitions are searchable. Fresh
+   installations do not seed food values; consumable content must be authored intentionally.
 5. Select an ordinary basic item or create a new stable item ID.
-6. Configure its use action, consumed quantity, optional result item, combat
+6. Enable **Consumable Behavior** and configure its use action, consumed quantity, optional result item, combat
    availability, cooldown, message, animation, and sound references.
 7. Add zero or more `skill_minimum` requirements.
-8. Add at least one `restore_resource` effect with an inclusive minimum/maximum range targeting health,
-   concentration, or Special.
+8. Add at least one `restore_resource` effect targeting health, concentration,
+   or Special. Each row has one `amount` control, defaulting to 1. Author an integer
+   from 1 through 1,000,000; preview/save/reload must preserve that exact amount.
 9. Preview **Save as Draft**, review every base/profile/requirement/effect change,
    and apply it.
 10. Reload the consumable and confirm the complete aggregate matches the form.
@@ -41,9 +48,8 @@ foundation.
 - Saving replaces requirements and effects transactionally; stale child rows do
   not survive removal from the logical definition.
 - Existing-item mutations require the aggregate `updated_at` token.
-- Equipment definitions remain read-only in Consumables.
-- Basic Items marks definitions carrying a consumable profile as Consumable and
-  refuses to edit them.
+- The unified Items aggregate preserves equipment and tool metadata while editing
+  consumable behavior. There is no separate Consumables workspace.
 - A result item cannot reference the consumable itself.
 - Duplicate skill requirements and duplicate resource effects are rejected.
 - Published items cannot return to draft while live inventory, equipment, or
@@ -66,6 +72,18 @@ Deferred:
 
 - one item instance carrying a mutable charge count
 - arbitrary effect scripts or contributor-supplied executable expressions
+
+## Deterministic amount correction verification
+
+The correction remains pending exact-delta review and human acceptance. It does
+not authorize game-server consumption or choose food balance values. See the
+[correction evidence](DETERMINISTIC_CONSUMABLE_AMOUNT_CORRECTION_2026-09-11.md)
+for validation limits and existing content requiring reauthoring.
+
+Migration checks in `tests/contract/test_consumable_amount_migration.py` use
+`psql` and `CONTENT_STUDIO_MIGRATION_DSN` against a disposable PostgreSQL database.
+Each case creates an isolated schema inside a rolled-back transaction. Without
+that environment, the database cases explicitly skip.
 
 ## Runtime boundary
 

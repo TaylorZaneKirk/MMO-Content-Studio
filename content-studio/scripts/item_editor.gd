@@ -1581,16 +1581,15 @@ func _add_consumable_effect_row(initial: Dictionary = {}) -> void:
 	_fill_option(target, _option_array("resource_targets", [{"id": "health", "display_name": "Health"}]))
 	_select_option(target, str(initial.get("target_id", "health")))
 	row.add_child(target)
-	var minimum := _row_spin(1, 1000000, float(initial.get("minimum_amount", 1)))
-	row.add_child(minimum)
-	var maximum := _row_spin(1, 1000000, float(initial.get("maximum_amount", initial.get("minimum_amount", 1))))
-	row.add_child(maximum)
+	# The authored amount passes unchanged through preview and save to the host.
+	var amount := _row_spin(1, 1000000, float(initial.get("amount", 1)))
+	amount.tooltip_text = "Restore amount"
+	row.add_child(amount)
 	var remove := _remove_button(row)
 	row.add_child(remove)
 	row.set_meta("type", type)
 	row.set_meta("target", target)
-	row.set_meta("minimum", minimum)
-	row.set_meta("maximum", maximum)
+	row.set_meta("amount", amount)
 	_connect_row_controls(row)
 	_consumable_effects.add_child(row)
 	_clear_preview()
@@ -1695,8 +1694,7 @@ func _collect_consumable_effects() -> Array:
 				"effect_index": values.size(),
 				"effect_type": _selected_metadata(row.get_meta("type") as OptionButton),
 				"target_id": _selected_metadata(row.get_meta("target") as OptionButton),
-				"minimum_amount": int((row.get_meta("minimum") as SpinBox).value),
-				"maximum_amount": int((row.get_meta("maximum") as SpinBox).value),
+				"amount": int((row.get_meta("amount") as SpinBox).value),
 			})
 	return values
 
@@ -1776,7 +1774,7 @@ func _on_consumable_toggled(_value: bool) -> void:
 	if _is_loading:
 		return
 	if _value and _consumable_effects.get_child_count() == 0:
-		_add_consumable_effect_row({"effect_type": "restore_resource", "target_id": "health", "minimum_amount": 1, "maximum_amount": 1})
+		_add_consumable_effect_row({"effect_type": "restore_resource", "target_id": "health", "amount": 1})
 	_update_contextual_sections()
 	_on_form_changed()
 

@@ -55,6 +55,20 @@ class U2UnifiedItemAuthoringTests(unittest.TestCase):
         cleanup = cleanup.split("private static async Task ReplaceRequirementsAsync", 1)[0]
         self.assertNotIn('"item_tool_capabilities"', cleanup)
 
+    def test_restore_amount_is_the_only_normal_contract_and_persistence_magnitude(self) -> None:
+        contracts = (ROOT / "host/Contracts/ConsumableContracts.cs").read_text()
+        repository = (ROOT / "host/Persistence/UnifiedItemRepository.cs").read_text()
+        schema = (ROOT / "host/Features/Items/ItemSchemaRequirements.cs").read_text()
+        editor = (ROOT / "content-studio/scripts/item_editor.gd").read_text()
+        for source in (contracts, repository, schema, editor):
+            for retired in ("minimum_amount", "maximum_amount", "MinimumAmount", "MaximumAmount"):
+                self.assertNotIn(retired, source)
+        self.assertIn('JsonPropertyName("amount")', contracts)
+        self.assertIn("select effect_index, effect_type, target_id, amount", repository)
+        self.assertIn('command.Parameters.AddWithValue("amount", effect.Amount)', repository)
+        self.assertIn('Column("item_consumable_effects", "amount")', schema)
+        self.assertIn('"amount": int((row.get_meta("amount") as SpinBox).value)', editor)
+
     def test_unified_service_owns_signature_without_compatibility_adapters(self) -> None:
         service = (ROOT / "host" / "Services" / "UnifiedItemAuthoringService.cs").read_text()
         for token in (

@@ -66,7 +66,7 @@ class SchemaHealthProviderTests(unittest.TestCase):
                 "item_combat_profiles",
                 "item_tool_capabilities",
                 "item_definitions_runtime_disable_guard",
-                "item_consumable_effects_amount_range_check",
+                "item_consumable_effects_amount_check",
                 "item_consumable_profiles_result_publication_guard",
                 "equipment_slot_definitions",
                 "item_combat_profiles_attack_type_accuracy_style_check",

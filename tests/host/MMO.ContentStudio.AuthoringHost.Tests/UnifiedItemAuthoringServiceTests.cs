@@ -462,6 +462,64 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         AssertSemanticallyEqual(expected, UnifiedItemDomainRules.FromRecord(after));
     }
 
+    [Theory]
+    [InlineData(1, true)]
+    [InlineData(1000000, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    [InlineData(1000001, false)]
+    public async Task ConsumableAmountValidationUsesExistingMagnitudeLimit(int amount, bool valid)
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        var service = CreateService(repository);
+        var request = UnifiedSaveRequest(null) with
+        {
+            ConsumableBehavior = ConsumableDraft() with
+            {
+                Effects = [new ConsumableEffectDefinition(0, "restore_resource", "health", amount)]
+            }
+        };
+        var preview = await service.PreviewAsync(
+            ItemId, ToPreview(request, "save_draft"), TestContext.Current.CancellationToken);
+
+        AssertSucceeded(preview);
+        Assert.Equal(valid, preview.Value!.ValidForDraft);
+        Assert.Equal(!valid, preview.Value.Messages.Any(error => error.Code == "invalid_effect_amount"));
+    }
+
+    [Fact]
+    public async Task ConsumableAmountEditChangesPreviewAndRoundTrips()
+    {
+        var repository = new InMemoryUnifiedItemRepository();
+        repository.Put(CompleteRecord());
+        var service = CreateService(repository);
+        var before = repository.Records[ItemId];
+        var original = ToSaveRequest(before, before.UpdatedAtUtc);
+        var changed = original with
+        {
+            ConsumableBehavior = original.ConsumableBehavior! with
+            {
+                Effects = [new ConsumableEffectDefinition(0, "restore_resource", "health", 17)]
+            }
+        };
+        var initialPreview = await service.PreviewAsync(ItemId, ToPreview(original, "save_draft"), TestContext.Current.CancellationToken);
+        var changedPreview = await service.PreviewAsync(ItemId, ToPreview(changed, "save_draft"), TestContext.Current.CancellationToken);
+        AssertSucceeded(initialPreview);
+        AssertSucceeded(changedPreview);
+        Assert.NotEqual(initialPreview.Value!.PreviewSignature, changedPreview.Value!.PreviewSignature);
+        Assert.Contains(changedPreview.Value.Changes, change => change.Field == "consumable_behavior");
+
+        var saved = await service.SaveDraftAsync(ItemId,
+            changed with { PreviewSignature = changedPreview.Value.PreviewSignature }, TestContext.Current.CancellationToken);
+        AssertSucceeded(saved);
+        var loaded = await service.LoadAsync(ItemId, TestContext.Current.CancellationToken);
+        AssertSucceeded(loaded);
+        Assert.Equal(17, Assert.Single(loaded.Value!.ConsumableBehavior!.Effects).Amount);
+        Assert.Equal(before.WeaponProfile, repository.Records[ItemId].WeaponProfile);
+        Assert.Equal(UnifiedItemDomainRules.FromRecord(before).ToolCapabilities,
+            UnifiedItemDomainRules.FromRecord(repository.Records[ItemId]).ToolCapabilities);
+    }
+
     [Fact]
     public async Task HiddenInvalidSpecializationBlocksPublication()
     {
@@ -1331,7 +1389,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             null,
             null,
             [],
-            [new ConsumableEffectDefinition(0, "restore_resource", "health", 1, 3)]);
+            [new ConsumableEffectDefinition(0, "restore_resource", "health", 3)]);
 
     private static ItemEquipmentMetadataDraft EquipmentDraft() =>
         new(
@@ -1408,7 +1466,7 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             true,
             new ConsumableProfileDraft("eat", 1, null, "Restored.", false, 0, null, null),
             [],
-            consumableEffects ?? [new ConsumableEffectDefinition(0, "restore_resource", "health", 1, 3)],
+            consumableEffects ?? [new ConsumableEffectDefinition(0, "restore_resource", "health", 3)],
             [new EquipmentSkillRequirementDefinition("strength", "Strength", 3)],
             [new EquipmentSkillModifierDefinition("attack", "Attack", 1)],
             WeaponProfile(),

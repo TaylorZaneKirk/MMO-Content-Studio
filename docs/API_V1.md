@@ -133,6 +133,12 @@ Loads the complete aggregate: identity, icon, publication state, optional
 `weapon_profile`, optional equipment `equipped_visual`, independent
 `tool_capabilities`, and one `updated_at_utc` concurrency token.
 
+Each `consumable_behavior.effects` entry contains `effect_index`,
+`effect_type = restore_resource`, `target_id = health | concentration | special`,
+and one integer `amount` between 1 and 1,000,000. Definitions, drafts, and
+previews share this shape. Invalid magnitudes report `invalid_effect_amount`.
+These are authored values; MMO Project runtime consumption integration is pending.
+
 ### `POST /api/v1/items/{itemId}/preview`
 
 Validates the complete normalized draft for `save_draft`, `publish`, `disable`,

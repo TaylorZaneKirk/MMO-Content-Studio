@@ -37,7 +37,7 @@ The repository now contains:
 - environment, schema, and asset-root health checks
 - a searchable unified Items workspace backed by complete `/api/v1/items` aggregates
 - canonical item-PNG selection and import
-- declarative consumable profiles, ordered requirements, and ordered effects
+- declarative consumable profiles, ordered requirements, and ordered resource-restore effects with one deterministic `amount`
 - editable wearable slots, requirements, skill modifiers, and combat bonuses
 - backend/API and Godot UI support for unified item aggregates, weapon profiles, and tool capabilities
 - optional equipped-visual metadata inside unified equipment aggregates, including canonical actor-rig selectors, exact-pose socket/grip authoring, and per-pose grip anchors

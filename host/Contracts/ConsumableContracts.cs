@@ -8,12 +8,12 @@ public sealed record ConsumableRequirementDefinition(
     [property: JsonPropertyName("target_id")] string TargetId,
     [property: JsonPropertyName("minimum_value")] int MinimumValue);
 
+// Authored restoration is one fixed amount; gameplay applies it to the target resource.
 public sealed record ConsumableEffectDefinition(
     [property: JsonPropertyName("effect_index")] int EffectIndex,
     [property: JsonPropertyName("effect_type")] string EffectType,
     [property: JsonPropertyName("target_id")] string TargetId,
-    [property: JsonPropertyName("minimum_amount")] int MinimumAmount,
-    [property: JsonPropertyName("maximum_amount")] int MaximumAmount);
+    [property: JsonPropertyName("amount")] int Amount);
 
 public sealed record AuthoringOption(
     [property: JsonPropertyName("id")] string Id,

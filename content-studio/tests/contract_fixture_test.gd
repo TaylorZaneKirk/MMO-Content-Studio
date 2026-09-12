@@ -115,6 +115,7 @@ func _run_fixture() -> void:
 	await _verify_quest_definition_fields_expand(main_scene)
 	await _verify_quest_nullable_transition_round_trip(main_scene)
 	await _verify_item_editor_default_initialization(main_scene)
+	await _verify_consumable_amount(main_scene)
 	await _verify_item_editor_integral_economy_values(main_scene)
 	await _verify_existing_item_icon_preservation(main_scene)
 	await _verify_grip_anchor_payload_normalization(main_scene)
@@ -1260,6 +1261,38 @@ func _verify_item_editor_default_initialization(main_scene: PackedScene) -> void
 
 	scene.queue_free()
 	await process_frame
+
+
+func _verify_consumable_amount(main_scene: PackedScene) -> void:
+	var scene := main_scene.instantiate()
+	root.add_child(scene)
+	await process_frame
+	var items := scene.get_node("Margin/Root/Tabs/Items")
+	items._on_options_received(_available_rig_catalog())
+	items._start_new()
+	items._consumable_enabled.button_pressed = true
+	items._on_consumable_toggled(true)
+	var effects: Array = items._payload()["consumable_behavior"]["effects"]
+	if effects != [{"effect_index": 0, "effect_type": "restore_resource", "target_id": "health", "amount": 1}]:
+		_fail("A new consumable must send one deterministic default amount")
+		return
+	var behavior: Dictionary = items._payload()["consumable_behavior"]
+	behavior["effects"][0]["amount"] = 17
+	items._apply_consumable(behavior)
+	var row: HBoxContainer = items._consumable_effects.get_child(0)
+	var spin_count := 0
+	for control in row.get_children():
+		if control is SpinBox:
+			spin_count += 1
+	if spin_count != 1 or (row.get_meta("amount") as SpinBox).value != 17:
+		_fail("Loading a restore effect must populate exactly one amount control")
+		return
+	(row.get_meta("amount") as SpinBox).value = 23
+	effects = items._payload()["consumable_behavior"]["effects"]
+	if effects != [{"effect_index": 0, "effect_type": "restore_resource", "target_id": "health", "amount": 23}]:
+		_fail("The unified preview/save payload must preserve the edited amount")
+		return
+	scene.free()
 
 
 func _verify_item_editor_integral_economy_values(main_scene: PackedScene) -> void:
