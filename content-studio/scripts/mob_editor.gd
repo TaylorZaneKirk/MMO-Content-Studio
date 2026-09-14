@@ -191,6 +191,7 @@ var _attack_speed_units: SpinBox
 var _attack_interval: Label
 var _derived_combat_level: Label
 var _combat_level_diagnostics: Label
+var _combat_level_warnings: Label
 var _attack_level: SpinBox
 var _strength_level: SpinBox
 var _defence_level: SpinBox
@@ -472,6 +473,9 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_defence_level = _spin_field(grid, "Defence level", 1, 1000, 1, 1)
 	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
 	_combat_level_diagnostics = _value_label(grid, "Innate-bonus diagnostics", "Attack 1.0 / Strength 1.0 / Defence T 1.0, S 1.0, C 1.0")
+	parent.add_child(_wrapped_label("Combat level = max(1, floor((Defence + maximum Health) / 4 + 13 x (Attack + Strength) / 40)). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
+	_combat_level_warnings = _wrapped_label("")
+	parent.add_child(_combat_level_warnings)
 
 
 func _add_bonuses_section(parent: VBoxContainer) -> void:
@@ -1355,6 +1359,8 @@ func _on_visual_path_changed(_value: String) -> void:
 
 
 func _on_option_changed() -> void:
+	# Accuracy style selects the attack bonus used by the live diagnostics.
+	_update_derived_combat_level()
 	_on_form_changed()
 
 
@@ -1449,6 +1455,8 @@ func _update_derived_combat_level() -> void:
 		_derived_combat_level.text = "No primary combat profile"
 		if _combat_level_diagnostics != null:
 			_combat_level_diagnostics.text = "No primary combat profile"
+		if _combat_level_warnings != null:
+			_combat_level_warnings.text = ""
 		return
 	var attack := int(_attack_level.value) if _attack_level != null else 1
 	var strength := int(_strength_level.value) if _strength_level != null else 1
@@ -1484,6 +1492,27 @@ func _set_combat_level_diagnostics(diagnostics: Dictionary) -> void:
 		float(diagnostics.get("equivalent_defence_crush_level", 1.0)),
 		int(diagnostics.get("defence_crush_bonus", 0)),
 	]
+	_update_combat_level_warnings(diagnostics)
+
+
+func _update_combat_level_warnings(diagnostics: Dictionary) -> void:
+	if _combat_level_warnings == null:
+		return
+	# These advisories explain known bonus effects, without inventing an encounter
+	# difficulty threshold. Both host previews and unsaved edits use this same path.
+	var warnings: PackedStringArray = []
+	if int(diagnostics.get("selected_attack_bonus", 0)) > 0:
+		warnings.append("Warning: the selected attack bonus raises accuracy above the base Attack level represented by combat level.")
+	if int(diagnostics.get("strength_bonus", 0)) > 0:
+		warnings.append("Warning: the melee strength bonus raises damage potential above the base Strength level represented by combat level.")
+	var thrust := int(diagnostics.get("defence_thrust_bonus", 0))
+	var slash := int(diagnostics.get("defence_slash_bonus", 0))
+	var crush := int(diagnostics.get("defence_crush_bonus", 0))
+	if thrust > 0 or slash > 0 or crush > 0:
+		warnings.append("Warning: positive defence bonuses increase resistance to their styles without increasing combat level.")
+	if thrust != slash or slash != crush:
+		warnings.append("Warning: defence bonuses differ by style; compare the equivalent levels above before judging the matchup.")
+	_combat_level_warnings.text = "\n".join(warnings)
 
 
 func _local_combat_level_diagnostics(attack: int, strength: int, defence: int) -> Dictionary:
