@@ -1,3 +1,4 @@
+// Composes the supported authoring features into the existing host and route tree.
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Features.ActorAppearance;
 using MMO.ContentStudio.AuthoringHost.Features.Dialogues;
@@ -7,6 +8,7 @@ using MMO.ContentStudio.AuthoringHost.Features.Mobs;
 using MMO.ContentStudio.AuthoringHost.Features.Npcs;
 using MMO.ContentStudio.AuthoringHost.Features.Quests;
 using MMO.ContentStudio.AuthoringHost.Services;
+using MMO.ContentStudio.AuthoringHost.Features.WorldObjects;
 
 namespace MMO.ContentStudio.AuthoringHost.Features;
 
@@ -19,6 +21,7 @@ public static class AuthoringFeatureExtensions
         services.AddLootTableAuthoring();
         services.AddMobAuthoring();
         services.AddNpcAuthoring();
+        services.AddWorldObjectAuthoring();
         services.AddDialogueAuthoring();
         services.AddQuestAuthoring();
         services.AddSingleton<IRuntimeCatalogPublisher, RuntimeCatalogPublisherService>();
@@ -33,6 +36,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapLootTableAuthoring();
         endpoints.MapMobAuthoring();
         endpoints.MapNpcAuthoring();
+        endpoints.MapWorldObjectAuthoring();
         endpoints.MapDialogueAuthoring();
         endpoints.MapQuestAuthoring();
         return endpoints;

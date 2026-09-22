@@ -28,6 +28,22 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
+## World Objects M0
+
+The **World Objects** tab authors reusable definitions through `/api/v1/world-objects`:
+search/load, ordered interactions and animation frames, preview, Save Draft,
+Publish, Disable and Delete. Mutations use preview signatures, aggregate versions,
+transactional child replacement and reload verification. Tiled retains placements.
+
+Apply MMO Project migrations 061 and 062 (mirrored under `integrations/`), then
+start Studio normally. The seed preserves the 13 existing shared runtime definitions.
+Publication changes refresh `export-world-object-catalog` through the existing
+runtime catalog publisher; failures return a warning/manual command. The command
+also participates in `export-runtime-catalogs`. Do not hand-edit the production
+World Object catalog. Regenerate maps, package and restart the game after changes.
+Mining mechanics, rocks, tools, XP, depletion/respawn and placement editing remain
+outside M0. Older interactable-object design documents are future context only.
+
 ## Current state: D5 Dialogue Runtime Verification
 
 The repository now contains:
