@@ -5,6 +5,8 @@ const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
 @onready var connection_badge: Label = %ConnectionBadge
 @onready var connection_message: Label = %ConnectionMessage
 @onready var retry_button: Button = %RetryButton
+@onready var refresh_button: Button = %RefreshButton
+@onready var refresh_confirmation: ConfirmationDialog = %RefreshConfirmation
 @onready var host_value: Label = %HostValue
 @onready var api_value: Label = %ApiValue
 @onready var database_value: Label = %DatabaseValue
@@ -34,8 +36,28 @@ func _ready() -> void:
 	mob_editor.item_grip_handoff_requested.connect(_on_item_grip_handoff_requested)
 	dialogue_editor.workspace_open_requested.connect(_on_workspace_open_requested)
 	retry_button.pressed.connect(authoring_host_client.retry)
+	refresh_button.pressed.connect(_on_refresh_pressed)
+	refresh_confirmation.confirmed.connect(_on_refresh_confirmed)
 	CONTENT_STUDIO_LOGGER.info("Content Studio startup requested")
 	authoring_host_client.connect_and_load()
+
+
+func _on_refresh_pressed() -> void:
+	if authoring_host_client.is_busy():
+		connection_message.text = "Wait for the current request to finish before refreshing."
+		return
+	refresh_confirmation.popup_centered()
+
+
+func _on_refresh_confirmed() -> void:
+	# Reuse startup so every workspace reloads its own options and asset lists.
+	# Do not interrupt a save/publication that began while the dialog was open.
+	if authoring_host_client.is_busy():
+		connection_message.text = "Wait for the current request to finish before refreshing."
+		return
+	var error := get_tree().reload_current_scene()
+	if error != OK:
+		connection_message.text = "Unable to refresh Studio (error %s)." % error
 
 
 func _on_connection_state_changed(state: String, message: String) -> void:

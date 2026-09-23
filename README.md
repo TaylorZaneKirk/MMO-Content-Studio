@@ -28,6 +28,14 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
+## Refreshing assets
+
+Use **Refresh** in the top header after adding assets to the configured folders.
+Confirm to reload Studio through its ordinary startup flow, fetching current
+asset lists and workspace options without restarting the host. Save edits first:
+refresh discards unsaved workspace changes. Refresh is blocked while host requests
+are running so it cannot interrupt an in-flight save or publication.
+
 ## Editing published items
 
 Save as Draft and Disable may unpublish an item that already exists in inventory,

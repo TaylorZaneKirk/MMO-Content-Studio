@@ -145,6 +145,9 @@ func _ready() -> void:
 	_transport.request_failed.connect(_on_request_failed)
 	add_child(_transport)
 
+func is_busy() -> bool:
+	return _transport.is_busy() or not _startup_operations.is_empty()
+
 func connect_and_load() -> void:
 	if _transport.is_busy():
 		return
