@@ -428,6 +428,12 @@ public sealed class UnifiedItemAuthoringService
         }
         if (operation == "delete")
         {
+            // Draft/Disable retain the definition and existing possessions.
+            // Deletion must still protect rows that reference that identity.
+            if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+            {
+                messages.Add(LiveReferenceError(itemId));
+            }
             await AddDisableReferenceErrorsAsync(itemId, messages, cancellationToken);
         }
         if (operation == "delete" && existing?.RuntimeEnabled == true)
@@ -441,10 +447,6 @@ public sealed class UnifiedItemAuthoringService
         ICollection<ApiError> messages,
         CancellationToken cancellationToken)
     {
-        if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
-        {
-            messages.Add(LiveReferenceError(itemId));
-        }
         if (await _repository.HasPendingDialogueSettlementReferencesAsync(itemId, cancellationToken))
         {
             messages.Add(PendingDialogueSettlementReferenceError(itemId));

@@ -28,6 +28,16 @@ NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
 
+## Editing published items
+
+Save as Draft and Disable may unpublish an item that already exists in inventory,
+equipment or ground-item rows. Existing possessions retain their item identity;
+live references still block deletion. Published-content dependencies and frozen
+settlement guards remain in force. Apply migration
+`064_allow_draft_items_with_live_possessions.sql` from the MMO Project SQL directory
+(or its integration mirror) for this behavior. Draft still means runtime-disabled:
+finish editing and publish again before restarting the game with that content.
+
 ## World Objects M0
 
 The **World Objects** tab authors reusable definitions through `/api/v1/world-objects`:
