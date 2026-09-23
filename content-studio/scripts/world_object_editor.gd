@@ -3,6 +3,8 @@
 extends HBoxContainer
 class_name WorldObjectEditor
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const WORKSPACE_SUPPORT := preload("res://scripts/authoring_workspace_support.gd")
 const NUMBER_FIELDS := [
 	["footprint_width_tiles", "Footprint width", 1, 1024, 1],
@@ -28,6 +30,8 @@ var _actions: VBoxContainer
 var _frames: VBoxContainer
 var _changes: VBoxContainer
 var _validation: VBoxContainer
+var _operation: OptionButton
+var _preview: Button
 var _apply: Button
 var _status: Label
 var _visual: TextureRect
@@ -54,43 +58,71 @@ func _ready() -> void:
 
 
 func _build_ui() -> void:
-	var catalog := VBoxContainer.new()
-	catalog.custom_minimum_size.x = 250
-	add_child(catalog)
+	theme = STUDIO_THEME.item_theme()
+	add_theme_constant_override("separation", 14)
+	var catalog := _panel(240)
+	_heading(catalog, "Object library", 20)
 	_search = LineEdit.new()
-	_search.placeholder_text = "Search World Objects"
+	_search.placeholder_text = "Search objects…"
 	catalog.add_child(_search)
 	_search.text_submitted.connect(func(value: String): _client.load_world_objects(value))
-	_button(catalog, "Search / Refresh", func(): _client.load_world_objects(_search.text))
-	_button(catalog, "New", _new_definition)
+	_button(catalog, "+ New object", _new_definition)
+	_button(catalog, "Search / reload library", func(): _client.load_world_objects(_search.text))
 	_list = ItemList.new()
 	_list.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_list.add_theme_color_override("font_color", Color("e5edf5"))
+	_list.add_theme_stylebox_override("panel", STUDIO_THEME.box("101923", "354355"))
+	_list.add_theme_stylebox_override("selected", STUDIO_THEME.box("29443f", "66d9c1"))
+	_list.add_theme_stylebox_override("selected_focus", STUDIO_THEME.box("29443f", "66d9c1"))
+	_list.add_theme_constant_override("v_separation", 12)
 	catalog.add_child(_list)
 	_list.item_selected.connect(func(index: int):
 		_invalidate()
 		_client.load_world_object(str(_list.get_item_metadata(index))))
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	add_child(scroll)
+
+	var editor := _panel()
+	editor.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_heading(editor, "Object details", 22)
+	_note(editor, "Author a reusable object here. Place it in Tiled.")
 	_form = VBoxContainer.new()
-	_form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(_form)
-	_label(_form, "Reusable definitions only. Place objects in Tiled.")
-	_definition_id = _text_field("Definition ID", _form)
-	_state = _label(_form, "Draft")
-	_fields["display_name"] = _text_field("Display name", _form)
+	_form.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	editor.add_child(_form)
+	var pages := TabContainer.new()
+	pages.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pages.use_hidden_tabs_for_min_size = false
+	_form.add_child(pages)
+	var basics := _page(pages, "Basics", "Identity & footprint", "Name the object and define the space it occupies in the world.")
+	var appearance := _page(pages, "Appearance", "Artwork & alignment", "Choose the texture, source dimensions and placement offsets.")
+	var interactions := _page(pages, "Interactions", "Player actions", "Top to bottom is menu order. Mark the action used by default.")
+	var animation := _page(pages, "Animation", "Frames & playback", "Frames play from top to bottom. Leave the list empty to use the main texture.")
+	_definition_id = _text_field("Definition ID", basics)
+	_definition_id.placeholder_text = "copper_rock"
+	_state = _label(basics, "Draft")
+	_state.modulate = Color("91ecd7")
+	_fields["display_name"] = _text_field("Display name", basics)
 	var blocks := CheckBox.new()
 	blocks.text = "Blocks movement"
-	_form.add_child(blocks)
+	basics.add_child(blocks)
 	blocks.toggled.connect(_invalidate)
 	_fields["blocks_movement"] = blocks
-	_fields["visual_texture_path"] = _text_field("Texture path", _form)
-	var grid := GridContainer.new()
-	grid.columns = 2
-	_form.add_child(grid)
+	_fields["visual_texture_path"] = _text_field("Texture path", appearance)
+	_fields["visual_texture_path"].placeholder_text = "res://assets/maps/objects/world_objects/…png"
+	var grids := {}
+	for page: VBoxContainer in [basics, appearance, animation]:
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 16)
+		grid.add_theme_constant_override("v_separation", 12)
+		page.add_child(grid)
+		grids[page] = grid
 	for spec: Array in NUMBER_FIELDS:
-		_label(grid, str(spec[1]))
+		var page := appearance
+		if str(spec[0]).begins_with("footprint_"): page = basics
+		elif spec[0] == "visual_animation_fps": page = animation
+		var grid: GridContainer = grids[page]
+		_label(grid, str(spec[1])).autowrap_mode = TextServer.AUTOWRAP_OFF
 		var number := SpinBox.new()
+		number.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		number.min_value = float(spec[2])
 		number.max_value = float(spec[3])
 		number.step = float(spec[4])
@@ -99,37 +131,94 @@ func _build_ui() -> void:
 		grid.add_child(number)
 		number.value_changed.connect(_invalidate)
 		_fields[str(spec[0])] = number
-	_label(_form, "Public interactions (top to bottom is menu order)")
 	_actions = VBoxContainer.new()
-	_form.add_child(_actions)
-	_button(_form, "Add interaction", func(): _add_action({}); _invalidate())
-	_label(_form, "Animation frames (top to bottom is playback order)")
+	_actions.add_theme_constant_override("separation", 12)
+	interactions.add_child(_actions)
+	_button(interactions, "+ Add interaction", func(): _add_action({}); _invalidate())
 	_frames = VBoxContainer.new()
-	_form.add_child(_frames)
-	_button(_form, "Add frame", func(): _add_frame(""); _invalidate())
-	_button(_form, "Refresh visual preview", _refresh_visual)
+	_frames.add_theme_constant_override("separation", 12)
+	animation.add_child(_frames)
+	_button(animation, "+ Add frame", func(): _add_frame(""); _invalidate())
+
+	var review := _panel(264)
+	_heading(review, "Review & apply", 20)
 	_visual = TextureRect.new()
-	_visual.custom_minimum_size = Vector2(240, 160)
+	_visual.custom_minimum_size = Vector2(0, 120)
 	_visual.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_visual.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_form.add_child(_visual)
-	var operations := HBoxContainer.new()
-	_form.add_child(operations)
-	_button(operations, "Validate / Preview", func(): _request_preview("save_draft"))
+	review.add_child(_visual)
+	_button(review, "Refresh visual preview", _refresh_visual)
+	_label(review, "Operation")
+	_operation = OptionButton.new()
 	for operation: String in ["save_draft", "publish", "disable", "delete"]:
-		_button(operations, _support.operation_name(operation), _request_preview.bind(operation))
-	_apply = _button(_form, "Apply Previewed Operation", _apply_preview)
+		_operation.add_item(_support.operation_name(operation))
+		_operation.set_item_metadata(_operation.item_count - 1, operation)
+	_operation.item_selected.connect(_invalidate)
+	review.add_child(_operation)
+	_preview = _button(review, "1. Preview changes", func(): _request_preview(str(_operation.get_selected_metadata())))
+	_preview.theme_type_variation = "PrimaryButton"
+	_preview.disabled = true
+	_apply = _button(review, "2. Apply changes", _apply_preview)
 	_apply.disabled = true
-	_status = _label(_form, "Select a definition or create a draft.")
-	_changes = VBoxContainer.new()
-	_form.add_child(_changes)
+	_status = _label(review, "Select an object or create a draft to begin.")
+	_status.modulate = Color("a9b8c9")
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	review.add_child(scroll)
+	var feedback := VBoxContainer.new()
+	feedback.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	feedback.add_theme_constant_override("separation", 12)
+	scroll.add_child(feedback)
+	_heading(feedback, "Validation", 16)
 	_validation = VBoxContainer.new()
-	_form.add_child(_validation)
+	feedback.add_child(_validation)
+	_heading(feedback, "Changes", 16)
+	_changes = VBoxContainer.new()
+	feedback.add_child(_changes)
+
+
+func _panel(width: float = 0) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = width
+	var style := STUDIO_THEME.box("17212e", "354355")
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 14
+	style.content_margin_bottom = 14
+	panel.add_theme_stylebox_override("panel", style)
+	add_child(panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	panel.add_child(content)
+	return content
+
+
+func _heading(parent: Node, value: String, size: int) -> void:
+	_label(parent, value).add_theme_font_size_override("font_size", size)
+
+
+func _note(parent: Node, value: String) -> void:
+	_label(parent, value).modulate = Color("a9b8c9")
+
+
+func _page(pages: TabContainer, title: String, heading: String, description: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	pages.add_child(scroll)
+	var page := VBoxContainer.new()
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page.add_theme_constant_override("separation", 12)
+	scroll.add_child(page)
+	_heading(page, heading, 20)
+	_note(page, description)
+	return page
 
 
 func _label(parent: Node, value: String) -> Label:
 	var label := Label.new()
 	label.text = value
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	parent.add_child(label)
 	return label
 
@@ -162,11 +251,13 @@ func _add_action(value: Dictionary) -> void:
 	var row := HBoxContainer.new()
 	_actions.add_child(row)
 	var action := LineEdit.new()
+	action.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	action.placeholder_text = "action_id"
 	action.text = str(value.get("action_id", ""))
 	row.add_child(action)
 	action.text_changed.connect(_invalidate)
 	var label := LineEdit.new()
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	label.placeholder_text = "Label"
 	label.text = str(value.get("label", ""))
 	row.add_child(label)
@@ -202,8 +293,10 @@ func _on_options(payload: Dictionary) -> void:
 func _on_catalog(payload: Dictionary) -> void:
 	_list.clear()
 	for item: Dictionary in payload.get("items", []):
-		var index := _list.add_item("%s [%s]" % [item["display_name"], item["publication_state"]])
+		var index := _list.add_item(str(item["display_name"]))
 		_list.set_item_metadata(index, item["definition_id"])
+		_list.set_item_tooltip(index, "%s\n%s" % [item["definition_id"], item["publication_state"]])
+		if item["definition_id"] == _current.get("definition_id", ""): _list.select(index)
 
 
 func _new_definition() -> void:
@@ -214,6 +307,9 @@ func _new_definition() -> void:
 func _on_definition(payload: Dictionary) -> void:
 	_loading = true
 	_current = payload
+	_list.deselect_all()
+	for index in _list.item_count:
+		if _list.get_item_metadata(index) == payload.get("definition_id", ""): _list.select(index)
 	_definition_id.text = str(payload.get("definition_id", ""))
 	_definition_id.editable = payload.get("updated_at_utc") == null
 	_state.text = str(payload.get("publication_state", "Draft"))
@@ -229,6 +325,8 @@ func _on_definition(payload: Dictionary) -> void:
 	for path: String in draft.get("visual_animation_frames", []): _add_frame(path)
 	_loading = false
 	_form.visible = true
+	_preview.disabled = false
+	_status.text = "Editing %s." % payload.get("definition_id", "") if not str(payload.get("definition_id", "")).is_empty() else "New draft. Choose a stable definition ID."
 	_invalidate()
 	_refresh_visual()
 
@@ -266,7 +364,7 @@ func _on_preview(payload: Dictionary) -> void:
 	_support.render_changes(_changes, payload.get("changes", []))
 	_support.render_validation(_validation, payload.get("messages", []))
 	var operation := str(payload.get("target_operation", ""))
-	_support.accept_preview(operation, str(payload.get("preview_signature", "")), bool(payload.get("applicable", false)), _apply, "Apply: " + _support.operation_name(operation))
+	_support.accept_preview(operation, str(payload.get("preview_signature", "")), bool(payload.get("applicable", false)), _apply, "2. Apply " + _support.operation_name(operation))
 
 
 func _apply_preview() -> void:
@@ -298,7 +396,7 @@ func _on_failed(operation: String, message: String, errors: Array) -> void:
 func _invalidate(_value: Variant = null) -> void:
 	if _loading or _apply == null: return
 	_preview_request = {}
-	_support.clear_preview(_apply, _changes, _validation)
+	_support.clear_preview(_apply, _changes, _validation, "2. Apply changes")
 
 
 # Preview uses the normal game asset root and Godot image loading; no asset import.
