@@ -24,6 +24,10 @@ const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
 var _observed_controls: Dictionary = {}
 
 
+func _enter_tree() -> void:
+	theme = preload("res://scripts/studio_theme.gd").checkbox_theme()
+
+
 func _ready() -> void:
 	get_tree().node_added.connect(_on_tree_node_added)
 	_observe_descendant_controls(self)

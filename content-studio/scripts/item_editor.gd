@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name UnifiedItemEditor
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
@@ -187,17 +189,18 @@ func stage_grip_anchor_handoff(item_id: String, grip_anchors: Dictionary) -> voi
 
 
 func _build_ui() -> void:
+	theme = STUDIO_THEME.item_theme()
 	add_theme_constant_override("separation", 14)
 
 	var catalog_panel := _panel()
-	catalog_panel.custom_minimum_size = Vector2(310, 0)
+	catalog_panel.custom_minimum_size = Vector2(240, 0)
 	add_child(catalog_panel)
 	var catalog := VBoxContainer.new()
 	catalog.add_theme_constant_override("separation", 10)
 	catalog_panel.add_child(catalog)
-	catalog.add_child(_heading("Items", 20))
+	catalog.add_child(_heading("Item library", 20))
 	_search = LineEdit.new()
-	_search.placeholder_text = "Search item ID, name, or classification"
+	_search.placeholder_text = "Search items…"
 	_search.text_changed.connect(_on_search_changed.unbind(1))
 	catalog.add_child(_search)
 	var new_button := Button.new()
@@ -205,11 +208,12 @@ func _build_ui() -> void:
 	new_button.pressed.connect(_start_new)
 	catalog.add_child(new_button)
 	var refresh := Button.new()
-	refresh.text = "Refresh"
+	refresh.text = "Reload library"
 	refresh.pressed.connect(_refresh_catalog)
 	catalog.add_child(refresh)
 	var catalog_scroll := ScrollContainer.new()
 	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog.add_child(catalog_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -220,15 +224,25 @@ func _build_ui() -> void:
 	var editor_panel := _panel()
 	editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(editor_panel)
-	var editor_scroll := ScrollContainer.new()
-	editor_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	editor_panel.add_child(editor_scroll)
-	var editor := VBoxContainer.new()
-	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	editor.add_theme_constant_override("separation", 12)
-	editor_scroll.add_child(editor)
-	editor.add_child(_heading("Complete Item Definition", 20))
+	var editor_shell := VBoxContainer.new()
+	editor_shell.add_theme_constant_override("separation", 16)
+	editor_panel.add_child(editor_shell)
+	editor_shell.add_child(_heading("Item details", 22))
+	var guidance := Label.new()
+	guidance.text = "Edit a section, preview your changes, then apply."
+	guidance.modulate = Color("a9b8c9")
+	editor_shell.add_child(guidance)
+	var pages := TabContainer.new()
+	pages.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pages.use_hidden_tabs_for_min_size = false
+	editor_shell.add_child(pages)
+	var basics_page := _editor_page(pages, "Basics", "Identity & inventory", "The name and icon players see in the game.")
+	var equipment_page := _editor_page(pages, "Equipment", "Equipment rules", "Choose a slot, requirements and combat properties.")
+	var appearance_page := _editor_page(pages, "Appearance", "Equipped appearance", "Enable equipability in Equipment, then align the held or worn artwork here.")
+	var consumable_page := _editor_page(pages, "Consumable", "Use & consume", "Configure what happens when this item is used.")
+	var economy_page := _editor_page(pages, "Economy", "Value & lifecycle", "Set trade, death and shop behavior.")
+	var tools_page := _editor_page(pages, "Tools", "Tool metadata", "Author capability metadata. Gameplay support is defined by each skill.")
+	var editor := basics_page
 
 	var identity_grid := _section_grid(editor, "Identity and Inventory")
 	_item_id = _add_line_field(identity_grid, "Stable item ID", "iron_ore")
@@ -238,6 +252,8 @@ func _build_ui() -> void:
 	icon_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	identity_grid.add_child(icon_row)
 	_icon = OptionButton.new()
+	_icon.fit_to_longest_item = false
+	_icon.clip_text = true
 	_icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_icon.item_selected.connect(_on_form_changed.unbind(1))
 	icon_row.add_child(_icon)
@@ -250,6 +266,7 @@ func _build_ui() -> void:
 	_kind = _add_value_field(identity_grid, "Authoring kind", "Unknown")
 	_updated = _add_value_field(identity_grid, "Last updated", "Unknown")
 
+	editor = consumable_page
 	var consumable_grid := _section_grid(editor, "Consumable Behavior")
 	consumable_grid.add_child(_field_label("Consumable"))
 	_consumable_enabled = CheckBox.new()
@@ -275,6 +292,7 @@ func _build_ui() -> void:
 	_consumable_effects = _rows()
 	editor.add_child(_consumable_effects)
 
+	editor = economy_page
 	var economy_grid := _section_grid(editor, "Economy and Lifecycle")
 	_reference_value = _add_line_field(economy_grid, "Reference value", "0")
 	_trade_policy = _add_option_field(economy_grid, "Trade policy")
@@ -295,6 +313,7 @@ func _build_ui() -> void:
 	economy_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	economy_grid.add_child(economy_note)
 
+	editor = equipment_page
 	var equip_grid := _section_grid(editor, "Equipability")
 	equip_grid.add_child(_field_label("Equipable"))
 	_equipable = CheckBox.new()
@@ -310,17 +329,18 @@ func _build_ui() -> void:
 	_equip_note.text = "Disabling equipability removes equipment requirements, modifiers, combat bonuses, and weapon profile. Tool capabilities and consumable behavior remain."
 	editor.add_child(_equip_note)
 
+	editor = appearance_page
 	_appearance_section = VBoxContainer.new()
 	_appearance_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_appearance_section)
 	_appearance_section.add_child(_heading("Equipped Appearance", 16))
-	var doll_row := HBoxContainer.new()
+	var doll_row := VBoxContainer.new()
 	doll_row.add_theme_constant_override("separation", 16)
 	_appearance_section.add_child(doll_row)
 	var doll_panel := PanelContainer.new()
 	var doll_style := StyleBoxFlat.new()
 	doll_style.bg_color = Color(0.045, 0.052, 0.066, 1)
-	doll_style.border_color = Color(0.19, 0.22, 0.28, 1)
+	doll_style.border_color = Color("354355")
 	doll_style.set_border_width_all(1)
 	doll_style.set_corner_radius_all(6)
 	doll_panel.add_theme_stylebox_override("panel", doll_style)
@@ -479,6 +499,7 @@ func _build_ui() -> void:
 	doll_controls.add_child(_paper_doll_status)
 	_paper_doll_preview.bind(_paper_doll_stage, _paper_doll_status)
 
+	editor = equipment_page
 	_requirements_section = VBoxContainer.new()
 	_requirements_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_requirements_section)
@@ -519,6 +540,7 @@ func _build_ui() -> void:
 	_weapon_speed_units = _add_spin_field(weapon_grid, "Attack speed units", 1, 60, 1)
 	_weapon_timing = _add_value_field(weapon_grid, "Attack interval", "4 attack units x 600 ms = 2400 ms")
 
+	editor = tools_page
 	_tool_section = VBoxContainer.new()
 	_tool_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_tool_section)
@@ -532,18 +554,15 @@ func _build_ui() -> void:
 	_tool_section.add_child(_tool_rows)
 
 	var preview_panel := _panel()
-	preview_panel.custom_minimum_size = Vector2(330, 0)
+	preview_panel.custom_minimum_size = Vector2(264, 0)
 	add_child(preview_panel)
-	var preview_scroll := ScrollContainer.new()
-	preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview_panel.add_child(preview_scroll)
 	var preview := VBoxContainer.new()
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview.add_theme_constant_override("separation", 10)
-	preview_scroll.add_child(preview)
-	preview.add_child(_heading("Preview", 20))
+	preview_panel.add_child(preview)
+	preview.add_child(_heading("Review & apply", 20))
 	_icon_preview = TextureRect.new()
-	_icon_preview.custom_minimum_size = Vector2(160, 160)
+	_icon_preview.custom_minimum_size = Vector2(80, 80)
 	_icon_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_icon_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	preview.add_child(_icon_preview)
@@ -555,7 +574,8 @@ func _build_ui() -> void:
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
 	preview.add_child(_operation)
 	_preview_button = Button.new()
-	_preview_button.text = "Validate and Preview Changes"
+	_preview_button.text = "1. Preview changes"
+	_preview_button.theme_type_variation = "PrimaryButton"
 	_preview_button.pressed.connect(_preview)
 	preview.add_child(_preview_button)
 	_delete_button = Button.new()
@@ -564,7 +584,7 @@ func _build_ui() -> void:
 	_delete_button.pressed.connect(_preview_delete)
 	preview.add_child(_delete_button)
 	_apply_button = Button.new()
-	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
 	preview.add_child(_apply_button)
@@ -573,12 +593,20 @@ func _build_ui() -> void:
 	_status.modulate = Color(0.7, 0.73, 0.79, 1)
 	_status.text = "Select an item or create a new one."
 	preview.add_child(_status)
-	preview.add_child(_heading("Exact Logical Changes", 16))
-	_changes = VBoxContainer.new()
-	preview.add_child(_changes)
-	preview.add_child(_heading("Validation", 16))
+	var review_scroll := ScrollContainer.new()
+	review_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	review_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	preview.add_child(review_scroll)
+	var review := VBoxContainer.new()
+	review.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	review.add_theme_constant_override("separation", 12)
+	review_scroll.add_child(review)
+	review.add_child(_heading("Validation", 16))
 	_validation = VBoxContainer.new()
-	preview.add_child(_validation)
+	review.add_child(_validation)
+	review.add_child(_heading("Changes", 16))
+	_changes = VBoxContainer.new()
+	review.add_child(_changes)
 
 	_file_dialog = FileDialog.new()
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
@@ -654,6 +682,7 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_reload_item_id = ""
 	_cancel_paper_doll_drag()
 	_current_item = payload.duplicate(true)
+	_rebuild_list()
 	_item_id.text = str(payload.get("item_id", ""))
 	_item_id.editable = false
 	_display_name.text = str(payload.get("display_name", ""))
@@ -705,7 +734,7 @@ func _on_preview_received(payload: Dictionary) -> void:
 		str(payload.get("preview_signature", "")),
 		applicable,
 		_apply_button,
-		"Apply %s" % _workspace_support.operation_name(operation)
+		"2. Apply %s" % _workspace_support.operation_name(operation)
 	)
 	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
 	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
@@ -767,13 +796,16 @@ func _rebuild_list() -> void:
 			continue
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s\n%s | %s | %s" % [
+		button.clip_text = true
+		button.custom_minimum_size.y = 60
+		button.text = "%s\n%s · %s" % [
 			str(item.get("display_name", "Unnamed item")),
-			str(item.get("item_id", "")),
 			str(item.get("publication_state", "Unknown")),
 			str(item.get("classification_label", item.get("authoring_kind", "Unknown"))),
 		]
-		button.tooltip_text = str(item.get("updated_at_utc", ""))
+		button.tooltip_text = "%s\n%s" % [item.get("item_id", ""), item.get("updated_at_utc", "")]
+		button.toggle_mode = true
+		button.button_pressed = item.get("item_id", "") == _current_item.get("item_id", "")
 		button.pressed.connect(_client.load_item_definition.bind(str(item.get("item_id", ""))))
 		_list.add_child(button)
 
@@ -784,6 +816,7 @@ func _start_new() -> void:
 	_reload_item_id = ""
 	_cancel_paper_doll_drag()
 	_current_item = {}
+	_rebuild_list()
 	_has_persisted_equipped_visual = false
 	_appearance_defaults_initialized = false
 	_item_id.text = ""
@@ -2072,10 +2105,27 @@ func _import_selected(path: String) -> void:
 	_status.text = "Importing PNG into the canonical item asset directory..."
 
 
+func _editor_page(pages: TabContainer, title: String, heading: String, description: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	pages.add_child(scroll)
+	var page := VBoxContainer.new()
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page.add_theme_constant_override("separation", 18)
+	scroll.add_child(page)
+	page.add_child(_heading(heading, 20))
+	var note := Label.new()
+	note.text = description
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.modulate = Color("a9b8c9")
+	page.add_child(note)
+	return page
+
+
 func _panel() -> PanelContainer:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.086, 0.098, 0.122, 1)
+	style.bg_color = Color("17212e")
 	style.border_color = Color(0.19, 0.22, 0.28, 1)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(8)
@@ -2113,6 +2163,8 @@ func _section_grid(parent: Node, title: String) -> GridContainer:
 	parent.add_child(_heading(title, 16))
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 12)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(grid)
 	return grid
@@ -2309,7 +2361,7 @@ func _has_error_code(errors: Array, code: String) -> bool:
 
 
 func _clear_preview() -> void:
-	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+	_workspace_support.clear_preview(_apply_button, _changes, _validation, "2. Apply changes")
 
 
 func _initialize_authored_appearance_defaults() -> void:
