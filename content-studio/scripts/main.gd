@@ -25,10 +25,11 @@ var _observed_controls: Dictionary = {}
 
 
 func _enter_tree() -> void:
-	theme = preload("res://scripts/studio_theme.gd").checkbox_theme()
+	theme = preload("res://scripts/studio_theme.gd").item_theme()
 
 
 func _ready() -> void:
+	_style_environment()
 	get_tree().node_added.connect(_on_tree_node_added)
 	_observe_descendant_controls(self)
 	authoring_host_client.connection_state_changed.connect(_on_connection_state_changed)
@@ -296,3 +297,18 @@ func _preceding_label(control: Control) -> String:
 			return ""
 		index -= 1
 	return ""
+
+
+func _style_environment() -> void:
+	# Keep the existing diagnostic controls; give long paths and health output room.
+	var environment := tabs.get_node("Environment")
+	for panel: PanelContainer in environment.get_children():
+		panel.add_theme_stylebox_override("panel", preload("res://scripts/studio_theme.gd").box("17212e", "354355"))
+		var content := panel.get_child(0)
+		var scroll := ScrollContainer.new()
+		scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		panel.add_child(scroll)
+		content.reparent(scroll)
+		content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		for child in content.get_children():
+			if child is Label: child.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

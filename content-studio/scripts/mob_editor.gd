@@ -3,6 +3,8 @@ class_name MobEditor
 
 signal item_grip_handoff_requested(item_id: String, grip_anchors: Dictionary)
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
@@ -249,7 +251,7 @@ func _connect_client() -> void:
 func _build_ui() -> void:
 	add_theme_constant_override("separation", 14)
 
-	var catalog_panel := _panel(Vector2(310, 0))
+	var catalog_panel := _panel(Vector2(240, 0))
 	add_child(catalog_panel)
 	var catalog_content := _vbox(catalog_panel)
 	_add_heading(catalog_content, "Mobs", 20)
@@ -263,6 +265,7 @@ func _build_ui() -> void:
 	catalog_content.add_child(_new_button)
 	var catalog_scroll := ScrollContainer.new()
 	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog_content.add_child(catalog_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -270,41 +273,38 @@ func _build_ui() -> void:
 	catalog_scroll.add_child(_list)
 	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
-	var form_panel := _panel(Vector2(520, 0))
+	var form_panel := _panel(Vector2(0, 0))
 	form_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(form_panel)
-	var form_scroll := ScrollContainer.new()
-	form_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	form_panel.add_child(form_scroll)
-	var form := VBoxContainer.new()
-	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form.add_theme_constant_override("separation", 12)
-	form_scroll.add_child(form)
-	_add_identity_section(form)
-	_add_visual_section(form)
-	_add_stats_section(form)
-	_add_behavior_section(form)
-	_add_faction_section(form)
-	_add_attack_section(form)
-	_add_bonuses_section(form)
-	_add_drops_section(form)
+	var form := _vbox(form_panel)
+	_add_heading(form, "Mob details", 22)
+	var pages := STUDIO_THEME.pages(form)
+	var basics_page := STUDIO_THEME.page(pages, "Basics")
+	_add_identity_section(basics_page)
+	var appearance_page := STUDIO_THEME.page(pages, "Appearance")
+	_add_visual_section(appearance_page)
+	var combat_page := STUDIO_THEME.page(pages, "Combat")
+	_add_stats_section(combat_page)
+	_add_attack_section(combat_page)
+	_add_bonuses_section(combat_page)
+	var behavior_page := STUDIO_THEME.page(pages, "Behavior")
+	_add_behavior_section(behavior_page)
+	_add_faction_section(behavior_page)
+	var drops_page := STUDIO_THEME.page(pages, "Drops")
+	_add_drops_section(drops_page)
+	var preview_page := STUDIO_THEME.page(pages, "Preview")
 
-	var preview_panel := _panel(Vector2(330, 0))
+	var preview_panel := _panel(Vector2(264, 0))
 	add_child(preview_panel)
-	var preview_scroll := ScrollContainer.new()
-	preview_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview_panel.add_child(preview_scroll)
 	var preview_content := VBoxContainer.new()
 	preview_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview_content.add_theme_constant_override("separation", 10)
-	preview_scroll.add_child(preview_content)
-	_add_heading(preview_content, "Preview", 20)
+	preview_panel.add_child(preview_content)
+	_add_heading(preview_page, "Preview", 20)
 	_visual_preview = MobVisualPreview.new()
-	preview_content.add_child(_visual_preview)
+	preview_page.add_child(_visual_preview)
 	_visual_status = _wrapped_label("No mob visual selected.")
-	preview_content.add_child(_visual_status)
+	preview_page.add_child(_visual_status)
 	var facing_row := HBoxContainer.new()
 	facing_row.add_theme_constant_override("separation", 8)
 	facing_row.add_child(_label("Preview facing"))
@@ -320,17 +320,17 @@ func _build_ui() -> void:
 		_preview_frame.set_item_metadata(_preview_frame.item_count - 1, frame)
 	_preview_frame.item_selected.connect(_on_preview_pose_changed.unbind(1))
 	facing_row.add_child(_preview_frame)
-	preview_content.add_child(facing_row)
+	preview_page.add_child(facing_row)
 	_presentation_semantics = _wrapped_label("")
-	preview_content.add_child(_presentation_semantics)
-	_add_heading(preview_content, "Actor Attachment Calibration", 16)
+	preview_page.add_child(_presentation_semantics)
+	_add_heading(preview_page, "Actor Attachment Calibration", 16)
 	_socket_calibration_editor = ACTOR_SOCKET_CALIBRATION_EDITOR.new()
 	_socket_calibration_editor.configure_client(_client)
 	_socket_calibration_editor.use_calibration_for_actor.connect(_on_use_socket_calibration_for_actor)
 	_socket_calibration_editor.calibration_saved.connect(_on_socket_calibration_saved)
 	_socket_calibration_editor.item_grip_handoff_requested.connect(_on_item_grip_handoff_requested)
-	preview_content.add_child(_socket_calibration_editor)
-	_add_heading(preview_content, "Operation", 16)
+	preview_page.add_child(_socket_calibration_editor)
+	_add_heading(preview_content, "Review & apply", 20)
 	_operation = OptionButton.new()
 	_add_operation("Save as Draft", "save_draft")
 	_add_operation("Publish", "publish")
@@ -339,7 +339,8 @@ func _build_ui() -> void:
 	_operation.item_selected.connect(_on_option_changed.unbind(1))
 	preview_content.add_child(_operation)
 	_preview_button = Button.new()
-	_preview_button.text = "Validate and Preview Changes"
+	_preview_button.theme_type_variation = "PrimaryButton"
+	_preview_button.text = "1. Preview changes"
 	_preview_button.pressed.connect(_preview)
 	preview_content.add_child(_preview_button)
 	_delete_button = Button.new()
@@ -348,7 +349,7 @@ func _build_ui() -> void:
 	_delete_button.pressed.connect(_preview_delete)
 	preview_content.add_child(_delete_button)
 	_apply_button = Button.new()
-	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
 	preview_content.add_child(_apply_button)
@@ -358,7 +359,10 @@ func _build_ui() -> void:
 	var feedback_content := VBoxContainer.new()
 	feedback_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	feedback_content.add_theme_constant_override("separation", 10)
-	preview_content.add_child(feedback_content)
+	var feedback_scroll := ScrollContainer.new()
+	feedback_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	preview_content.add_child(feedback_scroll)
+	feedback_scroll.add_child(feedback_content)
 	_add_heading(feedback_content, "Exact Logical Changes", 16)
 	_changes = VBoxContainer.new()
 	feedback_content.add_child(_changes)
@@ -629,16 +633,10 @@ func _rebuild_list() -> void:
 			continue
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s\n%s  |  %s  |  HP %d  |  %s  |  %s  |  drops %d" % [
-			str(mob.get("display_name", "Unnamed mob")),
-			str(mob.get("mob_definition_id", "")),
-			str(mob.get("publication_state", "Unknown")),
-			int(mob.get("max_health", 0)),
-			str(mob.get("combat_faction_display_name", mob.get("combat_faction_id", "No faction"))),
-			"combat" if bool(mob.get("has_combat_profile", false)) else "no combat",
-			int(mob.get("guaranteed_drop_count", 0)),
-		]
-		button.tooltip_text = str(mob.get("visual_texture_path", ""))
+		button.clip_text = true
+		button.custom_minimum_size.y = 60
+		button.text = "%s\n%s" % [mob.get("display_name", "Unnamed"), mob.get("publication_state", "Unknown")]
+		button.tooltip_text = "%s\nUpdated %s" % [mob.get("mob_definition_id", ""), mob.get("updated_at_utc", "")]
 		button.pressed.connect(_load_mob_id.bind(str(mob.get("mob_definition_id", ""))))
 		_list.add_child(button)
 
@@ -1641,7 +1639,7 @@ func _set_form_enabled(enabled: bool) -> void:
 
 func _clear_preview() -> void:
 	_visual_preview.set_rigged_sprite_preview({})
-	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+	_workspace_support.clear_preview(_apply_button, _changes, _validation, "2. Apply changes")
 
 
 func _update_operation_default() -> void:
@@ -1755,8 +1753,8 @@ func _panel(minimum_size: Vector2) -> PanelContainer:
 
 func _panel_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.086, 0.098, 0.122, 1)
-	style.border_color = Color(0.19, 0.22, 0.28, 1)
+	style.bg_color = Color("17212e")
+	style.border_color = Color("354355")
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(8)
 	style.content_margin_left = 16

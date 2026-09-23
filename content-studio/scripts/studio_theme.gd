@@ -25,7 +25,7 @@ static func checkbox_theme() -> Theme:
 static func item_theme() -> Theme:
 	var result := checkbox_theme()
 	result.default_font_size = 15
-	for type_name: String in ["Label", "Button", "OptionButton", "CheckBox", "LineEdit", "TabContainer"]:
+	for type_name: String in ["Label", "Button", "OptionButton", "CheckBox", "LineEdit", "TabContainer", "ItemList", "TextEdit"]:
 		result.set_color("font_color", type_name, Color("e5edf5"))
 		result.set_color("font_hover_color", type_name, Color.WHITE)
 		result.set_color("font_disabled_color", type_name, Color("8392a4"))
@@ -51,6 +51,11 @@ static func item_theme() -> Theme:
 	result.set_stylebox("tab_hovered", "TabContainer", box("243447", "7690a6"))
 	result.set_color("font_selected_color", "TabContainer", Color("91ecd7"))
 	result.set_color("font_unselected_color", "TabContainer", Color("a9b8c9"))
+	result.set_stylebox("normal", "TextEdit", box("101923", "46566b"))
+	result.set_stylebox("focus", "TextEdit", focus_box())
+	result.set_stylebox("panel", "ItemList", box("101923", "354355"))
+	result.set_stylebox("selected", "ItemList", box("29443f", "66d9c1"))
+	result.set_stylebox("selected_focus", "ItemList", box("29443f", "66d9c1"))
 	return result
 
 
@@ -71,3 +76,48 @@ static func focus_box() -> StyleBoxFlat:
 	var style := box("00000000", "66d9c1")
 	style.set_border_width_all(2)
 	return style
+
+
+# Shared layout primitives only; each workspace still owns its fields and actions.
+static func pages(parent: Node) -> TabContainer:
+	var tabs := TabContainer.new()
+	tabs.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tabs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	tabs.use_hidden_tabs_for_min_size = false
+	parent.add_child(tabs)
+	return tabs
+
+
+static func page(parent: TabContainer, title: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	parent.add_child(scroll)
+	return scroll_content(scroll)
+
+
+static func scroll_content(parent: Node) -> VBoxContainer:
+	var scroll: ScrollContainer
+	if parent is ScrollContainer:
+		scroll = parent
+	else:
+		scroll = ScrollContainer.new()
+		parent.add_child(scroll)
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var content := VBoxContainer.new()
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	scroll.add_child(content)
+	return content
+
+
+static func panel_content(parent: Node, width: float = 0) -> VBoxContainer:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = width
+	if width == 0: panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.add_theme_stylebox_override("panel", box("17212e", "354355"))
+	parent.add_child(panel)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	panel.add_child(content)
+	return content

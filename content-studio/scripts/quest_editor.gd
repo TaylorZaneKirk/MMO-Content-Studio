@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name QuestEditor
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
@@ -43,7 +45,7 @@ func _connect_client() -> void:
 func _build_ui() -> void:
 	add_theme_constant_override("separation", 14)
 
-	var catalog_panel := _panel(Vector2(300, 0))
+	var catalog_panel := _panel(Vector2(240, 0))
 	add_child(catalog_panel)
 	var catalog := _vbox(catalog_panel)
 	_heading(catalog, "Quests", 20)
@@ -57,16 +59,20 @@ func _build_ui() -> void:
 	catalog.add_child(new_button)
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog.add_child(scroll)
 	_list = VBoxContainer.new()
+	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_list)
 	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
-	var editor_panel := _panel(Vector2(520, 0))
+	var editor_panel := _panel(Vector2(0, 0))
 	editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(editor_panel)
 	var editor := _vbox(editor_panel)
-	_heading(editor, "Definition", 20)
+	_heading(editor, "Quest details", 22)
+	var pages := STUDIO_THEME.pages(editor)
+	editor = STUDIO_THEME.page(pages, "Basics")
 	var grid := GridContainer.new()
 	grid.columns = 2
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -77,26 +83,29 @@ func _build_ui() -> void:
 	_display_name = _line(grid, "Display name", "Test Quest")
 	_publication = _value(grid, "Publication", "Unsaved")
 	_updated = _value(grid, "Updated", "Never")
+	editor = STUDIO_THEME.page(pages, "Steps")
 	_heading(editor, "Steps", 16)
 	_steps = _text(editor, "step_id|display name|order", 130)
+	editor = STUDIO_THEME.page(pages, "Transitions")
 	_heading(editor, "Transitions", 16)
 	_transitions = _text(editor, "transition_id|source_status|source_step_id|target_status|target_step_id|order", 180)
 
-	var action_panel := _panel(Vector2(360, 0))
+	var action_panel := _panel(Vector2(264, 0))
 	add_child(action_panel)
 	var actions := _vbox(action_panel)
-	_heading(actions, "Operation", 20)
+	_heading(actions, "Review & apply", 20)
 	_operation = OptionButton.new()
 	for option in [["Save Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
 		_operation.add_item(option[0])
 		_operation.set_item_metadata(_operation.item_count - 1, option[1])
 	actions.add_child(_operation)
 	_preview_button = Button.new()
-	_preview_button.text = "Validate"
+	_preview_button.theme_type_variation = "PrimaryButton"
+	_preview_button.text = "1. Preview changes"
 	_preview_button.pressed.connect(_preview)
 	actions.add_child(_preview_button)
 	_apply_button = Button.new()
-	_apply_button.text = "Apply"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
 	actions.add_child(_apply_button)
@@ -109,8 +118,9 @@ func _build_ui() -> void:
 	_status.text = "Select or create a quest."
 	actions.add_child(_status)
 	_diagnostics = RichTextLabel.new()
-	_diagnostics.custom_minimum_size = Vector2(300, 320)
+	_diagnostics.custom_minimum_size = Vector2(0, 120)
 	_diagnostics.fit_content = false
+	_diagnostics.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	actions.add_child(_diagnostics)
 
 
@@ -265,6 +275,8 @@ func _render_list() -> void:
 		var button := Button.new()
 		button.text = "%s\n%s  %s" % [quest.get("display_name", "Unnamed Quest"), quest.get("quest_id", ""), quest.get("publication_state", "Draft")]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.clip_text = true
+		button.custom_minimum_size.y = 60
 		button.pressed.connect(_client.load_quest.bind(str(quest.get("quest_id", ""))))
 		_list.add_child(button)
 
@@ -339,6 +351,7 @@ func _set_editable(enabled: bool) -> void:
 func _panel(minimum_size: Vector2) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = minimum_size
+	panel.add_theme_stylebox_override("panel", STUDIO_THEME.box("17212e", "354355"))
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	return panel
 

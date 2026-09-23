@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name DialogueEditor
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 
 signal workspace_open_requested(workspace_id: String, resource_id: String)
@@ -105,7 +107,7 @@ func _connect_client() -> void:
 func _build_ui() -> void:
 	add_theme_constant_override("separation", 14)
 
-	var catalog_panel := _panel(Vector2(300, 0))
+	var catalog_panel := _panel(Vector2(240, 0))
 	add_child(catalog_panel)
 	var catalog_content := _vbox(catalog_panel)
 	_add_heading(catalog_content, "Dialogue", 20)
@@ -119,6 +121,7 @@ func _build_ui() -> void:
 	catalog_content.add_child(_new_button)
 	var catalog_scroll := ScrollContainer.new()
 	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog_content.add_child(catalog_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -126,10 +129,14 @@ func _build_ui() -> void:
 	catalog_scroll.add_child(_list)
 	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
-	var graph_panel := _panel(Vector2(520, 0))
+	var graph_panel := _panel(Vector2(0, 0))
 	graph_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(graph_panel)
 	var graph_content := _vbox(graph_panel)
+	_add_heading(graph_content, "Dialogue details", 22)
+	var pages := STUDIO_THEME.pages(graph_content)
+	graph_content = STUDIO_THEME.page(pages, "Graph")
+	graph_content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_add_heading(graph_content, "Graph", 20)
 	var graph_toolbar := HBoxContainer.new()
 	graph_toolbar.add_theme_constant_override("separation", 8)
@@ -141,11 +148,14 @@ func _build_ui() -> void:
 	restart_button.text = "Play"
 	restart_button.pressed.connect(_restart_playthrough)
 	graph_toolbar.add_child(restart_button)
-	_add_lifecycle_section(graph_content)
+	var focus_button := Button.new()
+	focus_button.text = "Focus node"
+	focus_button.pressed.connect(_focus_graph_node)
+	graph_toolbar.add_child(focus_button)
 	_graph = GraphEdit.new()
 	_graph.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_graph.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_graph.custom_minimum_size = Vector2(500, 520)
+	_graph.custom_minimum_size = Vector2(0, 220)
 	if _graph.has_signal("connection_request"):
 		_graph.connect("connection_request", Callable(self, "_on_connection_request"))
 	if _graph.has_signal("disconnection_request"):
@@ -156,21 +166,16 @@ func _build_ui() -> void:
 		_graph.connect("node_selected", Callable(self, "_on_graph_edit_node_selected"))
 	graph_content.add_child(_graph)
 
-	var inspector_panel := _panel(Vector2(390, 0))
+	var inspector_panel := _panel(Vector2(264, 0))
 	add_child(inspector_panel)
-	var inspector_scroll := ScrollContainer.new()
-	inspector_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inspector_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	inspector_panel.add_child(inspector_scroll)
-	var inspector := VBoxContainer.new()
-	inspector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	inspector.custom_minimum_size = Vector2(320, 0)
-	inspector.add_theme_constant_override("separation", 12)
-	inspector_scroll.add_child(inspector)
-	_add_definition_section(inspector)
-	_add_node_section(inspector)
-	_add_capability_section(inspector)
-	_add_operation_results_section(inspector)
+	var inspector := _vbox(inspector_panel)
+	_add_lifecycle_section(inspector)
+	_add_definition_section(STUDIO_THEME.page(pages, "Details"))
+	_add_node_section(STUDIO_THEME.page(pages, "Node"))
+	var play_page := STUDIO_THEME.page(pages, "Play")
+	_add_operation_results_section(STUDIO_THEME.scroll_content(inspector), play_page)
+	_add_capability_section(play_page)
+	restart_button.pressed.connect(func(): pages.current_tab = play_page.get_parent().get_index())
 
 
 func _add_definition_section(parent: VBoxContainer) -> void:
@@ -239,12 +244,14 @@ func _add_capability_section(parent: VBoxContainer) -> void:
 
 
 func _add_lifecycle_section(parent: VBoxContainer) -> void:
-	_add_heading(parent, "Dialogue Lifecycle", 16)
-	var row := HBoxContainer.new()
+	_add_heading(parent, "Review & apply", 20)
+	var row := VBoxContainer.new()
 	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_theme_constant_override("separation", 8)
 	parent.add_child(row)
 	_operation = OptionButton.new()
+	_operation.fit_to_longest_item = false
+	_operation.clip_text = true
 	_operation.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_add_operation("Save as Draft", "save_draft")
 	_add_operation("Publish", "publish")
@@ -253,11 +260,12 @@ func _add_lifecycle_section(parent: VBoxContainer) -> void:
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
 	row.add_child(_operation)
 	_preview_button = Button.new()
-	_preview_button.text = "Validate and Preview Changes"
+	_preview_button.theme_type_variation = "PrimaryButton"
+	_preview_button.text = "1. Preview changes"
 	_preview_button.pressed.connect(_preview)
 	row.add_child(_preview_button)
 	_apply_button = Button.new()
-	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
 	row.add_child(_apply_button)
@@ -270,7 +278,7 @@ func _add_lifecycle_section(parent: VBoxContainer) -> void:
 	parent.add_child(_status)
 
 
-func _add_operation_results_section(parent: VBoxContainer) -> void:
+func _add_operation_results_section(parent: VBoxContainer, play_page: VBoxContainer) -> void:
 	_add_heading(parent, "Operation Results", 20)
 	_add_heading(parent, "Graph Analysis", 16)
 	_analysis = VBoxContainer.new()
@@ -278,9 +286,9 @@ func _add_operation_results_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "NPC References", 16)
 	_reference_summary = VBoxContainer.new()
 	parent.add_child(_reference_summary)
-	_add_heading(parent, "Playthrough", 16)
+	_add_heading(play_page, "Playthrough", 20)
 	_playthrough = VBoxContainer.new()
-	parent.add_child(_playthrough)
+	play_page.add_child(_playthrough)
 	_add_heading(parent, "Exact Logical Changes", 16)
 	_changes = VBoxContainer.new()
 	parent.add_child(_changes)
@@ -458,6 +466,7 @@ func _load_dialogue(payload: Dictionary) -> void:
 	_update_operation_default()
 	_rebuild_entry_points()
 	_rebuild_graph()
+	_focus_graph_node.call_deferred()
 	_load_selected_node()
 	_clear_preview()
 	_render_empty_playthrough()
@@ -480,14 +489,10 @@ func _rebuild_list() -> void:
 			continue
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s\n%s | %s | %s nodes | %s choices" % [
-			str(dialogue.get("display_name", "Unnamed Dialogue")),
-			str(dialogue.get("dialogue_definition_id", "")),
-			str(dialogue.get("publication_state", "Unknown")),
-			str(dialogue.get("node_count", 0)),
-			str(dialogue.get("choice_count", 0)),
-		]
-		button.tooltip_text = "Updated %s" % str(dialogue.get("updated_at_utc", ""))
+		button.clip_text = true
+		button.custom_minimum_size.y = 60
+		button.text = "%s\n%s" % [dialogue.get("display_name", "Unnamed"), dialogue.get("publication_state", "Unknown")]
+		button.tooltip_text = "%s\nUpdated %s" % [dialogue.get("dialogue_definition_id", ""), dialogue.get("updated_at_utc", "")]
 		button.pressed.connect(_load_dialogue_id.bind(str(dialogue.get("dialogue_definition_id", ""))))
 		_list.add_child(button)
 
@@ -1259,6 +1264,8 @@ func _rebuild_choices(node: Dictionary) -> void:
 		text_field.text_changed.connect(_on_choice_text_changed.bind(index))
 		row.add_child(text_field)
 		var target := OptionButton.new()
+		target.fit_to_longest_item = false
+		target.clip_text = true
 		_fill_node_options(target, str(choice.get("target_node_id", "")), "Choose target")
 		target.item_selected.connect(_on_choice_target_selected.bind(index, target))
 		row.add_child(target)
@@ -1338,6 +1345,8 @@ func _add_condition_row(parent: VBoxContainer, condition: Dictionary, owner_kind
 	top.add_theme_constant_override("separation", 6)
 	row.add_child(top)
 	var type_select := OptionButton.new()
+	type_select.fit_to_longest_item = false
+	type_select.clip_text = true
 	type_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_condition_type_options(type_select, str(condition.get("condition_type", CONDITION_TYPE_QUEST_STATUS)))
 	type_select.disabled = not _form_editable
@@ -1381,6 +1390,8 @@ func _add_condition_text_field(grid: GridContainer, label_text: String, value: S
 func _add_condition_quest_field(grid: GridContainer, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
 	grid.add_child(_label("Quest"))
 	var quest := OptionButton.new()
+	quest.fit_to_longest_item = false
+	quest.clip_text = true
 	quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_quest_reference_options(quest, selected)
 	quest.disabled = not _form_editable
@@ -1391,6 +1402,8 @@ func _add_condition_quest_field(grid: GridContainer, selected: String, owner_kin
 func _add_condition_step_field(grid: GridContainer, quest_id: String, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
 	grid.add_child(_label("Step"))
 	var step := OptionButton.new()
+	step.fit_to_longest_item = false
+	step.clip_text = true
 	step.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_quest_step_options(step, quest_id, selected)
 	step.disabled = not _form_editable
@@ -1401,6 +1414,8 @@ func _add_condition_step_field(grid: GridContainer, quest_id: String, selected: 
 func _add_condition_item_field(grid: GridContainer, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
 	grid.add_child(_label("Item"))
 	var item := OptionButton.new()
+	item.fit_to_longest_item = false
+	item.clip_text = true
 	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_item_reference_options(item, selected)
 	item.disabled = not _form_editable
@@ -1411,6 +1426,8 @@ func _add_condition_item_field(grid: GridContainer, selected: String, owner_kind
 func _add_condition_status_field(grid: GridContainer, selected: String, owner_kind: String, owner_index: int, choice_index: int, condition_index: int) -> void:
 	grid.add_child(_label("Status"))
 	var status := OptionButton.new()
+	status.fit_to_longest_item = false
+	status.clip_text = true
 	status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	for quest_status in QUEST_STATUSES:
 		status.add_item(quest_status)
@@ -1467,6 +1484,8 @@ func _add_effect_row(parent: VBoxContainer, effect: Dictionary, choice_index: in
 	id_field.text_changed.connect(_on_effect_id_changed.bind(choice_index, effect_index))
 	top.add_child(id_field)
 	var type_select := OptionButton.new()
+	type_select.fit_to_longest_item = false
+	type_select.clip_text = true
 	type_select.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_effect_type_options(type_select, str(effect.get("effect_type", EFFECT_TYPE_GRANT_ITEM)))
 	type_select.disabled = not _form_editable
@@ -1509,6 +1528,8 @@ func _add_effect_row(parent: VBoxContainer, effect: Dictionary, choice_index: in
 func _add_effect_quest_field(grid: GridContainer, selected: String, choice_index: int, effect_index: int) -> void:
 	grid.add_child(_label("Quest"))
 	var quest := OptionButton.new()
+	quest.fit_to_longest_item = false
+	quest.clip_text = true
 	quest.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_quest_reference_options(quest, selected)
 	quest.disabled = not _form_editable
@@ -1519,6 +1540,8 @@ func _add_effect_quest_field(grid: GridContainer, selected: String, choice_index
 func _add_effect_transition_field(grid: GridContainer, quest_id: String, effect_type: String, selected: String, choice_index: int, effect_index: int) -> void:
 	grid.add_child(_label("Transition"))
 	var transition := OptionButton.new()
+	transition.fit_to_longest_item = false
+	transition.clip_text = true
 	transition.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_quest_transition_options(transition, quest_id, effect_type, selected)
 	transition.disabled = not _form_editable
@@ -1529,6 +1552,8 @@ func _add_effect_transition_field(grid: GridContainer, quest_id: String, effect_
 func _add_effect_item_field(grid: GridContainer, selected: String, choice_index: int, effect_index: int) -> void:
 	grid.add_child(_label("Item"))
 	var item := OptionButton.new()
+	item.fit_to_longest_item = false
+	item.clip_text = true
 	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_item_reference_options(item, selected)
 	item.disabled = not _form_editable
@@ -1552,6 +1577,8 @@ func _add_effect_quantity_field(grid: GridContainer, value: int, choice_index: i
 func _add_effect_skill_field(grid: GridContainer, selected: String, choice_index: int, effect_index: int) -> void:
 	grid.add_child(_label("Skill"))
 	var skill := OptionButton.new()
+	skill.fit_to_longest_item = false
+	skill.clip_text = true
 	skill.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_fill_skill_reference_options(skill, selected)
 	skill.disabled = not _form_editable
@@ -1866,6 +1893,8 @@ func _rebuild_entry_points() -> void:
 		entry_id.text_changed.connect(_on_entry_id_changed.bind(index))
 		row.add_child(entry_id)
 		var target := OptionButton.new()
+		target.fit_to_longest_item = false
+		target.clip_text = true
 		target.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_fill_node_options(target, str(entry.get("node_id", "")), "Choose entry node")
 		target.disabled = not _form_editable
@@ -2086,7 +2115,7 @@ func _set_node_controls_enabled(enabled: bool) -> void:
 
 
 func _clear_preview() -> void:
-	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+	_workspace_support.clear_preview(_apply_button, _changes, _validation, "2. Apply changes")
 	_workspace_support.clear_container(_analysis)
 	_workspace_support.clear_container(_reference_summary)
 
@@ -2592,6 +2621,8 @@ func _spin_field(grid: GridContainer, label_text: String, minimum: float, maximu
 func _option_field(grid: GridContainer, label_text: String) -> OptionButton:
 	grid.add_child(_label(label_text))
 	var option := OptionButton.new()
+	option.fit_to_longest_item = false
+	option.clip_text = true
 	option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	option.item_selected.connect(_on_form_changed.unbind(1))
 	grid.add_child(option)
@@ -2686,8 +2717,8 @@ func _panel(minimum_size: Vector2) -> PanelContainer:
 
 func _panel_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.086, 0.098, 0.122, 1)
-	style.border_color = Color(0.19, 0.22, 0.28, 1)
+	style.bg_color = Color("17212e")
+	style.border_color = Color("354355")
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(8)
 	style.content_margin_left = 16
@@ -2733,3 +2764,11 @@ func _clear_children(container: Node) -> void:
 	for child in container.get_children():
 		container.remove_child(child)
 		child.queue_free()
+
+
+func _focus_graph_node() -> void:
+	# Pan the viewport without changing authored node positions.
+	for child in _graph.get_children():
+		if child is GraphNode and str(child.name) == _selected_node_id:
+			_graph.scroll_offset = child.position_offset * _graph.zoom - Vector2(24, 72)
+			return

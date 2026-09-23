@@ -1,5 +1,7 @@
 extends HBoxContainer
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 
 var _support: AuthoringWorkspaceSupport = SUPPORT_SCRIPT.new()
@@ -16,11 +18,9 @@ var _groups_edit: TextEdit
 var _state_label: Label
 var _updated_label: Label
 var _ev_label: Label
+var _operation: OptionButton
 var _preview_button: Button
 var _apply_button: Button
-var _publish_button: Button
-var _disable_button: Button
-var _delete_button: Button
 var _changes_container: VBoxContainer
 var _validation_container: VBoxContainer
 
@@ -42,10 +42,7 @@ func _build_ui() -> void:
 	size_flags_vertical = Control.SIZE_EXPAND_FILL
 	add_theme_constant_override("separation", 14)
 
-	var left := VBoxContainer.new()
-	left.custom_minimum_size = Vector2(280, 0)
-	left.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	add_child(left)
+	var left := STUDIO_THEME.panel_content(self, 240)
 
 	var catalog_heading := Label.new()
 	catalog_heading.text = "Loot Tables"
@@ -68,11 +65,13 @@ func _build_ui() -> void:
 	new_button.text = "New Loot Table"
 	left.add_child(new_button)
 
-	var right := VBoxContainer.new()
-	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	right.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	right.add_theme_constant_override("separation", 10)
-	add_child(right)
+	var right := STUDIO_THEME.panel_content(self)
+	var heading := Label.new()
+	heading.text = "Loot table details"
+	heading.add_theme_font_size_override("font_size", 22)
+	right.add_child(heading)
+	var pages := STUDIO_THEME.pages(right)
+	right = STUDIO_THEME.page(pages, "Basics")
 
 	_id_edit = LineEdit.new()
 	_id_edit.placeholder_text = "loot_table_id"
@@ -87,13 +86,16 @@ func _build_ui() -> void:
 	_description_edit.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	right.add_child(_labeled_control("Description", _description_edit))
 
+	var basics := right
+	right = STUDIO_THEME.page(pages, "Groups")
 	_groups_edit = TextEdit.new()
 	_groups_edit.custom_minimum_size = Vector2(0, 280)
 	_groups_edit.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_groups_edit.wrap_mode = TextEdit.LINE_WRAPPING_NONE
 	right.add_child(_labeled_control("Groups JSON", _groups_edit))
 
-	var meta_row := HBoxContainer.new()
+	right = basics
+	var meta_row := VBoxContainer.new()
 	_state_label = Label.new()
 	_state_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_updated_label = Label.new()
@@ -106,23 +108,30 @@ func _build_ui() -> void:
 	_ev_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	right.add_child(_ev_label)
 
-	var buttons := HBoxContainer.new()
+	right = STUDIO_THEME.panel_content(self, 264)
+	var review_heading := Label.new()
+	review_heading.text = "Review & apply"
+	review_heading.add_theme_font_size_override("font_size", 20)
+	right.add_child(review_heading)
+	var buttons := VBoxContainer.new()
 	_preview_button = Button.new()
-	_preview_button.text = "Preview Draft"
+	_preview_button.theme_type_variation = "PrimaryButton"
+	_preview_button.text = "1. Preview changes"
 	_apply_button = Button.new()
-	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
-	_publish_button = Button.new()
-	_publish_button.text = "Preview Publish"
-	_disable_button = Button.new()
-	_disable_button.text = "Preview Disable"
-	_delete_button = Button.new()
-	_delete_button.text = "Preview Delete"
-	for button in [_preview_button, _apply_button, _publish_button, _disable_button, _delete_button]:
-		buttons.add_child(button)
+	_operation = OptionButton.new()
+	for operation in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
+		_operation.add_item(operation[0])
+		_operation.set_item_metadata(_operation.item_count - 1, operation[1])
+	_operation.item_selected.connect(func(_index: int):
+		_support.clear_preview(_apply_button, _changes_container, _validation_container, "2. Apply changes"))
+	buttons.add_child(_operation)
+	buttons.add_child(_preview_button)
+	buttons.add_child(_apply_button)
 	right.add_child(buttons)
 
-	var lower := HSplitContainer.new()
+	var lower := VBoxContainer.new()
 	lower.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_changes_container = VBoxContainer.new()
 	_validation_container = VBoxContainer.new()
@@ -133,10 +142,7 @@ func _build_ui() -> void:
 	search_button.pressed.connect(func() -> void: _client.load_loot_tables(_search_edit.text))
 	new_button.pressed.connect(_stage_new)
 	_catalog_list.item_selected.connect(_on_catalog_selected)
-	_preview_button.pressed.connect(func() -> void: _preview("save_draft"))
-	_publish_button.pressed.connect(func() -> void: _preview("publish"))
-	_disable_button.pressed.connect(func() -> void: _preview("disable"))
-	_delete_button.pressed.connect(func() -> void: _preview("delete"))
+	_preview_button.pressed.connect(func() -> void: _preview(str(_operation.get_selected_metadata())))
 	_apply_button.pressed.connect(_apply_preview)
 
 
@@ -177,7 +183,7 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_state_label.text = "State: %s" % str(payload.get("publication_state", "Draft"))
 	_updated_label.text = "Updated: %s" % str(payload.get("updated_at_utc", "not saved"))
 	_render_ev(payload.get("expected_value", {}))
-	_support.clear_preview(_apply_button, _changes_container, _validation_container)
+	_support.clear_preview(_apply_button, _changes_container, _validation_container, "2. Apply changes")
 
 
 func _on_preview_received(payload: Dictionary) -> void:
@@ -228,7 +234,7 @@ func _stage_new() -> void:
 	_state_label.text = "State: Draft"
 	_updated_label.text = "Updated: not saved"
 	_ev_label.text = "Expected value: not previewed"
-	_support.clear_preview(_apply_button, _changes_container, _validation_container)
+	_support.clear_preview(_apply_button, _changes_container, _validation_container, "2. Apply changes")
 
 
 func _preview(operation: String) -> void:
