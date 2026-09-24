@@ -12,6 +12,7 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
     private static readonly (RuntimeCatalogPublicationScope Scope, string Command, string Label, string OutputPath)[] Exports =
     [
         (RuntimeCatalogPublicationScope.WorldObject, "export-world-object-catalog", "World Object", "shared/maps/world_objects/catalog.json"),
+        (RuntimeCatalogPublicationScope.Shop, "export-shop-catalog", "Shop", "shared/shops/catalog.json"),
         (RuntimeCatalogPublicationScope.Npc, "export-npc-catalog", "NPC", "shared/maps/npcs/catalog.json"),
         (RuntimeCatalogPublicationScope.Mob, "export-mob-catalog", "mob", "shared/maps/mobs/catalog.json"),
         (RuntimeCatalogPublicationScope.Dialogue, "export-dialogue-catalog", "dialogue", "shared/dialogues/catalog.json"),

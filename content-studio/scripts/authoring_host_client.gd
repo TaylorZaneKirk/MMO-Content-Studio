@@ -21,6 +21,11 @@ signal world_object_catalog_received(payload: Dictionary)
 signal world_object_definition_received(payload: Dictionary)
 signal world_object_preview_received(payload: Dictionary)
 signal world_object_mutation_completed(payload: Dictionary)
+signal shop_options_received(payload: Dictionary)
+signal shop_catalog_received(payload: Dictionary)
+signal shop_definition_received(payload: Dictionary)
+signal shop_preview_received(payload: Dictionary)
+signal shop_mutation_completed(payload: Dictionary)
 
 signal mob_options_received(payload: Dictionary)
 signal mob_catalog_received(payload: Dictionary)
@@ -78,6 +83,11 @@ const OP_WORLD_OBJECT_CATALOG := "world_object_catalog"
 const OP_WORLD_OBJECT_DEFINITION := "world_object_definition"
 const OP_WORLD_OBJECT_PREVIEW := "world_object_preview"
 const OP_WORLD_OBJECT_MUTATION := "world_object_mutation"
+const OP_SHOP_OPTIONS := "shop_options"
+const OP_SHOP_CATALOG := "shop_catalog"
+const OP_SHOP_DEFINITION := "shop_definition"
+const OP_SHOP_PREVIEW := "shop_preview"
+const OP_SHOP_MUTATION := "shop_mutation"
 
 const OP_MOB_OPTIONS := "mob_options"
 const OP_MOBS := "mobs"
@@ -227,6 +237,24 @@ func mutate_world_object(definition_id: String, operation: String, payload: Dict
 	var suffix := "draft" if operation == "save_draft" else operation
 	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
 	_request(OP_WORLD_OBJECT_MUTATION, "/api/v1/world-objects/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
+
+# Shops shares this client's transport and startup queue.
+func load_shop_options() -> void:
+	_request(OP_SHOP_OPTIONS, "/api/v1/shops/options")
+
+func load_shops(search: String = "") -> void:
+	_request(OP_SHOP_CATALOG, "/api/v1/shops?search=%s" % search.uri_encode())
+
+func load_shop(definition_id: String) -> void:
+	_request(OP_SHOP_DEFINITION, "/api/v1/shops/%s" % definition_id.uri_encode())
+
+func preview_shop(definition_id: String, payload: Dictionary) -> void:
+	_request(OP_SHOP_PREVIEW, "/api/v1/shops/%s/preview" % definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+func mutate_shop(definition_id: String, operation: String, payload: Dictionary) -> void:
+	var suffix := "draft" if operation == "save_draft" else operation
+	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
+	_request(OP_SHOP_MUTATION, "/api/v1/shops/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
 
 func load_mob_options() -> void:
 	_request(OP_MOB_OPTIONS, "/api/v1/mobs/options")
@@ -462,6 +490,18 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			world_object_preview_received.emit(data)
 		OP_WORLD_OBJECT_MUTATION:
 			world_object_mutation_completed.emit(data)
+		OP_SHOP_OPTIONS:
+			shop_options_received.emit(data)
+			load_shops()
+		OP_SHOP_CATALOG:
+			shop_catalog_received.emit(data)
+			_request_next_startup_operation()
+		OP_SHOP_DEFINITION:
+			shop_definition_received.emit(data)
+		OP_SHOP_PREVIEW:
+			shop_preview_received.emit(data)
+		OP_SHOP_MUTATION:
+			shop_mutation_completed.emit(data)
 		OP_MOB_OPTIONS:
 			mob_options_received.emit(data)
 			_request(OP_MOBS, "/api/v1/mobs")
@@ -554,11 +594,11 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
-	if operation in [OP_WORLD_OBJECT_OPTIONS, OP_WORLD_OBJECT_CATALOG, OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
+	if operation in [OP_SHOP_OPTIONS, OP_SHOP_CATALOG, OP_WORLD_OBJECT_OPTIONS, OP_WORLD_OBJECT_CATALOG, OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
 		_request_next_startup_operation()
 
 func _start_workspace_initialization() -> void:
-	_startup_operations = [OP_WORLD_OBJECT_OPTIONS, OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
+	_startup_operations = [OP_SHOP_OPTIONS, OP_WORLD_OBJECT_OPTIONS, OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
 	_request_next_startup_operation()
 
 func _request_next_startup_operation() -> void:
@@ -566,6 +606,8 @@ func _request_next_startup_operation() -> void:
 		return
 	var operation := str(_startup_operations.pop_front())
 	match operation:
+		OP_SHOP_OPTIONS:
+			_request(OP_SHOP_OPTIONS, "/api/v1/shops/options")
 		OP_WORLD_OBJECT_OPTIONS:
 			_request(OP_WORLD_OBJECT_OPTIONS, "/api/v1/world-objects/options")
 		OP_MOB_OPTIONS:

@@ -9,6 +9,7 @@ using MMO.ContentStudio.AuthoringHost.Features.Npcs;
 using MMO.ContentStudio.AuthoringHost.Features.Quests;
 using MMO.ContentStudio.AuthoringHost.Services;
 using MMO.ContentStudio.AuthoringHost.Features.WorldObjects;
+using MMO.ContentStudio.AuthoringHost.Features.Shops;
 
 namespace MMO.ContentStudio.AuthoringHost.Features;
 
@@ -22,6 +23,7 @@ public static class AuthoringFeatureExtensions
         services.AddMobAuthoring();
         services.AddNpcAuthoring();
         services.AddWorldObjectAuthoring();
+        services.AddShopAuthoring();
         services.AddDialogueAuthoring();
         services.AddQuestAuthoring();
         services.AddSingleton<IRuntimeCatalogPublisher, RuntimeCatalogPublisherService>();
@@ -37,6 +39,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapMobAuthoring();
         endpoints.MapNpcAuthoring();
         endpoints.MapWorldObjectAuthoring();
+        endpoints.MapShopAuthoring();
         endpoints.MapDialogueAuthoring();
         endpoints.MapQuestAuthoring();
         return endpoints;

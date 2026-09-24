@@ -18,6 +18,7 @@ const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
 @onready var item_editor = %Items
 @onready var loot_table_editor = %LootTables
 @onready var mob_editor = %Mobs
+@onready var shop_editor = %Shops
 @onready var npc_editor = %NPCs
 @onready var dialogue_editor = %Dialogue
 
@@ -177,6 +178,9 @@ func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> 
 		"loot_tables":
 			_open_tab(loot_table_editor)
 			loot_table_editor.open_resource(resource_id)
+		"shops":
+			_open_tab(shop_editor)
+			shop_editor.open_resource(resource_id)
 		"npcs":
 			_open_tab(npc_editor)
 			npc_editor.open_resource(resource_id)

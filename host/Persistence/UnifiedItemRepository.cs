@@ -30,6 +30,8 @@ public interface IUnifiedItemRepository
     Task<bool> HasIncompatibleStackQuantitiesAsync(
         string itemId, CancellationToken cancellationToken = default);
 
+    Task<bool> HasShopReferencesAsync(string itemId, bool publishedOnly, CancellationToken cancellationToken = default);
+
     Task<bool> HasLiveReferencesAsync(
         string itemId,
         CancellationToken cancellationToken = default);
@@ -248,6 +250,19 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 or exists (select 1 from ground_items where item_id = @item and stack_count <> 1);
             """, connection);
         command.Parameters.AddWithValue("item", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    public async Task<bool> HasShopReferencesAsync(string itemId, bool publishedOnly, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select exists (select 1 from shop_stock_items stock
+                join shop_definitions shop using (shop_definition_id)
+                where stock.item_id = @item and (not @published_only or shop.publication_state = 'Published'));
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        command.Parameters.AddWithValue("published_only", publishedOnly);
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 

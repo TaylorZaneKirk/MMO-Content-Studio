@@ -28,6 +28,7 @@ public sealed class NpcSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("npc_definitions", "interaction_range_tiles"),
         AuthoringSchemaRequirement.Column("npc_definitions", "default_interaction"),
         AuthoringSchemaRequirement.Column("npc_definitions", "default_dialogue_id"),
+        AuthoringSchemaRequirement.Column("npc_definitions", "shop_definition_id"),
         AuthoringSchemaRequirement.Column("npc_definitions", "notes"),
         AuthoringSchemaRequirement.Column("npc_definitions", "created_at_utc"),
         AuthoringSchemaRequirement.Column("npc_definitions", "updated_at_utc"),

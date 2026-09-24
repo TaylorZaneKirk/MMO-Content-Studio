@@ -12,7 +12,8 @@ public enum RuntimeCatalogPublicationScope
     Dialogue = 1 << 2,
     EquipmentVisual = 1 << 3,
     Quest = 1 << 4,
-    WorldObject = 1 << 5
+    WorldObject = 1 << 5,
+    Shop = 1 << 6
 }
 
 public interface IRuntimeCatalogPublisher

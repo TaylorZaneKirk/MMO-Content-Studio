@@ -78,6 +78,7 @@ public sealed class NpcRepository : INpcRepository
                 interaction_range_tiles,
                 default_interaction,
                 default_dialogue_id,
+                shop_definition_id,
                 notes,
                 created_at_utc,
                 updated_at_utc
@@ -284,6 +285,7 @@ public sealed class NpcRepository : INpcRepository
                 interaction_range_tiles,
                 default_interaction,
                 default_dialogue_id,
+                shop_definition_id,
                 notes,
                 created_at_utc,
                 updated_at_utc
@@ -327,6 +329,7 @@ public sealed class NpcRepository : INpcRepository
                 interaction_range_tiles,
                 default_interaction,
                 default_dialogue_id,
+                shop_definition_id,
                 notes,
                 created_at_utc,
                 updated_at_utc
@@ -352,6 +355,7 @@ public sealed class NpcRepository : INpcRepository
                 @interaction_range_tiles,
                 @default_interaction,
                 @default_dialogue_id,
+                @shop_definition_id,
                 @notes,
                 now(),
                 now()
@@ -391,6 +395,7 @@ public sealed class NpcRepository : INpcRepository
                 interaction_range_tiles = @interaction_range_tiles,
                 default_interaction = @default_interaction,
                 default_dialogue_id = @default_dialogue_id,
+                shop_definition_id = @shop_definition_id,
                 notes = @notes,
                 updated_at_utc = now()
             where npc_definition_id = @npc_definition_id;
@@ -432,6 +437,8 @@ public sealed class NpcRepository : INpcRepository
         command.Parameters.AddWithValue("default_interaction", draft.DefaultInteraction);
         command.Parameters.Add("default_dialogue_id", NpgsqlDbType.Text).Value =
             (object?)draft.DefaultDialogueId ?? DBNull.Value;
+        command.Parameters.Add("shop_definition_id", NpgsqlDbType.Text).Value =
+            (object?)draft.ShopDefinitionId ?? DBNull.Value;
         command.Parameters.Add("notes", NpgsqlDbType.Text).Value =
             (object?)draft.Notes ?? DBNull.Value;
     }
@@ -467,7 +474,8 @@ public sealed class NpcRepository : INpcRepository
             reader.GetString(reader.GetOrdinal("visual_mode")),
             reader.IsDBNull(compositeVisualOrdinal)
                 ? null
-                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)));
+                : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)),
+            reader.IsDBNull(reader.GetOrdinal("shop_definition_id")) ? null : reader.GetString(reader.GetOrdinal("shop_definition_id")));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -520,7 +528,8 @@ public sealed record NpcDefinitionRecord(
     DateTimeOffset CreatedAtUtc,
     DateTimeOffset UpdatedAtUtc,
     string VisualMode = ActorVisualModes.FlatSprite,
-    RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    string? ShopDefinitionId = null);
 
 public sealed record NpcReferenceSummaryRecord(
     string NpcDefinitionId,

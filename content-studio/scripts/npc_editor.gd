@@ -157,6 +157,9 @@ var _movement_guidance: Label
 var _interaction_enabled: CheckBox
 var _interaction_range: SpinBox
 var _default_interaction: OptionButton
+var _shop_options: OptionButton
+var _open_shop_button: Button
+var _shop_id := ""
 var _dialogue_id: LineEdit
 var _dialogue_options: OptionButton
 var _open_dialogue_button: Button
@@ -205,6 +208,7 @@ func _ready() -> void:
 
 
 func _connect_client() -> void:
+	_client.shop_options_received.connect(_on_shop_options_received)
 	_client.health_received.connect(_on_health_received)
 	_client.npc_options_received.connect(_on_npc_options_received)
 	_client.npc_catalog_received.connect(_on_npc_catalog_received)
@@ -363,6 +367,34 @@ func _add_dialogue_section(parent: VBoxContainer) -> void:
 	_dialogue_capability = _value_label(grid, "Complete reference validation", "Unknown")
 	_dialogue_guidance = _wrapped_label("This field links to the current MMO Project dialogue definition. Dialogue and quest authoring remain separate future work.")
 	parent.add_child(_dialogue_guidance)
+
+	_add_heading(parent, "Shop capability", 18)
+	var shop_grid := _grid(parent)
+	_shop_options = _option_field(shop_grid, "Shop")
+	_shop_options.add_item("No shop")
+	_shop_options.set_item_metadata(0, "")
+	_shop_options.item_selected.connect(func(_index: int):
+		_shop_id = _selected_metadata(_shop_options)
+		_open_shop_button.disabled = _shop_id.is_empty()
+		_on_form_changed())
+	shop_grid.add_child(_label("Workspace"))
+	_open_shop_button = Button.new()
+	_open_shop_button.text = "Open Shop"
+	_open_shop_button.disabled = true
+	_open_shop_button.pressed.connect(func(): workspace_open_requested.emit("shops", _shop_id))
+	shop_grid.add_child(_open_shop_button)
+	parent.add_child(_wrapped_label("A draft may reference any existing Shop. Publishing requires a Published Shop and interaction enabled. Talk-to remains the default."))
+
+
+func _on_shop_options_received(payload: Dictionary) -> void:
+	_shop_options.clear()
+	_shop_options.add_item("No shop")
+	_shop_options.set_item_metadata(0, "")
+	for shop: Dictionary in payload.get("shops", []):
+		_shop_options.add_item("%s [%s] — %s" % [shop["display_name"], shop["publication_state"], shop["shop_definition_id"]])
+		_shop_options.set_item_metadata(_shop_options.item_count - 1, shop["shop_definition_id"])
+	_select_option(_shop_options, _shop_id)
+	_open_shop_button.disabled = _shop_id.is_empty()
 
 
 func _add_notes_section(parent: VBoxContainer) -> void:
@@ -647,6 +679,9 @@ func _load_npc(payload: Dictionary) -> void:
 	_interaction_enabled.button_pressed = bool(payload.get("interaction_enabled", true))
 	_interaction_range.value = int(payload.get("interaction_range_tiles", 1))
 	_select_option(_default_interaction, str(payload.get("default_interaction", "talk")))
+	_shop_id = _nullable_string(payload.get("shop_definition_id", ""))
+	_select_option(_shop_options, _shop_id)
+	_open_shop_button.disabled = _shop_id.is_empty()
 	_dialogue_id.text = _nullable_string(payload.get("default_dialogue_id", ""))
 	_select_option(_dialogue_options, _dialogue_id.text.strip_edges())
 	_notes.text = _nullable_string(payload.get("notes", ""))
@@ -690,6 +725,9 @@ func _start_new_npc() -> void:
 	_interaction_enabled.button_pressed = bool(defaults.get("interaction_enabled", true))
 	_interaction_range.value = int(defaults.get("interaction_range_tiles", 1))
 	_select_option(_default_interaction, str(defaults.get("default_interaction", "talk")))
+	_shop_id = ""
+	_select_option(_shop_options, "")
+	_open_shop_button.disabled = true
 	_dialogue_id.text = ""
 	_select_option(_dialogue_options, "")
 	_notes.text = ""
@@ -779,6 +817,7 @@ func _payload() -> Dictionary:
 		"interaction_enabled": interaction_enabled,
 		"interaction_range_tiles": int(_interaction_range.value),
 		"default_interaction": _selected_metadata(_default_interaction),
+		"shop_definition_id": _optional_payload(_shop_id),
 		"default_dialogue_id": _optional_payload(dialogue_value),
 		"notes": _optional_payload(_notes.text),
 		"expected_updated_at_utc": _current_npc.get("updated_at_utc", null),

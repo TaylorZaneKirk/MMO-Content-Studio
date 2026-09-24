@@ -436,6 +436,8 @@ public sealed class UnifiedItemAuthoringService
             }
             await AddDisableReferenceErrorsAsync(itemId, messages, cancellationToken);
         }
+        if (operation == "delete" && await _repository.HasShopReferencesAsync(itemId, false, cancellationToken))
+            messages.Add(new ApiError("shop_stock_reference", "Remove this item from all Shop stock before deletion.", ValidationSeverity.Error, "item_id"));
         if (operation == "delete" && existing?.RuntimeEnabled == true)
         {
             messages.Add(DeleteRequiresDisabledError(itemId));
@@ -447,6 +449,8 @@ public sealed class UnifiedItemAuthoringService
         ICollection<ApiError> messages,
         CancellationToken cancellationToken)
     {
+        if (await _repository.HasShopReferencesAsync(itemId, true, cancellationToken))
+            messages.Add(new ApiError("published_shop_stock_reference", "This item is stock in a Published Shop. Unpublish that Shop before changing this item.", ValidationSeverity.Error, "item_id"));
         if (await _repository.HasPendingDialogueSettlementReferencesAsync(itemId, cancellationToken))
         {
             messages.Add(PendingDialogueSettlementReferenceError(itemId));

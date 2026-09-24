@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://scripts/quest_editor.gd" id="8_quest"]
 
 [ext_resource type="Script" path="res://scripts/world_object_editor.gd" id="9_world_objects"]
+
+[ext_resource type="Script" path="res://scripts/shop_editor.gd" id="10_shops"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -242,3 +244,9 @@ unique_name_in_owner = true
 title = "Refresh Content Studio"
 dialog_text = "Reload all workspaces and asset lists? Unsaved edits will be discarded."
 ok_button_text = "Refresh"
+
+[node name="Shops" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+script = ExtResource("10_shops")

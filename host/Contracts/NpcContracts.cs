@@ -17,7 +17,8 @@ public sealed record NpcDefinitionSummary(
     [property: JsonPropertyName("editable_in_npcs")] bool EditableInNpcs,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null);
 
 public sealed record NpcDefinition(
     [property: JsonPropertyName("npc_definition_id")] string NpcDefinitionId,
@@ -45,7 +46,8 @@ public sealed record NpcDefinition(
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
-    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null);
+    [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
+    [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null);
 
 public sealed record NpcDraft(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -69,7 +71,8 @@ public sealed record NpcDraft(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null);
 
 public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -95,7 +98,8 @@ public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
-    [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null);
+    [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null,
+    [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null);
 
 public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -119,7 +123,8 @@ public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
-    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null);
+    [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
+    [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null);
 
 public sealed record NpcPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
