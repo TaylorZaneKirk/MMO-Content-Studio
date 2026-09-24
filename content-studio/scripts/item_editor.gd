@@ -56,6 +56,7 @@ var _search: LineEdit
 var _list: VBoxContainer
 var _item_id: LineEdit
 var _display_name: LineEdit
+var _stackable: CheckBox
 var _icon: OptionButton
 var _icon_preview: TextureRect
 var _publication: Label
@@ -261,6 +262,10 @@ func _build_ui() -> void:
 	import_button.text = "Import PNG..."
 	import_button.pressed.connect(_open_import)
 	icon_row.add_child(import_button)
+	identity_grid.add_child(_field_label("Stackable"))
+	_stackable = CheckBox.new()
+	_stackable.toggled.connect(_on_form_changed.unbind(1))
+	identity_grid.add_child(_stackable)
 	_publication = _add_value_field(identity_grid, "Publication state", "No item selected")
 	_classification = _add_value_field(identity_grid, "Classification", "Unknown")
 	_kind = _add_value_field(identity_grid, "Authoring kind", "Unknown")
@@ -687,6 +692,7 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_item_id.editable = false
 	_display_name.text = str(payload.get("display_name", ""))
 	_rebuild_asset_options(str(payload.get("icon_texture_path", "")))
+	_stackable.button_pressed = bool(payload.get("stackable", false))
 	_publication.text = str(payload.get("publication_state", "Unknown"))
 	_classification.text = str(payload.get("classification_label", "Unknown"))
 	_kind.text = str(payload.get("authoring_kind", "Unknown"))
@@ -823,6 +829,7 @@ func _start_new() -> void:
 	_item_id.editable = true
 	_display_name.text = ""
 	_select_option(_icon, "")
+	_stackable.button_pressed = false
 	_publication.text = "Unsaved"
 	_classification.text = "Basic"
 	_kind.text = "Unified"
@@ -888,6 +895,7 @@ func _payload() -> Dictionary:
 	return {
 		"display_name": _display_name.text,
 		"icon_texture_path": _selected_metadata(_icon),
+		"stackable": _stackable.button_pressed,
 		"consumable_behavior": _consumable_payload() if _consumable_enabled.button_pressed else null,
 		"equipment": _equipment_payload() if _equipable.button_pressed else null,
 		"tool_capabilities": _collect_tool_capabilities(),
@@ -1919,7 +1927,7 @@ func _set_form_enabled(enabled: bool) -> void:
 		option.disabled = not enabled
 	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units]:
 		spin.editable = enabled
-	for toggle in [_consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
+	for toggle in [_stackable, _consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
 		toggle.disabled = not enabled
 	_preview_button.disabled = not enabled
 	_delete_button.disabled = not enabled or _current_item.is_empty()

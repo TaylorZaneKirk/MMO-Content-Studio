@@ -27,6 +27,9 @@ public interface IUnifiedItemRepository
     Task<IReadOnlyList<AuthoringOption>> LoadPublishedItemOptionsAsync(
         CancellationToken cancellationToken = default);
 
+    Task<bool> HasIncompatibleStackQuantitiesAsync(
+        string itemId, CancellationToken cancellationToken = default);
+
     Task<bool> HasLiveReferencesAsync(
         string itemId,
         CancellationToken cancellationToken = default);
@@ -88,6 +91,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 i.item_id,
                 i.item_name,
                 i.icon_texture_path,
+                i.stackable,
                 i.equipment_slot_id,
                 slot.display_name as equipment_slot_display_name,
                 i.runtime_enabled,
@@ -235,6 +239,18 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return records;
     }
 
+    public async Task<bool> HasIncompatibleStackQuantitiesAsync(
+        string itemId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select exists (select 1 from character_inventory where item_id = @item and stack_count <> 1)
+                or exists (select 1 from ground_items where item_id = @item and stack_count <> 1);
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async Task<bool> HasLiveReferencesAsync(
         string itemId,
         CancellationToken cancellationToken = default)
@@ -359,6 +375,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 item_id,
                 item_name,
                 icon_texture_path,
+                stackable,
                 equipment_slot_id,
                 runtime_enabled,
                 required_strength,
@@ -378,6 +395,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @item_id,
                 @item_name,
                 @icon_texture_path,
+                @stackable,
                 @equipment_slot_id,
                 false,
                 @required_strength,
@@ -398,6 +416,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             do update set
                 item_name = excluded.item_name,
                 icon_texture_path = excluded.icon_texture_path,
+                stackable = excluded.stackable,
                 equipment_slot_id = excluded.equipment_slot_id,
                 required_strength = excluded.required_strength,
                 reference_value = excluded.reference_value,
@@ -419,6 +438,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             command.Parameters.AddWithValue("item_id", itemId);
             command.Parameters.AddWithValue("item_name", draft.DisplayName);
             command.Parameters.AddWithValue("icon_texture_path", draft.IconTexturePath);
+            command.Parameters.AddWithValue("stackable", draft.Stackable);
             command.Parameters.Add("equipment_slot_id", NpgsqlDbType.Text).Value =
                 (object?)draft.Equipment?.EquipmentSlotId ?? DBNull.Value;
             command.Parameters.AddWithValue("required_strength", draft.Equipment?.RequiredStrength ?? 1);
@@ -690,6 +710,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 i.item_id,
                 i.item_name,
                 i.icon_texture_path,
+                i.stackable,
                 i.equipment_slot_id,
                 slot.display_name as equipment_slot_display_name,
                 i.runtime_enabled,
@@ -1812,7 +1833,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reader.GetString(reader.GetOrdinal("reclaim_policy")),
                 ReadNullableInt64(reader, "reclaim_value"),
                 ReadNullableString(reader, "condition_policy_id"),
-                ReadNullableString(reader, "repair_policy_id")));
+                ReadNullableString(reader, "repair_policy_id")),
+            reader.GetBoolean(reader.GetOrdinal("stackable")));
     }
 
     private static string? ReadNullableString(NpgsqlDataReader reader, string column)
@@ -1875,7 +1897,7 @@ public sealed record UnifiedItemRecord(
     ItemEquippedVisualDefinition? EquippedVisual,
     IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     DateTimeOffset UpdatedAtUtc,
-    ItemEconomyLifecycleDefinition? EconomyLifecycle = null);
+    ItemEconomyLifecycleDefinition? EconomyLifecycle = null, bool Stackable = false);
 
 public sealed record ConsumableProfileDraft(
     string UseAction,

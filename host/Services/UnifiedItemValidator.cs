@@ -48,6 +48,13 @@ public sealed class UnifiedItemValidator
     {
         var messages = new List<ApiError>();
         ValidateIdentity(itemId, draft.DisplayName, messages);
+        if (forPublication && !draft.Stackable &&
+            await _repository.HasIncompatibleStackQuantitiesAsync(itemId, cancellationToken))
+        {
+            messages.Add(new ApiError("incompatible_stack_quantity",
+                "Cannot publish a non-stackable item while retained inventory or ground rows have quantities other than 1.",
+                ValidationSeverity.Error, "stackable"));
+        }
         var asset = _assetService.Resolve(draft.IconTexturePath);
         if (!asset.Exists)
         {

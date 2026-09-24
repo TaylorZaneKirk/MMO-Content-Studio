@@ -25,7 +25,7 @@ public static partial class UnifiedItemDomainRules
         ItemConsumableBehaviorDraft? consumableBehavior,
         ItemEquipmentMetadataDraft? equipment,
         IReadOnlyList<ItemToolCapabilityDraft>? toolCapabilities,
-        ItemEconomyLifecycleDraft? economyLifecycle = null)
+        ItemEconomyLifecycleDraft? economyLifecycle = null, bool stackable = false)
     {
         var normalizedEquipment = NormalizeEquipment(equipment);
         return new NormalizedItemDraft(
@@ -34,7 +34,7 @@ public static partial class UnifiedItemDomainRules
             NormalizeConsumable(consumableBehavior),
             normalizedEquipment,
             NormalizeToolCapabilities(toolCapabilities),
-            NormalizeEconomyLifecycle(economyLifecycle));
+            NormalizeEconomyLifecycle(economyLifecycle), stackable);
     }
 
     public static NormalizedItemDraft FromRecord(UnifiedItemRecord record) =>
@@ -95,7 +95,7 @@ public static partial class UnifiedItemDomainRules
                     record.EconomyLifecycle.ReclaimPolicy,
                     record.EconomyLifecycle.ReclaimValue,
                     record.EconomyLifecycle.ConditionPolicyId,
-                    record.EconomyLifecycle.RepairPolicyId));
+                    record.EconomyLifecycle.RepairPolicyId), record.Stackable);
 
     private static ItemEconomyLifecycleDraft NormalizeEconomyLifecycle(ItemEconomyLifecycleDraft? value) =>
         new(
@@ -402,7 +402,7 @@ public sealed record NormalizedItemDraft(
     NormalizedItemConsumableBehavior? ConsumableBehavior,
     NormalizedItemEquipmentMetadata? Equipment,
     IReadOnlyList<ItemToolCapabilityDraft> ToolCapabilities,
-    ItemEconomyLifecycleDraft EconomyLifecycle);
+    ItemEconomyLifecycleDraft EconomyLifecycle, bool Stackable);
 
 public sealed record NormalizedItemConsumableBehavior(
     string UseAction,

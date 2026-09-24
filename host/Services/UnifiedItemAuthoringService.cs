@@ -477,7 +477,7 @@ public sealed class UnifiedItemAuthoringService
             request.ConsumableBehavior,
             request.Equipment,
             request.ToolCapabilities,
-            request.EconomyLifecycle);
+            request.EconomyLifecycle, request.Stackable);
 
     private NormalizedItemDraft Normalize(SaveItemDraftRequest request) =>
         UnifiedItemDomainRules.Normalize(
@@ -486,7 +486,7 @@ public sealed class UnifiedItemAuthoringService
             request.ConsumableBehavior,
             request.Equipment,
             request.ToolCapabilities,
-            request.EconomyLifecycle);
+            request.EconomyLifecycle, request.Stackable);
 
     private ItemDefinitionSummary ToSummary(UnifiedItemRecord record)
     {
@@ -506,7 +506,7 @@ public sealed class UnifiedItemAuthoringService
             hasEquipment,
             hasWeapon,
             hasTools,
-            record.UpdatedAtUtc);
+            record.UpdatedAtUtc, record.Stackable);
     }
 
     private ItemDefinition ToDefinition(UnifiedItemRecord record)
@@ -526,7 +526,7 @@ public sealed class UnifiedItemAuthoringService
             record.ToolCapabilities,
             record.UpdatedAtUtc,
             asset.FilePath,
-            record.EconomyLifecycle);
+            record.EconomyLifecycle, record.Stackable);
     }
 
     private static ItemConsumableBehaviorDefinition ToConsumableDefinition(NormalizedItemConsumableBehavior consumable) =>
@@ -607,6 +607,7 @@ public sealed class UnifiedItemAuthoringService
         var changes = new List<AuthoringChange>();
         AddChange(changes, "display_name", current?.DisplayName, requested.DisplayName);
         AddChange(changes, "icon_texture_path", current?.IconTexturePath, requested.IconTexturePath);
+        AddChange(changes, "stackable", Serialize(current?.Stackable), Serialize(requested.Stackable));
         AddChange(changes, "consumable_behavior", Serialize(current?.ConsumableBehavior), Serialize(requested.ConsumableBehavior));
         AddChange(changes, "equipment", Serialize(current?.Equipment), Serialize(requested.Equipment));
         AddChange(changes, "tool_capabilities", Serialize(current?.ToolCapabilities ?? []), Serialize(requested.ToolCapabilities));

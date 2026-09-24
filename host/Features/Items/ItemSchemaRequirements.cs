@@ -26,6 +26,7 @@ public sealed class ItemSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Table("item_equipped_visual_pose_anchors"),
         AuthoringSchemaRequirement.Column("item_definitions", "item_id"),
         AuthoringSchemaRequirement.Column("item_definitions", "item_name"),
+        AuthoringSchemaRequirement.Column("item_definitions", "stackable"),
         AuthoringSchemaRequirement.Column("item_definitions", "icon_texture_path"),
         AuthoringSchemaRequirement.Column("item_definitions", "equipment_slot_id"),
         AuthoringSchemaRequirement.Column("item_definitions", "runtime_enabled"),
