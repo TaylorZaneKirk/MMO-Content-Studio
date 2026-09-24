@@ -195,8 +195,7 @@ public static partial class UnifiedItemDomainRules
                     value.EffectIndex,
                     NormalizeRequired(value.EffectType),
                     NormalizeRequired(value.TargetId),
-                    value.MinimumAmount,
-                    value.MaximumAmount))
+                    value.Amount))
                 .OrderBy(value => value.EffectIndex)
                 .ThenBy(value => value.EffectType, StringComparer.Ordinal)
                 .ThenBy(value => value.TargetId, StringComparer.Ordinal)

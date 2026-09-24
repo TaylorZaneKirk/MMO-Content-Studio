@@ -480,13 +480,11 @@ public sealed class UnifiedItemValidator
                     ValidationSeverity.Error,
                     field));
             }
-            if (effect.MinimumAmount is < 1 or > UnifiedItemDomainRules.MaximumMagnitude
-                || effect.MaximumAmount is < 1 or > UnifiedItemDomainRules.MaximumMagnitude
-                || effect.MaximumAmount < effect.MinimumAmount)
+            if (effect.Amount is < 1 or > UnifiedItemDomainRules.MaximumMagnitude)
             {
                 messages.Add(new ApiError(
-                    "invalid_effect_amount_range",
-                    "Restore range must use positive values with maximum greater than or equal to minimum.",
+                    "invalid_effect_amount",
+                    $"Restore amount must be between 1 and {UnifiedItemDomainRules.MaximumMagnitude}.",
                     ValidationSeverity.Error,
                     field));
             }

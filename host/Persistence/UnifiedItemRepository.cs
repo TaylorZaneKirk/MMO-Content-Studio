@@ -826,7 +826,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select effect_index, effect_type, target_id, minimum_amount, maximum_amount
+            select effect_index, effect_type, target_id, amount
             from item_consumable_effects
             where item_id = @item_id
             order by effect_index, target_id;
@@ -841,8 +841,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reader.GetInt32(reader.GetOrdinal("effect_index")),
                 reader.GetString(reader.GetOrdinal("effect_type")),
                 reader.GetString(reader.GetOrdinal("target_id")),
-                reader.GetInt32(reader.GetOrdinal("minimum_amount")),
-                reader.GetInt32(reader.GetOrdinal("maximum_amount"))));
+                reader.GetInt32(reader.GetOrdinal("amount"))));
         }
 
         return records;
@@ -1344,16 +1343,14 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 effect_index,
                 effect_type,
                 target_id,
-                minimum_amount,
-                maximum_amount,
+                amount,
                 updated_at
             ) values (
                 @item_id,
                 @effect_index,
                 @effect_type,
                 @target_id,
-                @minimum_amount,
-                @maximum_amount,
+                @amount,
                 now()
             );
             """;
@@ -1365,8 +1362,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             command.Parameters.AddWithValue("effect_index", index);
             command.Parameters.AddWithValue("effect_type", effect.EffectType);
             command.Parameters.AddWithValue("target_id", effect.TargetId);
-            command.Parameters.AddWithValue("minimum_amount", effect.MinimumAmount);
-            command.Parameters.AddWithValue("maximum_amount", effect.MaximumAmount);
+            command.Parameters.AddWithValue("amount", effect.Amount);
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
