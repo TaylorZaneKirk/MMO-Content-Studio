@@ -124,7 +124,7 @@ public sealed class ShopAuthoringService(
         return messages;
     }
 
-    private static bool StableId(string? value) => value is not null && Regex.IsMatch(value, "^[a-z][a-z0-9_]*$");
+    private static bool StableId(string? value) => value is not null && Regex.IsMatch(value, "^[a-z][a-z0-9]*(_[a-z0-9]+)*$");
     private static ApiError Error(string code, string message, string? field = null) => new(code, message, ValidationSeverity.Error, field);
     private static string Signature(string definitionId, string operation, ShopRequest request) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
