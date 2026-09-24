@@ -74,6 +74,7 @@ const OP_ITEM_OPTIONS := "item_options"
 const OP_ITEMS := "items"
 const OP_ITEM := "item"
 const OP_ITEM_PREVIEW := "item_preview"
+const OP_ITEM_SAVE_AND_PUBLISH := "item_save_and_publish"
 const OP_ITEM_SAVE_DRAFT := "item_save_draft"
 const OP_ITEM_PUBLISH := "item_publish"
 const OP_ITEM_DISABLE := "item_disable"
@@ -204,6 +205,9 @@ func save_item_draft(item_id: String, payload: Dictionary) -> void:
 
 func save_complete_item_draft(item_id: String, payload: Dictionary) -> void:
 	_request(OP_ITEM_SAVE_DRAFT, "/api/v1/items/%s/draft" % item_id.uri_encode(), HTTPClient.METHOD_PUT, payload)
+
+func save_and_publish_item(item_id: String, payload: Dictionary) -> void:
+	_request(OP_ITEM_SAVE_AND_PUBLISH, "/api/v1/items/%s/save-and-publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
 func publish_item(item_id: String, expected_updated_at_utc: Variant, preview_signature: String = "") -> void:
 	_request(OP_ITEM_PUBLISH, "/api/v1/items/%s/publish" % item_id.uri_encode(), HTTPClient.METHOD_POST, {
@@ -539,7 +543,7 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			item_preview_received.emit(data)
 		OP_ITEM_DELETE:
 			item_delete_completed.emit(data)
-		OP_ITEM_SAVE_DRAFT, OP_ITEM_PUBLISH, OP_ITEM_DISABLE:
+		OP_ITEM_SAVE_DRAFT, OP_ITEM_SAVE_AND_PUBLISH, OP_ITEM_PUBLISH, OP_ITEM_DISABLE:
 			item_mutation_completed.emit(data)
 		OP_MOB_ITEM:
 			mob_item_received.emit(data)

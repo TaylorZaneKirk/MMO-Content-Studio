@@ -573,7 +573,7 @@ func _build_ui() -> void:
 	preview.add_child(_icon_preview)
 	preview.add_child(_heading("Operation", 16))
 	_operation = OptionButton.new()
-	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
+	for option in [["Save as Draft", "save_draft"], ["Save & Publish", "save_and_publish"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
 		_operation.add_item(option[0])
 		_operation.set_item_metadata(_operation.item_count - 1, option[1])
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
@@ -734,7 +734,7 @@ func _apply_pending_grip_anchor_handoff() -> bool:
 
 func _on_preview_received(payload: Dictionary) -> void:
 	var operation := str(payload.get("target_operation", "save_draft"))
-	var applicable := bool(payload.get("valid_for_publication", false)) if operation == "publish" else bool(payload.get("valid_for_draft", false))
+	var applicable := bool(payload.get("valid_for_publication", false)) if operation in ["publish", "save_and_publish"] else bool(payload.get("valid_for_draft", false))
 	_workspace_support.accept_preview(
 		operation,
 		str(payload.get("preview_signature", "")),
@@ -941,6 +941,10 @@ func _apply() -> void:
 	var item_id := _item_id.text.strip_edges()
 	var expected: Variant = _current_item.get("updated_at_utc", null)
 	match operation:
+		"save_and_publish":
+			var payload := _payload()
+			payload["preview_signature"] = preview_signature
+			_client.save_and_publish_item(item_id, payload)
 		"publish":
 			_client.publish_item(item_id, expected, preview_signature)
 		"disable":

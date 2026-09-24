@@ -141,16 +141,18 @@ public sealed class UnifiedItemAuthoringService
                 existing is not null
                 && operation is "publish" or "disable" or "delete"
                 && !EquivalentDraft(existing, requested);
-            var effective = operation == "save_draft" || hasUnsavedOperationChanges
+            var effective = operation is "save_draft" or "save_and_publish" || hasUnsavedOperationChanges
                 ? requested
                 : UnifiedItemDomainRules.FromRecord(existing!);
             var validation = await _validator.ValidateAsync(
                 itemId,
                 effective,
                 existing,
-                operation == "publish" && !hasUnsavedOperationChanges,
+                operation is "publish" or "save_and_publish" && !hasUnsavedOperationChanges,
                 cancellationToken);
             var messages = validation.Messages.ToList();
+            if (operation == "save_and_publish" && existing?.RuntimeEnabled != true)
+                messages.Add(SaveAndPublishRequiresPublished());
             if (hasUnsavedOperationChanges)
             {
                 messages.Add(new ApiError(
@@ -177,27 +179,36 @@ public sealed class UnifiedItemAuthoringService
         }
     }
 
-    public async Task<AuthoringOperationResult<ItemMutationResponse>> SaveDraftAsync(
-        string itemId,
-        SaveItemDraftRequest request,
-        CancellationToken cancellationToken = default)
+    public Task<AuthoringOperationResult<ItemMutationResponse>> SaveDraftAsync(
+        string itemId, SaveItemDraftRequest request, CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, request, false, cancellationToken);
+
+    public Task<AuthoringOperationResult<ItemMutationResponse>> SaveAndPublishAsync(
+        string itemId, SaveItemDraftRequest request, CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, request, true, cancellationToken);
+
+    private async Task<AuthoringOperationResult<ItemMutationResponse>> SaveAsync(
+        string itemId, SaveItemDraftRequest request, bool publish, CancellationToken cancellationToken)
     {
+        var operation = publish ? "save_and_publish" : "save_draft";
         try
         {
             var existing = await _repository.LoadAsync(itemId, cancellationToken);
             var wasRuntimeEnabled = existing?.RuntimeEnabled == true;
+            if (publish && !wasRuntimeEnabled)
+                return AuthoringOperationResult<ItemMutationResponse>.Failure(SaveAndPublishRequiresPublished());
             var draft = Normalize(request);
-            if (!IsMatchingPreview(itemId, "save_draft", draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature))
+            if (!IsMatchingPreview(itemId, operation, draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature))
             {
-                return AuthoringOperationResult<ItemMutationResponse>.Failure(PreviewMismatch("save_draft"));
+                return AuthoringOperationResult<ItemMutationResponse>.Failure(PreviewMismatch(operation));
             }
 
-            var validation = await _validator.ValidateAsync(itemId, draft, existing, false, cancellationToken);
-            if (!validation.ValidForDraft)
+            var validation = await _validator.ValidateAsync(itemId, draft, existing, publish, cancellationToken);
+            if (publish ? !validation.ValidForPublication : !validation.ValidForDraft)
             {
                 return AuthoringOperationResult<ItemMutationResponse>.Failure(validation.Messages);
             }
-            if (wasRuntimeEnabled)
+            if (wasRuntimeEnabled && !publish)
             {
                 var referenceErrors = new List<ApiError>();
                 await AddDisableReferenceErrorsAsync(itemId, referenceErrors, cancellationToken);
@@ -207,14 +218,16 @@ public sealed class UnifiedItemAuthoringService
                 }
             }
 
-            var saved = await _repository.SaveDraftAsync(
+            var saved = publish
+                ? await _repository.SaveAndPublishAsync(itemId, draft, request.ExpectedUpdatedAtUtc, cancellationToken)
+                : await _repository.SaveDraftAsync(
                 itemId,
                 draft,
                 request.ExpectedUpdatedAtUtc,
                 existing is null,
                 cancellationToken);
             var verified = await _repository.LoadAsync(itemId, cancellationToken);
-            if (verified is null || !Equivalent(saved, verified))
+            if (verified is null || !Equivalent(saved, verified) || verified.RuntimeEnabled != publish)
             {
                 throw new InvalidOperationException("The saved item aggregate failed reload-and-verify.");
             }
@@ -228,7 +241,14 @@ public sealed class UnifiedItemAuthoringService
             }
 
             return AuthoringOperationResult<ItemMutationResponse>.Success(
-                new ItemMutationResponse("save_draft", ToDefinition(verified), messages));
+                new ItemMutationResponse(operation, ToDefinition(verified), messages));
+        }
+        catch (PostgresException exception) when (publish && exception.SqlState == "P0001"
+            && (exception.MessageText.StartsWith("Published Shop stock depends on item", StringComparison.Ordinal)
+                || exception.MessageText.StartsWith("Cannot publish non-stackable item", StringComparison.Ordinal)))
+        {
+            return AuthoringOperationResult<ItemMutationResponse>.Failure(new ApiError(
+                "publication_dependency_changed", exception.MessageText, ValidationSeverity.Error));
         }
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
@@ -450,7 +470,7 @@ public sealed class UnifiedItemAuthoringService
         CancellationToken cancellationToken)
     {
         if (await _repository.HasShopReferencesAsync(itemId, true, cancellationToken))
-            messages.Add(new ApiError("published_shop_stock_reference", "This item is stock in a Published Shop. Unpublish that Shop before changing this item.", ValidationSeverity.Error, "item_id"));
+            messages.Add(new ApiError("published_shop_stock_reference", "This item is stock in a Published Shop. Use Save & Publish for compatible edits. Unpublish the Shop before saving this item as Draft or disabling it.", ValidationSeverity.Error, "item_id"));
         if (await _repository.HasPendingDialogueSettlementReferencesAsync(itemId, cancellationToken))
         {
             messages.Add(PendingDialogueSettlementReferenceError(itemId));
@@ -619,7 +639,7 @@ public sealed class UnifiedItemAuthoringService
         var before = existing?.RuntimeEnabled == true ? "Published" : existing is null ? null : "Draft";
         var after = operation switch
         {
-            "publish" => "Published",
+            "publish" or "save_and_publish" => "Published",
             "delete" => "Deleted",
             _ => "Draft"
         };
@@ -677,7 +697,7 @@ public sealed class UnifiedItemAuthoringService
     private static string? NormalizePreviewOperation(string? operation)
     {
         var normalized = (operation ?? string.Empty).Trim();
-        return normalized is "save_draft" or "publish" or "disable" or "delete"
+        return normalized is "save_draft" or "save_and_publish" or "publish" or "disable" or "delete"
             ? normalized
             : null;
     }
@@ -709,9 +729,13 @@ public sealed class UnifiedItemAuthoringService
         ValidationSeverity.Error,
         "item_id");
 
+    private static ApiError SaveAndPublishRequiresPublished() => new(
+        "save_and_publish_requires_published", "Save & Publish edits an existing Published item. For a new or Draft item, Save Draft then Publish.",
+        ValidationSeverity.Error, "publication_state");
+
     private static ApiError InvalidTargetOperation() => new(
         "invalid_target_operation",
-        "Target operation must be save_draft, publish, disable, or delete.",
+        "Target operation must be save_draft, save_and_publish, publish, disable, or delete.",
         ValidationSeverity.Error,
         "target_operation");
 

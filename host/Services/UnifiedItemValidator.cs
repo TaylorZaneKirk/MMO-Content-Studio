@@ -55,6 +55,16 @@ public sealed class UnifiedItemValidator
                 "Cannot publish a non-stackable item while retained inventory or ground rows have quantities other than 1.",
                 ValidationSeverity.Error, "stackable"));
         }
+        if (forPublication)
+        {
+            var shops = await _repository.LoadIncompatiblePublishedShopsAsync(itemId,
+                draft.EconomyLifecycle.ShopPolicy ?? string.Empty, draft.EconomyLifecycle.NpcBuyPrice,
+                draft.EconomyLifecycle.NpcSellPrice, cancellationToken);
+            if (shops.Count > 0)
+                messages.Add(new ApiError("incompatible_published_shop_stock",
+                    $"This economic policy would invalidate stock in Published Shops: {string.Join(", ", shops)}. Keep a compatible policy or edit those Shops first.",
+                    ValidationSeverity.Error, "economy_lifecycle.shop_policy"));
+        }
         var asset = _assetService.Resolve(draft.IconTexturePath);
         if (!asset.Exists)
         {

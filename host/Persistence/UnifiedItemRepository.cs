@@ -63,6 +63,14 @@ public interface IUnifiedItemRepository
         bool expectNew,
         CancellationToken cancellationToken = default);
 
+    Task<UnifiedItemRecord> SaveAndPublishAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> LoadIncompatiblePublishedShopsAsync(
+        string itemId, string shopPolicy, long? npcBuyPrice, long? npcSellPrice,
+        CancellationToken cancellationToken = default);
+
     Task<UnifiedItemRecord> SetPublicationAsync(
         string itemId,
         bool runtimeEnabled,
@@ -253,6 +261,28 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
     }
 
+    public async Task<IReadOnlyList<string>> LoadIncompatiblePublishedShopsAsync(
+        string itemId, string shopPolicy, long? npcBuyPrice, long? npcSellPrice,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select shop.shop_definition_id from shop_stock_items stock
+            join shop_definitions shop using (shop_definition_id)
+            where stock.item_id = @item and shop.publication_state = 'Published'
+              and not shop_stock_item_is_valid(true, @policy, @buy, @sell, stock.default_stock)
+            order by shop.shop_definition_id;
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        command.Parameters.AddWithValue("policy", shopPolicy);
+        command.Parameters.Add("buy", NpgsqlDbType.Bigint).Value = (object?)npcBuyPrice ?? DBNull.Value;
+        command.Parameters.Add("sell", NpgsqlDbType.Bigint).Value = (object?)npcSellPrice ?? DBNull.Value;
+        var shops = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) shops.Add(reader.GetString(0));
+        return shops;
+    }
+
     public async Task<bool> HasShopReferencesAsync(string itemId, bool publishedOnly, CancellationToken cancellationToken = default)
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
@@ -364,12 +394,21 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             reader.GetBoolean(reader.GetOrdinal("runtime_enabled")));
     }
 
-    public async Task<UnifiedItemRecord> SaveDraftAsync(
-        string itemId,
-        NormalizedItemDraft draft,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        bool expectNew,
-        CancellationToken cancellationToken = default)
+    public Task<UnifiedItemRecord> SaveDraftAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        bool expectNew, CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, draft, expectedUpdatedAtUtc, expectNew, false, cancellationToken);
+
+    public Task<UnifiedItemRecord> SaveAndPublishAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, draft, expectedUpdatedAtUtc, false, true, cancellationToken);
+
+    // Both saves replace the complete aggregate in one transaction. A published
+    // edit never passes through runtime_enabled=false, so valid dependents stay live.
+    private async Task<UnifiedItemRecord> SaveAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        bool expectNew, bool publish, CancellationToken cancellationToken)
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -380,9 +419,13 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
         }
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, itemId);
+        if (publish && existing is null)
+            throw new UnifiedItemNotFoundException(itemId);
+        if (publish && !existing!.RuntimeEnabled)
+            throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
         if (existing?.RuntimeEnabled == true)
         {
-            await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, "save_draft", cancellationToken);
+            await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, publish ? "save_and_publish" : "save_draft", cancellationToken);
         }
 
         const string sql = """
@@ -412,7 +455,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @icon_texture_path,
                 @stackable,
                 @equipment_slot_id,
-                false,
+                @runtime_enabled,
                 @required_strength,
                 @reference_value,
                 @trade_policy,
@@ -445,12 +488,13 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reclaim_value = excluded.reclaim_value,
                 condition_policy_id = excluded.condition_policy_id,
                 repair_policy_id = excluded.repair_policy_id,
-                runtime_enabled = false,
+                runtime_enabled = excluded.runtime_enabled,
                 updated_at = now();
             """;
         await using (var command = new NpgsqlCommand(sql, connection, transaction))
         {
             command.Parameters.AddWithValue("item_id", itemId);
+            command.Parameters.AddWithValue("runtime_enabled", publish);
             command.Parameters.AddWithValue("item_name", draft.DisplayName);
             command.Parameters.AddWithValue("icon_texture_path", draft.IconTexturePath);
             command.Parameters.AddWithValue("stackable", draft.Stackable);
