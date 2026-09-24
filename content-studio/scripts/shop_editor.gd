@@ -156,6 +156,7 @@ func _note(parent: Node, value: String) -> void:
 func _page(pages: TabContainer, title: String, heading: String, description: String) -> VBoxContainer:
 	var scroll := ScrollContainer.new()
 	scroll.name = title
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	pages.add_child(scroll)
 	var page := VBoxContainer.new()
 	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -192,13 +193,19 @@ func _text_field(caption: String, parent: Node) -> LineEdit:
 
 
 func _number_field(parent: Node, caption: String, minimum: int, maximum: int, value: int) -> SpinBox:
-	_label(parent, caption)
+	var field := VBoxContainer.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.add_theme_constant_override("separation", 6)
+	parent.add_child(field)
+	_label(field, caption).autowrap_mode = TextServer.AUTOWRAP_OFF
 	var number := SpinBox.new()
+	number.custom_minimum_size = Vector2(160, 40)
+	number.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	number.min_value = minimum
 	number.max_value = maximum
 	number.step = 1
 	number.value = value
-	parent.add_child(number)
+	field.add_child(number)
 	number.value_changed.connect(_invalidate)
 	return number
 
@@ -206,6 +213,7 @@ func _number_field(parent: Node, caption: String, minimum: int, maximum: int, va
 # Each row owns its controls; its position is the authored stock order.
 func _add_stock(value: Dictionary) -> void:
 	var row := VBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
 	_stock.add_child(row)
 	var item := OptionButton.new()
 	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -219,6 +227,7 @@ func _add_stock(value: Dictionary) -> void:
 		item.set_item_metadata(index, option["item_id"])
 		if option["item_id"] == value.get("item_id", ""): item.select(index)
 	var context := _label(row, "")
+	context.modulate = Color("a9b8c9")
 	var refresh_context := func():
 		context.text = "Choose an item to see its publication and economic policy."
 		for option: Dictionary in _options.get("items", []):
@@ -227,15 +236,19 @@ func _add_stock(value: Dictionary) -> void:
 	item.item_selected.connect(func(_index: int): refresh_context.call(); _invalidate())
 	refresh_context.call()
 	var quantities := HBoxContainer.new()
+	quantities.add_theme_constant_override("separation", 16)
 	row.add_child(quantities)
 	var default_stock := _number_field(quantities, "Default stock", 0, 2147483647, int(value.get("default_stock", 0)))
 	var restock_ticks := _number_field(quantities, "Restock ticks", 1, 2147483647, int(value.get("restock_ticks", 1)))
 	row.set_meta("controls", [item, default_stock, restock_ticks])
 	var buttons := HBoxContainer.new()
+	buttons.alignment = BoxContainer.ALIGNMENT_END
+	buttons.add_theme_constant_override("separation", 6)
 	row.add_child(buttons)
 	_button(buttons, "↑", func(): _stock.move_child(row, maxi(0, row.get_index() - 1)); _invalidate())
 	_button(buttons, "↓", func(): _stock.move_child(row, mini(_stock.get_child_count() - 1, row.get_index() + 1)); _invalidate())
 	_button(buttons, "Remove", func(): _stock.remove_child(row); row.queue_free(); _invalidate())
+	row.add_child(HSeparator.new())
 
 
 func open_resource(shop_id: String) -> void:
