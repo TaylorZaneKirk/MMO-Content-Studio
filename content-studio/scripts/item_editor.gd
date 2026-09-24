@@ -1622,6 +1622,9 @@ func _add_consumable_effect_row(initial: Dictionary = {}) -> void:
 	_fill_option(target, _option_array("resource_targets", [{"id": "health", "display_name": "Health"}]))
 	_select_option(target, str(initial.get("target_id", "health")))
 	row.add_child(target)
+	var amount_label := Label.new()
+	amount_label.text = "Restore amount"
+	row.add_child(amount_label)
 	var amount := _row_spin(1, 1000000, float(initial.get("amount", 1)))
 	amount.tooltip_text = "Fixed restore amount"
 	row.add_child(amount)
