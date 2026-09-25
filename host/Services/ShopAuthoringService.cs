@@ -44,7 +44,7 @@ public sealed class ShopAuthoringService(
                     changes.Add(new(field.Name, previous.ValueKind == JsonValueKind.Undefined ? null : previous.Clone(), field.Value.Clone()));
             }
         }
-        var nextState = operation switch { "publish" => "Published", "disable" => "Disabled", "delete" => null, _ => "Draft" };
+        var nextState = operation switch { "publish" or "save_and_publish" => "Published", "disable" => "Disabled", "delete" => null, _ => "Draft" };
         if (existing?.PublicationState != nextState) changes.Add(new("publication_state", existing?.PublicationState, nextState));
         return AuthoringOperationResult<ShopPreview>.Success(new(operation,
             !messages.Any(message => message.Severity == ValidationSeverity.Error),
@@ -67,7 +67,7 @@ public sealed class ShopAuthoringService(
         var verified = await repository.LoadAsync(definitionId, cancellationToken);
         if (JsonSerializer.Serialize(saved) != JsonSerializer.Serialize(verified))
             throw new InvalidOperationException("Shop mutation failed reload-and-verify.");
-        if (operation is "publish" or "disable" or "delete" || existing?.PublicationState == "Published")
+        if (operation is "publish" or "save_and_publish" or "disable" or "delete" || existing?.PublicationState == "Published")
             messages.AddRange(await publisher.PublishCatalogsAsync(RuntimeCatalogPublicationScope.Shop, cancellationToken));
         return AuthoringOperationResult<ShopMutation>.Success(new(operation, verified, messages));
     });
@@ -76,14 +76,16 @@ public sealed class ShopAuthoringService(
         ShopDefinition? existing, CancellationToken cancellationToken)
     {
         var messages = new List<ApiError>();
-        if (operation is not ("save_draft" or "publish" or "disable" or "delete"))
-            messages.Add(Error("invalid_operation", "Choose Save Draft, Publish, Disable or Delete."));
+        if (operation is not ("save_draft" or "save_and_publish" or "publish" or "disable" or "delete"))
+            messages.Add(Error("invalid_operation", "Choose Save Draft, Save & Publish, Publish, Disable or Delete."));
         if (!StableId(definitionId)) messages.Add(Error("invalid_definition_id", "Use a lowercase snake-case definition ID.", "definition_id"));
         if (existing?.UpdatedAtUtc != request.ExpectedUpdatedAtUtc)
             messages.Add(Error("shop_version_conflict", "Definition changed; reload before editing."));
         if (existing is null && operation != "save_draft")
             messages.Add(Error("shop_not_found", "Save a draft first."));
-        if (operation != "save_draft" && existing is not null && JsonSerializer.Serialize(existing.Draft) != JsonSerializer.Serialize(request.Draft))
+        if (operation == "save_and_publish" && existing?.PublicationState != "Published")
+            messages.Add(Error("save_and_publish_requires_published", "Save & Publish edits an existing Published Shop. For a new or Draft Shop, Save Draft then Publish."));
+        if (operation is not ("save_draft" or "save_and_publish") && existing is not null && JsonSerializer.Serialize(existing.Draft) != JsonSerializer.Serialize(request.Draft))
             messages.Add(Error("unsaved_shop_changes", "Save edited fields as a draft before this operation."));
         if (operation == "delete" && existing?.PublicationState != "Disabled")
             messages.Add(Error("shop_still_published", "Disable the definition before deleting it."));
@@ -112,7 +114,7 @@ public sealed class ShopAuthoringService(
             }
             if (!items.TryGetValue(row.ItemId, out var item))
                 messages.Add(Error("missing_stock_item", $"Item '{row.ItemId}' does not exist.", "stock"));
-            else if (operation == "publish" && (!item.RuntimeEnabled ||
+            else if (operation is "publish" or "save_and_publish" && (!item.RuntimeEnabled ||
                 (row.DefaultStock > 0
                     ? item.ShopPolicy is not ("npc_sells" or "npc_buys_and_sells") || item.NpcSellPrice is null or < 0
                     : item.ShopPolicy is not ("npc_buys" or "npc_buys_and_sells") || item.NpcBuyPrice is null or < 0)))

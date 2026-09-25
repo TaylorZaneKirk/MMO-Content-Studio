@@ -101,7 +101,7 @@ func _build_ui() -> void:
 	_heading(review, "Review & apply", 20)
 	_label(review, "Operation")
 	_operation = OptionButton.new()
-	for operation: String in ["save_draft", "publish", "disable", "delete"]:
+	for operation: String in ["save_draft", "save_and_publish", "publish", "disable", "delete"]:
 		_operation.add_item(_support.operation_name(operation))
 		_operation.set_item_metadata(_operation.item_count - 1, operation)
 	_operation.item_selected.connect(_invalidate)
@@ -283,6 +283,7 @@ func _on_definition(payload: Dictionary) -> void:
 	_definition_id.text = str(payload.get("shop_definition_id", ""))
 	_definition_id.editable = payload.get("updated_at_utc") == null
 	_state.text = str(payload.get("publication_state", "Draft"))
+	_operation.select(1 if _state.text == "Published" else 0)
 	var draft: Dictionary = payload.get("draft", {})
 	for key: String in _fields:
 		var control: Control = _fields[key]

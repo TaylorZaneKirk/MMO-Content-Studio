@@ -256,7 +256,7 @@ func preview_shop(definition_id: String, payload: Dictionary) -> void:
 	_request(OP_SHOP_PREVIEW, "/api/v1/shops/%s/preview" % definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
 
 func mutate_shop(definition_id: String, operation: String, payload: Dictionary) -> void:
-	var suffix := "draft" if operation == "save_draft" else operation
+	var suffix := "draft" if operation == "save_draft" else "save-and-publish" if operation == "save_and_publish" else operation
 	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
 	_request(OP_SHOP_MUTATION, "/api/v1/shops/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
 

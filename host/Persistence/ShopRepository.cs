@@ -97,20 +97,22 @@ public sealed class ShopRepository(AuthoringDatabaseConnectionFactory connection
             if (existing!.PublicationState != "Disabled") throw new ShopConcurrencyException();
             command.CommandText = "DELETE FROM shop_definitions WHERE shop_definition_id=@id";
         }
-        else if (operation == "save_draft")
+        else if (operation is "save_draft" or "save_and_publish")
         {
             command.CommandText = existing is null ? """
                 INSERT INTO shop_definitions (shop_definition_id, display_name, buys_unstocked_items, price_change_per_stock_percent, notes)
                 VALUES (@id,@name,@buys,@rate,@notes)
                 """ : """
                 UPDATE shop_definitions SET display_name=@name, buys_unstocked_items=@buys,
-                    price_change_per_stock_percent=@rate, notes=@notes, publication_state='Draft',
+                    price_change_per_stock_percent=@rate, notes=@notes, publication_state=@state,
                     updated_at=greatest(clock_timestamp(), updated_at + interval '1 microsecond') WHERE shop_definition_id=@id
                 """;
             command.Parameters.AddWithValue("name", draft.DisplayName);
             command.Parameters.AddWithValue("buys", draft.BuysUnstockedItems);
             command.Parameters.AddWithValue("rate", draft.PriceChangePerStockPercent);
             command.Parameters.Add("notes", NpgsqlDbType.Text).Value = (object?)draft.Notes ?? DBNull.Value;
+            if (existing is not null)
+                command.Parameters.AddWithValue("state", operation == "save_and_publish" ? "Published" : "Draft");
         }
         else
         {
@@ -121,7 +123,7 @@ public sealed class ShopRepository(AuthoringDatabaseConnectionFactory connection
             command.Parameters.AddWithValue("state", operation == "publish" ? "Published" : "Disabled");
         }
         await command.ExecuteNonQueryAsync(cancellationToken);
-        if (operation == "save_draft")
+        if (operation is "save_draft" or "save_and_publish")
         {
             command.CommandText = "DELETE FROM shop_stock_items WHERE shop_definition_id=@id";
             await command.ExecuteNonQueryAsync(cancellationToken);

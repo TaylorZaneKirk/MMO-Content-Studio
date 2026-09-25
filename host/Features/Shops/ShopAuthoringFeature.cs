@@ -31,6 +31,8 @@ public static class ShopAuthoringFeature
             AuthoringHttpResults.FromOperation(context, await service.PreviewAsync(definitionId, request, ct)));
         shops.MapPut("/{definitionId}/draft", async (HttpContext context, string definitionId, ShopRequest request, ShopAuthoringService service, CancellationToken ct) =>
             AuthoringHttpResults.FromOperation(context, await service.MutateAsync(definitionId, "save_draft", request, ct)));
+        shops.MapPost("/{definitionId}/save-and-publish", async (HttpContext context, string definitionId, ShopRequest request, ShopAuthoringService service, CancellationToken ct) =>
+            AuthoringHttpResults.FromOperation(context, await service.MutateAsync(definitionId, "save_and_publish", request, ct)));
         shops.MapPost("/{definitionId}/publish", async (HttpContext context, string definitionId, ShopRequest request, ShopAuthoringService service, CancellationToken ct) =>
             AuthoringHttpResults.FromOperation(context, await service.MutateAsync(definitionId, "publish", request, ct)));
         shops.MapPost("/{definitionId}/disable", async (HttpContext context, string definitionId, ShopRequest request, ShopAuthoringService service, CancellationToken ct) =>
