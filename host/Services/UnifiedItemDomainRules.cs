@@ -253,7 +253,8 @@ public static partial class UnifiedItemDomainRules
             NormalizeOptional(profile.AccuracyStyle),
             profile.MinimumRangeTiles,
             profile.MaximumRangeTiles,
-            profile.AttackSpeedUnits);
+            profile.AttackSpeedUnits,
+            NormalizeOptional(profile.RangedDamageType));
     }
 
     private static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(

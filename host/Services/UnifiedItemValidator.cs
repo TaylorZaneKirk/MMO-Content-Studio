@@ -642,13 +642,25 @@ public sealed class UnifiedItemValidator
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.attack_type"));
         }
-        if (profile.AccuracyStyle is null || !_registry.SupportedAttackStyles.Contains(profile.AccuracyStyle))
+        if (profile.AttackType == "melee" &&
+            (profile.AccuracyStyle is null || !_registry.SupportedAttackStyles.Contains(profile.AccuracyStyle) ||
+             profile.RangedDamageType is not null))
         {
             messages.Add(new ApiError(
                 "unsupported_attack_style",
                 "Melee weapon profiles must use thrust, slash, or crush accuracy style.",
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.accuracy_style"));
+        }
+        if (profile.AttackType == "ranged" &&
+            (profile.AccuracyStyle is not null ||
+             profile.RangedDamageType is not ("light" or "standard" or "heavy")))
+        {
+            messages.Add(new ApiError(
+                "invalid_ranged_weapon_profile",
+                "Ranged weapon profiles need light, standard, or heavy damage type and no melee accuracy style.",
+                ValidationSeverity.Error,
+                "equipment.weapon_profile.ranged_damage_type"));
         }
         if (profile.MinimumRangeTiles < (forPublication ? 1 : 0)
             || profile.MaximumRangeTiles < profile.MinimumRangeTiles

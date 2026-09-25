@@ -9,7 +9,8 @@ public sealed class ItemAuthoringRegistry
 
     private static readonly AuthoringOption[] AttackFamilies =
     [
-        new("melee", "Melee")
+        new("melee", "Melee"),
+        new("ranged", "Ranged")
     ];
 
     private static readonly AuthoringOption[] MeleeAttackStyles =

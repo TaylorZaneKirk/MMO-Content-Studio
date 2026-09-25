@@ -954,7 +954,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select profile_id, attack_type, accuracy_style,
+            select profile_id, attack_type, accuracy_style, ranged_damage_type,
                 minimum_range_tiles, maximum_range_tiles, attack_speed_units
             from item_combat_profiles
             where item_id = @item_id;
@@ -973,7 +973,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             ReadNullableString(reader, "accuracy_style"),
             reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
             reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
-            reader.GetInt32(reader.GetOrdinal("attack_speed_units")));
+            reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
+            ReadNullableString(reader, "ranged_damage_type"));
     }
 
     private static async Task<EquipmentCombatBonusDefinition?> LoadCombatBonusesAsync(
@@ -1499,6 +1500,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 profile_id,
                 attack_type,
                 accuracy_style,
+                ranged_damage_type,
                 minimum_range_tiles,
                 maximum_range_tiles,
                 attack_speed_units,
@@ -1508,6 +1510,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @profile_id,
                 @attack_type,
                 @accuracy_style,
+                @ranged_damage_type,
                 @minimum_range_tiles,
                 @maximum_range_tiles,
                 @attack_speed_units,
@@ -1517,6 +1520,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 profile_id = excluded.profile_id,
                 attack_type = excluded.attack_type,
                 accuracy_style = excluded.accuracy_style,
+                ranged_damage_type = excluded.ranged_damage_type,
                 minimum_range_tiles = excluded.minimum_range_tiles,
                 maximum_range_tiles = excluded.maximum_range_tiles,
                 attack_speed_units = excluded.attack_speed_units,
@@ -1528,6 +1532,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("attack_type", profile.AttackType);
         command.Parameters.Add("accuracy_style", NpgsqlDbType.Text).Value =
             (object?)profile.AccuracyStyle ?? DBNull.Value;
+        command.Parameters.Add("ranged_damage_type", NpgsqlDbType.Text).Value =
+            (object?)profile.RangedDamageType ?? DBNull.Value;
         command.Parameters.AddWithValue("minimum_range_tiles", profile.MinimumRangeTiles);
         command.Parameters.AddWithValue("maximum_range_tiles", profile.MaximumRangeTiles);
         command.Parameters.AddWithValue("attack_speed_units", profile.AttackSpeedUnits);

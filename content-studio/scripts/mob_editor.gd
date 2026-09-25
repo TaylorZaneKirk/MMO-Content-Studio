@@ -22,7 +22,9 @@ const DEFAULT_BONUS_FIELDS := [
 	"defence_thrust",
 	"defence_slash",
 	"defence_crush",
-	"defence_ranged",
+	"defence_ranged_light",
+	"defence_ranged_standard",
+	"defence_ranged_heavy",
 	"defence_magic",
 ]
 const GAME_ASSET_PREFIX := "res://assets/"

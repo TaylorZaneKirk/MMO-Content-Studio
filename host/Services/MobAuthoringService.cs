@@ -423,7 +423,7 @@ public sealed class MobAuthoringService
         int mobTargetScanIntervalMs,
         int mobTargetScanCandidateLimit,
         MobCombatProfileDefinition? primaryCombatProfile,
-        EquipmentCombatBonusDefinition? combatBonuses,
+        MobCombatBonusDefinition? combatBonuses,
         IReadOnlyList<MobDropDraft>? guaranteedDrops,
         string? visualMode = ActorVisualModes.FlatSprite,
         RiggedSpriteVisualDescriptor? compositeVisual = null,
@@ -465,7 +465,7 @@ public sealed class MobAuthoringService
                     primaryCombatProfile.AttackLevel,
                     primaryCombatProfile.StrengthLevel,
                     primaryCombatProfile.DefenceLevel),
-            combatBonuses ?? EquipmentCombatBonusDefinition.Zero,
+            combatBonuses ?? MobCombatBonusDefinition.Zero,
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
             presentation.CompositeVisual,
@@ -560,7 +560,7 @@ public sealed class MobAuthoringService
         && record.MobTargetScanIntervalMs == draft.MobTargetScanIntervalMs
         && record.MobTargetScanCandidateLimit == draft.MobTargetScanCandidateLimit
         && record.PrimaryCombatProfile == draft.PrimaryCombatProfile
-        && (record.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == draft.CombatBonuses
+        && (record.CombatBonuses ?? MobCombatBonusDefinition.Zero) == draft.CombatBonuses
         && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops)
         && record.VisualMode == draft.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
@@ -592,7 +592,7 @@ public sealed class MobAuthoringService
         && left.MobTargetScanIntervalMs == right.MobTargetScanIntervalMs
         && left.MobTargetScanCandidateLimit == right.MobTargetScanCandidateLimit
         && left.PrimaryCombatProfile == right.PrimaryCombatProfile
-        && (left.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == (right.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero)
+        && (left.CombatBonuses ?? MobCombatBonusDefinition.Zero) == (right.CombatBonuses ?? MobCombatBonusDefinition.Zero)
         && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops)
         && left.VisualMode == right.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
@@ -820,7 +820,7 @@ public sealed class MobAuthoringService
         AddChange(changes, "mob_target_scan_interval_ms", existing?.MobTargetScanIntervalMs.ToString(), requested.MobTargetScanIntervalMs.ToString());
         AddChange(changes, "mob_target_scan_candidate_limit", existing?.MobTargetScanCandidateLimit.ToString(), requested.MobTargetScanCandidateLimit.ToString());
         AddChange(changes, "primary_combat_profile", JsonSerializer.Serialize(existing?.PrimaryCombatProfile), JsonSerializer.Serialize(requested.PrimaryCombatProfile));
-        AddChange(changes, "combat_bonuses", JsonSerializer.Serialize(existing?.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero), JsonSerializer.Serialize(requested.CombatBonuses));
+        AddChange(changes, "combat_bonuses", JsonSerializer.Serialize(existing?.CombatBonuses ?? MobCombatBonusDefinition.Zero), JsonSerializer.Serialize(requested.CombatBonuses));
         AddChange(changes, "guaranteed_drops", SerializeDrops(existing?.GuaranteedDrops ?? []), JsonSerializer.Serialize(requested.GuaranteedDrops));
         AddChange(changes, "root_loot_table_id", existing?.RootLootTableId, requested.RootLootTableId);
         var targetState = operation switch

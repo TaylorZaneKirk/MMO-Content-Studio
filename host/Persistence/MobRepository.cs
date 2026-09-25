@@ -397,7 +397,7 @@ public sealed class MobRepository : IMobRepository
             reader.GetInt32(reader.GetOrdinal("defence_level")));
     }
 
-    private static async Task<EquipmentCombatBonusDefinition?> LoadCombatBonusesAsync(
+    private static async Task<MobCombatBonusDefinition?> LoadCombatBonusesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         string mobDefinitionId,
@@ -406,7 +406,7 @@ public sealed class MobRepository : IMobRepository
         const string sql = """
             select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
                 strength_melee, strength_ranged, strength_magic,
-                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic
+                defence_thrust, defence_slash, defence_crush, defence_ranged_light, defence_ranged_standard, defence_ranged_heavy, defence_magic
             from mob_combat_bonuses
             where mob_definition_id = @mob_definition_id;
             """;
@@ -414,7 +414,7 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("mob_definition_id", mobDefinitionId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
-            ? new EquipmentCombatBonusDefinition(
+            ? new MobCombatBonusDefinition(
                 reader.GetInt32(reader.GetOrdinal("attack_thrust")),
                 reader.GetInt32(reader.GetOrdinal("attack_slash")),
                 reader.GetInt32(reader.GetOrdinal("attack_crush")),
@@ -426,7 +426,9 @@ public sealed class MobRepository : IMobRepository
                 reader.GetInt32(reader.GetOrdinal("defence_thrust")),
                 reader.GetInt32(reader.GetOrdinal("defence_slash")),
                 reader.GetInt32(reader.GetOrdinal("defence_crush")),
-                reader.GetInt32(reader.GetOrdinal("defence_ranged")),
+                reader.GetInt32(reader.GetOrdinal("defence_ranged_light")),
+                reader.GetInt32(reader.GetOrdinal("defence_ranged_standard")),
+                reader.GetInt32(reader.GetOrdinal("defence_ranged_heavy")),
                 reader.GetInt32(reader.GetOrdinal("defence_magic")))
             : null;
     }
@@ -650,7 +652,7 @@ public sealed class MobRepository : IMobRepository
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string mobDefinitionId,
-        EquipmentCombatBonusDefinition bonuses,
+        MobCombatBonusDefinition bonuses,
         CancellationToken cancellationToken)
     {
         if (bonuses.IsZero)
@@ -664,13 +666,13 @@ public sealed class MobRepository : IMobRepository
                 mob_definition_id,
                 attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
                 strength_melee, strength_ranged, strength_magic,
-                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
+                defence_thrust, defence_slash, defence_crush, defence_ranged_light, defence_ranged_standard, defence_ranged_heavy, defence_magic,
                 updated_at
             ) values (
                 @mob_definition_id,
                 @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
                 @strength_melee, @strength_ranged, @strength_magic,
-                @defence_thrust, @defence_slash, @defence_crush, @defence_ranged, @defence_magic,
+                @defence_thrust, @defence_slash, @defence_crush, @defence_ranged_light, @defence_ranged_standard, @defence_ranged_heavy, @defence_magic,
                 now()
             )
             on conflict (mob_definition_id) do update set
@@ -685,7 +687,9 @@ public sealed class MobRepository : IMobRepository
                 defence_thrust = excluded.defence_thrust,
                 defence_slash = excluded.defence_slash,
                 defence_crush = excluded.defence_crush,
-                defence_ranged = excluded.defence_ranged,
+                defence_ranged_light = excluded.defence_ranged_light,
+                defence_ranged_standard = excluded.defence_ranged_standard,
+                defence_ranged_heavy = excluded.defence_ranged_heavy,
                 defence_magic = excluded.defence_magic,
                 updated_at = now();
             """;
@@ -783,7 +787,7 @@ public sealed class MobRepository : IMobRepository
 
     private static void AddCombatBonusParameters(
         NpgsqlCommand command,
-        EquipmentCombatBonusDefinition bonuses)
+        MobCombatBonusDefinition bonuses)
     {
         command.Parameters.AddWithValue("attack_thrust", bonuses.AttackThrust);
         command.Parameters.AddWithValue("attack_slash", bonuses.AttackSlash);
@@ -796,14 +800,16 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("defence_thrust", bonuses.DefenceThrust);
         command.Parameters.AddWithValue("defence_slash", bonuses.DefenceSlash);
         command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);
-        command.Parameters.AddWithValue("defence_ranged", bonuses.DefenceRanged);
+        command.Parameters.AddWithValue("defence_ranged_light", bonuses.DefenceRangedLight);
+        command.Parameters.AddWithValue("defence_ranged_standard", bonuses.DefenceRangedStandard);
+        command.Parameters.AddWithValue("defence_ranged_heavy", bonuses.DefenceRangedHeavy);
         command.Parameters.AddWithValue("defence_magic", bonuses.DefenceMagic);
     }
 
     private static MobDefinitionRecord ReadBaseRecord(
         NpgsqlDataReader reader,
         MobCombatProfileDefinition? profile,
-        EquipmentCombatBonusDefinition? bonuses,
+        MobCombatBonusDefinition? bonuses,
         IReadOnlyList<MobDropDefinition> drops,
         bool hasCombatProfile)
     {
@@ -903,7 +909,7 @@ public sealed record MobDefinitionRecord(
     int MobTargetScanIntervalMs,
     int MobTargetScanCandidateLimit,
     MobCombatProfileDefinition? PrimaryCombatProfile,
-    EquipmentCombatBonusDefinition? CombatBonuses,
+    MobCombatBonusDefinition? CombatBonuses,
     IReadOnlyList<MobDropDefinition> GuaranteedDrops,
     bool HasCombatProfile,
     int GuaranteedDropCount,

@@ -26,7 +26,8 @@ public sealed record EquipmentCombatProfileDefinition(
     [property: JsonPropertyName("accuracy_style")] string? AccuracyStyle,
     [property: JsonPropertyName("minimum_range_tiles")] int MinimumRangeTiles,
     [property: JsonPropertyName("maximum_range_tiles")] int MaximumRangeTiles,
-    [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits);
+    [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits,
+    [property: JsonPropertyName("ranged_damage_type")] string? RangedDamageType = null);
 
 public sealed record EquipmentCombatBonusDefinition(
     [property: JsonPropertyName("attack_thrust")] int AttackThrust,

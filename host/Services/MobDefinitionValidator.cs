@@ -512,7 +512,7 @@ public sealed partial class MobDefinitionValidator
     }
 
     public static void ValidateBonuses(
-        EquipmentCombatBonusDefinition bonuses,
+        MobCombatBonusDefinition bonuses,
         ICollection<ApiError> messages)
     {
         foreach (var pair in CombatBonusValues(bonuses))
@@ -599,7 +599,7 @@ public sealed partial class MobDefinitionValidator
     }
 
     private static IReadOnlyDictionary<string, int> CombatBonusValues(
-        EquipmentCombatBonusDefinition bonuses) =>
+        MobCombatBonusDefinition bonuses) =>
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["attack_thrust"] = bonuses.AttackThrust,
@@ -613,7 +613,9 @@ public sealed partial class MobDefinitionValidator
             ["defence_thrust"] = bonuses.DefenceThrust,
             ["defence_slash"] = bonuses.DefenceSlash,
             ["defence_crush"] = bonuses.DefenceCrush,
-            ["defence_ranged"] = bonuses.DefenceRanged,
+            ["defence_ranged_light"] = bonuses.DefenceRangedLight,
+            ["defence_ranged_standard"] = bonuses.DefenceRangedStandard,
+            ["defence_ranged_heavy"] = bonuses.DefenceRangedHeavy,
             ["defence_magic"] = bonuses.DefenceMagic
         };
 
@@ -645,7 +647,7 @@ public sealed record NormalizedMobDraft(
     int MobTargetScanIntervalMs,
     int MobTargetScanCandidateLimit,
     MobCombatProfileDefinition? PrimaryCombatProfile,
-    EquipmentCombatBonusDefinition CombatBonuses,
+    MobCombatBonusDefinition CombatBonuses,
     IReadOnlyList<MobDropDraft> GuaranteedDrops,
     string VisualMode,
     RiggedSpriteVisualDescriptor? CompositeVisual,

@@ -161,7 +161,7 @@ public static class MobDomainRules
 
     public static MobCombatLevelDiagnosticsDefinition CalculateCombatLevelDiagnostics(
         MobCombatProfileDefinition profile,
-        EquipmentCombatBonusDefinition bonuses)
+        MobCombatBonusDefinition bonuses)
     {
         var style = NormalizeAccuracyStyle(profile.AccuracyStyle) ?? "crush";
         var selectedAttackBonus = style switch
