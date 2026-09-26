@@ -754,7 +754,7 @@ public sealed class UnifiedItemAuthoringService
 
     private static ApiError LiveReferenceError(string itemId) => new(
         "item_has_live_references",
-        $"Item '{itemId}' is referenced by live inventory, equipment, or ground-item state.",
+        $"Item '{itemId}' is referenced by durable inventory or equipment state.",
         ValidationSeverity.Error,
         "publication_state");
 

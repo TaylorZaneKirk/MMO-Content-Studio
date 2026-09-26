@@ -255,7 +255,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
             select exists (select 1 from character_inventory where item_id = @item and stack_count <> 1)
-                or exists (select 1 from ground_items where item_id = @item and stack_count <> 1)
                 or exists (select 1 from character_equipment where item_id = @item and (stack_count <> 1 or slot_id = 'ammo'));
             """, connection);
         command.Parameters.AddWithValue("item", itemId);
@@ -306,8 +305,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 select 1 from character_inventory where item_id = @item_id
                 union all
                 select 1 from character_equipment where item_id = @item_id
-                union all
-                select 1 from ground_items where item_id = @item_id
             );
             """;
 

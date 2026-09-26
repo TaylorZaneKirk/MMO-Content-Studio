@@ -59,3 +59,13 @@ configured development database. See the parent guide's **Ranged weapons and
 Ammo (R5)** section for exact content and runtime rules. No tests were run;
 production host build, Godot 4.7 parse/startup and live API/reload verification
 passed. Manual editor/gameplay acceptance remains Taylor's gate.
+
+
+## Ordinary ground-state retirement (071)
+
+Migration `071_ephemeral_ground_items.sql` is mirrored from MMO Project.
+Ordinary floor instances now exist only in the live game process and disappear
+on restart; they no longer block item deletion or stackability publication through
+SQL references. Item health and possession checks therefore no longer require
+`ground_items`. Durable inventory/equipment guards still apply. Deploy this host
+with the matching game server and apply 071 with the old processes stopped.

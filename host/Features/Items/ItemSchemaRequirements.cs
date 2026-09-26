@@ -15,7 +15,6 @@ public sealed class ItemSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Trigger("character_equipment", "equipment_stackability_guard"),
         AuthoringSchemaRequirement.Constraint("character_equipment_stack_count_check"),
         AuthoringSchemaRequirement.Constraint("character_equipment_slot_quantity_check"),
-        AuthoringSchemaRequirement.Table("ground_items"),
         AuthoringSchemaRequirement.Table("equipment_slot_definitions"),
         AuthoringSchemaRequirement.Table("skill_definitions"),
         AuthoringSchemaRequirement.Table("item_consumable_profiles"),

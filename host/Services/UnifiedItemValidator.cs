@@ -52,7 +52,7 @@ public sealed class UnifiedItemValidator
             await _repository.HasIncompatibleStackQuantitiesAsync(itemId, cancellationToken))
         {
             messages.Add(new ApiError("incompatible_stack_quantity",
-                "Cannot publish a non-stackable item while retained inventory, ground or equipment quantities require stacks, or the item is equipped as Ammo.",
+                "Cannot publish a non-stackable item while retained inventory or equipment quantities require stacks, or the item is equipped as Ammo.",
                 ValidationSeverity.Error, "stackable"));
         }
         if (forPublication)
