@@ -40,3 +40,22 @@ runtime protocol change is involved.
 advisory warnings and accuracy-style refresh. Build, test, parse, smoke and
 independent review runs were skipped under Taylor's current direction; no new
 validation or human acceptance is claimed.
+
+
+## R5 ammunition authoring
+
+The unified Item editor now exposes an optional Ammo family for Ranged weapons.
+Arrow hides the weapon-owned damage type; None (self-contained) requires a
+Light/Standard/Heavy weapon damage type. The Ammo equipment slot exposes its own
+Arrow family and damage type and requires a stackable item, ammo profile and no
+weapon profile for publication. Other slots cannot carry an ammunition profile.
+Combat bonuses continue to own Ranged Attack/Strength; no Ammo paper-doll art is
+required. Migration 070 is mirrored under `integrations/mmo-project/prototype/sql`.
+
+Use Preview -> Save Draft -> reload -> Preview -> Publish for new ammunition, and
+Preview -> Save & Publish -> reload when updating a Published bow. These supported
+API flows authored `copper_arrows` and updated `inventory_346_wooden_bow` in the
+configured development database. See the parent guide's **Ranged weapons and
+Ammo (R5)** section for exact content and runtime rules. No tests were run;
+production host build, Godot 4.7 parse/startup and live API/reload verification
+passed. Manual editor/gameplay acceptance remains Taylor's gate.

@@ -78,7 +78,8 @@ public sealed record ItemEquipmentMetadataDefinition(
     [property: JsonPropertyName("skill_modifiers")] IReadOnlyList<EquipmentSkillModifierDefinition> SkillModifiers,
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition CombatBonuses,
     [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
-    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition? EquippedVisual);
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition? EquippedVisual,
+    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
 
 public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -147,7 +148,8 @@ public sealed record ItemEquipmentMetadataDraft(
     [property: JsonPropertyName("skill_modifiers")] IReadOnlyList<EquipmentSkillModifierDraft>? SkillModifiers,
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
-    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDraft? EquippedVisual);
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDraft? EquippedVisual,
+    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
 
 public sealed record ItemEquippedVisualDefinition(
     [property: JsonPropertyName("asset_key")] string AssetKey,

@@ -102,6 +102,11 @@ var _weapon_profile_id: LineEdit
 var _weapon_attack_type: OptionButton
 var _weapon_accuracy_style: OptionButton
 var _weapon_accuracy_label: Label
+var _weapon_ammunition_family: OptionButton
+var _weapon_ammunition_label: Label
+var _ammunition_section: VBoxContainer
+var _ammunition_family: OptionButton
+var _ammunition_damage_type: OptionButton
 var _weapon_ranged_damage_type: OptionButton
 var _weapon_ranged_damage_label: Label
 var _weapon_min_range: SpinBox
@@ -545,12 +550,24 @@ func _build_ui() -> void:
 	_weapon_attack_type.item_selected.connect(_on_weapon_attack_type_selected)
 	_weapon_accuracy_style = _add_option_field(weapon_grid, "Accuracy style")
 	_weapon_accuracy_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
+	_weapon_ammunition_family = _add_option_field(weapon_grid, "Ammo family")
+	_weapon_ammunition_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
+	_weapon_ammunition_family.item_selected.connect(_on_weapon_attack_type_selected)
 	_weapon_ranged_damage_type = _add_option_field(weapon_grid, "Ranged damage type")
 	_weapon_ranged_damage_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
 	_weapon_min_range = _add_spin_field(weapon_grid, "Minimum range tiles", 0, 32, 1)
 	_weapon_max_range = _add_spin_field(weapon_grid, "Maximum range tiles", 0, 32, 1)
 	_weapon_speed_units = _add_spin_field(weapon_grid, "Attack speed units", 1, 60, 1)
 	_weapon_timing = _add_value_field(weapon_grid, "Attack interval", "4 attack units x 600 ms = 2400 ms")
+
+	_ammunition_section = VBoxContainer.new()
+	equipment_page.add_child(_ammunition_section)
+	_ammunition_section.add_child(_heading("Ammunition profile", 18))
+	var ammunition_grid := GridContainer.new()
+	ammunition_grid.columns = 2
+	_ammunition_section.add_child(ammunition_grid)
+	_ammunition_family = _add_option_field(ammunition_grid, "Ammunition family")
+	_ammunition_damage_type = _add_option_field(ammunition_grid, "Ranged damage type")
 
 	editor = tools_page
 	_tool_section = VBoxContainer.new()
@@ -672,6 +689,9 @@ func _on_options_received(payload: Dictionary) -> void:
 	_fill_option(_reclaim_policy, _option_array("reclaim_policies", [{"id": "none", "display_name": "None"}, {"id": "fixed_cost", "display_name": "Fixed Cost"}]))
 	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}, {"id": "ranged", "display_name": "Ranged"}]))
 	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
+	_fill_option(_weapon_ammunition_family, [{"id": "", "display_name": "None (self-contained)"}, {"id": "arrow", "display_name": "Arrow"}])
+	_fill_option(_ammunition_family, [{"id": "arrow", "display_name": "Arrow"}])
+	_fill_option(_ammunition_damage_type, [{"id": "light", "display_name": "Light"}, {"id": "standard", "display_name": "Standard"}, {"id": "heavy", "display_name": "Heavy"}])
 	_fill_option(_weapon_ranged_damage_type, [{"id": "light", "display_name": "Light"}, {"id": "standard", "display_name": "Standard"}, {"id": "heavy", "display_name": "Heavy"}])
 	_update_weapon_family_fields()
 	_fill_option(_appearance_binding, _option_array("equipped_visual_binding_types", [{"id": "rig_layer", "display_name": "Rig Layer"}, {"id": "socket", "display_name": "Socket"}]))
@@ -897,6 +917,10 @@ func _apply_equipment(value: Variant) -> void:
 	var bonuses := equipment.get("combat_bonuses", {}) as Dictionary
 	_apply_bonus_values(bonuses)
 	_apply_weapon_profile(equipment.get("weapon_profile", null))
+	var ammunition_variant: Variant = equipment.get("ammunition_profile", null)
+	var ammunition := ammunition_variant as Dictionary if ammunition_variant is Dictionary else {}
+	_select_option(_ammunition_family, str(ammunition.get("ammunition_family", "arrow")))
+	_select_option(_ammunition_damage_type, str(ammunition.get("ranged_damage_type", "standard")))
 	_apply_equipped_visual(equipment.get("equipped_visual", null))
 
 
@@ -1064,6 +1088,10 @@ func _equipment_payload() -> Dictionary:
 		"skill_modifiers": _collect_modifiers(),
 		"combat_bonuses": _collect_bonuses(),
 		"weapon_profile": _weapon_profile_payload(),
+		"ammunition_profile": {
+			"ammunition_family": _selected_metadata(_ammunition_family),
+			"ranged_damage_type": _selected_metadata(_ammunition_damage_type),
+		} if _selected_metadata(_equipment_slot) == "ammo" else null,
 		"equipped_visual": _equipped_visual_payload(),
 	}
 
@@ -1075,7 +1103,8 @@ func _weapon_profile_payload() -> Variant:
 		"profile_id": _weapon_profile_id.text.strip_edges(),
 		"attack_type": _selected_metadata(_weapon_attack_type),
 		"accuracy_style": _selected_metadata(_weapon_accuracy_style) if _selected_metadata(_weapon_attack_type) == "melee" else null,
-		"ranged_damage_type": _selected_metadata(_weapon_ranged_damage_type) if _selected_metadata(_weapon_attack_type) == "ranged" else null,
+		"ranged_damage_type": _selected_metadata(_weapon_ranged_damage_type) if _selected_metadata(_weapon_attack_type) == "ranged" and _selected_metadata(_weapon_ammunition_family).is_empty() else null,
+		"ammunition_family": _optional_payload(_selected_metadata(_weapon_ammunition_family)) if _selected_metadata(_weapon_attack_type) == "ranged" else null,
 		"minimum_range_tiles": int(_weapon_min_range.value),
 		"maximum_range_tiles": int(_weapon_max_range.value),
 		"attack_speed_units": int(_weapon_speed_units.value),
@@ -1814,6 +1843,7 @@ func _apply_weapon_profile(profile_variant: Variant) -> void:
 	_select_option(_weapon_attack_type, str(profile.get("attack_type", "melee")))
 	_select_option(_weapon_accuracy_style, str(profile.get("accuracy_style", "slash")))
 	_select_option(_weapon_ranged_damage_type, str(profile.get("ranged_damage_type", "standard")))
+	_select_option(_weapon_ammunition_family, str(profile.get("ammunition_family")) if profile.get("ammunition_family") != null else "")
 	_update_weapon_family_fields()
 	_weapon_min_range.value = float(profile.get("minimum_range_tiles", 1))
 	_weapon_max_range.value = float(profile.get("maximum_range_tiles", 1))
@@ -1929,6 +1959,7 @@ func _update_contextual_sections() -> void:
 	_requirements_section.visible = equipment_enabled
 	_combat_bonus_section.visible = equipment_enabled
 	_weapon_section.visible = weapon_capable
+	_ammunition_section.visible = equipment_enabled and _selected_metadata(_equipment_slot) == "ammo"
 	_tool_section.visible = true
 	_set_consumable_controls_enabled(_consumable_enabled.button_pressed)
 	_set_equipment_controls_enabled(equipment_enabled)
@@ -1939,7 +1970,7 @@ func _update_contextual_sections() -> void:
 func _set_form_enabled(enabled: bool) -> void:
 	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id, _reference_value, _npc_buy_price, _npc_sell_price, _reclaim_value, _death_transform_item_id, _condition_policy_id, _repair_policy_id]:
 		edit.editable = enabled and (edit != _item_id or _current_item.is_empty())
-	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _weapon_ranged_damage_type, _operation]:
+	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _weapon_ranged_damage_type, _weapon_ammunition_family, _ammunition_family, _ammunition_damage_type, _operation]:
 		option.disabled = not enabled
 	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units]:
 		spin.editable = enabled
@@ -1978,6 +2009,7 @@ func _set_weapon_controls_enabled(enabled: bool) -> void:
 	_weapon_attack_type.disabled = not enabled
 	_weapon_accuracy_style.disabled = not enabled
 	_weapon_ranged_damage_type.disabled = not enabled
+	_weapon_ammunition_family.disabled = not enabled
 	_weapon_min_range.editable = enabled
 	_weapon_max_range.editable = enabled
 	_weapon_speed_units.editable = enabled
@@ -2062,8 +2094,11 @@ func _update_weapon_family_fields() -> void:
 	var ranged := _selected_metadata(_weapon_attack_type) == "ranged"
 	_weapon_accuracy_label.visible = not ranged
 	_weapon_accuracy_style.visible = not ranged
-	_weapon_ranged_damage_label.visible = ranged
-	_weapon_ranged_damage_type.visible = ranged
+	_weapon_ammunition_label.visible = ranged
+	_weapon_ammunition_family.visible = ranged
+	var self_contained := ranged and _selected_metadata(_weapon_ammunition_family).is_empty()
+	_weapon_ranged_damage_label.visible = self_contained
+	_weapon_ranged_damage_type.visible = self_contained
 
 
 func _rebuild_asset_options(selected_path: String = "") -> void:

@@ -255,7 +255,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var command = new NpgsqlCommand("""
             select exists (select 1 from character_inventory where item_id = @item and stack_count <> 1)
-                or exists (select 1 from ground_items where item_id = @item and stack_count <> 1);
+                or exists (select 1 from ground_items where item_id = @item and stack_count <> 1)
+                or exists (select 1 from character_equipment where item_id = @item and (stack_count <> 1 or slot_id = 'ammo'));
             """, connection);
         command.Parameters.AddWithValue("item", itemId);
         return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
@@ -624,6 +625,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             Requirements = await LoadRequirementsAsync(connection, transaction, itemId, cancellationToken),
             SkillModifiers = await LoadModifiersAsync(connection, transaction, itemId, cancellationToken),
             WeaponProfile = await LoadWeaponProfileAsync(connection, transaction, itemId, cancellationToken),
+            AmmunitionProfile = await LoadAmmunitionProfileAsync(connection, transaction, itemId, cancellationToken),
             CombatBonuses = await LoadCombatBonusesAsync(connection, transaction, itemId, cancellationToken),
             EquippedVisual = await LoadEquippedVisualAsync(connection, transaction, itemId, cancellationToken),
             ToolCapabilities = await LoadToolCapabilitiesAsync(connection, transaction, itemId, cancellationToken)
@@ -955,7 +957,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         const string sql = """
             select profile_id, attack_type, accuracy_style, ranged_damage_type,
-                minimum_range_tiles, maximum_range_tiles, attack_speed_units
+                minimum_range_tiles, maximum_range_tiles, attack_speed_units, ammunition_family
             from item_combat_profiles
             where item_id = @item_id;
             """;
@@ -974,7 +976,40 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
             reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
             reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
-            ReadNullableString(reader, "ranged_damage_type"));
+            ReadNullableString(reader, "ranged_damage_type"), ReadNullableString(reader, "ammunition_family"));
+    }
+
+    private static async Task<ItemAmmunitionProfileDefinition?> LoadAmmunitionProfileAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, string itemId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            select ammunition_family, ranged_damage_type from item_ammunition_profiles where item_id = @item;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("item", itemId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? new(reader.GetString(0), reader.GetString(1)) : null;
+    }
+
+    private static async Task ReplaceAmmunitionProfileAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string itemId,
+        ItemAmmunitionProfileDefinition? profile, CancellationToken cancellationToken)
+    {
+        if (profile is null)
+        {
+            await ExecuteDeleteAsync(connection, transaction, "item_ammunition_profiles", itemId, cancellationToken);
+            return;
+        }
+        await using var command = new NpgsqlCommand("""
+            insert into item_ammunition_profiles (item_id, ammunition_family, ranged_damage_type)
+            values (@item, @family, @damage)
+            on conflict (item_id) do update set ammunition_family = excluded.ammunition_family,
+                ranged_damage_type = excluded.ranged_damage_type, updated_at = now();
+            """, connection, transaction);
+        command.Parameters.AddWithValue("item", itemId);
+        command.Parameters.AddWithValue("family", profile.AmmunitionFamily);
+        command.Parameters.AddWithValue("damage", profile.RangedDamageType);
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<EquipmentCombatBonusDefinition?> LoadCombatBonusesAsync(
@@ -1423,6 +1458,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         {
             await ExecuteDeleteAsync(connection, transaction, "item_skill_requirements", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
+            await ExecuteDeleteAsync(connection, transaction, "item_ammunition_profiles", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_equipped_visual_pose_anchors", itemId, cancellationToken);
@@ -1433,6 +1469,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await ReplaceRequirementsAsync(connection, transaction, itemId, equipment.Requirements, cancellationToken);
         await ReplaceModifiersAsync(connection, transaction, itemId, equipment.SkillModifiers, cancellationToken);
         await ReplaceWeaponProfileAsync(connection, transaction, itemId, equipment.WeaponProfile, cancellationToken);
+        await ReplaceAmmunitionProfileAsync(connection, transaction, itemId, equipment.AmmunitionProfile, cancellationToken);
         await ReplaceCombatBonusesAsync(connection, transaction, itemId, equipment.CombatBonuses, cancellationToken);
         await ReplaceEquippedVisualAsync(connection, transaction, itemId, equipment.EquippedVisual, cancellationToken);
     }
@@ -1501,6 +1538,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 attack_type,
                 accuracy_style,
                 ranged_damage_type,
+                ammunition_family,
                 minimum_range_tiles,
                 maximum_range_tiles,
                 attack_speed_units,
@@ -1511,6 +1549,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @attack_type,
                 @accuracy_style,
                 @ranged_damage_type,
+                @ammunition_family,
                 @minimum_range_tiles,
                 @maximum_range_tiles,
                 @attack_speed_units,
@@ -1521,6 +1560,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 attack_type = excluded.attack_type,
                 accuracy_style = excluded.accuracy_style,
                 ranged_damage_type = excluded.ranged_damage_type,
+                ammunition_family = excluded.ammunition_family,
                 minimum_range_tiles = excluded.minimum_range_tiles,
                 maximum_range_tiles = excluded.maximum_range_tiles,
                 attack_speed_units = excluded.attack_speed_units,
@@ -1534,6 +1574,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             (object?)profile.AccuracyStyle ?? DBNull.Value;
         command.Parameters.Add("ranged_damage_type", NpgsqlDbType.Text).Value =
             (object?)profile.RangedDamageType ?? DBNull.Value;
+        command.Parameters.Add("ammunition_family", NpgsqlDbType.Text).Value =
+            (object?)profile.AmmunitionFamily ?? DBNull.Value;
         command.Parameters.AddWithValue("minimum_range_tiles", profile.MinimumRangeTiles);
         command.Parameters.AddWithValue("maximum_range_tiles", profile.MaximumRangeTiles);
         command.Parameters.AddWithValue("attack_speed_units", profile.AttackSpeedUnits);
@@ -1958,7 +2000,8 @@ public sealed record UnifiedItemRecord(
     ItemEquippedVisualDefinition? EquippedVisual,
     IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     DateTimeOffset UpdatedAtUtc,
-    ItemEconomyLifecycleDefinition? EconomyLifecycle = null, bool Stackable = false);
+    ItemEconomyLifecycleDefinition? EconomyLifecycle = null, bool Stackable = false,
+    ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
 
 public sealed record ConsumableProfileDraft(
     string UseAction,

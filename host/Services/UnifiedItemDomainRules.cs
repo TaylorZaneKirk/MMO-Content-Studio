@@ -75,7 +75,8 @@ public static partial class UnifiedItemDomainRules
                             record.EquippedVisual.GripAnchors,
                             record.EquippedVisual.FlipXByPose,
                             record.EquippedVisual.HiddenPoses,
-                            record.EquippedVisual.ItemOverGripByPose))
+                            record.EquippedVisual.ItemOverGripByPose),
+                    record.AmmunitionProfile)
                 : null,
             record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
@@ -216,7 +217,7 @@ public static partial class UnifiedItemDomainRules
             return null;
         }
 
-        var weaponProfile = IsHandSlot(slotId)
+        var weaponProfile = IsHandSlot(slotId) || slotId == "ammo"
             ? NormalizeWeaponProfile(equipment.WeaponProfile)
             : null;
         return new NormalizedItemEquipmentMetadata(
@@ -236,7 +237,10 @@ public static partial class UnifiedItemDomainRules
                 .ToArray(),
             equipment.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero,
             weaponProfile,
-            NormalizeEquippedVisual(equipment.EquippedVisual));
+            NormalizeEquippedVisual(equipment.EquippedVisual),
+            equipment.AmmunitionProfile is null ? null : new ItemAmmunitionProfileDefinition(
+                NormalizeRequired(equipment.AmmunitionProfile.AmmunitionFamily),
+                NormalizeRequired(equipment.AmmunitionProfile.RangedDamageType)));
     }
 
     private static EquipmentCombatProfileDefinition? NormalizeWeaponProfile(
@@ -254,7 +258,7 @@ public static partial class UnifiedItemDomainRules
             profile.MinimumRangeTiles,
             profile.MaximumRangeTiles,
             profile.AttackSpeedUnits,
-            NormalizeOptional(profile.RangedDamageType));
+            NormalizeOptional(profile.RangedDamageType), NormalizeOptional(profile.AmmunitionFamily));
     }
 
     private static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(
@@ -423,7 +427,8 @@ public sealed record NormalizedItemEquipmentMetadata(
     IReadOnlyList<EquipmentSkillModifierDraft> SkillModifiers,
     EquipmentCombatBonusDefinition CombatBonuses,
     EquipmentCombatProfileDefinition? WeaponProfile,
-    NormalizedItemEquippedVisual? EquippedVisual);
+    NormalizedItemEquippedVisual? EquippedVisual,
+    ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
 
 public sealed record NormalizedItemEquippedVisual(
     string? AssetKey,

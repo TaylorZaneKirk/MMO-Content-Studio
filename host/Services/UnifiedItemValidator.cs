@@ -52,7 +52,7 @@ public sealed class UnifiedItemValidator
             await _repository.HasIncompatibleStackQuantitiesAsync(itemId, cancellationToken))
         {
             messages.Add(new ApiError("incompatible_stack_quantity",
-                "Cannot publish a non-stackable item while retained inventory or ground rows have quantities other than 1.",
+                "Cannot publish a non-stackable item while retained inventory, ground or equipment quantities require stacks, or the item is equipped as Ammo.",
                 ValidationSeverity.Error, "stackable"));
         }
         if (forPublication)
@@ -82,6 +82,7 @@ public sealed class UnifiedItemValidator
         if (draft.Equipment is not null)
         {
             await ValidateEquipmentAsync(draft.Equipment, forPublication, messages, cancellationToken);
+            ValidateAmmunition(draft.Equipment, draft.Stackable, forPublication, messages);
         }
         await ValidateToolCapabilitiesAsync(draft.ToolCapabilities, messages, cancellationToken);
         await ValidateEconomyLifecycleAsync(itemId, draft.EconomyLifecycle, forPublication, messages, cancellationToken);
@@ -589,6 +590,23 @@ public sealed class UnifiedItemValidator
         }
     }
 
+    private static void ValidateAmmunition(
+        NormalizedItemEquipmentMetadata equipment, bool stackable, bool forPublication,
+        ICollection<ApiError> messages)
+    {
+        var profile = equipment.AmmunitionProfile;
+        if (profile is not null && (equipment.EquipmentSlotId != "ammo" ||
+            profile.AmmunitionFamily != "arrow" || profile.RangedDamageType is not ("light" or "standard" or "heavy")))
+            messages.Add(new ApiError("invalid_ammunition_profile",
+                "Ammunition profiles belong only to Ammo equipment and require Arrow family with Light, Standard or Heavy damage type.",
+                ValidationSeverity.Error, "equipment.ammunition_profile"));
+        if (equipment.EquipmentSlotId == "ammo" && forPublication &&
+            (!stackable || profile is null || equipment.WeaponProfile is not null))
+            messages.Add(new ApiError("invalid_ammunition_equipment",
+                "Published Ammo must be stackable, have an ammunition profile, and have no weapon profile.",
+                ValidationSeverity.Error, "equipment"));
+    }
+
     private void ValidateWeaponProfile(
         NormalizedItemEquipmentMetadata equipment,
         bool forPublication,
@@ -644,21 +662,22 @@ public sealed class UnifiedItemValidator
         }
         if (profile.AttackType == "melee" &&
             (profile.AccuracyStyle is null || !_registry.SupportedAttackStyles.Contains(profile.AccuracyStyle) ||
-             profile.RangedDamageType is not null))
+             profile.RangedDamageType is not null || profile.AmmunitionFamily is not null))
         {
             messages.Add(new ApiError(
                 "unsupported_attack_style",
-                "Melee weapon profiles must use thrust, slash, or crush accuracy style.",
+                "Melee weapon profiles need thrust, slash, or crush accuracy style, with no ammunition family or Ranged damage type.",
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.accuracy_style"));
         }
         if (profile.AttackType == "ranged" &&
             (profile.AccuracyStyle is not null ||
-             profile.RangedDamageType is not ("light" or "standard" or "heavy")))
+             !((profile.AmmunitionFamily is null && profile.RangedDamageType is "light" or "standard" or "heavy") ||
+               (profile.AmmunitionFamily == "arrow" && profile.RangedDamageType is null))))
         {
             messages.Add(new ApiError(
                 "invalid_ranged_weapon_profile",
-                "Ranged weapon profiles need light, standard, or heavy damage type and no melee accuracy style.",
+                "Ranged weapons need either Arrow ammunition with no weapon damage type, or a self-contained Light/Standard/Heavy damage type; no melee accuracy style.",
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.ranged_damage_type"));
         }
