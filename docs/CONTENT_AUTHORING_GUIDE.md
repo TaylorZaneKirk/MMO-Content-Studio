@@ -91,3 +91,34 @@ Equipping a shield against a worn two-handed item returns the weapon to the
 shield's vacated source slot, even with an otherwise full inventory. One-handed
 right + left equipment and Ammo remain independent. A two-handed item occupies
 one durable right_hand row, never a duplicate left_hand row.
+
+## Arrow-tier compatibility (R6D)
+
+Ammo family identifies the ammunition kind; `ammunition_tier` is a positive
+compatibility rank. An ammo-using Ranged weapon authors
+`maximum_ammunition_tier`. Firing requires the same family and
+`ammo.ammunition_tier <= weapon.maximum_ammunition_tier`.
+A valid Ammo stack can be equipped independently of the current weapon; an
+incompatible combination is rejected when the weapon tries to use it. Tier
+changes neither skill requirements, Ranged Strength, prices, damage type nor
+recovery probability.
+
+In the Item editor's Ammunition profile section, author **Ammunition tier**.
+In Weapon Profile, an enabled Ranged profile with Arrow family exposes
+**Maximum ammunition tier**. Both use integer values from 1 to 1,000,000.
+Melee and self-contained Ranged carry no maximum tier; self-contained Ranged has
+no Ammo family and retains its own damage type. Only Arrow family is supported.
+
+Migration 074 permits transition nulls without defaults so existing Published
+profiles can be loaded for repair. The editor may display 1 as the starting value;
+only explicit Preview and Apply writes it. Draft and Published mutations reject
+missing/nonpositive tiers once the corresponding profile exists. Runtime startup
+rejects active malformed profiles. The existing complete-equipment preview and
+signature cover both fields.
+
+Current Published content: `copper_arrows` tier **1** and
+`inventory_346_wooden_bow` maximum **2**. Copper retains its canonical 003 icon and
+Ranged Strength +3; Wooden Bow retains two-handed right_hand, Arrow requirement,
+base range 1-7 and speed 4. Future Iron Arrows map to tier 2; this mapping creates
+no Iron Arrow item, asset, recipe or shop content. Stronger future bows may author
+a higher maximum; 2 is this bow's content value, not a global ceiling.

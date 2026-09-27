@@ -28,11 +28,13 @@ public sealed record EquipmentCombatProfileDefinition(
     [property: JsonPropertyName("maximum_range_tiles")] int MaximumRangeTiles,
     [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits,
     [property: JsonPropertyName("ranged_damage_type")] string? RangedDamageType = null,
-    [property: JsonPropertyName("ammunition_family")] string? AmmunitionFamily = null);
+    [property: JsonPropertyName("ammunition_family")] string? AmmunitionFamily = null,
+    [property: JsonPropertyName("maximum_ammunition_tier")] int? MaximumAmmunitionTier = null);
 
 public sealed record ItemAmmunitionProfileDefinition(
     [property: JsonPropertyName("ammunition_family")] string AmmunitionFamily,
-    [property: JsonPropertyName("ranged_damage_type")] string RangedDamageType);
+    [property: JsonPropertyName("ranged_damage_type")] string RangedDamageType,
+    [property: JsonPropertyName("ammunition_tier")] int? AmmunitionTier = null);
 
 public sealed record EquipmentCombatBonusDefinition(
     [property: JsonPropertyName("attack_thrust")] int AttackThrust,

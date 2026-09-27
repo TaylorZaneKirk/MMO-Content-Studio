@@ -240,7 +240,7 @@ public static partial class UnifiedItemDomainRules
             NormalizeEquippedVisual(equipment.EquippedVisual),
             equipment.AmmunitionProfile is null ? null : new ItemAmmunitionProfileDefinition(
                 NormalizeRequired(equipment.AmmunitionProfile.AmmunitionFamily),
-                NormalizeRequired(equipment.AmmunitionProfile.RangedDamageType)), equipment.TwoHanded);
+                NormalizeRequired(equipment.AmmunitionProfile.RangedDamageType), equipment.AmmunitionProfile.AmmunitionTier), equipment.TwoHanded);
     }
 
     private static EquipmentCombatProfileDefinition? NormalizeWeaponProfile(
@@ -258,7 +258,7 @@ public static partial class UnifiedItemDomainRules
             profile.MinimumRangeTiles,
             profile.MaximumRangeTiles,
             profile.AttackSpeedUnits,
-            NormalizeOptional(profile.RangedDamageType), NormalizeOptional(profile.AmmunitionFamily));
+            NormalizeOptional(profile.RangedDamageType), NormalizeOptional(profile.AmmunitionFamily), profile.MaximumAmmunitionTier);
     }
 
     private static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(

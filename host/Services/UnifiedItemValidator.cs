@@ -610,6 +610,10 @@ public sealed class UnifiedItemValidator
             messages.Add(new ApiError("invalid_ammunition_profile",
                 "Ammunition profiles belong only to Ammo equipment and require Arrow family with Light, Standard or Heavy damage type.",
                 ValidationSeverity.Error, "equipment.ammunition_profile"));
+        if (profile is not null && profile.AmmunitionTier is not (>= 1 and <= UnifiedItemDomainRules.MaximumMagnitude))
+            messages.Add(new ApiError("invalid_ammunition_tier",
+                "Ammunition tier must be an integer from 1 to 1,000,000.",
+                ValidationSeverity.Error, "equipment.ammunition_profile.ammunition_tier"));
         if (equipment.EquipmentSlotId == "ammo" && forPublication &&
             (!stackable || profile is null || equipment.WeaponProfile is not null))
             messages.Add(new ApiError("invalid_ammunition_equipment",
@@ -691,6 +695,13 @@ public sealed class UnifiedItemValidator
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.ranged_damage_type"));
         }
+        var usesAmmunition = profile.AttackType == "ranged" && profile.AmmunitionFamily is not null;
+        if (usesAmmunition
+            ? profile.MaximumAmmunitionTier is not (>= 1 and <= UnifiedItemDomainRules.MaximumMagnitude)
+            : profile.MaximumAmmunitionTier is not null)
+            messages.Add(new ApiError("invalid_maximum_ammunition_tier",
+                "Ammo-using Ranged weapons require a maximum ammunition tier from 1 to 1,000,000; other weapons must leave it empty.",
+                ValidationSeverity.Error, "equipment.weapon_profile.maximum_ammunition_tier"));
         if (profile.MinimumRangeTiles < (forPublication ? 1 : 0)
             || profile.MaximumRangeTiles < profile.MinimumRangeTiles
             || profile.MaximumRangeTiles > UnifiedItemDomainRules.MaximumRangeTiles)

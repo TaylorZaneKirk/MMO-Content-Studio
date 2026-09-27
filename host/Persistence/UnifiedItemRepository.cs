@@ -978,7 +978,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         const string sql = """
             select profile_id, attack_type, accuracy_style, ranged_damage_type,
-                minimum_range_tiles, maximum_range_tiles, attack_speed_units, ammunition_family
+                minimum_range_tiles, maximum_range_tiles, attack_speed_units, ammunition_family, maximum_ammunition_tier
             from item_combat_profiles
             where item_id = @item_id;
             """;
@@ -997,7 +997,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
             reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
             reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
-            ReadNullableString(reader, "ranged_damage_type"), ReadNullableString(reader, "ammunition_family"));
+            ReadNullableString(reader, "ranged_damage_type"), ReadNullableString(reader, "ammunition_family"),
+            reader.IsDBNull(reader.GetOrdinal("maximum_ammunition_tier")) ? null : reader.GetInt32(reader.GetOrdinal("maximum_ammunition_tier")));
     }
 
     private static async Task<ItemAmmunitionProfileDefinition?> LoadAmmunitionProfileAsync(
@@ -1005,11 +1006,11 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand("""
-            select ammunition_family, ranged_damage_type from item_ammunition_profiles where item_id = @item;
+            select ammunition_family, ranged_damage_type, ammunition_tier from item_ammunition_profiles where item_id = @item;
             """, connection, transaction);
         command.Parameters.AddWithValue("item", itemId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? new(reader.GetString(0), reader.GetString(1)) : null;
+        return await reader.ReadAsync(cancellationToken) ? new(reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetInt32(2)) : null;
     }
 
     private static async Task ReplaceAmmunitionProfileAsync(
@@ -1022,14 +1023,15 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             return;
         }
         await using var command = new NpgsqlCommand("""
-            insert into item_ammunition_profiles (item_id, ammunition_family, ranged_damage_type)
-            values (@item, @family, @damage)
+            insert into item_ammunition_profiles (item_id, ammunition_family, ranged_damage_type, ammunition_tier)
+            values (@item, @family, @damage, @tier)
             on conflict (item_id) do update set ammunition_family = excluded.ammunition_family,
-                ranged_damage_type = excluded.ranged_damage_type, updated_at = now();
+                ranged_damage_type = excluded.ranged_damage_type, ammunition_tier = excluded.ammunition_tier, updated_at = now();
             """, connection, transaction);
         command.Parameters.AddWithValue("item", itemId);
         command.Parameters.AddWithValue("family", profile.AmmunitionFamily);
         command.Parameters.AddWithValue("damage", profile.RangedDamageType);
+        command.Parameters.Add("tier", NpgsqlDbType.Integer).Value = (object?)profile.AmmunitionTier ?? DBNull.Value;
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -1560,6 +1562,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 accuracy_style,
                 ranged_damage_type,
                 ammunition_family,
+                maximum_ammunition_tier,
                 minimum_range_tiles,
                 maximum_range_tiles,
                 attack_speed_units,
@@ -1571,6 +1574,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @accuracy_style,
                 @ranged_damage_type,
                 @ammunition_family,
+                @maximum_ammunition_tier,
                 @minimum_range_tiles,
                 @maximum_range_tiles,
                 @attack_speed_units,
@@ -1582,6 +1586,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 accuracy_style = excluded.accuracy_style,
                 ranged_damage_type = excluded.ranged_damage_type,
                 ammunition_family = excluded.ammunition_family,
+                maximum_ammunition_tier = excluded.maximum_ammunition_tier,
                 minimum_range_tiles = excluded.minimum_range_tiles,
                 maximum_range_tiles = excluded.maximum_range_tiles,
                 attack_speed_units = excluded.attack_speed_units,
@@ -1597,6 +1602,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             (object?)profile.RangedDamageType ?? DBNull.Value;
         command.Parameters.Add("ammunition_family", NpgsqlDbType.Text).Value =
             (object?)profile.AmmunitionFamily ?? DBNull.Value;
+        command.Parameters.Add("maximum_ammunition_tier", NpgsqlDbType.Integer).Value =
+            (object?)profile.MaximumAmmunitionTier ?? DBNull.Value;
         command.Parameters.AddWithValue("minimum_range_tiles", profile.MinimumRangeTiles);
         command.Parameters.AddWithValue("maximum_range_tiles", profile.MaximumRangeTiles);
         command.Parameters.AddWithValue("attack_speed_units", profile.AttackSpeedUnits);

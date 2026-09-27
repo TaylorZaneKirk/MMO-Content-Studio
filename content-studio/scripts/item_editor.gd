@@ -105,9 +105,12 @@ var _weapon_accuracy_style: OptionButton
 var _weapon_accuracy_label: Label
 var _weapon_ammunition_family: OptionButton
 var _weapon_ammunition_label: Label
+var _maximum_ammunition_tier: SpinBox
+var _maximum_ammunition_tier_label: Label
 var _ammunition_section: VBoxContainer
 var _ammunition_family: OptionButton
 var _ammunition_damage_type: OptionButton
+var _ammunition_tier: SpinBox
 var _weapon_ranged_damage_type: OptionButton
 var _weapon_ranged_damage_label: Label
 var _weapon_min_range: SpinBox
@@ -559,6 +562,9 @@ func _build_ui() -> void:
 	_weapon_ammunition_family = _add_option_field(weapon_grid, "Ammo family")
 	_weapon_ammunition_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
 	_weapon_ammunition_family.item_selected.connect(_on_weapon_attack_type_selected)
+	_maximum_ammunition_tier = _add_spin_field(weapon_grid, "Maximum ammunition tier", 1, 1000000, 1)
+	_maximum_ammunition_tier_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
+	_maximum_ammunition_tier.value_changed.connect(_on_form_changed.unbind(1))
 	_weapon_ranged_damage_type = _add_option_field(weapon_grid, "Ranged damage type")
 	_weapon_ranged_damage_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
 	_weapon_min_range = _add_spin_field(weapon_grid, "Minimum range tiles", 0, 32, 1)
@@ -573,6 +579,8 @@ func _build_ui() -> void:
 	ammunition_grid.columns = 2
 	_ammunition_section.add_child(ammunition_grid)
 	_ammunition_family = _add_option_field(ammunition_grid, "Ammunition family")
+	_ammunition_tier = _add_spin_field(ammunition_grid, "Ammunition tier", 1, 1000000, 1)
+	_ammunition_tier.value_changed.connect(_on_form_changed.unbind(1))
 	_ammunition_damage_type = _add_option_field(ammunition_grid, "Ranged damage type")
 
 	editor = tools_page
@@ -927,6 +935,8 @@ func _apply_equipment(value: Variant) -> void:
 	var ammunition_variant: Variant = equipment.get("ammunition_profile", null)
 	var ammunition := ammunition_variant as Dictionary if ammunition_variant is Dictionary else {}
 	_select_option(_ammunition_family, str(ammunition.get("ammunition_family", "arrow")))
+	# Legacy-transition nulls display a starting value only; Preview/Apply is still required to save it.
+	_ammunition_tier.value = float(ammunition["ammunition_tier"]) if ammunition.get("ammunition_tier") != null else 1
 	_select_option(_ammunition_damage_type, str(ammunition.get("ranged_damage_type", "standard")))
 	_apply_equipped_visual(equipment.get("equipped_visual", null))
 
@@ -1098,6 +1108,7 @@ func _equipment_payload() -> Dictionary:
 		"weapon_profile": _weapon_profile_payload(),
 		"ammunition_profile": {
 			"ammunition_family": _selected_metadata(_ammunition_family),
+			"ammunition_tier": int(_ammunition_tier.value),
 			"ranged_damage_type": _selected_metadata(_ammunition_damage_type),
 		} if _selected_metadata(_equipment_slot) == "ammo" else null,
 		"equipped_visual": _equipped_visual_payload(),
@@ -1113,6 +1124,7 @@ func _weapon_profile_payload() -> Variant:
 		"accuracy_style": _selected_metadata(_weapon_accuracy_style) if _selected_metadata(_weapon_attack_type) == "melee" else null,
 		"ranged_damage_type": _selected_metadata(_weapon_ranged_damage_type) if _selected_metadata(_weapon_attack_type) == "ranged" and _selected_metadata(_weapon_ammunition_family).is_empty() else null,
 		"ammunition_family": _optional_payload(_selected_metadata(_weapon_ammunition_family)) if _selected_metadata(_weapon_attack_type) == "ranged" else null,
+		"maximum_ammunition_tier": int(_maximum_ammunition_tier.value) if _selected_metadata(_weapon_attack_type) == "ranged" and not _selected_metadata(_weapon_ammunition_family).is_empty() else null,
 		"minimum_range_tiles": int(_weapon_min_range.value),
 		"maximum_range_tiles": int(_weapon_max_range.value),
 		"attack_speed_units": int(_weapon_speed_units.value),
@@ -1856,6 +1868,7 @@ func _apply_weapon_profile(profile_variant: Variant) -> void:
 	_weapon_min_range.value = float(profile.get("minimum_range_tiles", 1))
 	_weapon_max_range.value = float(profile.get("maximum_range_tiles", 1))
 	_weapon_speed_units.value = float(profile.get("attack_speed_units", 4))
+	_maximum_ammunition_tier.value = float(profile["maximum_ammunition_tier"]) if profile.get("maximum_ammunition_tier") != null else 1
 	_update_weapon_timing()
 
 
@@ -1980,7 +1993,7 @@ func _set_form_enabled(enabled: bool) -> void:
 		edit.editable = enabled and (edit != _item_id or _current_item.is_empty())
 	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _weapon_ranged_damage_type, _weapon_ammunition_family, _ammunition_family, _ammunition_damage_type, _operation]:
 		option.disabled = not enabled
-	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units]:
+	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units, _ammunition_tier, _maximum_ammunition_tier]:
 		spin.editable = enabled
 	for toggle in [_stackable, _consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
 		toggle.disabled = not enabled
@@ -2004,6 +2017,7 @@ func _set_consumable_controls_enabled(enabled: bool) -> void:
 
 func _set_equipment_controls_enabled(enabled: bool) -> void:
 	_equipment_slot.disabled = not enabled
+	_ammunition_tier.editable = enabled and _selected_metadata(_equipment_slot) == "ammo"
 	_two_handed.disabled = not enabled or _selected_metadata(_equipment_slot) != "right_hand"
 	if _two_handed.disabled:
 		_two_handed.set_pressed_no_signal(false)
@@ -2024,6 +2038,7 @@ func _set_weapon_controls_enabled(enabled: bool) -> void:
 	_weapon_min_range.editable = enabled
 	_weapon_max_range.editable = enabled
 	_weapon_speed_units.editable = enabled
+	_update_weapon_family_fields()
 
 
 func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: bool, socket_binding: bool) -> void:
@@ -2107,6 +2122,10 @@ func _update_weapon_family_fields() -> void:
 	_weapon_accuracy_style.visible = not ranged
 	_weapon_ammunition_label.visible = ranged
 	_weapon_ammunition_family.visible = ranged
+	var uses_ammunition := ranged and _weapon_enabled.button_pressed and not _selected_metadata(_weapon_ammunition_family).is_empty()
+	_maximum_ammunition_tier.visible = uses_ammunition
+	_maximum_ammunition_tier_label.visible = uses_ammunition
+	_maximum_ammunition_tier.editable = uses_ammunition and not _weapon_ammunition_family.disabled
 	var self_contained := ranged and _selected_metadata(_weapon_ammunition_family).is_empty()
 	_weapon_ranged_damage_label.visible = self_contained
 	_weapon_ranged_damage_type.visible = self_contained
