@@ -595,7 +595,7 @@ public sealed class UnifiedItemAuthoringService
                     equipment.EquippedVisual.FlipXByPose,
                     equipment.EquippedVisual.HiddenPoses,
                     equipment.EquippedVisual.ItemOverGripByPose),
-            equipment.AmmunitionProfile);
+            equipment.AmmunitionProfile, equipment.TwoHanded);
 
     private static string ClassifySummary(
         bool hasConsumable,

@@ -76,7 +76,7 @@ public static partial class UnifiedItemDomainRules
                             record.EquippedVisual.FlipXByPose,
                             record.EquippedVisual.HiddenPoses,
                             record.EquippedVisual.ItemOverGripByPose),
-                    record.AmmunitionProfile)
+                    record.AmmunitionProfile, record.TwoHanded)
                 : null,
             record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
@@ -240,7 +240,7 @@ public static partial class UnifiedItemDomainRules
             NormalizeEquippedVisual(equipment.EquippedVisual),
             equipment.AmmunitionProfile is null ? null : new ItemAmmunitionProfileDefinition(
                 NormalizeRequired(equipment.AmmunitionProfile.AmmunitionFamily),
-                NormalizeRequired(equipment.AmmunitionProfile.RangedDamageType)));
+                NormalizeRequired(equipment.AmmunitionProfile.RangedDamageType)), equipment.TwoHanded);
     }
 
     private static EquipmentCombatProfileDefinition? NormalizeWeaponProfile(
@@ -428,7 +428,7 @@ public sealed record NormalizedItemEquipmentMetadata(
     EquipmentCombatBonusDefinition CombatBonuses,
     EquipmentCombatProfileDefinition? WeaponProfile,
     NormalizedItemEquippedVisual? EquippedVisual,
-    ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
+    ItemAmmunitionProfileDefinition? AmmunitionProfile = null, bool TwoHanded = false);
 
 public sealed record NormalizedItemEquippedVisual(
     string? AssetKey,

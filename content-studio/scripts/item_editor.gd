@@ -87,6 +87,7 @@ var _consumable_requirements: VBoxContainer
 var _consumable_effects: VBoxContainer
 var _equipable: CheckBox
 var _equipment_slot: OptionButton
+var _two_handed: CheckBox
 var _required_strength: SpinBox
 var _equip_note: Label
 var _appearance_section: VBoxContainer
@@ -335,6 +336,11 @@ func _build_ui() -> void:
 	equip_grid.add_child(_equipable)
 	_equipment_slot = _add_option_field(equip_grid, "Equipment slot")
 	_equipment_slot.item_selected.connect(_on_slot_changed.unbind(1))
+	equip_grid.add_child(_field_label("Hand occupancy"))
+	_two_handed = CheckBox.new()
+	_two_handed.text = "Two-handed (uses right + left hand)"
+	_two_handed.toggled.connect(_on_form_changed.unbind(1))
+	equip_grid.add_child(_two_handed)
 	_required_strength = _add_spin_field(equip_grid, "Required strength", 1, 1000000, 1)
 	_equip_note = Label.new()
 	_equip_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -905,6 +911,7 @@ func _apply_equipment(value: Variant) -> void:
 	var equipment := value as Dictionary if enabled else {}
 	_equipable.button_pressed = enabled
 	_select_option(_equipment_slot, str(equipment.get("equipment_slot_id", "right_hand")))
+	_two_handed.button_pressed = bool(equipment.get("two_handed", false))
 	_required_strength.value = float(equipment.get("required_strength", 1))
 	_clear_rows(_requirements)
 	for variant in equipment.get("requirements", []) as Array:
@@ -1083,6 +1090,7 @@ func _has_valid_economy_integers() -> bool:
 func _equipment_payload() -> Dictionary:
 	return {
 		"equipment_slot_id": _selected_metadata(_equipment_slot),
+		"two_handed": _two_handed.button_pressed and _selected_metadata(_equipment_slot) == "right_hand",
 		"required_strength": int(_required_strength.value),
 		"requirements": _collect_requirements(),
 		"skill_modifiers": _collect_modifiers(),
@@ -1996,6 +2004,9 @@ func _set_consumable_controls_enabled(enabled: bool) -> void:
 
 func _set_equipment_controls_enabled(enabled: bool) -> void:
 	_equipment_slot.disabled = not enabled
+	_two_handed.disabled = not enabled or _selected_metadata(_equipment_slot) != "right_hand"
+	if _two_handed.disabled:
+		_two_handed.set_pressed_no_signal(false)
 	_required_strength.editable = enabled
 	for row in _requirements.get_children() + _modifiers.get_children():
 		_set_row_enabled(row, enabled)

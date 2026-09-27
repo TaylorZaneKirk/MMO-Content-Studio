@@ -79,7 +79,8 @@ public sealed record ItemEquipmentMetadataDefinition(
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition CombatBonuses,
     [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
     [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition? EquippedVisual,
-    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
+    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null,
+    [property: JsonPropertyName("two_handed")] bool TwoHanded = false);
 
 public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -149,7 +150,8 @@ public sealed record ItemEquipmentMetadataDraft(
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
     [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDraft? EquippedVisual,
-    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null);
+    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null,
+    [property: JsonPropertyName("two_handed")] bool TwoHanded = false);
 
 public sealed record ItemEquippedVisualDefinition(
     [property: JsonPropertyName("asset_key")] string AssetKey,

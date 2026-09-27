@@ -83,6 +83,16 @@ public sealed class UnifiedItemValidator
         {
             await ValidateEquipmentAsync(draft.Equipment, forPublication, messages, cancellationToken);
             ValidateAmmunition(draft.Equipment, draft.Stackable, forPublication, messages);
+            if (draft.Equipment.TwoHanded)
+            {
+                if (draft.Equipment.EquipmentSlotId != "right_hand")
+                    messages.Add(new ApiError("invalid_two_handed_slot",
+                        "Two-handed equipment must use right_hand.", ValidationSeverity.Error, "equipment.two_handed"));
+                if (await _repository.HasTwoHandedEquipmentConflictAsync(itemId, cancellationToken))
+                    messages.Add(new ApiError("two_handed_equipment_conflict",
+                        "This item is already equipped alongside a left-hand item or outside right_hand. Unequip the conflicting equipment in game before authoring it as two-handed.",
+                        ValidationSeverity.Error, "equipment.two_handed"));
+            }
         }
         await ValidateToolCapabilitiesAsync(draft.ToolCapabilities, messages, cancellationToken);
         await ValidateEconomyLifecycleAsync(itemId, draft.EconomyLifecycle, forPublication, messages, cancellationToken);

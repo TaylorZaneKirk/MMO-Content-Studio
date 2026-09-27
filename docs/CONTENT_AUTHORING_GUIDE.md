@@ -69,3 +69,25 @@ on restart; they no longer block item deletion or stackability publication throu
 SQL references. Item health and possession checks therefore no longer require
 `ground_items`. Durable inventory/equipment guards still apply. Deploy this host
 with the matching game server and apply 071 with the old processes stopped.
+
+## Two-handed right-hand equipment (R6B)
+
+Migration 072 adds `item_definitions.two_handed` (boolean, default false).
+In Items -> Equipment -> Equipability, select `right_hand` and check
+**Two-handed (uses right + left hand)**. Other slots disable and clear the flag;
+disabling equipability clears it too. Preview, Save Draft, Save & Publish and
+reload carry `equipment.two_handed`. The server rejects a true flag on another
+slot. Gameplay occupancy is independent of appearance sockets and held art.
+
+Studio rejects two-handed authoring if retained equipment wears the item outside
+right_hand or pairs it with an occupied left_hand. Unequip the conflict through
+the game; Studio never moves player possessions. Restart the game after changing
+Published equipment facts; live gameplay uses its startup snapshot.
+
+Equipping a two-handed item returns a target right-hand item to the clicked
+inventory slot. A left-hand conflict uses that slot if no target item is displaced,
+otherwise the lowest other free slot; no capacity rejects the entire equip.
+Equipping a shield against a worn two-handed item returns the weapon to the
+shield's vacated source slot, even with an otherwise full inventory. One-handed
+right + left equipment and Ammo remain independent. A two-handed item occupies
+one durable right_hand row, never a duplicate left_hand row.
