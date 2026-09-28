@@ -1,3 +1,4 @@
+// Declares database schema requirements for the Mob authoring workspace.
 using MMO.ContentStudio.AuthoringHost.Health;
 
 namespace MMO.ContentStudio.AuthoringHost.Features.Mobs;
@@ -59,6 +60,8 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "attack_level"),
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "strength_level"),
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "defence_level"),
+        AuthoringSchemaRequirement.Column("mob_combat_profiles", "magic_level"),
+        AuthoringSchemaRequirement.Constraint("mob_combat_profiles_magic_level_check"),
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "updated_at"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_thrust"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_slash"),
@@ -67,7 +70,6 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_magic"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "strength_melee"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "strength_ranged"),
-        AuthoringSchemaRequirement.Column("mob_combat_bonuses", "strength_magic"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_thrust"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_slash"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_crush"),

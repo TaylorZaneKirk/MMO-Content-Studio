@@ -1,3 +1,4 @@
+// Owns Mob authoring previews and lifecycle decisions over the complete aggregate.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -464,7 +465,7 @@ public sealed class MobAuthoringService
                     primaryCombatProfile.AttackSpeedUnits,
                     primaryCombatProfile.AttackLevel,
                     primaryCombatProfile.StrengthLevel,
-                    primaryCombatProfile.DefenceLevel),
+                    primaryCombatProfile.DefenceLevel, primaryCombatProfile.MagicLevel),
             combatBonuses ?? MobCombatBonusDefinition.Zero,
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
@@ -775,7 +776,7 @@ public sealed class MobAuthoringService
                 draft.PrimaryCombatProfile.AttackLevel,
                 draft.PrimaryCombatProfile.StrengthLevel,
                 draft.PrimaryCombatProfile.DefenceLevel,
-                draft.MaxHealth);
+                draft.MaxHealth, draft.PrimaryCombatProfile.MagicLevel);
     }
 
     private static MobCombatLevelDiagnosticsDefinition? CalculateCombatLevelDiagnostics(NormalizedMobDraft draft)

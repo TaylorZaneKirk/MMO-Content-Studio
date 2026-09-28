@@ -1,3 +1,4 @@
+// Owns unified Item preview and publication decisions over repository-owned persistence.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -713,15 +714,15 @@ public sealed class UnifiedItemAuthoringService
         new("attack_slash", "Attack Slash"),
         new("attack_crush", "Attack Crush"),
         new("attack_ranged", "Attack Ranged"),
-        new("attack_magic", "Attack Magic"),
+        new("attack_magic", "Magic Attack"),
         new("strength_melee", "Strength Melee"),
         new("strength_ranged", "Strength Ranged"),
-        new("strength_magic", "Strength Magic"),
+        new("magic_damage_percent", "Magic Damage %"),
         new("defence_thrust", "Defence Thrust"),
         new("defence_slash", "Defence Slash"),
         new("defence_crush", "Defence Crush"),
         new("defence_ranged", "Defence Ranged"),
-        new("defence_magic", "Defence Magic")
+        new("defence_magic", "Magic Defence")
     ];
 
     private static ApiError ItemNotFound(string itemId) => new(

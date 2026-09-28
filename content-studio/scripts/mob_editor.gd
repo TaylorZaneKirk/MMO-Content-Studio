@@ -18,7 +18,6 @@ const DEFAULT_BONUS_FIELDS := [
 	"attack_magic",
 	"strength_melee",
 	"strength_ranged",
-	"strength_magic",
 	"defence_thrust",
 	"defence_slash",
 	"defence_crush",
@@ -199,6 +198,7 @@ var _combat_level_warnings: Label
 var _attack_level: SpinBox
 var _strength_level: SpinBox
 var _defence_level: SpinBox
+var _magic_level: SpinBox
 var _drops: VBoxContainer
 var _add_drop_button: Button
 var _operation: OptionButton
@@ -477,6 +477,7 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_attack_level = _spin_field(grid, "Attack level", 1, 1000, 1, 1)
 	_strength_level = _spin_field(grid, "Strength level", 1, 1000, 1, 1)
 	_defence_level = _spin_field(grid, "Defence level", 1, 1000, 1, 1)
+	_magic_level = _spin_field(grid, "Magic level", 0, 1000000, 1, 0)
 	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
 	_combat_level_diagnostics = _value_label(grid, "Innate-bonus diagnostics", "Attack 1.0 / Strength 1.0 / Defence T 1.0, S 1.0, C 1.0")
 	parent.add_child(_wrapped_label("Combat level = max(1, floor((Defence + maximum Health) / 4 + 13 x (Attack + Strength) / 40)). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
@@ -737,6 +738,7 @@ func _start_new_mob() -> void:
 	_attack_level.value = 1
 	_strength_level.value = 1
 	_defence_level.value = 1
+	_magic_level.value = 0
 	_zero_bonuses()
 	_load_drops([])
 	_asset_preview_file_path = ""
@@ -770,6 +772,7 @@ func _load_combat_profile(profile_variant: Variant) -> void:
 	_attack_level.value = int(profile.get("attack_level", 1))
 	_strength_level.value = int(profile.get("strength_level", 1))
 	_defence_level.value = int(profile.get("defence_level", 1))
+	_magic_level.value = int(profile.get("magic_level", 0))
 
 
 func _load_bonuses(bonuses_variant: Variant) -> void:
@@ -888,6 +891,7 @@ func _combat_profile_payload() -> Dictionary:
 		"attack_level": int(_attack_level.value),
 		"strength_level": int(_strength_level.value),
 		"defence_level": int(_defence_level.value),
+		"magic_level": int(_magic_level.value),
 	}
 
 
@@ -1434,7 +1438,7 @@ func _update_attack_controls() -> void:
 	var enabled := _form_editable and _attack_enabled.button_pressed
 	for control in [_attack_type, _accuracy_style]:
 		(control as OptionButton).disabled = not enabled
-	for control in [_minimum_range, _maximum_range, _attack_speed_units, _attack_level, _strength_level, _defence_level]:
+	for control in [_minimum_range, _maximum_range, _attack_speed_units, _attack_level, _strength_level, _defence_level, _magic_level]:
 		(control as SpinBox).editable = enabled
 	_update_attack_interval()
 
@@ -1462,7 +1466,7 @@ func _update_derived_combat_level() -> void:
 	var strength := int(_strength_level.value) if _strength_level != null else 1
 	var defence := int(_defence_level.value) if _defence_level != null else 1
 	var health := int(_max_health.value) if _max_health != null else 1
-	var level := maxi(1, int((10 * (defence + health) + 13 * (attack + strength)) / 40))
+	var level := maxi(1, int((10 * (defence + health) + 13 * maxi(attack + strength, (3 * int(_magic_level.value)) / 2)) / 40))
 	_set_derived_combat_level(level)
 	_set_combat_level_diagnostics(_local_combat_level_diagnostics(attack, strength, defence))
 

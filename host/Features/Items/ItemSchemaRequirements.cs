@@ -1,3 +1,4 @@
+// Declares database schema requirements for the unified Item workspace.
 using MMO.ContentStudio.AuthoringHost.Health;
 
 namespace MMO.ContentStudio.AuthoringHost.Features.Items;
@@ -112,7 +113,7 @@ public sealed class ItemSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("item_combat_bonuses", "attack_magic"),
         AuthoringSchemaRequirement.Column("item_combat_bonuses", "strength_melee"),
         AuthoringSchemaRequirement.Column("item_combat_bonuses", "strength_ranged"),
-        AuthoringSchemaRequirement.Column("item_combat_bonuses", "strength_magic"),
+        AuthoringSchemaRequirement.Column("item_combat_bonuses", "magic_damage_percent"),
         AuthoringSchemaRequirement.Column("item_combat_bonuses", "defence_thrust"),
         AuthoringSchemaRequirement.Column("item_combat_bonuses", "defence_slash"),
         AuthoringSchemaRequirement.Column("item_combat_bonuses", "defence_crush"),

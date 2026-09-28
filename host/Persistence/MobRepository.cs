@@ -1,3 +1,4 @@
+// Reads and writes the complete Mob aggregate under the existing authoring transaction.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
@@ -373,7 +374,7 @@ public sealed class MobRepository : IMobRepository
     {
         const string sql = """
             select attack_type, accuracy_style, minimum_range_tiles, maximum_range_tiles,
-                attack_speed_units, attack_level, strength_level, defence_level
+                attack_speed_units, attack_level, strength_level, defence_level, magic_level
             from mob_combat_profiles
             where mob_definition_id = @mob_definition_id;
             """;
@@ -394,7 +395,8 @@ public sealed class MobRepository : IMobRepository
             reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
             reader.GetInt32(reader.GetOrdinal("attack_level")),
             reader.GetInt32(reader.GetOrdinal("strength_level")),
-            reader.GetInt32(reader.GetOrdinal("defence_level")));
+            reader.GetInt32(reader.GetOrdinal("defence_level")),
+            reader.GetInt32(reader.GetOrdinal("magic_level")));
     }
 
     private static async Task<MobCombatBonusDefinition?> LoadCombatBonusesAsync(
@@ -405,7 +407,7 @@ public sealed class MobRepository : IMobRepository
     {
         const string sql = """
             select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
+                strength_melee, strength_ranged,
                 defence_thrust, defence_slash, defence_crush, defence_ranged_light, defence_ranged_standard, defence_ranged_heavy, defence_magic
             from mob_combat_bonuses
             where mob_definition_id = @mob_definition_id;
@@ -422,7 +424,6 @@ public sealed class MobRepository : IMobRepository
                 reader.GetInt32(reader.GetOrdinal("attack_magic")),
                 reader.GetInt32(reader.GetOrdinal("strength_melee")),
                 reader.GetInt32(reader.GetOrdinal("strength_ranged")),
-                reader.GetInt32(reader.GetOrdinal("strength_magic")),
                 reader.GetInt32(reader.GetOrdinal("defence_thrust")),
                 reader.GetInt32(reader.GetOrdinal("defence_slash")),
                 reader.GetInt32(reader.GetOrdinal("defence_crush")),
@@ -610,6 +611,7 @@ public sealed class MobRepository : IMobRepository
                 attack_level,
                 strength_level,
                 defence_level,
+                magic_level,
                 updated_at
             ) values (
                 @mob_definition_id,
@@ -621,6 +623,7 @@ public sealed class MobRepository : IMobRepository
                 @attack_level,
                 @strength_level,
                 @defence_level,
+                @magic_level,
                 now()
             )
             on conflict (mob_definition_id) do update set
@@ -632,6 +635,7 @@ public sealed class MobRepository : IMobRepository
                 attack_level = excluded.attack_level,
                 strength_level = excluded.strength_level,
                 defence_level = excluded.defence_level,
+                magic_level = excluded.magic_level,
                 updated_at = now();
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -645,6 +649,7 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("attack_level", profile.AttackLevel);
         command.Parameters.AddWithValue("strength_level", profile.StrengthLevel);
         command.Parameters.AddWithValue("defence_level", profile.DefenceLevel);
+        command.Parameters.AddWithValue("magic_level", profile.MagicLevel);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -665,13 +670,13 @@ public sealed class MobRepository : IMobRepository
             insert into mob_combat_bonuses (
                 mob_definition_id,
                 attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
+                strength_melee, strength_ranged,
                 defence_thrust, defence_slash, defence_crush, defence_ranged_light, defence_ranged_standard, defence_ranged_heavy, defence_magic,
                 updated_at
             ) values (
                 @mob_definition_id,
                 @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
-                @strength_melee, @strength_ranged, @strength_magic,
+                @strength_melee, @strength_ranged,
                 @defence_thrust, @defence_slash, @defence_crush, @defence_ranged_light, @defence_ranged_standard, @defence_ranged_heavy, @defence_magic,
                 now()
             )
@@ -683,7 +688,6 @@ public sealed class MobRepository : IMobRepository
                 attack_magic = excluded.attack_magic,
                 strength_melee = excluded.strength_melee,
                 strength_ranged = excluded.strength_ranged,
-                strength_magic = excluded.strength_magic,
                 defence_thrust = excluded.defence_thrust,
                 defence_slash = excluded.defence_slash,
                 defence_crush = excluded.defence_crush,
@@ -796,7 +800,6 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("attack_magic", bonuses.AttackMagic);
         command.Parameters.AddWithValue("strength_melee", bonuses.StrengthMelee);
         command.Parameters.AddWithValue("strength_ranged", bonuses.StrengthRanged);
-        command.Parameters.AddWithValue("strength_magic", bonuses.StrengthMagic);
         command.Parameters.AddWithValue("defence_thrust", bonuses.DefenceThrust);
         command.Parameters.AddWithValue("defence_slash", bonuses.DefenceSlash);
         command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);

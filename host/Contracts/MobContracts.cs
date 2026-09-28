@@ -1,3 +1,4 @@
+// Defines Mob authoring payloads; explicit combat levels and bonuses survive preview and persistence.
 using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
@@ -73,7 +74,8 @@ public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits,
     [property: JsonPropertyName("attack_level")] int AttackLevel,
     [property: JsonPropertyName("strength_level")] int StrengthLevel,
-    [property: JsonPropertyName("defence_level")] int DefenceLevel);
+    [property: JsonPropertyName("defence_level")] int DefenceLevel,
+    [property: JsonPropertyName("magic_level")] int MagicLevel = 0);
 
 public sealed record MobDropDefinition(
     [property: JsonPropertyName("drop_order")] int DropOrder,
@@ -259,7 +261,6 @@ public sealed record MobCombatBonusDefinition(
     [property: JsonPropertyName("attack_magic")] int AttackMagic,
     [property: JsonPropertyName("strength_melee")] int StrengthMelee,
     [property: JsonPropertyName("strength_ranged")] int StrengthRanged,
-    [property: JsonPropertyName("strength_magic")] int StrengthMagic,
     [property: JsonPropertyName("defence_thrust")] int DefenceThrust,
     [property: JsonPropertyName("defence_slash")] int DefenceSlash,
     [property: JsonPropertyName("defence_crush")] int DefenceCrush,
@@ -270,7 +271,7 @@ public sealed record MobCombatBonusDefinition(
 {
     public static MobCombatBonusDefinition Zero { get; } = new(
         0, 0, 0, 0, 0,
-        0, 0, 0,
+        0, 0,
         0, 0, 0, 0, 0, 0, 0);
 
     public bool IsZero => this == Zero;

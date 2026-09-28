@@ -1,3 +1,4 @@
+// Persists the unified Item aggregate and its equipment, consumable and tool facts.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
@@ -1043,7 +1044,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         const string sql = """
             select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
+                strength_melee, strength_ranged, magic_damage_percent,
                 defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic
             from item_combat_bonuses
             where item_id = @item_id;
@@ -1060,7 +1061,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reader.GetInt32(reader.GetOrdinal("attack_magic")),
                 reader.GetInt32(reader.GetOrdinal("strength_melee")),
                 reader.GetInt32(reader.GetOrdinal("strength_ranged")),
-                reader.GetInt32(reader.GetOrdinal("strength_magic")),
+                reader.GetInt32(reader.GetOrdinal("magic_damage_percent")),
                 reader.GetInt32(reader.GetOrdinal("defence_thrust")),
                 reader.GetInt32(reader.GetOrdinal("defence_slash")),
                 reader.GetInt32(reader.GetOrdinal("defence_crush")),
@@ -1627,13 +1628,13 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             insert into item_combat_bonuses (
                 item_id,
                 attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
+                strength_melee, strength_ranged, magic_damage_percent,
                 defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
                 updated_at
             ) values (
                 @item_id,
                 @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
-                @strength_melee, @strength_ranged, @strength_magic,
+                @strength_melee, @strength_ranged, @magic_damage_percent,
                 @defence_thrust, @defence_slash, @defence_crush, @defence_ranged, @defence_magic,
                 now()
             )
@@ -1645,7 +1646,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 attack_magic = excluded.attack_magic,
                 strength_melee = excluded.strength_melee,
                 strength_ranged = excluded.strength_ranged,
-                strength_magic = excluded.strength_magic,
+                magic_damage_percent = excluded.magic_damage_percent,
                 defence_thrust = excluded.defence_thrust,
                 defence_slash = excluded.defence_slash,
                 defence_crush = excluded.defence_crush,
@@ -1662,7 +1663,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("attack_magic", bonuses.AttackMagic);
         command.Parameters.AddWithValue("strength_melee", bonuses.StrengthMelee);
         command.Parameters.AddWithValue("strength_ranged", bonuses.StrengthRanged);
-        command.Parameters.AddWithValue("strength_magic", bonuses.StrengthMagic);
+        command.Parameters.AddWithValue("magic_damage_percent", bonuses.MagicDamagePercent);
         command.Parameters.AddWithValue("defence_thrust", bonuses.DefenceThrust);
         command.Parameters.AddWithValue("defence_slash", bonuses.DefenceSlash);
         command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);

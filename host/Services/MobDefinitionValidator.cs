@@ -1,3 +1,4 @@
+// Validates supported Mob content for Draft and Published authoring operations.
 using System.Text.RegularExpressions;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
@@ -501,7 +502,8 @@ public sealed partial class MobDefinitionValidator
         }
         if (!MobDomainRules.IsLevelSupported(profile.AttackLevel)
             || !MobDomainRules.IsLevelSupported(profile.StrengthLevel)
-            || !MobDomainRules.IsLevelSupported(profile.DefenceLevel))
+            || !MobDomainRules.IsLevelSupported(profile.DefenceLevel)
+            || !MobDomainRules.IsLevelSupported(profile.MagicLevel))
         {
             messages.Add(new ApiError(
                 "invalid_mob_combat_level",
@@ -609,7 +611,6 @@ public sealed partial class MobDefinitionValidator
             ["attack_magic"] = bonuses.AttackMagic,
             ["strength_melee"] = bonuses.StrengthMelee,
             ["strength_ranged"] = bonuses.StrengthRanged,
-            ["strength_magic"] = bonuses.StrengthMagic,
             ["defence_thrust"] = bonuses.DefenceThrust,
             ["defence_slash"] = bonuses.DefenceSlash,
             ["defence_crush"] = bonuses.DefenceCrush,

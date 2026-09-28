@@ -339,3 +339,31 @@ server-authoritative runtime execution. See
 - [`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
+
+## Magic M1 authoring
+
+The **Spells** workspace authors ordinary selected combat spells: stable Spell ID,
+Display Name, Tier (1–4), Element (air/earth/fire/water), Required Magic Level
+(1–99), positive Crystal Shard cost, successful-hit minimum damage, base maximum
+hit, and base cast XP in integer tenths (15 means 1.5 XP). These are content facts;
+the workspace does not execute casts or author effect graphs.
+
+Create a new definition or load one from the library. Choose Save Draft or Save &
+Publish, Preview, then Apply. Publish, Disable and Delete also use preview; delete
+requires Disabled state. Editing invalidates the preview. Concurrent edits are
+rejected using the loaded `updated_at` timestamp; reload and preview again.
+A spell does not require an icon or projectile asset to publish.
+
+In **Items**, choose the Magic weapon family for a right-hand standard focus.
+Author its range and attack speed; accuracy style and all Ranged/ammunition fields
+are null. **Magic Attack**, **Magic Damage %**, and **Magic Defence** are distinct
+bonuses. There is no attached spell, charge store or legacy `strength_magic` alias.
+In **Mobs**, author **Magic level** independently of physical Defence and retain
+Magic Defence as a bonus. The combat-level preview uses the approved strongest
+melee-or-Magic component, with zero Magic contributing zero.
+
+Apply MMO Project migration `077_magic_authoring_foundation.sql` once against the
+shared development DB. The copy under `integrations/mmo-project/prototype/sql` is
+byte-identical documentation/integration material, not a second migration run.
+Existing whole XP remains unchanged; a database-owned 0–9 tenths remainder awaits
+the later casting settlement implementation. M1 supplies no starter balance data.

@@ -1,3 +1,4 @@
+// Defines the normalized equipment payload, including separate Magic accuracy and damage percentage facts.
 using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
@@ -44,7 +45,7 @@ public sealed record EquipmentCombatBonusDefinition(
     [property: JsonPropertyName("attack_magic")] int AttackMagic,
     [property: JsonPropertyName("strength_melee")] int StrengthMelee,
     [property: JsonPropertyName("strength_ranged")] int StrengthRanged,
-    [property: JsonPropertyName("strength_magic")] int StrengthMagic,
+    [property: JsonPropertyName("magic_damage_percent")] int MagicDamagePercent,
     [property: JsonPropertyName("defence_thrust")] int DefenceThrust,
     [property: JsonPropertyName("defence_slash")] int DefenceSlash,
     [property: JsonPropertyName("defence_crush")] int DefenceCrush,

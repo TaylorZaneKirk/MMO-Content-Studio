@@ -1,3 +1,4 @@
+// Lists the supported Mob authoring values and bounded numeric conventions.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
@@ -77,7 +78,6 @@ public sealed class MobAuthoringRegistry
         new("attack_magic", "Attack Magic"),
         new("strength_melee", "Strength Melee"),
         new("strength_ranged", "Strength Ranged"),
-        new("strength_magic", "Strength Magic"),
         new("defence_thrust", "Defence Thrust"),
         new("defence_slash", "Defence Slash"),
         new("defence_crush", "Defence Crush"),

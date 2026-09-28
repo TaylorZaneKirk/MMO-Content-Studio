@@ -1,3 +1,4 @@
+// Validates the unified Item aggregate for supported draft and publication shapes.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
 
@@ -695,6 +696,15 @@ public sealed class UnifiedItemValidator
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.ranged_damage_type"));
         }
+        if (profile.AttackType == "magic" && (profile.AccuracyStyle is not null ||
+            profile.RangedDamageType is not null || profile.AmmunitionFamily is not null ||
+            profile.MaximumAmmunitionTier is not null))
+        {
+            messages.Add(new ApiError("invalid_magic_weapon_profile",
+                "Magic focuses have no accuracy style, Ranged damage type or ammunition fields.",
+                ValidationSeverity.Error, "equipment.weapon_profile"));
+        }
+
         var usesAmmunition = profile.AttackType == "ranged" && profile.AmmunitionFamily is not null;
         if (usesAmmunition
             ? profile.MaximumAmmunitionTier is not (>= 1 and <= UnifiedItemDomainRules.MaximumMagnitude)
@@ -1026,7 +1036,7 @@ public sealed class UnifiedItemValidator
             ["attack_magic"] = bonuses.AttackMagic,
             ["strength_melee"] = bonuses.StrengthMelee,
             ["strength_ranged"] = bonuses.StrengthRanged,
-            ["strength_magic"] = bonuses.StrengthMagic,
+            ["magic_damage_percent"] = bonuses.MagicDamagePercent,
             ["defence_thrust"] = bonuses.DefenceThrust,
             ["defence_slash"] = bonuses.DefenceSlash,
             ["defence_crush"] = bonuses.DefenceCrush,

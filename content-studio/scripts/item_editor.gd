@@ -15,15 +15,15 @@ const DEFAULT_BONUS_FIELDS := [
 	{"id": "attack_slash", "display_name": "Attack Slash"},
 	{"id": "attack_crush", "display_name": "Attack Crush"},
 	{"id": "attack_ranged", "display_name": "Attack Ranged"},
-	{"id": "attack_magic", "display_name": "Attack Magic"},
+	{"id": "attack_magic", "display_name": "Magic Attack"},
 	{"id": "strength_melee", "display_name": "Strength Melee"},
 	{"id": "strength_ranged", "display_name": "Strength Ranged"},
-	{"id": "strength_magic", "display_name": "Strength Magic"},
+	{"id": "magic_damage_percent", "display_name": "Magic Damage %"},
 	{"id": "defence_thrust", "display_name": "Defence Thrust"},
 	{"id": "defence_slash", "display_name": "Defence Slash"},
 	{"id": "defence_crush", "display_name": "Defence Crush"},
 	{"id": "defence_ranged", "display_name": "Defence Ranged"},
-	{"id": "defence_magic", "display_name": "Defence Magic"},
+	{"id": "defence_magic", "display_name": "Magic Defence"},
 ]
 const DEFAULT_EQUIPMENT_SLOTS := [
 	{"id": "head", "display_name": "Head"},
@@ -701,7 +701,7 @@ func _on_options_received(payload: Dictionary) -> void:
 	_fill_option(_death_behavior, _option_array("death_behaviors", [{"id": "ordinary", "display_name": "Ordinary"}, {"id": "always_keep", "display_name": "Always Keep"}, {"id": "always_destroy", "display_name": "Always Destroy"}, {"id": "transform", "display_name": "Transform"}, {"id": "reclaim", "display_name": "Reclaim"}]))
 	_fill_option(_shop_policy, _option_array("shop_policies", [{"id": "not_shop_traded", "display_name": "Not Shop Traded"}, {"id": "npc_buys", "display_name": "NPC Buys"}, {"id": "npc_sells", "display_name": "NPC Sells"}, {"id": "npc_buys_and_sells", "display_name": "NPC Buys and Sells"}]))
 	_fill_option(_reclaim_policy, _option_array("reclaim_policies", [{"id": "none", "display_name": "None"}, {"id": "fixed_cost", "display_name": "Fixed Cost"}]))
-	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}, {"id": "ranged", "display_name": "Ranged"}]))
+	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}, {"id": "ranged", "display_name": "Ranged"}, {"id": "magic", "display_name": "Magic"}]))
 	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
 	_fill_option(_weapon_ammunition_family, [{"id": "", "display_name": "None (self-contained)"}, {"id": "arrow", "display_name": "Arrow"}])
 	_fill_option(_ammunition_family, [{"id": "arrow", "display_name": "Arrow"}])
@@ -2118,8 +2118,8 @@ func _on_weapon_attack_type_selected(_index: int) -> void:
 
 func _update_weapon_family_fields() -> void:
 	var ranged := _selected_metadata(_weapon_attack_type) == "ranged"
-	_weapon_accuracy_label.visible = not ranged
-	_weapon_accuracy_style.visible = not ranged
+	_weapon_accuracy_label.visible = _selected_metadata(_weapon_attack_type) == "melee"
+	_weapon_accuracy_style.visible = _selected_metadata(_weapon_attack_type) == "melee"
 	_weapon_ammunition_label.visible = ranged
 	_weapon_ammunition_family.visible = ranged
 	var uses_ammunition := ranged and _weapon_enabled.button_pressed and not _selected_metadata(_weapon_ammunition_family).is_empty()
