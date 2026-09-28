@@ -185,9 +185,8 @@ public sealed class ItemSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Constraint("item_equipped_visual_pose_anchors_pkey"),
         AuthoringSchemaRequirement.Constraint("item_equipped_visual_pose_anchors_direction_check"),
         AuthoringSchemaRequirement.Constraint("item_equipped_visual_pose_anchors_frame_check"),
-        AuthoringSchemaRequirement.Trigger(
-            "item_definitions",
-            "item_definitions_runtime_disable_guard"),
+        // Migration 076 retired the donor combat-reward tables and their exclusive
+        // runtime-disable trigger. Current Item guards remain required below.
         AuthoringSchemaRequirement.Trigger(
             "item_definitions",
             "item_definitions_runtime_economy_policy_guard"),
