@@ -127,6 +127,16 @@ func _build_ui() -> void:
 			presentation.add_child(facing)
 			facing.item_selected.connect(_invalidate)
 			_fields["projectile_source_facing"] = facing
+			var homing := CheckBox.new()
+			homing.text = "Visually home toward moving target"
+			presentation.add_child(homing)
+			_fields["projectile_homing_enabled"] = homing
+			var strength := _number_field(presentation, "Homing strength (1.0 tracks throughout flight; lower bends later)", 0, 1, 1)
+			strength.min_value = 0.01
+			strength.step = 0.01
+			strength.editable = false
+			_fields["projectile_homing_strength"] = strength
+			homing.toggled.connect(func(enabled: bool): strength.editable = enabled; _invalidate())
 		_fields["cast_sound_path" if phase == "projectile" else phase + "_sound_path"] = _text_field("Cast sound" if phase == "projectile" else phase.capitalize() + " sound", presentation)
 		_add_visual(presentation, phase)
 	_button(presentation, "Refresh visual previews", _refresh_visuals)
@@ -280,8 +290,9 @@ func _on_definition(payload: Dictionary) -> void:
 			if key == "projectile_source_facing": control.select(0)
 			for index in control.item_count:
 				if control.get_item_metadata(index) == draft.get(key, "right" if key == "projectile_source_facing" else null): control.select(index)
-		elif control is CheckBox: control.button_pressed = bool(draft.get(key, true))
-		elif control is SpinBox: control.value = float(draft.get(key, 0.0)) if draft.get(key) != null else 0.0
+		elif control is CheckBox: control.button_pressed = bool(draft.get(key, key != "projectile_homing_enabled"))
+		elif control is SpinBox: control.value = float(draft.get(key, 1.0 if key == "projectile_homing_strength" else 0.0)) if draft.get(key) != null else 0.0
+	(_fields["projectile_homing_strength"] as SpinBox).editable = (_fields["projectile_homing_enabled"] as CheckBox).button_pressed
 	for phase: String in _frames:
 		_support.clear_container(_frames[phase])
 		var paths: Array = draft.get(phase + "_frames", []) if draft.get(phase + "_frames") != null else []
@@ -305,7 +316,8 @@ func _draft() -> Dictionary:
 		elif control is OptionButton: draft[key] = str(control.get_selected_metadata())
 		elif control is CheckBox: draft[key] = control.button_pressed
 		elif control is SpinBox:
-			if key.ends_with("_fps") or key.ends_with("_scale"):
+			if key == "projectile_homing_strength": draft[key] = control.value
+			elif key.ends_with("_fps") or key.ends_with("_scale"):
 				draft[key] = control.value if control.value > 0 else null
 			else: draft[key] = int(control.value)
 	for phase: String in _frames:

@@ -108,6 +108,8 @@ public sealed class MagicSpellAuthoringService(
         var publishing = operation is "publish" or "save_and_publish";
         if (draft.ProjectileSourceFacing is not ("right" or "down" or "left" or "up"))
             messages.Add(Error("invalid_projectile_source_facing", "Choose Right, Down, Left or Up.", "projectile_source_facing"));
+        if (!double.IsFinite(draft.ProjectileHomingStrength) || draft.ProjectileHomingStrength is <= 0 or > 1)
+            messages.Add(Error("invalid_projectile_homing_strength", "Homing strength must be greater than 0 and at most 1.", "projectile_homing_strength"));
         CheckPath(draft.IconTexturePath, "icon_texture_path", false);
         CheckPath(draft.CastSoundPath, "cast_sound_path", true);
         CheckPath(draft.ImpactSoundPath, "impact_sound_path", true);
