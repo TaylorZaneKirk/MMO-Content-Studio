@@ -106,6 +106,8 @@ public sealed class MagicSpellAuthoringService(
     private void ValidatePresentation(MagicSpellDraft draft, string operation, List<ApiError> messages)
     {
         var publishing = operation is "publish" or "save_and_publish";
+        if (draft.ProjectileSourceFacing is not ("right" or "down" or "left" or "up"))
+            messages.Add(Error("invalid_projectile_source_facing", "Choose Right, Down, Left or Up.", "projectile_source_facing"));
         CheckPath(draft.IconTexturePath, "icon_texture_path", false);
         CheckPath(draft.CastSoundPath, "cast_sound_path", true);
         CheckPath(draft.ImpactSoundPath, "impact_sound_path", true);

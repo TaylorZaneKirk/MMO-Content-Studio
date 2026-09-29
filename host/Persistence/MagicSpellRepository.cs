@@ -38,7 +38,7 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 successful_hit_min_damage, base_max_hit, base_cast_xp_tenths, publication_state, updated_at,
                 icon_texture_path, projectile_animation_fps, projectile_render_scale, projectile_rotates_to_travel,
                 cast_sound_path, impact_animation_fps, impact_render_scale, impact_sound_path, splash_animation_fps,
-                splash_render_scale, splash_sound_path
+                splash_render_scale, splash_sound_path, projectile_source_facing
             FROM magic_combat_spells WHERE spell_id = @id
             """ + (forUpdate ? " FOR UPDATE" : ""), connection, transaction);
         command.Parameters.AddWithValue("id", definitionId);
@@ -60,7 +60,8 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 reader.IsDBNull(17) ? null : reader.GetString(17),
                 reader.IsDBNull(18) ? null : reader.GetDouble(18),
                 reader.IsDBNull(19) ? null : reader.GetDouble(19),
-                reader.IsDBNull(20) ? null : reader.GetString(20));
+                reader.IsDBNull(20) ? null : reader.GetString(20),
+                ProjectileSourceFacing: reader.GetString(21));
             state = reader.GetString(8);
             updated = reader.GetFieldValue<DateTimeOffset>(9);
         }
@@ -104,12 +105,12 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     base_cast_xp_tenths, publication_state, icon_texture_path, projectile_animation_fps,
                     projectile_render_scale, projectile_rotates_to_travel, cast_sound_path, impact_animation_fps,
                     impact_render_scale, impact_sound_path, splash_animation_fps, splash_render_scale,
-                    splash_sound_path)
+                    splash_sound_path, projectile_source_facing)
                 VALUES (@id, @display_name, @tier, @element, @required_magic_level, @shard_cost,
                     @successful_hit_min_damage, @base_max_hit, @base_cast_xp_tenths, @state, @icon_texture_path,
                     @projectile_animation_fps, @projectile_render_scale, @projectile_rotates_to_travel, @cast_sound_path,
                     @impact_animation_fps, @impact_render_scale, @impact_sound_path, @splash_animation_fps,
-                    @splash_render_scale, @splash_sound_path)
+                    @splash_render_scale, @splash_sound_path, @projectile_source_facing)
                 """ : """
                 UPDATE magic_combat_spells SET display_name=@display_name, tier=@tier, element=@element,
                     required_magic_level=@required_magic_level, shard_cost=@shard_cost,
@@ -117,7 +118,8 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     base_cast_xp_tenths=@base_cast_xp_tenths, publication_state=@state,
                     icon_texture_path=@icon_texture_path, projectile_animation_fps=@projectile_animation_fps,
                     projectile_render_scale=@projectile_render_scale,
-                    projectile_rotates_to_travel=@projectile_rotates_to_travel, cast_sound_path=@cast_sound_path,
+                    projectile_rotates_to_travel=@projectile_rotates_to_travel,
+                    projectile_source_facing=@projectile_source_facing, cast_sound_path=@cast_sound_path,
                     impact_animation_fps=@impact_animation_fps, impact_render_scale=@impact_render_scale,
                     impact_sound_path=@impact_sound_path, splash_animation_fps=@splash_animation_fps,
                     splash_render_scale=@splash_render_scale, splash_sound_path=@splash_sound_path,
@@ -127,6 +129,7 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
             command.Parameters.AddWithValue("projectile_animation_fps", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.ProjectileAnimationFps ?? DBNull.Value);
             command.Parameters.AddWithValue("projectile_render_scale", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.ProjectileRenderScale ?? DBNull.Value);
             command.Parameters.AddWithValue("projectile_rotates_to_travel", NpgsqlTypes.NpgsqlDbType.Boolean, (object?)draft.ProjectileRotatesToTravel ?? DBNull.Value);
+            command.Parameters.AddWithValue("projectile_source_facing", draft.ProjectileSourceFacing);
             command.Parameters.AddWithValue("cast_sound_path", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.CastSoundPath ?? DBNull.Value);
             command.Parameters.AddWithValue("impact_animation_fps", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.ImpactAnimationFps ?? DBNull.Value);
             command.Parameters.AddWithValue("impact_render_scale", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.ImpactRenderScale ?? DBNull.Value);

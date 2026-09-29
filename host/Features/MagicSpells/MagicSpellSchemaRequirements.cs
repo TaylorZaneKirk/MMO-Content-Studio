@@ -11,6 +11,7 @@ public sealed class MagicSpellSchemaRequirements : IAuthoringSchemaRequirementPr
         AuthoringSchemaRequirement.Column("magic_combat_spells", "projectile_animation_fps"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "projectile_render_scale"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "projectile_rotates_to_travel"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "projectile_source_facing"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "cast_sound_path"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "impact_animation_fps"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "impact_render_scale"),

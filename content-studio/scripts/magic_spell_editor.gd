@@ -97,7 +97,7 @@ func _build_ui() -> void:
 	_fields["base_max_hit"] = _number_field(basics, "Base maximum hit", 0, 2147483647, 0)
 	_fields["base_cast_xp_tenths"] = _number_field(basics, "Base cast XP (tenths; 15 = 1.5 XP)", 0, 2147483647, 0)
 
-	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Source projectile art faces right when rotation is enabled. Zero FPS/scale means unset.")
+	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Choose the direction the source projectile art faces when rotation is enabled. Zero FPS/scale means unset.")
 	_fields["icon_texture_path"] = _text_field("Spellbook icon (res://assets/...png)", presentation)
 	_add_visual(presentation, "icon")
 	for phase: String in ["projectile", "impact", "splash"]:
@@ -114,11 +114,19 @@ func _build_ui() -> void:
 		_fields[phase + "_render_scale"] = render_scale
 		if phase == "projectile":
 			var rotates := CheckBox.new()
-			rotates.text = "Rotate toward target (art faces right)"
+			rotates.text = "Rotate toward target"
 			rotates.button_pressed = true
 			presentation.add_child(rotates)
 			rotates.toggled.connect(_invalidate)
 			_fields["projectile_rotates_to_travel"] = rotates
+			_label(presentation, "Source art faces")
+			var facing := OptionButton.new()
+			for direction: String in ["right", "down", "left", "up"]:
+				facing.add_item(direction.capitalize())
+				facing.set_item_metadata(facing.item_count - 1, direction)
+			presentation.add_child(facing)
+			facing.item_selected.connect(_invalidate)
+			_fields["projectile_source_facing"] = facing
 		_fields["cast_sound_path" if phase == "projectile" else phase + "_sound_path"] = _text_field("Cast sound" if phase == "projectile" else phase.capitalize() + " sound", presentation)
 		_add_visual(presentation, phase)
 	_button(presentation, "Refresh visual previews", _refresh_visuals)
@@ -269,8 +277,9 @@ func _on_definition(payload: Dictionary) -> void:
 		var control: Control = _fields[key]
 		if control is LineEdit or control is TextEdit: control.text = str(draft.get(key, "")) if draft.get(key) != null else ""
 		elif control is OptionButton:
+			if key == "projectile_source_facing": control.select(0)
 			for index in control.item_count:
-				if control.get_item_metadata(index) == draft.get(key): control.select(index)
+				if control.get_item_metadata(index) == draft.get(key, "right" if key == "projectile_source_facing" else null): control.select(index)
 		elif control is CheckBox: control.button_pressed = bool(draft.get(key, true))
 		elif control is SpinBox: control.value = float(draft.get(key, 0.0)) if draft.get(key) != null else 0.0
 	for phase: String in _frames:

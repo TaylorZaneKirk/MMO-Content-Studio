@@ -25,7 +25,8 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("splash_sound_path")] string? SplashSoundPath = null,
     [property: JsonPropertyName("projectile_frames")] IReadOnlyList<string>? ProjectileFrames = null,
     [property: JsonPropertyName("impact_frames")] IReadOnlyList<string>? ImpactFrames = null,
-    [property: JsonPropertyName("splash_frames")] IReadOnlyList<string>? SplashFrames = null);
+    [property: JsonPropertyName("splash_frames")] IReadOnlyList<string>? SplashFrames = null,
+    [property: JsonPropertyName("projectile_source_facing")] string ProjectileSourceFacing = "right");
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,
