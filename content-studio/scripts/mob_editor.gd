@@ -480,7 +480,7 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_magic_level = _spin_field(grid, "Magic level", 0, 1000000, 1, 0)
 	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
 	_combat_level_diagnostics = _value_label(grid, "Innate-bonus diagnostics", "Attack 1.0 / Strength 1.0 / Defence T 1.0, S 1.0, C 1.0")
-	parent.add_child(_wrapped_label("Combat level = max(1, floor((Defence + maximum Health) / 4 + 13 x (Attack + Strength) / 40)). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
+	parent.add_child(_wrapped_label("Combat level combines Defence + maximum Health with whichever offensive component is stronger: Melee from Attack + Strength, or Magic from floor(3 x Magic / 2). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
 	_combat_level_warnings = _wrapped_label("")
 	parent.add_child(_combat_level_warnings)
 
