@@ -28,7 +28,12 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("splash_frames")] IReadOnlyList<string>? SplashFrames = null,
     [property: JsonPropertyName("projectile_source_facing")] string ProjectileSourceFacing = "right",
     [property: JsonPropertyName("projectile_homing_enabled")] bool ProjectileHomingEnabled = false,
-    [property: JsonPropertyName("projectile_homing_strength")] double ProjectileHomingStrength = 1.0);
+    [property: JsonPropertyName("projectile_homing_strength")] double ProjectileHomingStrength = 1.0,
+    [property: JsonPropertyName("cast_mode")] string CastMode = "selected_combat",
+    [property: JsonPropertyName("impact_effect")] string? ImpactEffect = null,
+    [property: JsonPropertyName("force")] int? Force = null,
+    [property: JsonPropertyName("force_falloff_per_tile")] int? ForceFalloffPerTile = null,
+    [property: JsonPropertyName("max_displacement_tiles")] int? MaxDisplacementTiles = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,

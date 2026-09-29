@@ -26,6 +26,7 @@ var _preview: Button
 var _apply: Button
 var _status: Label
 var _form: VBoxContainer
+var _force_fields: VBoxContainer
 var _loading := false
 var _preview_request: Dictionary = {}
 var _pending_definition_id := ""
@@ -68,7 +69,7 @@ func _build_ui() -> void:
 	var editor := _panel()
 	editor.get_parent().size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_heading(editor, "Spell details", 22)
-	_note(editor, "Author ordinary combat spells. Casting is a separate game feature.")
+	_note(editor, "Author combat spells and explicit techniques.")
 	_form = VBoxContainer.new()
 	_form.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	editor.add_child(_form)
@@ -81,6 +82,14 @@ func _build_ui() -> void:
 	_definition_id.placeholder_text = "lowercase_spell_id"
 	_state = _label(basics, "Draft")
 	_state.modulate = Color("91ecd7")
+	_label(basics, "Cast mode")
+	var cast_mode := OptionButton.new()
+	for value: String in ["selected_combat", "explicit_technique"]:
+		cast_mode.add_item(value.replace("_", " ").capitalize())
+		cast_mode.set_item_metadata(cast_mode.item_count - 1, value)
+	basics.add_child(cast_mode)
+	cast_mode.item_selected.connect(_invalidate)
+	_fields["cast_mode"] = cast_mode
 	_fields["display_name"] = _text_field("Display name", basics)
 	_fields["tier"] = _number_field(basics, "Tier", 1, 4, 1)
 	_label(basics, "Element")
@@ -96,6 +105,22 @@ func _build_ui() -> void:
 	_fields["successful_hit_min_damage"] = _number_field(basics, "Successful-hit minimum damage", 0, 2147483647, 0)
 	_fields["base_max_hit"] = _number_field(basics, "Base maximum hit", 0, 2147483647, 0)
 	_fields["base_cast_xp_tenths"] = _number_field(basics, "Base cast XP (tenths; 15 = 1.5 XP)", 0, 2147483647, 0)
+
+	_label(basics, "Impact effect")
+	var effect := OptionButton.new()
+	effect.add_item("None")
+	effect.set_item_metadata(0, null)
+	effect.add_item("Air displacement")
+	effect.set_item_metadata(1, "air_displacement")
+	basics.add_child(effect)
+	_fields["impact_effect"] = effect
+	_force_fields = VBoxContainer.new()
+	basics.add_child(_force_fields)
+	_fields["force"] = _number_field(_force_fields, "Force", 1, 2147483647, 1)
+	_fields["force_falloff_per_tile"] = _number_field(_force_fields, "Force falloff / tile after first", 0, 2147483647, 0)
+	_fields["max_displacement_tiles"] = _number_field(_force_fields, "Maximum displacement tiles", 1, 2147483647, 1)
+	effect.item_selected.connect(func(_index: int): _force_fields.visible = effect.selected == 1; _invalidate())
+	_force_fields.visible = false
 
 	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Choose the direction the source projectile art faces when rotation is enabled. Zero FPS/scale means unset.")
 	_fields["icon_texture_path"] = _text_field("Spellbook icon (res://assets/...png)", presentation)
@@ -287,7 +312,7 @@ func _on_definition(payload: Dictionary) -> void:
 		var control: Control = _fields[key]
 		if control is LineEdit or control is TextEdit: control.text = str(draft.get(key, "")) if draft.get(key) != null else ""
 		elif control is OptionButton:
-			if key == "projectile_source_facing": control.select(0)
+			if key in ["projectile_source_facing", "cast_mode", "impact_effect"]: control.select(0)
 			for index in control.item_count:
 				if control.get_item_metadata(index) == draft.get(key, "right" if key == "projectile_source_facing" else null): control.select(index)
 		elif control is CheckBox: control.button_pressed = bool(draft.get(key, key != "projectile_homing_enabled"))
@@ -297,6 +322,7 @@ func _on_definition(payload: Dictionary) -> void:
 		_support.clear_container(_frames[phase])
 		var paths: Array = draft.get(phase + "_frames", []) if draft.get(phase + "_frames") != null else []
 		for path: String in paths: _add_frame(phase, path)
+	_force_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 1
 	_loading = false
 	_refresh_visuals()
 	_form.visible = true
@@ -313,7 +339,7 @@ func _draft() -> Dictionary:
 		if control is LineEdit:
 			draft[key] = control.text.strip_edges()
 			if key.ends_with("_path") and control.text.strip_edges().is_empty(): draft[key] = null
-		elif control is OptionButton: draft[key] = str(control.get_selected_metadata())
+		elif control is OptionButton: draft[key] = control.get_selected_metadata()
 		elif control is CheckBox: draft[key] = control.button_pressed
 		elif control is SpinBox:
 			if key == "projectile_homing_strength": draft[key] = control.value
@@ -324,6 +350,8 @@ func _draft() -> Dictionary:
 		var paths: Array = []
 		for row: Node in _frames[phase].get_children(): paths.append((row.get_child(0) as LineEdit).text.strip_edges())
 		draft[phase + "_frames"] = paths
+	if draft["impact_effect"] == null:
+		for key: String in ["force", "force_falloff_per_tile", "max_displacement_tiles"]: draft[key] = null
 	return draft
 
 

@@ -199,6 +199,7 @@ var _attack_level: SpinBox
 var _strength_level: SpinBox
 var _defence_level: SpinBox
 var _magic_level: SpinBox
+var _physical_weight: SpinBox
 var _drops: VBoxContainer
 var _add_drop_button: Button
 var _operation: OptionButton
@@ -478,6 +479,8 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_strength_level = _spin_field(grid, "Strength level", 1, 1000, 1, 1)
 	_defence_level = _spin_field(grid, "Defence level", 1, 1000, 1, 1)
 	_magic_level = _spin_field(grid, "Magic level", 0, 1000000, 1, 0)
+	_physical_weight = _spin_field(grid, "Physical weight", 1, 1000000, 1, 100)
+	_physical_weight.tooltip_text = "Weight resists forced displacement."
 	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
 	_combat_level_diagnostics = _value_label(grid, "Innate-bonus diagnostics", "Attack 1.0 / Strength 1.0 / Defence T 1.0, S 1.0, C 1.0")
 	parent.add_child(_wrapped_label("Combat level combines Defence + maximum Health with whichever offensive component is stronger: Melee from Attack + Strength, or Magic from floor(3 x Magic / 2). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
@@ -739,6 +742,7 @@ func _start_new_mob() -> void:
 	_strength_level.value = 1
 	_defence_level.value = 1
 	_magic_level.value = 0
+	_physical_weight.value = 100
 	_zero_bonuses()
 	_load_drops([])
 	_asset_preview_file_path = ""
@@ -773,6 +777,7 @@ func _load_combat_profile(profile_variant: Variant) -> void:
 	_strength_level.value = int(profile.get("strength_level", 1))
 	_defence_level.value = int(profile.get("defence_level", 1))
 	_magic_level.value = int(profile.get("magic_level", 0))
+	_physical_weight.value = int(profile.get("physical_weight", 100))
 
 
 func _load_bonuses(bonuses_variant: Variant) -> void:
@@ -892,6 +897,7 @@ func _combat_profile_payload() -> Dictionary:
 		"strength_level": int(_strength_level.value),
 		"defence_level": int(_defence_level.value),
 		"magic_level": int(_magic_level.value),
+		"physical_weight": int(_physical_weight.value),
 	}
 
 
@@ -1438,7 +1444,7 @@ func _update_attack_controls() -> void:
 	var enabled := _form_editable and _attack_enabled.button_pressed
 	for control in [_attack_type, _accuracy_style]:
 		(control as OptionButton).disabled = not enabled
-	for control in [_minimum_range, _maximum_range, _attack_speed_units, _attack_level, _strength_level, _defence_level, _magic_level]:
+	for control in [_minimum_range, _maximum_range, _attack_speed_units, _attack_level, _strength_level, _defence_level, _magic_level, _physical_weight]:
 		(control as SpinBox).editable = enabled
 	_update_attack_interval()
 

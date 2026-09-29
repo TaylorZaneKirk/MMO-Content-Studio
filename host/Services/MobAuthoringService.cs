@@ -465,7 +465,7 @@ public sealed class MobAuthoringService
                     primaryCombatProfile.AttackSpeedUnits,
                     primaryCombatProfile.AttackLevel,
                     primaryCombatProfile.StrengthLevel,
-                    primaryCombatProfile.DefenceLevel, primaryCombatProfile.MagicLevel),
+                    primaryCombatProfile.DefenceLevel, primaryCombatProfile.MagicLevel, primaryCombatProfile.PhysicalWeight),
             combatBonuses ?? MobCombatBonusDefinition.Zero,
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,

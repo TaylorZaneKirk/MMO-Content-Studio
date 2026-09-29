@@ -13,6 +13,8 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Table("mob_faction_dispositions"),
         AuthoringSchemaRequirement.Table("mob_definitions"),
         AuthoringSchemaRequirement.Table("mob_combat_profiles"),
+        AuthoringSchemaRequirement.Column("mob_combat_profiles", "physical_weight"),
+        AuthoringSchemaRequirement.Constraint("mob_combat_profiles_physical_weight_check"),
         AuthoringSchemaRequirement.Table("mob_combat_bonuses"),
         AuthoringSchemaRequirement.Table("mob_drops"),
         AuthoringSchemaRequirement.Column("mob_factions", "faction_id"),

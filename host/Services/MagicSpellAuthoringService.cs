@@ -99,6 +99,24 @@ public sealed class MagicSpellAuthoringService(
             messages.Add(Error("invalid_damage_band", "Damage must satisfy 0 <= minimum <= maximum.", "base_max_hit"));
         if (draft.BaseCastXpTenths < 0)
             messages.Add(Error("invalid_cast_xp", "Base cast XP tenths must be nonnegative.", "base_cast_xp_tenths"));
+        if (draft.CastMode is not ("selected_combat" or "explicit_technique"))
+            messages.Add(Error("invalid_cast_mode", "Choose Selected combat or Explicit technique.", "cast_mode"));
+        var forceShape = draft.ImpactEffect switch
+        {
+            null => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
+            "air_displacement" => draft.Force is > 0 && draft.ForceFalloffPerTile is >= 0 && draft.MaxDisplacementTiles is > 0,
+            _ => false
+        };
+        if (!forceShape)
+            messages.Add(Error("invalid_force_shape", "Air displacement requires positive force and maximum tiles, and nonnegative falloff; None requires empty force fields.", "impact_effect"));
+        if (operation is "publish" or "save_and_publish")
+        {
+            var supported = draft.CastMode == "selected_combat" && draft.ImpactEffect is null ||
+                draft.CastMode == "explicit_technique" && draft.Element == "air" &&
+                draft.ImpactEffect == "air_displacement" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0;
+            if (!supported)
+                messages.Add(Error("unsupported_spell_shape", "Publish a selected combat spell without an effect, or a zero-damage Air displacement technique.", "cast_mode"));
+        }
         ValidatePresentation(draft, operation, messages);
         return messages;
     }

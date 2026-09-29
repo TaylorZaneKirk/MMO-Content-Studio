@@ -500,6 +500,9 @@ public sealed partial class MobDefinitionValidator
                 ValidationSeverity.Error,
                 "primary_combat_profile.attack_speed_units"));
         }
+        if (profile.PhysicalWeight is < 1 or > 1_000_000)
+            messages.Add(new ApiError("invalid_physical_weight", "Physical weight must be 1–1,000,000; weight resists forced displacement.",
+                ValidationSeverity.Error, "primary_combat_profile.physical_weight"));
         if (!MobDomainRules.IsLevelSupported(profile.AttackLevel)
             || !MobDomainRules.IsLevelSupported(profile.StrengthLevel)
             || !MobDomainRules.IsLevelSupported(profile.DefenceLevel)

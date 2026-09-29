@@ -374,7 +374,7 @@ public sealed class MobRepository : IMobRepository
     {
         const string sql = """
             select attack_type, accuracy_style, minimum_range_tiles, maximum_range_tiles,
-                attack_speed_units, attack_level, strength_level, defence_level, magic_level
+                attack_speed_units, attack_level, strength_level, defence_level, magic_level, physical_weight
             from mob_combat_profiles
             where mob_definition_id = @mob_definition_id;
             """;
@@ -396,7 +396,8 @@ public sealed class MobRepository : IMobRepository
             reader.GetInt32(reader.GetOrdinal("attack_level")),
             reader.GetInt32(reader.GetOrdinal("strength_level")),
             reader.GetInt32(reader.GetOrdinal("defence_level")),
-            reader.GetInt32(reader.GetOrdinal("magic_level")));
+            reader.GetInt32(reader.GetOrdinal("magic_level")),
+            reader.GetInt32(reader.GetOrdinal("physical_weight")));
     }
 
     private static async Task<MobCombatBonusDefinition?> LoadCombatBonusesAsync(
@@ -612,6 +613,7 @@ public sealed class MobRepository : IMobRepository
                 strength_level,
                 defence_level,
                 magic_level,
+                physical_weight,
                 updated_at
             ) values (
                 @mob_definition_id,
@@ -624,6 +626,7 @@ public sealed class MobRepository : IMobRepository
                 @strength_level,
                 @defence_level,
                 @magic_level,
+                @physical_weight,
                 now()
             )
             on conflict (mob_definition_id) do update set
@@ -636,6 +639,7 @@ public sealed class MobRepository : IMobRepository
                 strength_level = excluded.strength_level,
                 defence_level = excluded.defence_level,
                 magic_level = excluded.magic_level,
+                physical_weight = excluded.physical_weight,
                 updated_at = now();
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -650,6 +654,7 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("strength_level", profile.StrengthLevel);
         command.Parameters.AddWithValue("defence_level", profile.DefenceLevel);
         command.Parameters.AddWithValue("magic_level", profile.MagicLevel);
+        command.Parameters.AddWithValue("physical_weight", profile.PhysicalWeight);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

@@ -7,6 +7,17 @@ public sealed class MagicSpellSchemaRequirements : IAuthoringSchemaRequirementPr
     public IReadOnlyList<AuthoringSchemaRequirement> GetRequirements() =>
     [
         AuthoringSchemaRequirement.Table("magic_combat_spells"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "cast_mode"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "impact_effect"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "force"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "force_falloff_per_tile"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "max_displacement_tiles"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_cast_mode_check"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_impact_effect_check"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_force_check"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_force_falloff_check"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_max_displacement_check"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_force_shape_check"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "icon_texture_path"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "projectile_animation_fps"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "projectile_render_scale"),

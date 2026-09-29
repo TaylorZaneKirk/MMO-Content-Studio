@@ -75,7 +75,8 @@ public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_level")] int AttackLevel,
     [property: JsonPropertyName("strength_level")] int StrengthLevel,
     [property: JsonPropertyName("defence_level")] int DefenceLevel,
-    [property: JsonPropertyName("magic_level")] int MagicLevel = 0);
+    [property: JsonPropertyName("magic_level")] int MagicLevel = 0,
+    [property: JsonPropertyName("physical_weight")] int PhysicalWeight = 100);
 
 public sealed record MobDropDefinition(
     [property: JsonPropertyName("drop_order")] int DropOrder,
