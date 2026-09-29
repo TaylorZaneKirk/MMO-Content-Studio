@@ -26,6 +26,7 @@ signal shop_catalog_received(payload: Dictionary)
 signal shop_definition_received(payload: Dictionary)
 signal shop_preview_received(payload: Dictionary)
 signal shop_mutation_completed(payload: Dictionary)
+signal spell_options_received(payload: Dictionary)
 signal spell_catalog_received(payload: Dictionary)
 signal spell_definition_received(payload: Dictionary)
 signal spell_preview_received(payload: Dictionary)
@@ -93,6 +94,7 @@ const OP_SHOP_CATALOG := "shop_catalog"
 const OP_SHOP_DEFINITION := "shop_definition"
 const OP_SHOP_PREVIEW := "shop_preview"
 const OP_SHOP_MUTATION := "shop_mutation"
+const OP_SPELL_OPTIONS := "spell_options"
 const OP_SPELL_CATALOG := "spell_catalog"
 const OP_SPELL_DEFINITION := "spell_definition"
 const OP_SPELL_PREVIEW := "spell_preview"
@@ -528,6 +530,9 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			shop_preview_received.emit(data)
 		OP_SHOP_MUTATION:
 			shop_mutation_completed.emit(data)
+		OP_SPELL_OPTIONS:
+			spell_options_received.emit(data)
+			_request_next_startup_operation()
 		OP_SPELL_CATALOG:
 			spell_catalog_received.emit(data)
 			_request_next_startup_operation()
@@ -629,11 +634,11 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
-	if operation in [OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_SHOP_CATALOG, OP_WORLD_OBJECT_OPTIONS, OP_WORLD_OBJECT_CATALOG, OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
+	if operation in [OP_SPELL_OPTIONS, OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_SHOP_CATALOG, OP_WORLD_OBJECT_OPTIONS, OP_WORLD_OBJECT_CATALOG, OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
 		_request_next_startup_operation()
 
 func _start_workspace_initialization() -> void:
-	_startup_operations = [OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_WORLD_OBJECT_OPTIONS, OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
+	_startup_operations = [OP_SPELL_OPTIONS, OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_WORLD_OBJECT_OPTIONS, OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
 	_request_next_startup_operation()
 
 func _request_next_startup_operation() -> void:
@@ -641,6 +646,8 @@ func _request_next_startup_operation() -> void:
 		return
 	var operation := str(_startup_operations.pop_front())
 	match operation:
+		OP_SPELL_OPTIONS:
+			_request(OP_SPELL_OPTIONS, "/api/v1/spells/options")
 		OP_SPELL_CATALOG:
 			load_spells()
 		OP_SHOP_OPTIONS:

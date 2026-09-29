@@ -21,6 +21,7 @@ public static class MagicSpellAuthoringFeature
     public static IEndpointRouteBuilder MapMagicSpellAuthoring(this IEndpointRouteBuilder endpoints)
     {
         var spells = endpoints.MapGroup($"{AuthoringApi.RoutePrefix}/spells");
+        spells.MapGet("/options", (HttpContext context, ItemAssetService assets) => AuthoringHttpResults.Ok(context, new MagicSpellOptions(assets.GetGameAssetsRoot())));
         spells.MapGet("", async (HttpContext context, string? search, MagicSpellAuthoringService service, CancellationToken ct) =>
             AuthoringHttpResults.FromOperation(context, await service.ListAsync(search, ct)));
         spells.MapGet("/{definitionId}", async (HttpContext context, string definitionId, MagicSpellAuthoringService service, CancellationToken ct) =>

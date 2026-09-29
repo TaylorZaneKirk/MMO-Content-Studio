@@ -1,5 +1,5 @@
 // Owns combat-spell validation, preview and lifecycle decisions. The repository
-// atomically persists scalar content; no casting or gameplay state lives here.
+// atomically persists content; no casting or gameplay state lives here.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -11,7 +11,7 @@ using Npgsql;
 namespace MMO.ContentStudio.AuthoringHost.Services;
 
 public sealed class MagicSpellAuthoringService(
-    MagicSpellRepository repository,
+    MagicSpellRepository repository, ItemAssetService assets,
     ILogger<MagicSpellAuthoringService> logger)
 {
     public Task<AuthoringOperationResult<MagicSpellCatalogResponse>> ListAsync(string? search, CancellationToken cancellationToken) =>
@@ -67,7 +67,7 @@ public sealed class MagicSpellAuthoringService(
         return AuthoringOperationResult<MagicSpellMutation>.Success(new(operation, verified, messages));
     });
 
-    private static List<ApiError> ValidateOperation(string definitionId, string operation, MagicSpellRequest request,
+    private List<ApiError> ValidateOperation(string definitionId, string operation, MagicSpellRequest request,
         MagicSpellDefinition? existing)
     {
         var messages = new List<ApiError>();
@@ -99,7 +99,60 @@ public sealed class MagicSpellAuthoringService(
             messages.Add(Error("invalid_damage_band", "Damage must satisfy 0 <= minimum <= maximum.", "base_max_hit"));
         if (draft.BaseCastXpTenths < 0)
             messages.Add(Error("invalid_cast_xp", "Base cast XP tenths must be nonnegative.", "base_cast_xp_tenths"));
+        ValidatePresentation(draft, operation, messages);
         return messages;
+    }
+
+    private void ValidatePresentation(MagicSpellDraft draft, string operation, List<ApiError> messages)
+    {
+        var publishing = operation is "publish" or "save_and_publish";
+        CheckPath(draft.IconTexturePath, "icon_texture_path", false);
+        CheckPath(draft.CastSoundPath, "cast_sound_path", true);
+        CheckPath(draft.ImpactSoundPath, "impact_sound_path", true);
+        CheckPath(draft.SplashSoundPath, "splash_sound_path", true);
+        CheckPhase("projectile", draft.ProjectileFrames, draft.ProjectileAnimationFps, draft.ProjectileRenderScale);
+        CheckPhase("impact", draft.ImpactFrames, draft.ImpactAnimationFps, draft.ImpactRenderScale);
+        CheckPhase("splash", draft.SplashFrames, draft.SplashAnimationFps, draft.SplashRenderScale);
+
+        void CheckPhase(string phase, IReadOnlyList<string>? frames, double? fps, double? scale)
+        {
+            if ((fps is { } f && (!double.IsFinite(f) || f <= 0)) ||
+                (scale is { } s && (!double.IsFinite(s) || s <= 0)))
+                messages.Add(Error("invalid_fx_number", "FPS and scale must be finite positive values or empty.", phase));
+            if ((frames?.Count > 0 && scale is null) || (frames?.Count > 1 && fps is null))
+                messages.Add(Error("incomplete_fx_phase", "Frames require scale; multiple frames also require FPS.", phase));
+            foreach (var path in frames ?? [])
+            {
+                if (path is null) messages.Add(Error("invalid_asset_path", "A frame path is required.", phase));
+                else CheckPath(path, phase + "_frames", false);
+            }
+        }
+
+        void CheckPath(string? path, string field, bool audio)
+        {
+            if (path is null) return;
+            // Match existing game-asset conventions before resolving against the
+            // shared configured root. Audio uses the same root as PNG previews.
+            if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) ||
+                path.Contains('\\') || path["res://".Length..].Contains(':') ||
+                path["res://assets/".Length..].Split('/').Any(segment => segment is ".." or "." or ""))
+            {
+                messages.Add(Error("invalid_asset_path", "Use a canonical res://assets/ path without traversal.", field));
+                return;
+            }
+            var extension = Path.GetExtension(path).ToLowerInvariant();
+            if (audio ? extension is not (".wav" or ".ogg" or ".mp3") : extension != ".png")
+            {
+                messages.Add(Error("invalid_asset_type", audio ? "Use WAV, OGG or MP3 audio." : "Use PNG frames/icons.", field));
+                return;
+            }
+            var root = assets.GetGameAssetsRoot();
+            var exists = audio ? root is not null && File.Exists(Path.Combine(root, path["res://assets/".Length..]))
+                : assets.ResolveGameAssetPng(path, "Spell image").Exists;
+            if (!exists)
+                messages.Add(new("spell_asset_unavailable", "Asset does not exist or the game asset root is unavailable.",
+                    publishing ? ValidationSeverity.Error : ValidationSeverity.Warning, field));
+        }
     }
 
     private static bool StableId(string? value) => value is not null && Regex.IsMatch(value, "^[a-z][a-z0-9]*(_[a-z0-9]+)*$");

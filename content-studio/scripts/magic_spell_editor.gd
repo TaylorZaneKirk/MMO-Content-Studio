@@ -10,6 +10,11 @@ const WORKSPACE_SUPPORT := preload("res://scripts/authoring_workspace_support.gd
 var _support := WORKSPACE_SUPPORT.new()
 var _current: Dictionary = {}
 var _fields: Dictionary = {}
+var _frames: Dictionary = {}
+var _visuals: Dictionary = {}
+var _preview_textures: Dictionary = {}
+var _preview_elapsed := 0.0
+var _game_assets_root := ""
 var _list: ItemList
 var _search: LineEdit
 var _definition_id: LineEdit
@@ -28,6 +33,7 @@ var _pending_definition_id := ""
 
 func _ready() -> void:
 	_build_ui()
+	_client.spell_options_received.connect(func(payload: Dictionary): _game_assets_root = str(payload.get("game_assets_root", "")))
 	_client.spell_catalog_received.connect(_on_catalog)
 	_client.spell_definition_received.connect(_on_definition)
 	_client.spell_preview_received.connect(_on_preview)
@@ -90,6 +96,32 @@ func _build_ui() -> void:
 	_fields["successful_hit_min_damage"] = _number_field(basics, "Successful-hit minimum damage", 0, 2147483647, 0)
 	_fields["base_max_hit"] = _number_field(basics, "Base maximum hit", 0, 2147483647, 0)
 	_fields["base_cast_xp_tenths"] = _number_field(basics, "Base cast XP (tenths; 15 = 1.5 XP)", 0, 2147483647, 0)
+
+	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Source projectile art faces right when rotation is enabled. Zero FPS/scale means unset.")
+	_fields["icon_texture_path"] = _text_field("Spellbook icon (res://assets/...png)", presentation)
+	_add_visual(presentation, "icon")
+	for phase: String in ["projectile", "impact", "splash"]:
+		_heading(presentation, phase.capitalize(), 18)
+		var rows := VBoxContainer.new()
+		presentation.add_child(rows)
+		_frames[phase] = rows
+		_button(presentation, "+ Add frame", func(): _add_frame(phase, ""); _invalidate())
+		var fps := _number_field(presentation, "Animation FPS", 0, 1000, 0)
+		fps.step = 0.01
+		_fields[phase + "_animation_fps"] = fps
+		var render_scale := _number_field(presentation, "Render scale", 0, 1000, 0)
+		render_scale.step = 0.01
+		_fields[phase + "_render_scale"] = render_scale
+		if phase == "projectile":
+			var rotates := CheckBox.new()
+			rotates.text = "Rotate toward target (art faces right)"
+			rotates.button_pressed = true
+			presentation.add_child(rotates)
+			rotates.toggled.connect(_invalidate)
+			_fields["projectile_rotates_to_travel"] = rotates
+		_fields["cast_sound_path" if phase == "projectile" else phase + "_sound_path"] = _text_field("Cast sound" if phase == "projectile" else phase.capitalize() + " sound", presentation)
+		_add_visual(presentation, phase)
+	_button(presentation, "Refresh visual previews", _refresh_visuals)
 
 	var review := _panel(264)
 	_heading(review, "Review & apply", 20)
@@ -239,8 +271,14 @@ func _on_definition(payload: Dictionary) -> void:
 		elif control is OptionButton:
 			for index in control.item_count:
 				if control.get_item_metadata(index) == draft.get(key): control.select(index)
+		elif control is CheckBox: control.button_pressed = bool(draft.get(key, true))
 		elif control is SpinBox: control.value = float(draft.get(key, 0.0)) if draft.get(key) != null else 0.0
+	for phase: String in _frames:
+		_support.clear_container(_frames[phase])
+		var paths: Array = draft.get(phase + "_frames", []) if draft.get(phase + "_frames") != null else []
+		for path: String in paths: _add_frame(phase, path)
 	_loading = false
+	_refresh_visuals()
 	_form.visible = true
 	_preview.disabled = false
 	_status.text = "Editing %s." % payload.get("spell_id", "") if not str(payload.get("spell_id", "")).is_empty() else "New draft. Choose a stable definition ID."
@@ -252,9 +290,19 @@ func _draft() -> Dictionary:
 	var draft: Dictionary = {}
 	for key: String in _fields:
 		var control: Control = _fields[key]
-		if control is LineEdit: draft[key] = control.text.strip_edges()
+		if control is LineEdit:
+			draft[key] = control.text.strip_edges()
+			if key.ends_with("_path") and control.text.strip_edges().is_empty(): draft[key] = null
 		elif control is OptionButton: draft[key] = str(control.get_selected_metadata())
-		elif control is SpinBox: draft[key] = int(control.value)
+		elif control is CheckBox: draft[key] = control.button_pressed
+		elif control is SpinBox:
+			if key.ends_with("_fps") or key.ends_with("_scale"):
+				draft[key] = control.value if control.value > 0 else null
+			else: draft[key] = int(control.value)
+	for phase: String in _frames:
+		var paths: Array = []
+		for row: Node in _frames[phase].get_children(): paths.append((row.get_child(0) as LineEdit).text.strip_edges())
+		draft[phase + "_frames"] = paths
 	return draft
 
 
@@ -289,7 +337,7 @@ func _on_mutation(payload: Dictionary) -> void:
 	else:
 		_new_definition()
 	_support.render_validation(_validation, payload.get("messages", []))
-	_status.text = "Operation committed and reloaded. Casting is not implemented in M1."
+	_status.text = "Operation committed and reloaded. Restart the game server to load published presentation."
 	_client.load_spells()
 
 
@@ -304,3 +352,60 @@ func _invalidate(_value: Variant = null) -> void:
 	if _loading or _apply == null: return
 	_preview_request = {}
 	_support.clear_preview(_apply, _changes, _validation, "2. Apply changes")
+
+
+# Same ordered-row interaction as World Objects; frame order is explicit content.
+func _add_frame(phase: String, path: String) -> void:
+	var parent: VBoxContainer = _frames[phase]
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var field := LineEdit.new()
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.placeholder_text = "res://assets/...png"
+	field.text = path
+	row.add_child(field)
+	field.text_changed.connect(_invalidate)
+	_button(row, "↑", func(): parent.move_child(row, maxi(0, row.get_index() - 1)); _invalidate())
+	_button(row, "↓", func(): parent.move_child(row, mini(parent.get_child_count() - 1, row.get_index() + 1)); _invalidate())
+	_button(row, "Remove", func(): parent.remove_child(row); row.queue_free(); _invalidate())
+
+
+func _add_visual(parent: Node, phase: String) -> void:
+	var visual := TextureRect.new()
+	visual.custom_minimum_size = Vector2(128, 96)
+	visual.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	visual.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	parent.add_child(visual)
+	_visuals[phase] = visual
+
+
+# Read images from the configured game asset root without importing/copying them.
+func _refresh_visuals() -> void:
+	_preview_textures.clear()
+	_preview_elapsed = 0.0
+	var draft := _draft()
+	for phase: String in _visuals:
+		var paths: Array = [draft.get("icon_texture_path")] if phase == "icon" else draft.get(phase + "_frames", [])
+		var textures: Array[Texture2D] = []
+		for value: Variant in paths:
+			if not (value is String): continue
+			var path := str(value)
+			if _game_assets_root.is_empty() or not path.begins_with("res://assets/") or path.contains("..") or path.contains("\\"): continue
+			var file_path := _game_assets_root.path_join(path.trim_prefix("res://assets/"))
+			if not FileAccess.file_exists(file_path): continue
+			var image := Image.load_from_file(file_path)
+			if image != null and not image.is_empty(): textures.append(ImageTexture.create_from_image(image))
+		_preview_textures[phase] = textures
+		(_visuals[phase] as TextureRect).texture = null if textures.is_empty() else textures[0]
+
+
+func _process(delta: float) -> void:
+	_preview_elapsed += delta
+	for phase: String in _preview_textures:
+		var textures: Array = _preview_textures[phase]
+		if phase == "icon" or textures.size() < 2: continue
+		var fps := (_fields[phase + "_animation_fps"] as SpinBox).value
+		if fps <= 0: continue
+		var frame := int(_preview_elapsed * fps)
+		frame = frame % textures.size() if phase == "projectile" else mini(frame, textures.size() - 1)
+		(_visuals[phase] as TextureRect).texture = textures[frame]
