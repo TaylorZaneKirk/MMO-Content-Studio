@@ -40,7 +40,10 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 cast_sound_path, impact_animation_fps, impact_render_scale, impact_sound_path, splash_animation_fps,
                 splash_render_scale, splash_sound_path, projectile_source_facing,
                 projectile_homing_enabled, projectile_homing_strength,
-                cast_mode, impact_effect, force, force_falloff_per_tile, max_displacement_tiles
+                cast_mode, impact_effect, force, force_falloff_per_tile, max_displacement_tiles,
+                target_mode, manifestation_base_success_percent, manifestation_magic_levels_per_step,
+                manifestation_success_percent_per_step, matter_lifetime_milliseconds,
+                matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale
             FROM magic_combat_spells WHERE spell_id = @id
             """ + (forUpdate ? " FOR UPDATE" : ""), connection, transaction);
         command.Parameters.AddWithValue("id", definitionId);
@@ -70,7 +73,16 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 ImpactEffect: reader.IsDBNull(25) ? null : reader.GetString(25),
                 Force: reader.IsDBNull(26) ? null : reader.GetInt32(26),
                 ForceFalloffPerTile: reader.IsDBNull(27) ? null : reader.GetInt32(27),
-                MaxDisplacementTiles: reader.IsDBNull(28) ? null : reader.GetInt32(28));
+                MaxDisplacementTiles: reader.IsDBNull(28) ? null : reader.GetInt32(28),
+                TargetMode: reader.GetString(29),
+                ManifestationBaseSuccessPercent: reader.IsDBNull(30) ? null : reader.GetInt32(30),
+                ManifestationMagicLevelsPerStep: reader.IsDBNull(31) ? null : reader.GetInt32(31),
+                ManifestationSuccessPercentPerStep: reader.IsDBNull(32) ? null : reader.GetInt32(32),
+                MatterLifetimeMilliseconds: reader.IsDBNull(33) ? null : reader.GetInt32(33),
+                MatterCapacityMagicLevelsPerStep: reader.IsDBNull(34) ? null : reader.GetInt32(34),
+                MatterMaxActive: reader.IsDBNull(35) ? null : reader.GetInt32(35),
+                MatterVisualTexturePath: reader.IsDBNull(36) ? null : reader.GetString(36),
+                MatterVisualRenderScale: reader.IsDBNull(37) ? null : reader.GetDouble(37));
             state = reader.GetString(8);
             updated = reader.GetFieldValue<DateTimeOffset>(9);
         }
@@ -115,13 +127,19 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     projectile_render_scale, projectile_rotates_to_travel, cast_sound_path, impact_animation_fps,
                     impact_render_scale, impact_sound_path, splash_animation_fps, splash_render_scale,
                     splash_sound_path, projectile_source_facing, projectile_homing_enabled,
-                    projectile_homing_strength, cast_mode, impact_effect, force, force_falloff_per_tile, max_displacement_tiles)
+                    projectile_homing_strength, cast_mode, impact_effect, force, force_falloff_per_tile, max_displacement_tiles,
+                target_mode, manifestation_base_success_percent, manifestation_magic_levels_per_step,
+                manifestation_success_percent_per_step, matter_lifetime_milliseconds,
+                matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale)
                 VALUES (@id, @display_name, @tier, @element, @required_magic_level, @shard_cost,
                     @successful_hit_min_damage, @base_max_hit, @base_cast_xp_tenths, @state, @icon_texture_path,
                     @projectile_animation_fps, @projectile_render_scale, @projectile_rotates_to_travel, @cast_sound_path,
                     @impact_animation_fps, @impact_render_scale, @impact_sound_path, @splash_animation_fps,
                     @splash_render_scale, @splash_sound_path, @projectile_source_facing,
-                    @projectile_homing_enabled, @projectile_homing_strength, @cast_mode, @impact_effect, @force, @force_falloff_per_tile, @max_displacement_tiles)
+                    @projectile_homing_enabled, @projectile_homing_strength, @cast_mode, @impact_effect, @force, @force_falloff_per_tile, @max_displacement_tiles,
+                    @target_mode, @manifestation_base_success_percent, @manifestation_magic_levels_per_step,
+                    @manifestation_success_percent_per_step, @matter_lifetime_milliseconds,
+                    @matter_capacity_magic_levels_per_step, @matter_max_active, @matter_visual_texture_path, @matter_visual_render_scale)
                 """ : """
                 UPDATE magic_combat_spells SET display_name=@display_name, tier=@tier, element=@element,
                     required_magic_level=@required_magic_level, shard_cost=@shard_cost,
@@ -133,6 +151,15 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     projectile_source_facing=@projectile_source_facing,
                     projectile_homing_enabled=@projectile_homing_enabled,
                     projectile_homing_strength=@projectile_homing_strength,
+                    target_mode=@target_mode,
+                    manifestation_base_success_percent=@manifestation_base_success_percent,
+                    manifestation_magic_levels_per_step=@manifestation_magic_levels_per_step,
+                    manifestation_success_percent_per_step=@manifestation_success_percent_per_step,
+                    matter_lifetime_milliseconds=@matter_lifetime_milliseconds,
+                    matter_capacity_magic_levels_per_step=@matter_capacity_magic_levels_per_step,
+                    matter_max_active=@matter_max_active,
+                    matter_visual_texture_path=@matter_visual_texture_path,
+                    matter_visual_render_scale=@matter_visual_render_scale,
                     cast_mode=@cast_mode, impact_effect=@impact_effect, force=@force,
                     force_falloff_per_tile=@force_falloff_per_tile, max_displacement_tiles=@max_displacement_tiles,
                     cast_sound_path=@cast_sound_path,
@@ -141,6 +168,15 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     splash_render_scale=@splash_render_scale, splash_sound_path=@splash_sound_path,
                     updated_at=greatest(clock_timestamp(), updated_at + interval '1 microsecond') WHERE spell_id=@id
                 """;
+            command.Parameters.AddWithValue("target_mode", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.TargetMode ?? DBNull.Value);
+            command.Parameters.AddWithValue("manifestation_base_success_percent", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ManifestationBaseSuccessPercent ?? DBNull.Value);
+            command.Parameters.AddWithValue("manifestation_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ManifestationMagicLevelsPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("manifestation_success_percent_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ManifestationSuccessPercentPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("matter_lifetime_milliseconds", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.MatterLifetimeMilliseconds ?? DBNull.Value);
+            command.Parameters.AddWithValue("matter_capacity_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.MatterCapacityMagicLevelsPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("matter_max_active", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.MatterMaxActive ?? DBNull.Value);
+            command.Parameters.AddWithValue("matter_visual_texture_path", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.MatterVisualTexturePath ?? DBNull.Value);
+            command.Parameters.AddWithValue("matter_visual_render_scale", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.MatterVisualRenderScale ?? DBNull.Value);
             command.Parameters.AddWithValue("cast_mode", draft.CastMode);
             command.Parameters.AddWithValue("impact_effect", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.ImpactEffect ?? DBNull.Value);
             command.Parameters.AddWithValue("force", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.Force ?? DBNull.Value);

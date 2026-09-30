@@ -103,19 +103,38 @@ public sealed class MagicSpellAuthoringService(
             messages.Add(Error("invalid_cast_mode", "Choose Selected combat or Explicit technique.", "cast_mode"));
         var forceShape = draft.ImpactEffect switch
         {
-            null => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
+            null or "earth_matter" => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
             "air_displacement" => draft.Force is > 0 && draft.ForceFalloffPerTile is >= 0 && draft.MaxDisplacementTiles is > 0,
             _ => false
         };
         if (!forceShape)
             messages.Add(Error("invalid_force_shape", "Air displacement requires positive force and maximum tiles, and nonnegative falloff; None requires empty force fields.", "impact_effect"));
+        if (draft.TargetMode is not ("mob" or "tile"))
+            messages.Add(Error("invalid_target_mode", "Choose Mob or Tile.", "target_mode"));
+        var noMatter = draft.ManifestationBaseSuccessPercent is null && draft.ManifestationMagicLevelsPerStep is null &&
+            draft.ManifestationSuccessPercentPerStep is null && draft.MatterLifetimeMilliseconds is null &&
+            draft.MatterCapacityMagicLevelsPerStep is null && draft.MatterMaxActive is null &&
+            draft.MatterVisualTexturePath is null && draft.MatterVisualRenderScale is null;
+        if (draft.ImpactEffect != "earth_matter" && !noMatter)
+            messages.Add(Error("invalid_matter_shape", "Only Earth matter uses manifestation, capacity and matter visuals.", "impact_effect"));
+        if (draft.ManifestationBaseSuccessPercent is < 0 or > 100 ||
+            draft.ManifestationMagicLevelsPerStep is <= 0 || draft.ManifestationSuccessPercentPerStep is < 0 or > 100 ||
+            draft.MatterLifetimeMilliseconds is <= 0 || draft.MatterCapacityMagicLevelsPerStep is <= 0 ||
+            draft.MatterMaxActive is <= 0 || draft.MatterVisualRenderScale is { } scale && (!double.IsFinite(scale) || scale <= 0))
+            messages.Add(Error("invalid_matter_number", "Percentages must be 0–100; step sizes, lifetime, capacity and scale must be positive.", "impact_effect"));
         if (operation is "publish" or "save_and_publish")
         {
-            var supported = draft.CastMode == "selected_combat" && draft.ImpactEffect is null ||
-                draft.CastMode == "explicit_technique" && draft.Element == "air" &&
-                draft.ImpactEffect == "air_displacement" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0;
+            var supported = draft.CastMode == "selected_combat" && draft.TargetMode == "mob" && draft.ImpactEffect is null && noMatter ||
+                draft.CastMode == "explicit_technique" && draft.TargetMode == "mob" && draft.Element == "air" &&
+                draft.ImpactEffect == "air_displacement" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 && noMatter ||
+                draft.CastMode == "explicit_technique" && draft.TargetMode == "tile" && draft.Element == "earth" &&
+                draft.ImpactEffect == "earth_matter" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 &&
+                draft.ManifestationBaseSuccessPercent is not null && draft.ManifestationMagicLevelsPerStep is not null &&
+                draft.ManifestationSuccessPercentPerStep is not null && draft.MatterLifetimeMilliseconds is not null &&
+                draft.MatterCapacityMagicLevelsPerStep is not null && draft.MatterMaxActive is not null &&
+                draft.MatterVisualTexturePath is not null && draft.MatterVisualRenderScale is not null;
             if (!supported)
-                messages.Add(Error("unsupported_spell_shape", "Publish a selected combat spell without an effect, or a zero-damage Air displacement technique.", "cast_mode"));
+                messages.Add(Error("unsupported_spell_shape", "Publish selected Mob combat, a zero-damage Mob Air technique, or a complete zero-damage tile Earth technique.", "cast_mode"));
         }
         ValidatePresentation(draft, operation, messages);
         return messages;
@@ -128,6 +147,7 @@ public sealed class MagicSpellAuthoringService(
             messages.Add(Error("invalid_projectile_source_facing", "Choose Right, Down, Left or Up.", "projectile_source_facing"));
         if (!double.IsFinite(draft.ProjectileHomingStrength) || draft.ProjectileHomingStrength is <= 0 or > 1)
             messages.Add(Error("invalid_projectile_homing_strength", "Homing strength must be greater than 0 and at most 1.", "projectile_homing_strength"));
+        CheckPath(draft.MatterVisualTexturePath, "matter_visual_texture_path", false);
         CheckPath(draft.IconTexturePath, "icon_texture_path", false);
         CheckPath(draft.CastSoundPath, "cast_sound_path", true);
         CheckPath(draft.ImpactSoundPath, "impact_sound_path", true);

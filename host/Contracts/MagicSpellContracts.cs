@@ -33,7 +33,16 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("impact_effect")] string? ImpactEffect = null,
     [property: JsonPropertyName("force")] int? Force = null,
     [property: JsonPropertyName("force_falloff_per_tile")] int? ForceFalloffPerTile = null,
-    [property: JsonPropertyName("max_displacement_tiles")] int? MaxDisplacementTiles = null);
+    [property: JsonPropertyName("max_displacement_tiles")] int? MaxDisplacementTiles = null,
+    [property: JsonPropertyName("target_mode")] string TargetMode = "mob",
+    [property: JsonPropertyName("manifestation_base_success_percent")] int? ManifestationBaseSuccessPercent = null,
+    [property: JsonPropertyName("manifestation_magic_levels_per_step")] int? ManifestationMagicLevelsPerStep = null,
+    [property: JsonPropertyName("manifestation_success_percent_per_step")] int? ManifestationSuccessPercentPerStep = null,
+    [property: JsonPropertyName("matter_lifetime_milliseconds")] int? MatterLifetimeMilliseconds = null,
+    [property: JsonPropertyName("matter_capacity_magic_levels_per_step")] int? MatterCapacityMagicLevelsPerStep = null,
+    [property: JsonPropertyName("matter_max_active")] int? MatterMaxActive = null,
+    [property: JsonPropertyName("matter_visual_texture_path")] string? MatterVisualTexturePath = null,
+    [property: JsonPropertyName("matter_visual_render_scale")] double? MatterVisualRenderScale = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,

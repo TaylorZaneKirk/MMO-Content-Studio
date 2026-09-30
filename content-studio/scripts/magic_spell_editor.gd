@@ -26,6 +26,7 @@ var _preview: Button
 var _apply: Button
 var _status: Label
 var _form: VBoxContainer
+var _matter_fields: VBoxContainer
 var _force_fields: VBoxContainer
 var _loading := false
 var _preview_request: Dictionary = {}
@@ -90,6 +91,14 @@ func _build_ui() -> void:
 	basics.add_child(cast_mode)
 	cast_mode.item_selected.connect(_invalidate)
 	_fields["cast_mode"] = cast_mode
+	_label(basics, "Target mode")
+	var target_mode := OptionButton.new()
+	for value: String in ["mob", "tile"]:
+		target_mode.add_item(value.capitalize())
+		target_mode.set_item_metadata(target_mode.item_count - 1, value)
+	basics.add_child(target_mode)
+	target_mode.item_selected.connect(_invalidate)
+	_fields["target_mode"] = target_mode
 	_fields["display_name"] = _text_field("Display name", basics)
 	_fields["tier"] = _number_field(basics, "Tier", 1, 4, 1)
 	_label(basics, "Element")
@@ -112,6 +121,8 @@ func _build_ui() -> void:
 	effect.set_item_metadata(0, null)
 	effect.add_item("Air displacement")
 	effect.set_item_metadata(1, "air_displacement")
+	effect.add_item("Earth matter")
+	effect.set_item_metadata(2, "earth_matter")
 	basics.add_child(effect)
 	_fields["impact_effect"] = effect
 	_force_fields = VBoxContainer.new()
@@ -119,7 +130,25 @@ func _build_ui() -> void:
 	_fields["force"] = _number_field(_force_fields, "Force", 1, 2147483647, 1)
 	_fields["force_falloff_per_tile"] = _number_field(_force_fields, "Force falloff / tile after first", 0, 2147483647, 0)
 	_fields["max_displacement_tiles"] = _number_field(_force_fields, "Maximum displacement tiles", 1, 2147483647, 1)
-	effect.item_selected.connect(func(_index: int): _force_fields.visible = effect.selected == 1; _invalidate())
+	_matter_fields = VBoxContainer.new()
+	basics.add_child(_matter_fields)
+	_fields["manifestation_base_success_percent"] = _number_field(_matter_fields, "Base manifestation success %", 0, 100, 55)
+	_fields["manifestation_magic_levels_per_step"] = _number_field(_matter_fields, "Magic levels / manifestation step", 1, 2147483647, 5)
+	_fields["manifestation_success_percent_per_step"] = _number_field(_matter_fields, "Success % / step", 0, 100, 7)
+	_fields["matter_lifetime_milliseconds"] = _number_field(_matter_fields, "Matter lifetime (milliseconds)", 1, 2147483647, 20000)
+	_fields["matter_capacity_magic_levels_per_step"] = _number_field(_matter_fields, "Base Magic levels / capacity step", 1, 2147483647, 15)
+	_fields["matter_max_active"] = _number_field(_matter_fields, "Maximum active matter", 1, 2147483647, 3)
+	_fields["matter_visual_texture_path"] = _text_field("Persistent matter PNG (res://assets/...png)", _matter_fields)
+	var matter_scale := _number_field(_matter_fields, "Persistent matter render scale (0 = unset)", 0, 1000, 0)
+	matter_scale.step = 0.01
+	_fields["matter_visual_render_scale"] = matter_scale
+	_add_visual(_matter_fields, "matter")
+	_button(_matter_fields, "Refresh matter preview", _refresh_visuals)
+	effect.item_selected.connect(func(_index: int):
+		_force_fields.visible = effect.selected == 1
+		_matter_fields.visible = effect.selected == 2
+		_invalidate())
+	_matter_fields.visible = false
 	_force_fields.visible = false
 
 	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Choose the direction the source projectile art faces when rotation is enabled. Zero FPS/scale means unset.")
@@ -312,7 +341,7 @@ func _on_definition(payload: Dictionary) -> void:
 		var control: Control = _fields[key]
 		if control is LineEdit or control is TextEdit: control.text = str(draft.get(key, "")) if draft.get(key) != null else ""
 		elif control is OptionButton:
-			if key in ["projectile_source_facing", "cast_mode", "impact_effect"]: control.select(0)
+			if key in ["projectile_source_facing", "cast_mode", "impact_effect", "target_mode"]: control.select(0)
 			for index in control.item_count:
 				if control.get_item_metadata(index) == draft.get(key, "right" if key == "projectile_source_facing" else null): control.select(index)
 		elif control is CheckBox: control.button_pressed = bool(draft.get(key, key != "projectile_homing_enabled"))
@@ -323,6 +352,7 @@ func _on_definition(payload: Dictionary) -> void:
 		var paths: Array = draft.get(phase + "_frames", []) if draft.get(phase + "_frames") != null else []
 		for path: String in paths: _add_frame(phase, path)
 	_force_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 1
+	_matter_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 2
 	_loading = false
 	_refresh_visuals()
 	_form.visible = true
@@ -350,8 +380,11 @@ func _draft() -> Dictionary:
 		var paths: Array = []
 		for row: Node in _frames[phase].get_children(): paths.append((row.get_child(0) as LineEdit).text.strip_edges())
 		draft[phase + "_frames"] = paths
-	if draft["impact_effect"] == null:
+	if draft["impact_effect"] != "air_displacement":
 		for key: String in ["force", "force_falloff_per_tile", "max_displacement_tiles"]: draft[key] = null
+	if draft["impact_effect"] != "earth_matter":
+		for key: String in _fields:
+			if key.begins_with("manifestation_") or key.begins_with("matter_"): draft[key] = null
 	return draft
 
 
@@ -435,6 +468,7 @@ func _refresh_visuals() -> void:
 	var draft := _draft()
 	for phase: String in _visuals:
 		var paths: Array = [draft.get("icon_texture_path")] if phase == "icon" else draft.get(phase + "_frames", [])
+		if phase == "matter": paths = [draft.get("matter_visual_texture_path")]
 		var textures: Array[Texture2D] = []
 		for value: Variant in paths:
 			if not (value is String): continue
@@ -452,7 +486,7 @@ func _process(delta: float) -> void:
 	_preview_elapsed += delta
 	for phase: String in _preview_textures:
 		var textures: Array = _preview_textures[phase]
-		if phase == "icon" or textures.size() < 2: continue
+		if phase in ["icon", "matter"] or textures.size() < 2: continue
 		var fps := (_fields[phase + "_animation_fps"] as SpinBox).value
 		if fps <= 0: continue
 		var frame := int(_preview_elapsed * fps)
