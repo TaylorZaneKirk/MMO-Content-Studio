@@ -27,6 +27,7 @@ var _apply: Button
 var _status: Label
 var _form: VBoxContainer
 var _matter_fields: VBoxContainer
+var _fire_fields: VBoxContainer
 var _force_fields: VBoxContainer
 var _loading := false
 var _preview_request: Dictionary = {}
@@ -123,6 +124,8 @@ func _build_ui() -> void:
 	effect.set_item_metadata(1, "air_displacement")
 	effect.add_item("Earth matter")
 	effect.set_item_metadata(2, "earth_matter")
+	effect.add_item("Burning terrain")
+	effect.set_item_metadata(3, "burning_terrain")
 	basics.add_child(effect)
 	_fields["impact_effect"] = effect
 	_force_fields = VBoxContainer.new()
@@ -153,12 +156,30 @@ func _build_ui() -> void:
 	matter_scale.step = 0.01
 	_fields["matter_visual_render_scale"] = matter_scale
 	_add_visual(_matter_fields, "matter")
+	_fire_fields = VBoxContainer.new()
+	basics.add_child(_fire_fields)
+	_fields["ignition_base_success_percent"] = _number_field(_fire_fields, "Base ignition success %", 0, 100, 55)
+	_fields["ignition_magic_levels_per_step"] = _number_field(_fire_fields, "Effective Magic levels / success step", 1, 2147483647, 5)
+	_fields["ignition_success_percent_per_step"] = _number_field(_fire_fields, "Success % / step", 0, 100, 7)
+	_fields["burning_lifetime_milliseconds"] = _number_field(_fire_fields, "Burning lifetime (ms)", 1, 2147483647, 10000)
+	_fields["burning_capacity_magic_levels_per_step"] = _number_field(_fire_fields, "Base Magic levels / capacity step", 1, 2147483647, 20)
+	_fields["burning_max_active"] = _number_field(_fire_fields, "Maximum active fire", 1, 2147483647, 3)
+	_fields["burning_min_damage"] = _number_field(_fire_fields, "Minimum environmental Fire damage", 1, 2147483647, 1)
+	_fields["burning_max_damage"] = _number_field(_fire_fields, "Maximum environmental Fire damage", 1, 2147483647, 2)
+	_fields["burning_hazard_cooldown_milliseconds"] = _number_field(_fire_fields, "Per-Mob Fire hazard cooldown (ms)", 1, 2147483647, 2400)
+	_fields["burning_visual_texture_path"] = _text_field("Persistent Fire PNG (res://assets/...png)", _fire_fields)
+	var fire_scale := _number_field(_fire_fields, "Persistent Fire render scale (0 = unset)", 0, 1000, 0)
+	fire_scale.step = 0.01
+	_fields["burning_visual_render_scale"] = fire_scale
+
 	_button(_matter_fields, "Refresh matter preview", _refresh_visuals)
 	effect.item_selected.connect(func(_index: int):
 		_force_fields.visible = effect.selected == 1
 		_matter_fields.visible = effect.selected == 2
+		_fire_fields.visible = effect.selected == 3
 		_invalidate())
 	_matter_fields.visible = false
+	_fire_fields.visible = false
 	_force_fields.visible = false
 
 	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Choose the direction the source projectile art faces when rotation is enabled. Zero FPS/scale means unset.")
@@ -363,6 +384,7 @@ func _on_definition(payload: Dictionary) -> void:
 		for path: String in paths: _add_frame(phase, path)
 	_force_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 1
 	_matter_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 2
+	_fire_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 3
 	_loading = false
 	_refresh_visuals()
 	_form.visible = true
@@ -397,6 +419,9 @@ func _draft() -> Dictionary:
 	if draft["impact_effect"] != "earth_matter":
 		for key: String in _fields:
 			if key.begins_with("manifestation_") or key.begins_with("matter_"): draft[key] = null
+	if draft["impact_effect"] != "burning_terrain":
+		for key: String in _fields:
+			if key.begins_with("ignition_") or key.begins_with("burning_"): draft[key] = null
 	return draft
 
 

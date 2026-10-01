@@ -49,7 +49,18 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("displacement_mastery_magic_levels_per_step")] int? DisplacementMasteryMagicLevelsPerStep = null,
     [property: JsonPropertyName("displacement_mastery_tiles_per_step")] int? DisplacementMasteryTilesPerStep = null,
     [property: JsonPropertyName("displacement_mastery_max_tiles")] int? DisplacementMasteryMaxTiles = null,
-    [property: JsonPropertyName("matter_physical_weight")] int? MatterPhysicalWeight = null);
+    [property: JsonPropertyName("matter_physical_weight")] int? MatterPhysicalWeight = null,
+    [property: JsonPropertyName("ignition_base_success_percent")] int? IgnitionBaseSuccessPercent = null,
+    [property: JsonPropertyName("ignition_magic_levels_per_step")] int? IgnitionMagicLevelsPerStep = null,
+    [property: JsonPropertyName("ignition_success_percent_per_step")] int? IgnitionSuccessPercentPerStep = null,
+    [property: JsonPropertyName("burning_lifetime_milliseconds")] int? BurningLifetimeMilliseconds = null,
+    [property: JsonPropertyName("burning_capacity_magic_levels_per_step")] int? BurningCapacityMagicLevelsPerStep = null,
+    [property: JsonPropertyName("burning_max_active")] int? BurningMaxActive = null,
+    [property: JsonPropertyName("burning_min_damage")] int? BurningMinDamage = null,
+    [property: JsonPropertyName("burning_max_damage")] int? BurningMaxDamage = null,
+    [property: JsonPropertyName("burning_hazard_cooldown_milliseconds")] int? BurningHazardCooldownMilliseconds = null,
+    [property: JsonPropertyName("burning_visual_texture_path")] string? BurningVisualTexturePath = null,
+    [property: JsonPropertyName("burning_visual_render_scale")] double? BurningVisualRenderScale = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,

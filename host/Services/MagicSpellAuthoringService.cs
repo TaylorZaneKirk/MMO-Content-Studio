@@ -123,7 +123,7 @@ public sealed class MagicSpellAuthoringService(
                 "impact_effect"));
         var forceShape = draft.ImpactEffect switch
         {
-            null or "earth_matter" => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
+            null or "earth_matter" or "burning_terrain" => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
             "air_displacement" => draft.Force is > 0 && draft.ForceFalloffPerTile is >= 0 && draft.MaxDisplacementTiles is > 0,
             _ => false
         };
@@ -142,19 +142,43 @@ public sealed class MagicSpellAuthoringService(
             draft.MatterLifetimeMilliseconds is <= 0 || draft.MatterCapacityMagicLevelsPerStep is <= 0 ||
             draft.MatterPhysicalWeight is <= 0 || draft.MatterMaxActive is <= 0 || draft.MatterVisualRenderScale is { } scale && (!double.IsFinite(scale) || scale <= 0))
             messages.Add(Error("invalid_matter_number", "Percentages must be 0–100; step sizes, lifetime, capacity, weight and scale must be positive.", "impact_effect"));
+        var noFire = draft.IgnitionBaseSuccessPercent is null && draft.IgnitionMagicLevelsPerStep is null &&
+            draft.IgnitionSuccessPercentPerStep is null && draft.BurningLifetimeMilliseconds is null &&
+            draft.BurningCapacityMagicLevelsPerStep is null && draft.BurningMaxActive is null &&
+            draft.BurningMinDamage is null && draft.BurningMaxDamage is null &&
+            draft.BurningHazardCooldownMilliseconds is null && draft.BurningVisualTexturePath is null &&
+            draft.BurningVisualRenderScale is null;
+        if (draft.ImpactEffect != "burning_terrain" && !noFire)
+            messages.Add(Error("invalid_fire_shape", "Only burning terrain uses Fire ignition and hazard fields.", "impact_effect"));
+        if (draft.IgnitionBaseSuccessPercent is < 0 or > 100 || draft.IgnitionMagicLevelsPerStep is <= 0 ||
+            draft.IgnitionSuccessPercentPerStep is < 0 or > 100 || draft.BurningLifetimeMilliseconds is <= 0 ||
+            draft.BurningCapacityMagicLevelsPerStep is <= 0 || draft.BurningMaxActive is <= 0 ||
+            draft.BurningMinDamage is <= 0 || draft.BurningMaxDamage is <= 0 ||
+            draft.BurningHazardCooldownMilliseconds is <= 0 ||
+            draft.BurningMinDamage > draft.BurningMaxDamage ||
+            draft.BurningVisualRenderScale is { } fireScale && (!double.IsFinite(fireScale) || fireScale <= 0))
+            messages.Add(Error("invalid_fire_number", "Fire percentages must be 0–100; other Fire values must be positive and maximum damage must cover minimum damage.", "impact_effect"));
         if (operation is "publish" or "save_and_publish")
         {
-            var supported = draft.CastMode == "selected_combat" && draft.TargetMode == "mob" && draft.ImpactEffect is null && noMatter ||
+            var supported = draft.CastMode == "selected_combat" && draft.TargetMode == "mob" && draft.ImpactEffect is null && noMatter && noFire ||
                 draft.CastMode == "explicit_technique" && draft.TargetMode == "physical" && draft.Element == "air" &&
-                draft.ImpactEffect == "air_displacement" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 && noMatter ||
+                draft.ImpactEffect == "air_displacement" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 && noMatter && noFire ||
                 draft.CastMode == "explicit_technique" && draft.TargetMode == "tile" && draft.Element == "earth" &&
                 draft.ImpactEffect == "earth_matter" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 &&
                 draft.ManifestationBaseSuccessPercent is not null && draft.ManifestationMagicLevelsPerStep is not null &&
                 draft.ManifestationSuccessPercentPerStep is not null && draft.MatterLifetimeMilliseconds is not null &&
                 draft.MatterPhysicalWeight is > 0 && draft.MatterCapacityMagicLevelsPerStep is not null && draft.MatterMaxActive is not null &&
-                draft.MatterVisualTexturePath is not null && draft.MatterVisualRenderScale is not null;
+                draft.MatterVisualTexturePath is not null && draft.MatterVisualRenderScale is not null && noFire ||
+                draft.CastMode == "explicit_technique" && draft.TargetMode == "tile" && draft.Element == "fire" &&
+                draft.ImpactEffect == "burning_terrain" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 &&
+                noMatter && noAirMastery && draft.IgnitionBaseSuccessPercent is not null &&
+                draft.IgnitionMagicLevelsPerStep is not null && draft.IgnitionSuccessPercentPerStep is not null &&
+                draft.BurningLifetimeMilliseconds is not null && draft.BurningCapacityMagicLevelsPerStep is not null &&
+                draft.BurningMaxActive is not null && draft.BurningMinDamage is not null && draft.BurningMaxDamage is not null &&
+                draft.BurningHazardCooldownMilliseconds is not null && draft.BurningVisualTexturePath is not null &&
+                draft.BurningVisualRenderScale is not null;
             if (!supported)
-                messages.Add(Error("unsupported_spell_shape", "Publish selected Mob combat, a zero-damage physical Air technique, or a complete zero-damage tile Earth technique.", "cast_mode"));
+                messages.Add(Error("unsupported_spell_shape", "Publish selected Mob combat, a zero-damage physical Air technique, or a complete zero-damage tile Earth or Fire technique.", "cast_mode"));
         }
         ValidatePresentation(draft, operation, messages);
         return messages;
@@ -168,6 +192,7 @@ public sealed class MagicSpellAuthoringService(
         if (!double.IsFinite(draft.ProjectileHomingStrength) || draft.ProjectileHomingStrength is <= 0 or > 1)
             messages.Add(Error("invalid_projectile_homing_strength", "Homing strength must be greater than 0 and at most 1.", "projectile_homing_strength"));
         CheckPath(draft.MatterVisualTexturePath, "matter_visual_texture_path", false);
+        CheckPath(draft.BurningVisualTexturePath, "burning_visual_texture_path", false);
         CheckPath(draft.IconTexturePath, "icon_texture_path", false);
         CheckPath(draft.CastSoundPath, "cast_sound_path", true);
         CheckPath(draft.ImpactSoundPath, "impact_sound_path", true);
