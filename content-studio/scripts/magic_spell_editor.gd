@@ -514,8 +514,13 @@ func _refresh_visuals() -> void:
 	_preview_elapsed = 0.0
 	var draft := _draft()
 	for phase: String in _visuals:
-		var paths: Array = [draft.get("icon_texture_path")] if phase == "icon" else draft.get(phase + "_frames", [])
-		if phase == "matter": paths = [draft.get("matter_visual_texture_path")]
+		var paths: Array = []
+		if phase == "icon":
+			paths = [draft.get("icon_texture_path")]
+		elif phase == "matter":
+			paths = [draft.get("matter_visual_texture_path")]
+		elif draft.get(phase + "_frames") is Array:
+			paths = draft[phase + "_frames"]
 		var textures: Array[Texture2D] = []
 		for value: Variant in paths:
 			if not (value is String): continue
