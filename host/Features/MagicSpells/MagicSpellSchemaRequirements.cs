@@ -7,6 +7,8 @@ public sealed class MagicSpellSchemaRequirements : IAuthoringSchemaRequirementPr
     public IReadOnlyList<AuthoringSchemaRequirement> GetRequirements() =>
     [
         AuthoringSchemaRequirement.Table("magic_combat_spells"),
+        AuthoringSchemaRequirement.Column("magic_combat_spells", "matter_physical_weight"),
+        AuthoringSchemaRequirement.Constraint("magic_spells_matter_physical_weight_check"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "force_mastery_magic_levels_per_step"),
         AuthoringSchemaRequirement.Constraint("magic_spells_force_mastery_magic_levels_per_step_check"),
         AuthoringSchemaRequirement.Column("magic_combat_spells", "force_mastery_force_per_step"),

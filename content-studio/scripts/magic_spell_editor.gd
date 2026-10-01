@@ -93,7 +93,7 @@ func _build_ui() -> void:
 	_fields["cast_mode"] = cast_mode
 	_label(basics, "Target mode")
 	var target_mode := OptionButton.new()
-	for value: String in ["mob", "tile"]:
+	for value: String in ["mob", "tile", "physical"]:
 		target_mode.add_item(value.capitalize())
 		target_mode.set_item_metadata(target_mode.item_count - 1, value)
 	basics.add_child(target_mode)
@@ -146,6 +146,7 @@ func _build_ui() -> void:
 	_fields["manifestation_success_percent_per_step"] = _number_field(_matter_fields, "Success % / step", 0, 100, 7)
 	_fields["matter_lifetime_milliseconds"] = _number_field(_matter_fields, "Matter lifetime (milliseconds)", 1, 2147483647, 20000)
 	_fields["matter_capacity_magic_levels_per_step"] = _number_field(_matter_fields, "Base Magic levels / capacity step", 1, 2147483647, 15)
+	_fields["matter_physical_weight"] = _number_field(_matter_fields, "Physical weight (0 = unset)", 0, 2147483647, 0)
 	_fields["matter_max_active"] = _number_field(_matter_fields, "Maximum active matter", 1, 2147483647, 3)
 	_fields["matter_visual_texture_path"] = _text_field("Persistent matter PNG (res://assets/...png)", _matter_fields)
 	var matter_scale := _number_field(_matter_fields, "Persistent matter render scale (0 = unset)", 0, 1000, 0)
@@ -381,7 +382,7 @@ func _draft() -> Dictionary:
 		elif control is OptionButton: draft[key] = control.get_selected_metadata()
 		elif control is CheckBox: draft[key] = control.button_pressed
 		elif control is SpinBox:
-			if key.begins_with("force_mastery_") or key.begins_with("displacement_mastery_"):
+			if key == "matter_physical_weight" or key.begins_with("force_mastery_") or key.begins_with("displacement_mastery_"):
 				draft[key] = int(control.value) if control.value > 0 else null
 			elif key == "projectile_homing_strength": draft[key] = control.value
 			elif key.ends_with("_fps") or key.ends_with("_scale"):

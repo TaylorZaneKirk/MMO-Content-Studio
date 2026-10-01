@@ -48,7 +48,8 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("force_mastery_max_force")] int? ForceMasteryMaxForce = null,
     [property: JsonPropertyName("displacement_mastery_magic_levels_per_step")] int? DisplacementMasteryMagicLevelsPerStep = null,
     [property: JsonPropertyName("displacement_mastery_tiles_per_step")] int? DisplacementMasteryTilesPerStep = null,
-    [property: JsonPropertyName("displacement_mastery_max_tiles")] int? DisplacementMasteryMaxTiles = null);
+    [property: JsonPropertyName("displacement_mastery_max_tiles")] int? DisplacementMasteryMaxTiles = null,
+    [property: JsonPropertyName("matter_physical_weight")] int? MatterPhysicalWeight = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,
