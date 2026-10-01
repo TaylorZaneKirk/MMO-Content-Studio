@@ -30,6 +30,9 @@ var _matter_fields: VBoxContainer
 var _fire_fields: VBoxContainer
 var _water_fields: VBoxContainer
 var _force_fields: VBoxContainer
+var _matter_presentation_fields: VBoxContainer
+var _fire_presentation_fields: VBoxContainer
+var _water_presentation_fields: VBoxContainer
 var _loading := false
 var _preview_request: Dictionary = {}
 var _pending_definition_id := ""
@@ -154,11 +157,6 @@ func _build_ui() -> void:
 	_fields["matter_capacity_magic_levels_per_step"] = _number_field(_matter_fields, "Base Magic levels / capacity step", 1, 2147483647, 15)
 	_fields["matter_physical_weight"] = _number_field(_matter_fields, "Physical weight (0 = unset)", 0, 2147483647, 0)
 	_fields["matter_max_active"] = _number_field(_matter_fields, "Maximum active matter", 1, 2147483647, 3)
-	_fields["matter_visual_texture_path"] = _text_field("Persistent matter PNG (res://assets/...png)", _matter_fields)
-	var matter_scale := _number_field(_matter_fields, "Persistent matter render scale (0 = unset)", 0, 1000, 0)
-	matter_scale.step = 0.01
-	_fields["matter_visual_render_scale"] = matter_scale
-	_add_visual(_matter_fields, "matter")
 	_fire_fields = VBoxContainer.new()
 	basics.add_child(_fire_fields)
 	_fields["ignition_base_success_percent"] = _number_field(_fire_fields, "Base ignition success %", 0, 100, 55)
@@ -170,19 +168,6 @@ func _build_ui() -> void:
 	_fields["burning_min_damage"] = _number_field(_fire_fields, "Minimum environmental Fire damage", 1, 2147483647, 1)
 	_fields["burning_max_damage"] = _number_field(_fire_fields, "Maximum environmental Fire damage", 1, 2147483647, 2)
 	_fields["burning_hazard_cooldown_milliseconds"] = _number_field(_fire_fields, "Per-Mob Fire hazard cooldown (ms)", 1, 2147483647, 2400)
-	_heading(_fire_fields, "Persistent Fire animation", 18)
-	var fire_frames := VBoxContainer.new()
-	_fire_fields.add_child(fire_frames)
-	_frames["burning_visual"] = fire_frames
-	_button(_fire_fields, "+ Add Fire frame", func(): _add_frame("burning_visual", ""); _invalidate())
-	var fire_fps := _number_field(_fire_fields, "Persistent Fire animation FPS (0 = unset)", 0, 1000, 0)
-	fire_fps.step = 0.01
-	_fields["burning_visual_animation_fps"] = fire_fps
-	var fire_scale := _number_field(_fire_fields, "Persistent Fire render scale (0 = unset)", 0, 1000, 0)
-	fire_scale.step = 0.01
-	_fields["burning_visual_render_scale"] = fire_scale
-	_button(_fire_fields, "Refresh Fire preview", _refresh_visuals)
-	_add_visual(_fire_fields, "burning_visual")
 	_water_fields = VBoxContainer.new()
 	basics.add_child(_water_fields)
 	_fields["slick_base_success_percent"] = _number_field(_water_fields, "Base slick manifestation success %", 0, 100, 55)
@@ -191,31 +176,6 @@ func _build_ui() -> void:
 	_fields["slick_lifetime_milliseconds"] = _number_field(_water_fields, "Slick lifetime (ms)", 1, 2147483647, 15000)
 	_fields["slick_capacity_magic_levels_per_step"] = _number_field(_water_fields, "Base Magic levels / capacity step", 1, 2147483647, 20)
 	_fields["slick_max_active"] = _number_field(_water_fields, "Maximum active slicks", 1, 2147483647, 3)
-	_heading(_water_fields, "Persistent slick animation", 18)
-	var water_frames := VBoxContainer.new()
-	_water_fields.add_child(water_frames)
-	_frames["slick_visual"] = water_frames
-	_button(_water_fields, "+ Add slick frame", func(): _add_frame("slick_visual", ""); _invalidate())
-	var water_fps := _number_field(_water_fields, "Persistent slick animation FPS (0 = unset)", 0, 1000, 0)
-	water_fps.step = 0.01
-	_fields["slick_visual_animation_fps"] = water_fps
-	var water_scale := _number_field(_water_fields, "Persistent slick render scale (0 = unset)", 0, 1000, 0)
-	water_scale.step = 0.01
-	_fields["slick_visual_render_scale"] = water_scale
-	_button(_water_fields, "Refresh slick preview", _refresh_visuals)
-	_add_visual(_water_fields, "slick_visual")
-
-	_button(_matter_fields, "Refresh matter preview", _refresh_visuals)
-	effect.item_selected.connect(func(_index: int):
-		_force_fields.visible = effect.selected == 1
-		_matter_fields.visible = effect.selected == 2
-		_fire_fields.visible = effect.selected == 3
-		_water_fields.visible = effect.selected == 4
-		_invalidate())
-	_matter_fields.visible = false
-	_fire_fields.visible = false
-	_water_fields.visible = false
-	_force_fields.visible = false
 
 	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Choose the direction the source projectile art faces when rotation is enabled. Zero FPS/scale means unset.")
 	_fields["icon_texture_path"] = _text_field("Spellbook icon (res://assets/...png)", presentation)
@@ -259,7 +219,50 @@ func _build_ui() -> void:
 			homing.toggled.connect(func(enabled: bool): strength.editable = enabled; _invalidate())
 		_fields["cast_sound_path" if phase == "projectile" else phase + "_sound_path"] = _text_field("Cast sound" if phase == "projectile" else phase.capitalize() + " sound", presentation)
 		_add_visual(presentation, phase)
+	_matter_presentation_fields = VBoxContainer.new()
+	presentation.add_child(_matter_presentation_fields)
+	_heading(_matter_presentation_fields, "Persistent Earth matter", 18)
+	_fields["matter_visual_texture_path"] = _text_field("Persistent matter PNG (res://assets/...png)", _matter_presentation_fields)
+	var matter_scale := _number_field(_matter_presentation_fields, "Persistent matter render scale (0 = unset)", 0, 1000, 0)
+	matter_scale.step = 0.01
+	_fields["matter_visual_render_scale"] = matter_scale
+	_button(_matter_presentation_fields, "Refresh matter preview", _refresh_visuals)
+	_add_visual(_matter_presentation_fields, "matter")
+	_fire_presentation_fields = VBoxContainer.new()
+	presentation.add_child(_fire_presentation_fields)
+	_heading(_fire_presentation_fields, "Persistent Fire animation", 18)
+	var fire_frames := VBoxContainer.new()
+	_fire_presentation_fields.add_child(fire_frames)
+	_frames["burning_visual"] = fire_frames
+	_button(_fire_presentation_fields, "+ Add Fire frame", func(): _add_frame("burning_visual", ""); _invalidate())
+	var fire_fps := _number_field(_fire_presentation_fields, "Persistent Fire animation FPS (0 = unset)", 0, 1000, 0)
+	fire_fps.step = 0.01
+	_fields["burning_visual_animation_fps"] = fire_fps
+	var fire_scale := _number_field(_fire_presentation_fields, "Persistent Fire render scale (0 = unset)", 0, 1000, 0)
+	fire_scale.step = 0.01
+	_fields["burning_visual_render_scale"] = fire_scale
+	_button(_fire_presentation_fields, "Refresh Fire preview", _refresh_visuals)
+	_add_visual(_fire_presentation_fields, "burning_visual")
+	_water_presentation_fields = VBoxContainer.new()
+	presentation.add_child(_water_presentation_fields)
+	_heading(_water_presentation_fields, "Persistent slick animation", 18)
+	var water_frames := VBoxContainer.new()
+	_water_presentation_fields.add_child(water_frames)
+	_frames["slick_visual"] = water_frames
+	_button(_water_presentation_fields, "+ Add slick frame", func(): _add_frame("slick_visual", ""); _invalidate())
+	var water_fps := _number_field(_water_presentation_fields, "Persistent slick animation FPS (0 = unset)", 0, 1000, 0)
+	water_fps.step = 0.01
+	_fields["slick_visual_animation_fps"] = water_fps
+	var water_scale := _number_field(_water_presentation_fields, "Persistent slick render scale (0 = unset)", 0, 1000, 0)
+	water_scale.step = 0.01
+	_fields["slick_visual_render_scale"] = water_scale
+	_button(_water_presentation_fields, "Refresh slick preview", _refresh_visuals)
+	_add_visual(_water_presentation_fields, "slick_visual")
 	_button(presentation, "Refresh visual previews", _refresh_visuals)
+	effect.item_selected.connect(func(_index: int):
+		_show_impact_sections(effect.selected)
+		_invalidate())
+	_show_impact_sections(effect.selected)
 
 	var review := _panel(264)
 	_heading(review, "Review & apply", 20)
@@ -417,16 +420,23 @@ func _on_definition(payload: Dictionary) -> void:
 		_support.clear_container(_frames[phase])
 		var paths: Array = draft.get(phase + "_frames", []) if draft.get(phase + "_frames") != null else []
 		for path: String in paths: _add_frame(phase, path)
-	_force_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 1
-	_matter_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 2
-	_fire_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 3
-	_water_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 4
+	_show_impact_sections((_fields["impact_effect"] as OptionButton).selected)
 	_loading = false
 	_refresh_visuals()
 	_form.visible = true
 	_preview.disabled = false
 	_status.text = "Editing %s." % payload.get("spell_id", "") if not str(payload.get("spell_id", "")).is_empty() else "New draft. Choose a stable definition ID."
 	_invalidate()
+
+
+func _show_impact_sections(effect_index: int) -> void:
+	_force_fields.visible = effect_index == 1
+	_matter_fields.visible = effect_index == 2
+	_fire_fields.visible = effect_index == 3
+	_water_fields.visible = effect_index == 4
+	_matter_presentation_fields.visible = effect_index == 2
+	_fire_presentation_fields.visible = effect_index == 3
+	_water_presentation_fields.visible = effect_index == 4
 
 
 # XP is transmitted as integer tenths, never a floating-point authority.
