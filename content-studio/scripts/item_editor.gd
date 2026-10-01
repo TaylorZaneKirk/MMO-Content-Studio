@@ -101,8 +101,9 @@ var _bonus_controls: Dictionary = {}
 var _weapon_enabled: CheckBox
 var _weapon_profile_id: LineEdit
 var _weapon_attack_type: OptionButton
-var _weapon_accuracy_style: OptionButton
-var _weapon_accuracy_label: Label
+var _melee_options_section: VBoxContainer
+var _melee_option_rows: VBoxContainer
+var _melee_option_add_button: Button
 var _weapon_ammunition_family: OptionButton
 var _weapon_ammunition_label: Label
 var _maximum_ammunition_tier: SpinBox
@@ -557,8 +558,6 @@ func _build_ui() -> void:
 	_weapon_profile_id = _add_line_field(weapon_grid, "Profile ID", "iron_sword_melee")
 	_weapon_attack_type = _add_option_field(weapon_grid, "Attack type")
 	_weapon_attack_type.item_selected.connect(_on_weapon_attack_type_selected)
-	_weapon_accuracy_style = _add_option_field(weapon_grid, "Accuracy style")
-	_weapon_accuracy_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
 	_weapon_ammunition_family = _add_option_field(weapon_grid, "Ammo family")
 	_weapon_ammunition_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
 	_weapon_ammunition_family.item_selected.connect(_on_weapon_attack_type_selected)
@@ -571,6 +570,15 @@ func _build_ui() -> void:
 	_weapon_max_range = _add_spin_field(weapon_grid, "Maximum range tiles", 0, 32, 1)
 	_weapon_speed_units = _add_spin_field(weapon_grid, "Attack speed units", 1, 60, 1)
 	_weapon_timing = _add_value_field(weapon_grid, "Attack interval", "4 attack units x 600 ms = 2400 ms")
+	_melee_options_section = VBoxContainer.new()
+	_weapon_section.add_child(_melee_options_section)
+	_melee_options_section.add_child(_heading("Melee Combat Options", 14))
+	_melee_option_rows = VBoxContainer.new()
+	_melee_options_section.add_child(_melee_option_rows)
+	_melee_option_add_button = Button.new()
+	_melee_option_add_button.text = "Add option"
+	_melee_option_add_button.pressed.connect(func(): _add_melee_option_row())
+	_melee_options_section.add_child(_melee_option_add_button)
 
 	_ammunition_section = VBoxContainer.new()
 	equipment_page.add_child(_ammunition_section)
@@ -702,7 +710,6 @@ func _on_options_received(payload: Dictionary) -> void:
 	_fill_option(_shop_policy, _option_array("shop_policies", [{"id": "not_shop_traded", "display_name": "Not Shop Traded"}, {"id": "npc_buys", "display_name": "NPC Buys"}, {"id": "npc_sells", "display_name": "NPC Sells"}, {"id": "npc_buys_and_sells", "display_name": "NPC Buys and Sells"}]))
 	_fill_option(_reclaim_policy, _option_array("reclaim_policies", [{"id": "none", "display_name": "None"}, {"id": "fixed_cost", "display_name": "Fixed Cost"}]))
 	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}, {"id": "ranged", "display_name": "Ranged"}, {"id": "magic", "display_name": "Magic"}]))
-	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
 	_fill_option(_weapon_ammunition_family, [{"id": "", "display_name": "None (self-contained)"}, {"id": "arrow", "display_name": "Arrow"}])
 	_fill_option(_ammunition_family, [{"id": "arrow", "display_name": "Arrow"}])
 	_fill_option(_ammunition_damage_type, [{"id": "light", "display_name": "Light"}, {"id": "standard", "display_name": "Standard"}, {"id": "heavy", "display_name": "Heavy"}])
@@ -1121,7 +1128,7 @@ func _weapon_profile_payload() -> Variant:
 	return {
 		"profile_id": _weapon_profile_id.text.strip_edges(),
 		"attack_type": _selected_metadata(_weapon_attack_type),
-		"accuracy_style": _selected_metadata(_weapon_accuracy_style) if _selected_metadata(_weapon_attack_type) == "melee" else null,
+		"melee_combat_options": _collect_melee_options() if _selected_metadata(_weapon_attack_type) == "melee" else [],
 		"ranged_damage_type": _selected_metadata(_weapon_ranged_damage_type) if _selected_metadata(_weapon_attack_type) == "ranged" and _selected_metadata(_weapon_ammunition_family).is_empty() else null,
 		"ammunition_family": _optional_payload(_selected_metadata(_weapon_ammunition_family)) if _selected_metadata(_weapon_attack_type) == "ranged" else null,
 		"maximum_ammunition_tier": int(_maximum_ammunition_tier.value) if _selected_metadata(_weapon_attack_type) == "ranged" and not _selected_metadata(_weapon_ammunition_family).is_empty() else null,
@@ -1129,6 +1136,96 @@ func _weapon_profile_payload() -> Variant:
 		"maximum_range_tiles": int(_weapon_max_range.value),
 		"attack_speed_units": int(_weapon_speed_units.value),
 	}
+
+
+func _add_melee_option_row(value: Dictionary = {}) -> void:
+	if _melee_option_rows.get_child_count() >= 4:
+		return
+	var row := VBoxContainer.new()
+	_melee_option_rows.add_child(row)
+	var heading := HBoxContainer.new()
+	heading.name = "OptionHeader"
+	row.add_child(heading)
+	var slot_label := Label.new()
+	slot_label.name = "SlotLabel"
+	heading.add_child(slot_label)
+	var up := Button.new()
+	up.text = "↑"
+	up.pressed.connect(_move_melee_option.bind(row, -1))
+	heading.add_child(up)
+	var down := Button.new()
+	down.text = "↓"
+	down.pressed.connect(_move_melee_option.bind(row, 1))
+	heading.add_child(down)
+	var remove := Button.new()
+	remove.text = "Remove"
+	remove.pressed.connect(func():
+		_melee_option_rows.remove_child(row)
+		row.queue_free()
+		_renumber_melee_options()
+		_clear_preview())
+	heading.add_child(remove)
+	var fields := GridContainer.new()
+	fields.name = "OptionFields"
+	fields.columns = 2
+	row.add_child(fields)
+	fields.add_child(_heading("ID", 11))
+	var option_id := LineEdit.new()
+	option_id.name = "OptionId"
+	option_id.text = str(value.get("option_id", ""))
+	option_id.text_changed.connect(_on_form_changed.unbind(1))
+	fields.add_child(option_id)
+	fields.add_child(_heading("Name", 11))
+	var display_name := LineEdit.new()
+	display_name.name = "DisplayName"
+	display_name.text = str(value.get("display_name", ""))
+	display_name.text_changed.connect(_on_form_changed.unbind(1))
+	fields.add_child(display_name)
+	fields.add_child(_heading("Combat style", 11))
+	var combat_style := OptionButton.new()
+	combat_style.name = "CombatStyle"
+	_fill_option(combat_style, [{"id": "accurate", "display_name": "Accurate"}, {"id": "aggressive", "display_name": "Aggressive"}, {"id": "defensive", "display_name": "Defensive"}, {"id": "controlled", "display_name": "Controlled"}])
+	_select_option(combat_style, str(value.get("combat_style", "accurate")))
+	combat_style.item_selected.connect(_on_form_changed.unbind(1))
+	fields.add_child(combat_style)
+	fields.add_child(_heading("Accuracy type", 11))
+	var accuracy_style := OptionButton.new()
+	accuracy_style.name = "AccuracyStyle"
+	_fill_option(accuracy_style, _option_array("attack_styles", [{"id": "thrust", "display_name": "Thrust"}, {"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}]))
+	_select_option(accuracy_style, str(value.get("accuracy_style", "slash")))
+	accuracy_style.item_selected.connect(_on_form_changed.unbind(1))
+	fields.add_child(accuracy_style)
+	_renumber_melee_options()
+	_clear_preview()
+
+
+func _move_melee_option(row: VBoxContainer, direction: int) -> void:
+	var destination := row.get_index() + direction
+	if destination < 0 or destination >= _melee_option_rows.get_child_count():
+		return
+	_melee_option_rows.move_child(row, destination)
+	_renumber_melee_options()
+	_clear_preview()
+
+
+func _renumber_melee_options() -> void:
+	for slot in _melee_option_rows.get_child_count():
+		var row := _melee_option_rows.get_child(slot) as VBoxContainer
+		(row.get_node("OptionHeader/SlotLabel") as Label).text = "Slot %d" % slot
+
+
+func _collect_melee_options() -> Array:
+	var options: Array = []
+	for slot in _melee_option_rows.get_child_count():
+		var row := _melee_option_rows.get_child(slot) as VBoxContainer
+		options.append({
+			"option_slot": slot,
+			"option_id": (row.get_node("OptionFields/OptionId") as LineEdit).text.strip_edges(),
+			"display_name": (row.get_node("OptionFields/DisplayName") as LineEdit).text.strip_edges(),
+			"combat_style": _selected_metadata(row.get_node("OptionFields/CombatStyle") as OptionButton),
+			"accuracy_style": _selected_metadata(row.get_node("OptionFields/AccuracyStyle") as OptionButton),
+		})
+	return options
 
 
 func _equipped_visual_payload() -> Variant:
@@ -1861,7 +1958,10 @@ func _apply_weapon_profile(profile_variant: Variant) -> void:
 	_weapon_enabled.button_pressed = has_profile
 	_weapon_profile_id.text = str(profile.get("profile_id", ""))
 	_select_option(_weapon_attack_type, str(profile.get("attack_type", "melee")))
-	_select_option(_weapon_accuracy_style, str(profile.get("accuracy_style", "slash")))
+	_clear_rows(_melee_option_rows)
+	for option_variant: Variant in profile.get("melee_combat_options", []):
+		if option_variant is Dictionary:
+			_add_melee_option_row(option_variant as Dictionary)
 	_select_option(_weapon_ranged_damage_type, str(profile.get("ranged_damage_type", "standard")))
 	_select_option(_weapon_ammunition_family, str(profile.get("ammunition_family")) if profile.get("ammunition_family") != null else "")
 	_update_weapon_family_fields()
@@ -1991,12 +2091,15 @@ func _update_contextual_sections() -> void:
 func _set_form_enabled(enabled: bool) -> void:
 	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id, _reference_value, _npc_buy_price, _npc_sell_price, _reclaim_value, _death_transform_item_id, _condition_policy_id, _repair_policy_id]:
 		edit.editable = enabled and (edit != _item_id or _current_item.is_empty())
-	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _weapon_ranged_damage_type, _weapon_ammunition_family, _ammunition_family, _ammunition_damage_type, _operation]:
+	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_ranged_damage_type, _weapon_ammunition_family, _ammunition_family, _ammunition_damage_type, _operation]:
 		option.disabled = not enabled
 	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units, _ammunition_tier, _maximum_ammunition_tier]:
 		spin.editable = enabled
 	for toggle in [_stackable, _consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
 		toggle.disabled = not enabled
+	_melee_option_add_button.disabled = not enabled
+	for row in _melee_option_rows.get_children():
+		_set_row_enabled(row, enabled)
 	_preview_button.disabled = not enabled
 	_delete_button.disabled = not enabled or _current_item.is_empty()
 	if not enabled:
@@ -2032,12 +2135,14 @@ func _set_equipment_controls_enabled(enabled: bool) -> void:
 func _set_weapon_controls_enabled(enabled: bool) -> void:
 	_weapon_profile_id.editable = enabled
 	_weapon_attack_type.disabled = not enabled
-	_weapon_accuracy_style.disabled = not enabled
 	_weapon_ranged_damage_type.disabled = not enabled
 	_weapon_ammunition_family.disabled = not enabled
 	_weapon_min_range.editable = enabled
 	_weapon_max_range.editable = enabled
 	_weapon_speed_units.editable = enabled
+	_melee_option_add_button.disabled = not enabled
+	for row in _melee_option_rows.get_children():
+		_set_row_enabled(row, enabled)
 	_update_weapon_family_fields()
 
 
@@ -2098,6 +2203,8 @@ func _set_row_enabled(row: Node, enabled: bool) -> void:
 			(child as LineEdit).editable = enabled
 		elif child is Button:
 			(child as Button).disabled = not enabled
+		elif child.get_child_count() > 0:
+			_set_row_enabled(child, enabled)
 
 
 func _update_operation_default() -> void:
@@ -2118,8 +2225,7 @@ func _on_weapon_attack_type_selected(_index: int) -> void:
 
 func _update_weapon_family_fields() -> void:
 	var ranged := _selected_metadata(_weapon_attack_type) == "ranged"
-	_weapon_accuracy_label.visible = _selected_metadata(_weapon_attack_type) == "melee"
-	_weapon_accuracy_style.visible = _selected_metadata(_weapon_attack_type) == "melee"
+	_melee_options_section.visible = _selected_metadata(_weapon_attack_type) == "melee" and _weapon_enabled.button_pressed
 	_weapon_ammunition_label.visible = ranged
 	_weapon_ammunition_family.visible = ranged
 	var uses_ammunition := ranged and _weapon_enabled.button_pressed and not _selected_metadata(_weapon_ammunition_family).is_empty()

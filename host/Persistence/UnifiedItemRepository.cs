@@ -978,28 +978,37 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select profile_id, attack_type, accuracy_style, ranged_damage_type,
+            select profile_id, attack_type, ranged_damage_type,
                 minimum_range_tiles, maximum_range_tiles, attack_speed_units, ammunition_family, maximum_ammunition_tier
             from item_combat_profiles
             where item_id = @item_id;
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        EquipmentCombatProfileDefinition? profile;
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            return null;
+            if (!await reader.ReadAsync(cancellationToken)) return null;
+            profile = new EquipmentCombatProfileDefinition(
+                reader.GetString(reader.GetOrdinal("profile_id")),
+                reader.GetString(reader.GetOrdinal("attack_type")),
+                reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
+                reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
+                reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
+                ReadNullableString(reader, "ranged_damage_type"), ReadNullableString(reader, "ammunition_family"),
+                reader.IsDBNull(reader.GetOrdinal("maximum_ammunition_tier")) ? null : reader.GetInt32(reader.GetOrdinal("maximum_ammunition_tier")));
         }
-
-        return new EquipmentCombatProfileDefinition(
-            reader.GetString(reader.GetOrdinal("profile_id")),
-            reader.GetString(reader.GetOrdinal("attack_type")),
-            ReadNullableString(reader, "accuracy_style"),
-            reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
-            reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
-            reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
-            ReadNullableString(reader, "ranged_damage_type"), ReadNullableString(reader, "ammunition_family"),
-            reader.IsDBNull(reader.GetOrdinal("maximum_ammunition_tier")) ? null : reader.GetInt32(reader.GetOrdinal("maximum_ammunition_tier")));
+        var options = new List<MeleeCombatOptionDefinition>();
+        await using var optionCommand = new NpgsqlCommand("""
+            select option_slot, option_id, display_name, combat_style, accuracy_style
+            from item_melee_combat_options where item_id = @item_id order by option_slot;
+            """, connection, transaction);
+        optionCommand.Parameters.AddWithValue("item_id", itemId);
+        await using var optionReader = await optionCommand.ExecuteReaderAsync(cancellationToken);
+        while (await optionReader.ReadAsync(cancellationToken))
+            options.Add(new MeleeCombatOptionDefinition(optionReader.GetInt16(0), optionReader.GetString(1),
+                optionReader.GetString(2), optionReader.GetString(3), optionReader.GetString(4)));
+        return profile with { MeleeCombatOptions = options };
     }
 
     private static async Task<ItemAmmunitionProfileDefinition?> LoadAmmunitionProfileAsync(
@@ -1483,6 +1492,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             await ExecuteDeleteAsync(connection, transaction, "item_skill_requirements", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_ammunition_profiles", itemId, cancellationToken);
+            await ExecuteDeleteAsync(connection, transaction, "item_melee_combat_options", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_equipped_visual_pose_anchors", itemId, cancellationToken);
@@ -1551,6 +1561,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         if (profile is null)
         {
+            await ExecuteDeleteAsync(connection, transaction, "item_melee_combat_options", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
             return;
         }
@@ -1560,7 +1571,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 item_id,
                 profile_id,
                 attack_type,
-                accuracy_style,
                 ranged_damage_type,
                 ammunition_family,
                 maximum_ammunition_tier,
@@ -1572,7 +1582,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @item_id,
                 @profile_id,
                 @attack_type,
-                @accuracy_style,
                 @ranged_damage_type,
                 @ammunition_family,
                 @maximum_ammunition_tier,
@@ -1584,7 +1593,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             on conflict (item_id) do update set
                 profile_id = excluded.profile_id,
                 attack_type = excluded.attack_type,
-                accuracy_style = excluded.accuracy_style,
                 ranged_damage_type = excluded.ranged_damage_type,
                 ammunition_family = excluded.ammunition_family,
                 maximum_ammunition_tier = excluded.maximum_ammunition_tier,
@@ -1597,8 +1605,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("item_id", itemId);
         command.Parameters.AddWithValue("profile_id", profile.ProfileId);
         command.Parameters.AddWithValue("attack_type", profile.AttackType);
-        command.Parameters.Add("accuracy_style", NpgsqlDbType.Text).Value =
-            (object?)profile.AccuracyStyle ?? DBNull.Value;
         command.Parameters.Add("ranged_damage_type", NpgsqlDbType.Text).Value =
             (object?)profile.RangedDamageType ?? DBNull.Value;
         command.Parameters.Add("ammunition_family", NpgsqlDbType.Text).Value =
@@ -1609,6 +1615,22 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("maximum_range_tiles", profile.MaximumRangeTiles);
         command.Parameters.AddWithValue("attack_speed_units", profile.AttackSpeedUnits);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_melee_combat_options", itemId, cancellationToken);
+        foreach (var option in profile.MeleeCombatOptions ?? [])
+        {
+            await using var optionCommand = new NpgsqlCommand("""
+                insert into item_melee_combat_options
+                    (item_id, option_slot, option_id, display_name, combat_style, accuracy_style)
+                values (@item_id, @option_slot, @option_id, @display_name, @combat_style, @accuracy_style);
+                """, connection, transaction);
+            optionCommand.Parameters.AddWithValue("item_id", itemId);
+            optionCommand.Parameters.AddWithValue("option_slot", option.OptionSlot);
+            optionCommand.Parameters.AddWithValue("option_id", option.OptionId);
+            optionCommand.Parameters.AddWithValue("display_name", option.DisplayName);
+            optionCommand.Parameters.AddWithValue("combat_style", option.CombatStyle);
+            optionCommand.Parameters.AddWithValue("accuracy_style", option.AccuracyStyle);
+            await optionCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
     }
 
     private static async Task ReplaceCombatBonusesAsync(

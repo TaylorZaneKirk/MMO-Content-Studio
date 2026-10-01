@@ -675,33 +675,47 @@ public sealed class UnifiedItemValidator
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.attack_type"));
         }
+        var meleeOptions = profile.MeleeCombatOptions ?? [];
         if (profile.AttackType == "melee" &&
-            (profile.AccuracyStyle is null || !_registry.SupportedAttackStyles.Contains(profile.AccuracyStyle) ||
-             profile.RangedDamageType is not null || profile.AmmunitionFamily is not null))
+            (profile.RangedDamageType is not null || profile.AmmunitionFamily is not null))
         {
             messages.Add(new ApiError(
-                "unsupported_attack_style",
-                "Melee weapon profiles need thrust, slash, or crush accuracy style, with no ammunition family or Ranged damage type.",
+                "invalid_melee_weapon_profile",
+                "Melee weapons have no ammunition family or Ranged damage type.",
                 ValidationSeverity.Error,
-                "equipment.weapon_profile.accuracy_style"));
+                "equipment.weapon_profile"));
         }
+        if (profile.AttackType == "melee" && (meleeOptions.Count > 4 || (forPublication && meleeOptions.Count == 0)))
+            messages.Add(new ApiError("melee_options_required", "Published Melee weapons require 1-4 combat options.",
+                ValidationSeverity.Error, "equipment.weapon_profile.melee_combat_options"));
+        if (profile.AttackType != "melee" && meleeOptions.Count > 0)
+            messages.Add(new ApiError("melee_options_wrong_family", "Only Melee weapons may have Melee combat options.",
+                ValidationSeverity.Error, "equipment.weapon_profile.melee_combat_options"));
+        if (meleeOptions.Select(option => option.OptionSlot).Distinct().Count() != meleeOptions.Count ||
+            meleeOptions.Select(option => option.OptionId).Distinct(StringComparer.Ordinal).Count() != meleeOptions.Count ||
+            meleeOptions.Any(option => option.OptionSlot is < 0 or > 3 ||
+                !System.Text.RegularExpressions.Regex.IsMatch(option.OptionId, "^[a-z][a-z0-9_]*$") ||
+                string.IsNullOrWhiteSpace(option.DisplayName) ||
+                option.CombatStyle is not ("accurate" or "aggressive" or "defensive" or "controlled") ||
+                !_registry.SupportedAttackStyles.Contains(option.AccuracyStyle)))
+            messages.Add(new ApiError("invalid_melee_options",
+                "Melee options need unique slots and IDs, names, combat styles and accuracy types.",
+                ValidationSeverity.Error, "equipment.weapon_profile.melee_combat_options"));
         if (profile.AttackType == "ranged" &&
-            (profile.AccuracyStyle is not null ||
-             !((profile.AmmunitionFamily is null && profile.RangedDamageType is "light" or "standard" or "heavy") ||
+            (!((profile.AmmunitionFamily is null && profile.RangedDamageType is "light" or "standard" or "heavy") ||
                (profile.AmmunitionFamily == "arrow" && profile.RangedDamageType is null))))
         {
             messages.Add(new ApiError(
                 "invalid_ranged_weapon_profile",
-                "Ranged weapons need either Arrow ammunition with no weapon damage type, or a self-contained Light/Standard/Heavy damage type; no melee accuracy style.",
+                "Ranged weapons need either Arrow ammunition with no weapon damage type, or a self-contained Light/Standard/Heavy damage type.",
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.ranged_damage_type"));
         }
-        if (profile.AttackType == "magic" && (profile.AccuracyStyle is not null ||
-            profile.RangedDamageType is not null || profile.AmmunitionFamily is not null ||
+        if (profile.AttackType == "magic" && (profile.RangedDamageType is not null || profile.AmmunitionFamily is not null ||
             profile.MaximumAmmunitionTier is not null))
         {
             messages.Add(new ApiError("invalid_magic_weapon_profile",
-                "Magic focuses have no accuracy style, Ranged damage type or ammunition fields.",
+                "Magic focuses have no Ranged damage type or ammunition fields.",
                 ValidationSeverity.Error, "equipment.weapon_profile"));
         }
 

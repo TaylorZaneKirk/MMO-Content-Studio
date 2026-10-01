@@ -254,11 +254,13 @@ public static partial class UnifiedItemDomainRules
         return new EquipmentCombatProfileDefinition(
             NormalizeRequired(profile.ProfileId),
             NormalizeRequired(profile.AttackType),
-            NormalizeOptional(profile.AccuracyStyle),
             profile.MinimumRangeTiles,
             profile.MaximumRangeTiles,
             profile.AttackSpeedUnits,
-            NormalizeOptional(profile.RangedDamageType), NormalizeOptional(profile.AmmunitionFamily), profile.MaximumAmmunitionTier);
+            NormalizeOptional(profile.RangedDamageType), NormalizeOptional(profile.AmmunitionFamily), profile.MaximumAmmunitionTier,
+            (profile.MeleeCombatOptions ?? []).Select(option => new MeleeCombatOptionDefinition(
+                option.OptionSlot, NormalizeRequired(option.OptionId), NormalizeRequired(option.DisplayName),
+                NormalizeRequired(option.CombatStyle), NormalizeRequired(option.AccuracyStyle))).ToArray());
     }
 
     private static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(
