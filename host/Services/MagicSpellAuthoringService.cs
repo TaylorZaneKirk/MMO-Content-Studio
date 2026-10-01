@@ -146,7 +146,8 @@ public sealed class MagicSpellAuthoringService(
             draft.IgnitionSuccessPercentPerStep is null && draft.BurningLifetimeMilliseconds is null &&
             draft.BurningCapacityMagicLevelsPerStep is null && draft.BurningMaxActive is null &&
             draft.BurningMinDamage is null && draft.BurningMaxDamage is null &&
-            draft.BurningHazardCooldownMilliseconds is null && draft.BurningVisualTexturePath is null &&
+            draft.BurningHazardCooldownMilliseconds is null && (draft.BurningVisualFrames is null or { Count: 0 }) &&
+            draft.BurningVisualAnimationFps is null &&
             draft.BurningVisualRenderScale is null;
         if (draft.ImpactEffect != "burning_terrain" && !noFire)
             messages.Add(Error("invalid_fire_shape", "Only burning terrain uses Fire ignition and hazard fields.", "impact_effect"));
@@ -156,7 +157,8 @@ public sealed class MagicSpellAuthoringService(
             draft.BurningMinDamage is <= 0 || draft.BurningMaxDamage is <= 0 ||
             draft.BurningHazardCooldownMilliseconds is <= 0 ||
             draft.BurningMinDamage > draft.BurningMaxDamage ||
-            draft.BurningVisualRenderScale is { } fireScale && (!double.IsFinite(fireScale) || fireScale <= 0))
+            draft.BurningVisualRenderScale is { } fireScale && (!double.IsFinite(fireScale) || fireScale <= 0) ||
+            draft.BurningVisualAnimationFps is { } fireFps && (!double.IsFinite(fireFps) || fireFps <= 0))
             messages.Add(Error("invalid_fire_number", "Fire percentages must be 0–100; other Fire values must be positive and maximum damage must cover minimum damage.", "impact_effect"));
         if (operation is "publish" or "save_and_publish")
         {
@@ -175,7 +177,8 @@ public sealed class MagicSpellAuthoringService(
                 draft.IgnitionMagicLevelsPerStep is not null && draft.IgnitionSuccessPercentPerStep is not null &&
                 draft.BurningLifetimeMilliseconds is not null && draft.BurningCapacityMagicLevelsPerStep is not null &&
                 draft.BurningMaxActive is not null && draft.BurningMinDamage is not null && draft.BurningMaxDamage is not null &&
-                draft.BurningHazardCooldownMilliseconds is not null && draft.BurningVisualTexturePath is not null &&
+                draft.BurningHazardCooldownMilliseconds is not null && draft.BurningVisualFrames is { Count: >= 2 } &&
+                draft.BurningVisualAnimationFps is not null &&
                 draft.BurningVisualRenderScale is not null;
             if (!supported)
                 messages.Add(Error("unsupported_spell_shape", "Publish selected Mob combat, a zero-damage physical Air technique, or a complete zero-damage tile Earth or Fire technique.", "cast_mode"));
@@ -192,7 +195,13 @@ public sealed class MagicSpellAuthoringService(
         if (!double.IsFinite(draft.ProjectileHomingStrength) || draft.ProjectileHomingStrength is <= 0 or > 1)
             messages.Add(Error("invalid_projectile_homing_strength", "Homing strength must be greater than 0 and at most 1.", "projectile_homing_strength"));
         CheckPath(draft.MatterVisualTexturePath, "matter_visual_texture_path", false);
-        CheckPath(draft.BurningVisualTexturePath, "burning_visual_texture_path", false);
+        if (draft.BurningVisualFrames is { Count: > 64 })
+            messages.Add(Error("too_many_fire_frames", "Persistent Fire supports at most 64 ordered frames.", "burning_visual_frames"));
+        foreach (var path in draft.BurningVisualFrames ?? [])
+        {
+            if (path is null) messages.Add(Error("invalid_asset_path", "A Fire frame path is required.", "burning_visual_frames"));
+            else CheckPath(path, "burning_visual_frames", false);
+        }
         CheckPath(draft.IconTexturePath, "icon_texture_path", false);
         CheckPath(draft.CastSoundPath, "cast_sound_path", true);
         CheckPath(draft.ImpactSoundPath, "impact_sound_path", true);

@@ -59,7 +59,8 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("burning_min_damage")] int? BurningMinDamage = null,
     [property: JsonPropertyName("burning_max_damage")] int? BurningMaxDamage = null,
     [property: JsonPropertyName("burning_hazard_cooldown_milliseconds")] int? BurningHazardCooldownMilliseconds = null,
-    [property: JsonPropertyName("burning_visual_texture_path")] string? BurningVisualTexturePath = null,
+    [property: JsonPropertyName("burning_visual_frames")] IReadOnlyList<string>? BurningVisualFrames = null,
+    [property: JsonPropertyName("burning_visual_animation_fps")] double? BurningVisualAnimationFps = null,
     [property: JsonPropertyName("burning_visual_render_scale")] double? BurningVisualRenderScale = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,

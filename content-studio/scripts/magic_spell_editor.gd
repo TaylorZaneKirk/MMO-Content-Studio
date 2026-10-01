@@ -167,10 +167,19 @@ func _build_ui() -> void:
 	_fields["burning_min_damage"] = _number_field(_fire_fields, "Minimum environmental Fire damage", 1, 2147483647, 1)
 	_fields["burning_max_damage"] = _number_field(_fire_fields, "Maximum environmental Fire damage", 1, 2147483647, 2)
 	_fields["burning_hazard_cooldown_milliseconds"] = _number_field(_fire_fields, "Per-Mob Fire hazard cooldown (ms)", 1, 2147483647, 2400)
-	_fields["burning_visual_texture_path"] = _text_field("Persistent Fire PNG (res://assets/...png)", _fire_fields)
+	_heading(_fire_fields, "Persistent Fire animation", 18)
+	var fire_frames := VBoxContainer.new()
+	_fire_fields.add_child(fire_frames)
+	_frames["burning_visual"] = fire_frames
+	_button(_fire_fields, "+ Add Fire frame", func(): _add_frame("burning_visual", ""); _invalidate())
+	var fire_fps := _number_field(_fire_fields, "Persistent Fire animation FPS (0 = unset)", 0, 1000, 0)
+	fire_fps.step = 0.01
+	_fields["burning_visual_animation_fps"] = fire_fps
 	var fire_scale := _number_field(_fire_fields, "Persistent Fire render scale (0 = unset)", 0, 1000, 0)
 	fire_scale.step = 0.01
 	_fields["burning_visual_render_scale"] = fire_scale
+	_button(_fire_fields, "Refresh Fire preview", _refresh_visuals)
+	_add_visual(_fire_fields, "burning_visual")
 
 	_button(_matter_fields, "Refresh matter preview", _refresh_visuals)
 	effect.item_selected.connect(func(_index: int):
@@ -422,6 +431,7 @@ func _draft() -> Dictionary:
 	if draft["impact_effect"] != "burning_terrain":
 		for key: String in _fields:
 			if key.begins_with("ignition_") or key.begins_with("burning_"): draft[key] = null
+		draft["burning_visual_frames"] = null
 	return draft
 
 
@@ -527,5 +537,5 @@ func _process(delta: float) -> void:
 		var fps := (_fields[phase + "_animation_fps"] as SpinBox).value
 		if fps <= 0: continue
 		var frame := int(_preview_elapsed * fps)
-		frame = frame % textures.size() if phase == "projectile" else mini(frame, textures.size() - 1)
+		frame = frame % textures.size() if phase in ["projectile", "burning_visual"] else mini(frame, textures.size() - 1)
 		(_visuals[phase] as TextureRect).texture = textures[frame]
