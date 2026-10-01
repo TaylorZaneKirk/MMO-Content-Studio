@@ -123,7 +123,7 @@ public sealed class MagicSpellAuthoringService(
                 "impact_effect"));
         var forceShape = draft.ImpactEffect switch
         {
-            null or "earth_matter" or "burning_terrain" => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
+            null or "earth_matter" or "burning_terrain" or "slippery_terrain" => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,
             "air_displacement" => draft.Force is > 0 && draft.ForceFalloffPerTile is >= 0 && draft.MaxDisplacementTiles is > 0,
             _ => false
         };
@@ -160,6 +160,19 @@ public sealed class MagicSpellAuthoringService(
             draft.BurningVisualRenderScale is { } fireScale && (!double.IsFinite(fireScale) || fireScale <= 0) ||
             draft.BurningVisualAnimationFps is { } fireFps && (!double.IsFinite(fireFps) || fireFps <= 0))
             messages.Add(Error("invalid_fire_number", "Fire percentages must be 0–100; other Fire values must be positive and maximum damage must cover minimum damage.", "impact_effect"));
+        var noSlick = draft.SlickBaseSuccessPercent is null && draft.SlickMagicLevelsPerStep is null &&
+            draft.SlickSuccessPercentPerStep is null && draft.SlickLifetimeMilliseconds is null &&
+            draft.SlickCapacityMagicLevelsPerStep is null && draft.SlickMaxActive is null &&
+            (draft.SlickVisualFrames is null or { Count: 0 }) && draft.SlickVisualAnimationFps is null &&
+            draft.SlickVisualRenderScale is null;
+        if (draft.ImpactEffect != "slippery_terrain" && !noSlick)
+            messages.Add(Error("invalid_slick_shape", "Only slippery terrain uses Water manifestation and slick fields.", "impact_effect"));
+        if (draft.SlickBaseSuccessPercent is < 0 or > 100 || draft.SlickMagicLevelsPerStep is <= 0 ||
+            draft.SlickSuccessPercentPerStep is < 0 or > 100 || draft.SlickLifetimeMilliseconds is <= 0 ||
+            draft.SlickCapacityMagicLevelsPerStep is <= 0 || draft.SlickMaxActive is <= 0 ||
+            draft.SlickVisualRenderScale is { } slickScale && (!double.IsFinite(slickScale) || slickScale <= 0) ||
+            draft.SlickVisualAnimationFps is { } slickFps && (!double.IsFinite(slickFps) || slickFps <= 0))
+            messages.Add(Error("invalid_slick_number", "Water percentages must be 0–100; other Water values must be positive.", "impact_effect"));
         if (operation is "publish" or "save_and_publish")
         {
             var supported = draft.CastMode == "selected_combat" && draft.TargetMode == "mob" && draft.ImpactEffect is null && noMatter && noFire ||
@@ -179,9 +192,16 @@ public sealed class MagicSpellAuthoringService(
                 draft.BurningMaxActive is not null && draft.BurningMinDamage is not null && draft.BurningMaxDamage is not null &&
                 draft.BurningHazardCooldownMilliseconds is not null && draft.BurningVisualFrames is { Count: >= 2 } &&
                 draft.BurningVisualAnimationFps is not null &&
-                draft.BurningVisualRenderScale is not null;
+                draft.BurningVisualRenderScale is not null ||
+                draft.CastMode == "explicit_technique" && draft.TargetMode == "tile" && draft.Element == "water" &&
+                draft.ImpactEffect == "slippery_terrain" && draft.SuccessfulHitMinDamage == 0 && draft.BaseMaxHit == 0 &&
+                noMatter && noFire && noAirMastery && draft.SlickBaseSuccessPercent is not null &&
+                draft.SlickMagicLevelsPerStep is not null && draft.SlickSuccessPercentPerStep is not null &&
+                draft.SlickLifetimeMilliseconds is not null && draft.SlickCapacityMagicLevelsPerStep is not null &&
+                draft.SlickMaxActive is not null && draft.SlickVisualFrames is { Count: >= 1 } &&
+                draft.SlickVisualAnimationFps is not null && draft.SlickVisualRenderScale is not null;
             if (!supported)
-                messages.Add(Error("unsupported_spell_shape", "Publish selected Mob combat, a zero-damage physical Air technique, or a complete zero-damage tile Earth or Fire technique.", "cast_mode"));
+                messages.Add(Error("unsupported_spell_shape", "Publish selected Mob combat, a zero-damage physical Air technique, or a complete zero-damage tile Earth, Fire or Water technique.", "cast_mode"));
         }
         ValidatePresentation(draft, operation, messages);
         return messages;
@@ -201,6 +221,13 @@ public sealed class MagicSpellAuthoringService(
         {
             if (path is null) messages.Add(Error("invalid_asset_path", "A Fire frame path is required.", "burning_visual_frames"));
             else CheckPath(path, "burning_visual_frames", false);
+        }
+        if (draft.SlickVisualFrames is { Count: > 64 })
+            messages.Add(Error("too_many_slick_frames", "Persistent Water supports at most 64 ordered frames.", "slick_visual_frames"));
+        foreach (var path in draft.SlickVisualFrames ?? [])
+        {
+            if (path is null) messages.Add(Error("invalid_asset_path", "A Water frame path is required.", "slick_visual_frames"));
+            else CheckPath(path, "slick_visual_frames", false);
         }
         CheckPath(draft.IconTexturePath, "icon_texture_path", false);
         CheckPath(draft.CastSoundPath, "cast_sound_path", true);

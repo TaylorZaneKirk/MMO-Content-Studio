@@ -28,6 +28,7 @@ var _status: Label
 var _form: VBoxContainer
 var _matter_fields: VBoxContainer
 var _fire_fields: VBoxContainer
+var _water_fields: VBoxContainer
 var _force_fields: VBoxContainer
 var _loading := false
 var _preview_request: Dictionary = {}
@@ -126,6 +127,8 @@ func _build_ui() -> void:
 	effect.set_item_metadata(2, "earth_matter")
 	effect.add_item("Burning terrain")
 	effect.set_item_metadata(3, "burning_terrain")
+	effect.add_item("Slippery terrain")
+	effect.set_item_metadata(4, "slippery_terrain")
 	basics.add_child(effect)
 	_fields["impact_effect"] = effect
 	_force_fields = VBoxContainer.new()
@@ -180,15 +183,38 @@ func _build_ui() -> void:
 	_fields["burning_visual_render_scale"] = fire_scale
 	_button(_fire_fields, "Refresh Fire preview", _refresh_visuals)
 	_add_visual(_fire_fields, "burning_visual")
+	_water_fields = VBoxContainer.new()
+	basics.add_child(_water_fields)
+	_fields["slick_base_success_percent"] = _number_field(_water_fields, "Base slick manifestation success %", 0, 100, 55)
+	_fields["slick_magic_levels_per_step"] = _number_field(_water_fields, "Effective Magic levels / success step", 1, 2147483647, 5)
+	_fields["slick_success_percent_per_step"] = _number_field(_water_fields, "Success % / step", 0, 100, 7)
+	_fields["slick_lifetime_milliseconds"] = _number_field(_water_fields, "Slick lifetime (ms)", 1, 2147483647, 15000)
+	_fields["slick_capacity_magic_levels_per_step"] = _number_field(_water_fields, "Base Magic levels / capacity step", 1, 2147483647, 20)
+	_fields["slick_max_active"] = _number_field(_water_fields, "Maximum active slicks", 1, 2147483647, 3)
+	_heading(_water_fields, "Persistent slick animation", 18)
+	var water_frames := VBoxContainer.new()
+	_water_fields.add_child(water_frames)
+	_frames["slick_visual"] = water_frames
+	_button(_water_fields, "+ Add slick frame", func(): _add_frame("slick_visual", ""); _invalidate())
+	var water_fps := _number_field(_water_fields, "Persistent slick animation FPS (0 = unset)", 0, 1000, 0)
+	water_fps.step = 0.01
+	_fields["slick_visual_animation_fps"] = water_fps
+	var water_scale := _number_field(_water_fields, "Persistent slick render scale (0 = unset)", 0, 1000, 0)
+	water_scale.step = 0.01
+	_fields["slick_visual_render_scale"] = water_scale
+	_button(_water_fields, "Refresh slick preview", _refresh_visuals)
+	_add_visual(_water_fields, "slick_visual")
 
 	_button(_matter_fields, "Refresh matter preview", _refresh_visuals)
 	effect.item_selected.connect(func(_index: int):
 		_force_fields.visible = effect.selected == 1
 		_matter_fields.visible = effect.selected == 2
 		_fire_fields.visible = effect.selected == 3
+		_water_fields.visible = effect.selected == 4
 		_invalidate())
 	_matter_fields.visible = false
 	_fire_fields.visible = false
+	_water_fields.visible = false
 	_force_fields.visible = false
 
 	var presentation := _page(pages, "Presentation", "Spell presentation", "Optional game assets. Choose the direction the source projectile art faces when rotation is enabled. Zero FPS/scale means unset.")
@@ -394,6 +420,7 @@ func _on_definition(payload: Dictionary) -> void:
 	_force_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 1
 	_matter_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 2
 	_fire_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 3
+	_water_fields.visible = (_fields["impact_effect"] as OptionButton).selected == 4
 	_loading = false
 	_refresh_visuals()
 	_form.visible = true
@@ -432,6 +459,10 @@ func _draft() -> Dictionary:
 		for key: String in _fields:
 			if key.begins_with("ignition_") or key.begins_with("burning_"): draft[key] = null
 		draft["burning_visual_frames"] = null
+	if draft["impact_effect"] != "slippery_terrain":
+		for key: String in draft:
+			if key.begins_with("slick_"): draft[key] = null
+		draft["slick_visual_frames"] = null
 	return draft
 
 
@@ -542,5 +573,5 @@ func _process(delta: float) -> void:
 		var fps := (_fields[phase + "_animation_fps"] as SpinBox).value
 		if fps <= 0: continue
 		var frame := int(_preview_elapsed * fps)
-		frame = frame % textures.size() if phase in ["projectile", "burning_visual"] else mini(frame, textures.size() - 1)
+		frame = frame % textures.size() if phase in ["projectile", "burning_visual", "slick_visual"] else mini(frame, textures.size() - 1)
 		(_visuals[phase] as TextureRect).texture = textures[frame]

@@ -45,7 +45,8 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 manifestation_success_percent_per_step, matter_lifetime_milliseconds,
                 matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale,
                 force_mastery_magic_levels_per_step, force_mastery_force_per_step, force_mastery_max_force, displacement_mastery_magic_levels_per_step, displacement_mastery_tiles_per_step, displacement_mastery_max_tiles, matter_physical_weight,
-                ignition_base_success_percent, ignition_magic_levels_per_step, ignition_success_percent_per_step, burning_lifetime_milliseconds, burning_capacity_magic_levels_per_step, burning_max_active, burning_min_damage, burning_max_damage, burning_hazard_cooldown_milliseconds, burning_visual_frames, burning_visual_animation_fps, burning_visual_render_scale
+                ignition_base_success_percent, ignition_magic_levels_per_step, ignition_success_percent_per_step, burning_lifetime_milliseconds, burning_capacity_magic_levels_per_step, burning_max_active, burning_min_damage, burning_max_damage, burning_hazard_cooldown_milliseconds, burning_visual_frames, burning_visual_animation_fps, burning_visual_render_scale,
+                slick_base_success_percent, slick_magic_levels_per_step, slick_success_percent_per_step, slick_lifetime_milliseconds, slick_capacity_magic_levels_per_step, slick_max_active, slick_visual_frames, slick_visual_animation_fps, slick_visual_render_scale
             FROM magic_combat_spells WHERE spell_id = @id
             """ + (forUpdate ? " FOR UPDATE" : ""), connection, transaction);
         command.Parameters.AddWithValue("id", definitionId);
@@ -103,7 +104,16 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 BurningHazardCooldownMilliseconds: reader.IsDBNull(53) ? null : reader.GetInt32(53),
                 BurningVisualFrames: reader.IsDBNull(54) ? null : Array.AsReadOnly(reader.GetFieldValue<string[]>(54)),
                 BurningVisualAnimationFps: reader.IsDBNull(55) ? null : reader.GetDouble(55),
-                BurningVisualRenderScale: reader.IsDBNull(56) ? null : reader.GetDouble(56));
+                BurningVisualRenderScale: reader.IsDBNull(56) ? null : reader.GetDouble(56),
+                SlickBaseSuccessPercent: reader.IsDBNull(57) ? null : reader.GetInt32(57),
+                SlickMagicLevelsPerStep: reader.IsDBNull(58) ? null : reader.GetInt32(58),
+                SlickSuccessPercentPerStep: reader.IsDBNull(59) ? null : reader.GetInt32(59),
+                SlickLifetimeMilliseconds: reader.IsDBNull(60) ? null : reader.GetInt32(60),
+                SlickCapacityMagicLevelsPerStep: reader.IsDBNull(61) ? null : reader.GetInt32(61),
+                SlickMaxActive: reader.IsDBNull(62) ? null : reader.GetInt32(62),
+                SlickVisualFrames: reader.IsDBNull(63) ? null : Array.AsReadOnly(reader.GetFieldValue<string[]>(63)),
+                SlickVisualAnimationFps: reader.IsDBNull(64) ? null : reader.GetDouble(64),
+                SlickVisualRenderScale: reader.IsDBNull(65) ? null : reader.GetDouble(65));
             state = reader.GetString(8);
             updated = reader.GetFieldValue<DateTimeOffset>(9);
         }
@@ -152,7 +162,7 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 target_mode, manifestation_base_success_percent, manifestation_magic_levels_per_step,
                 manifestation_success_percent_per_step, matter_lifetime_milliseconds,
                 matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale,
-                    force_mastery_magic_levels_per_step, force_mastery_force_per_step, force_mastery_max_force, displacement_mastery_magic_levels_per_step, displacement_mastery_tiles_per_step, displacement_mastery_max_tiles, matter_physical_weight, ignition_base_success_percent, ignition_magic_levels_per_step, ignition_success_percent_per_step, burning_lifetime_milliseconds, burning_capacity_magic_levels_per_step, burning_max_active, burning_min_damage, burning_max_damage, burning_hazard_cooldown_milliseconds, burning_visual_frames, burning_visual_animation_fps, burning_visual_render_scale)
+                    force_mastery_magic_levels_per_step, force_mastery_force_per_step, force_mastery_max_force, displacement_mastery_magic_levels_per_step, displacement_mastery_tiles_per_step, displacement_mastery_max_tiles, matter_physical_weight, ignition_base_success_percent, ignition_magic_levels_per_step, ignition_success_percent_per_step, burning_lifetime_milliseconds, burning_capacity_magic_levels_per_step, burning_max_active, burning_min_damage, burning_max_damage, burning_hazard_cooldown_milliseconds, burning_visual_frames, burning_visual_animation_fps, burning_visual_render_scale, slick_base_success_percent, slick_magic_levels_per_step, slick_success_percent_per_step, slick_lifetime_milliseconds, slick_capacity_magic_levels_per_step, slick_max_active, slick_visual_frames, slick_visual_animation_fps, slick_visual_render_scale)
                 VALUES (@id, @display_name, @tier, @element, @required_magic_level, @shard_cost,
                     @successful_hit_min_damage, @base_max_hit, @base_cast_xp_tenths, @state, @icon_texture_path,
                     @projectile_animation_fps, @projectile_render_scale, @projectile_rotates_to_travel, @cast_sound_path,
@@ -162,7 +172,7 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     @target_mode, @manifestation_base_success_percent, @manifestation_magic_levels_per_step,
                     @manifestation_success_percent_per_step, @matter_lifetime_milliseconds,
                     @matter_capacity_magic_levels_per_step, @matter_max_active, @matter_visual_texture_path, @matter_visual_render_scale,
-                    @force_mastery_magic_levels_per_step, @force_mastery_force_per_step, @force_mastery_max_force, @displacement_mastery_magic_levels_per_step, @displacement_mastery_tiles_per_step, @displacement_mastery_max_tiles, @matter_physical_weight, @ignition_base_success_percent, @ignition_magic_levels_per_step, @ignition_success_percent_per_step, @burning_lifetime_milliseconds, @burning_capacity_magic_levels_per_step, @burning_max_active, @burning_min_damage, @burning_max_damage, @burning_hazard_cooldown_milliseconds, @burning_visual_frames, @burning_visual_animation_fps, @burning_visual_render_scale)
+                    @force_mastery_magic_levels_per_step, @force_mastery_force_per_step, @force_mastery_max_force, @displacement_mastery_magic_levels_per_step, @displacement_mastery_tiles_per_step, @displacement_mastery_max_tiles, @matter_physical_weight, @ignition_base_success_percent, @ignition_magic_levels_per_step, @ignition_success_percent_per_step, @burning_lifetime_milliseconds, @burning_capacity_magic_levels_per_step, @burning_max_active, @burning_min_damage, @burning_max_damage, @burning_hazard_cooldown_milliseconds, @burning_visual_frames, @burning_visual_animation_fps, @burning_visual_render_scale, @slick_base_success_percent, @slick_magic_levels_per_step, @slick_success_percent_per_step, @slick_lifetime_milliseconds, @slick_capacity_magic_levels_per_step, @slick_max_active, @slick_visual_frames, @slick_visual_animation_fps, @slick_visual_render_scale)
                 """ : """
                 UPDATE magic_combat_spells SET display_name=@display_name, tier=@tier, element=@element,
                     required_magic_level=@required_magic_level, shard_cost=@shard_cost,
@@ -188,6 +198,15 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     burning_visual_frames=@burning_visual_frames,
                     burning_visual_animation_fps=@burning_visual_animation_fps,
                     burning_visual_render_scale=@burning_visual_render_scale,
+                    slick_base_success_percent=@slick_base_success_percent,
+                    slick_magic_levels_per_step=@slick_magic_levels_per_step,
+                    slick_success_percent_per_step=@slick_success_percent_per_step,
+                    slick_lifetime_milliseconds=@slick_lifetime_milliseconds,
+                    slick_capacity_magic_levels_per_step=@slick_capacity_magic_levels_per_step,
+                    slick_max_active=@slick_max_active,
+                    slick_visual_frames=@slick_visual_frames,
+                    slick_visual_animation_fps=@slick_visual_animation_fps,
+                    slick_visual_render_scale=@slick_visual_render_scale,
                     manifestation_base_success_percent=@manifestation_base_success_percent,
                     manifestation_magic_levels_per_step=@manifestation_magic_levels_per_step,
                     manifestation_success_percent_per_step=@manifestation_success_percent_per_step,
@@ -223,6 +242,15 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
             command.Parameters.AddWithValue("burning_visual_frames", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.BurningVisualFrames?.ToArray() ?? DBNull.Value);
             command.Parameters.AddWithValue("burning_visual_animation_fps", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.BurningVisualAnimationFps ?? DBNull.Value);
             command.Parameters.AddWithValue("burning_visual_render_scale", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.BurningVisualRenderScale ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_base_success_percent", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.SlickBaseSuccessPercent ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.SlickMagicLevelsPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_success_percent_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.SlickSuccessPercentPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_lifetime_milliseconds", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.SlickLifetimeMilliseconds ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_capacity_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.SlickCapacityMagicLevelsPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_max_active", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.SlickMaxActive ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_visual_frames", NpgsqlTypes.NpgsqlDbType.Array | NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.SlickVisualFrames?.ToArray() ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_visual_animation_fps", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.SlickVisualAnimationFps ?? DBNull.Value);
+            command.Parameters.AddWithValue("slick_visual_render_scale", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.SlickVisualRenderScale ?? DBNull.Value);
             command.Parameters.AddWithValue("target_mode", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.TargetMode ?? DBNull.Value);
             command.Parameters.AddWithValue("manifestation_base_success_percent", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ManifestationBaseSuccessPercent ?? DBNull.Value);
             command.Parameters.AddWithValue("manifestation_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ManifestationMagicLevelsPerStep ?? DBNull.Value);

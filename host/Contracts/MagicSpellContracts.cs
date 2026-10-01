@@ -61,7 +61,16 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("burning_hazard_cooldown_milliseconds")] int? BurningHazardCooldownMilliseconds = null,
     [property: JsonPropertyName("burning_visual_frames")] IReadOnlyList<string>? BurningVisualFrames = null,
     [property: JsonPropertyName("burning_visual_animation_fps")] double? BurningVisualAnimationFps = null,
-    [property: JsonPropertyName("burning_visual_render_scale")] double? BurningVisualRenderScale = null);
+    [property: JsonPropertyName("burning_visual_render_scale")] double? BurningVisualRenderScale = null,
+    [property: JsonPropertyName("slick_base_success_percent")] int? SlickBaseSuccessPercent = null,
+    [property: JsonPropertyName("slick_magic_levels_per_step")] int? SlickMagicLevelsPerStep = null,
+    [property: JsonPropertyName("slick_success_percent_per_step")] int? SlickSuccessPercentPerStep = null,
+    [property: JsonPropertyName("slick_lifetime_milliseconds")] int? SlickLifetimeMilliseconds = null,
+    [property: JsonPropertyName("slick_capacity_magic_levels_per_step")] int? SlickCapacityMagicLevelsPerStep = null,
+    [property: JsonPropertyName("slick_max_active")] int? SlickMaxActive = null,
+    [property: JsonPropertyName("slick_visual_frames")] IReadOnlyList<string>? SlickVisualFrames = null,
+    [property: JsonPropertyName("slick_visual_animation_fps")] double? SlickVisualAnimationFps = null,
+    [property: JsonPropertyName("slick_visual_render_scale")] double? SlickVisualRenderScale = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,
