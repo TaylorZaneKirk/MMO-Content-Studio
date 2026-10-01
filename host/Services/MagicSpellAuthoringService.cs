@@ -101,6 +101,26 @@ public sealed class MagicSpellAuthoringService(
             messages.Add(Error("invalid_cast_xp", "Base cast XP tenths must be nonnegative.", "base_cast_xp_tenths"));
         if (draft.CastMode is not ("selected_combat" or "explicit_technique"))
             messages.Add(Error("invalid_cast_mode", "Choose Selected combat or Explicit technique.", "cast_mode"));
+        // Optional as a group, including for fixed-force Air drafts and Published spells.
+        var noAirMastery = draft.ForceMasteryMagicLevelsPerStep is null &&
+            draft.ForceMasteryForcePerStep is null &&
+            draft.ForceMasteryMaxForce is null &&
+            draft.DisplacementMasteryMagicLevelsPerStep is null &&
+            draft.DisplacementMasteryTilesPerStep is null &&
+            draft.DisplacementMasteryMaxTiles is null;
+        var validAirMastery = draft.ImpactEffect == "air_displacement" &&
+            draft.ForceMasteryMagicLevelsPerStep is > 0 &&
+            draft.ForceMasteryForcePerStep is > 0 &&
+            draft.ForceMasteryMaxForce is > 0 &&
+            draft.DisplacementMasteryMagicLevelsPerStep is > 0 &&
+            draft.DisplacementMasteryTilesPerStep is > 0 &&
+            draft.DisplacementMasteryMaxTiles is > 0 &&
+            draft.ForceMasteryMaxForce >= draft.Force &&
+            draft.DisplacementMasteryMaxTiles >= draft.MaxDisplacementTiles;
+        if (!noAirMastery && !validAirMastery)
+            messages.Add(Error("invalid_air_mastery_shape",
+                "Air mastery requires all six positive values, with mastered limits at least their base values. Other effects require empty mastery fields.",
+                "impact_effect"));
         var forceShape = draft.ImpactEffect switch
         {
             null or "earth_matter" => draft.Force is null && draft.ForceFalloffPerTile is null && draft.MaxDisplacementTiles is null,

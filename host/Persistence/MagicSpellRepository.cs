@@ -43,7 +43,8 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 cast_mode, impact_effect, force, force_falloff_per_tile, max_displacement_tiles,
                 target_mode, manifestation_base_success_percent, manifestation_magic_levels_per_step,
                 manifestation_success_percent_per_step, matter_lifetime_milliseconds,
-                matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale
+                matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale,
+                force_mastery_magic_levels_per_step, force_mastery_force_per_step, force_mastery_max_force, displacement_mastery_magic_levels_per_step, displacement_mastery_tiles_per_step, displacement_mastery_max_tiles
             FROM magic_combat_spells WHERE spell_id = @id
             """ + (forUpdate ? " FOR UPDATE" : ""), connection, transaction);
         command.Parameters.AddWithValue("id", definitionId);
@@ -82,7 +83,13 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                 MatterCapacityMagicLevelsPerStep: reader.IsDBNull(34) ? null : reader.GetInt32(34),
                 MatterMaxActive: reader.IsDBNull(35) ? null : reader.GetInt32(35),
                 MatterVisualTexturePath: reader.IsDBNull(36) ? null : reader.GetString(36),
-                MatterVisualRenderScale: reader.IsDBNull(37) ? null : reader.GetDouble(37));
+                MatterVisualRenderScale: reader.IsDBNull(37) ? null : reader.GetDouble(37),
+                ForceMasteryMagicLevelsPerStep: reader.IsDBNull(38) ? null : reader.GetInt32(38),
+                ForceMasteryForcePerStep: reader.IsDBNull(39) ? null : reader.GetInt32(39),
+                ForceMasteryMaxForce: reader.IsDBNull(40) ? null : reader.GetInt32(40),
+                DisplacementMasteryMagicLevelsPerStep: reader.IsDBNull(41) ? null : reader.GetInt32(41),
+                DisplacementMasteryTilesPerStep: reader.IsDBNull(42) ? null : reader.GetInt32(42),
+                DisplacementMasteryMaxTiles: reader.IsDBNull(43) ? null : reader.GetInt32(43));
             state = reader.GetString(8);
             updated = reader.GetFieldValue<DateTimeOffset>(9);
         }
@@ -130,7 +137,8 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     projectile_homing_strength, cast_mode, impact_effect, force, force_falloff_per_tile, max_displacement_tiles,
                 target_mode, manifestation_base_success_percent, manifestation_magic_levels_per_step,
                 manifestation_success_percent_per_step, matter_lifetime_milliseconds,
-                matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale)
+                matter_capacity_magic_levels_per_step, matter_max_active, matter_visual_texture_path, matter_visual_render_scale,
+                    force_mastery_magic_levels_per_step, force_mastery_force_per_step, force_mastery_max_force, displacement_mastery_magic_levels_per_step, displacement_mastery_tiles_per_step, displacement_mastery_max_tiles)
                 VALUES (@id, @display_name, @tier, @element, @required_magic_level, @shard_cost,
                     @successful_hit_min_damage, @base_max_hit, @base_cast_xp_tenths, @state, @icon_texture_path,
                     @projectile_animation_fps, @projectile_render_scale, @projectile_rotates_to_travel, @cast_sound_path,
@@ -139,7 +147,8 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     @projectile_homing_enabled, @projectile_homing_strength, @cast_mode, @impact_effect, @force, @force_falloff_per_tile, @max_displacement_tiles,
                     @target_mode, @manifestation_base_success_percent, @manifestation_magic_levels_per_step,
                     @manifestation_success_percent_per_step, @matter_lifetime_milliseconds,
-                    @matter_capacity_magic_levels_per_step, @matter_max_active, @matter_visual_texture_path, @matter_visual_render_scale)
+                    @matter_capacity_magic_levels_per_step, @matter_max_active, @matter_visual_texture_path, @matter_visual_render_scale,
+                    @force_mastery_magic_levels_per_step, @force_mastery_force_per_step, @force_mastery_max_force, @displacement_mastery_magic_levels_per_step, @displacement_mastery_tiles_per_step, @displacement_mastery_max_tiles)
                 """ : """
                 UPDATE magic_combat_spells SET display_name=@display_name, tier=@tier, element=@element,
                     required_magic_level=@required_magic_level, shard_cost=@shard_cost,
@@ -160,6 +169,12 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
                     matter_max_active=@matter_max_active,
                     matter_visual_texture_path=@matter_visual_texture_path,
                     matter_visual_render_scale=@matter_visual_render_scale,
+                    force_mastery_magic_levels_per_step=@force_mastery_magic_levels_per_step,
+                    force_mastery_force_per_step=@force_mastery_force_per_step,
+                    force_mastery_max_force=@force_mastery_max_force,
+                    displacement_mastery_magic_levels_per_step=@displacement_mastery_magic_levels_per_step,
+                    displacement_mastery_tiles_per_step=@displacement_mastery_tiles_per_step,
+                    displacement_mastery_max_tiles=@displacement_mastery_max_tiles,
                     cast_mode=@cast_mode, impact_effect=@impact_effect, force=@force,
                     force_falloff_per_tile=@force_falloff_per_tile, max_displacement_tiles=@max_displacement_tiles,
                     cast_sound_path=@cast_sound_path,
@@ -177,6 +192,12 @@ public sealed class MagicSpellRepository(AuthoringDatabaseConnectionFactory conn
             command.Parameters.AddWithValue("matter_max_active", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.MatterMaxActive ?? DBNull.Value);
             command.Parameters.AddWithValue("matter_visual_texture_path", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.MatterVisualTexturePath ?? DBNull.Value);
             command.Parameters.AddWithValue("matter_visual_render_scale", NpgsqlTypes.NpgsqlDbType.Double, (object?)draft.MatterVisualRenderScale ?? DBNull.Value);
+            command.Parameters.AddWithValue("force_mastery_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ForceMasteryMagicLevelsPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("force_mastery_force_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ForceMasteryForcePerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("force_mastery_max_force", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.ForceMasteryMaxForce ?? DBNull.Value);
+            command.Parameters.AddWithValue("displacement_mastery_magic_levels_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.DisplacementMasteryMagicLevelsPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("displacement_mastery_tiles_per_step", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.DisplacementMasteryTilesPerStep ?? DBNull.Value);
+            command.Parameters.AddWithValue("displacement_mastery_max_tiles", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.DisplacementMasteryMaxTiles ?? DBNull.Value);
             command.Parameters.AddWithValue("cast_mode", draft.CastMode);
             command.Parameters.AddWithValue("impact_effect", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.ImpactEffect ?? DBNull.Value);
             command.Parameters.AddWithValue("force", NpgsqlTypes.NpgsqlDbType.Integer, (object?)draft.Force ?? DBNull.Value);

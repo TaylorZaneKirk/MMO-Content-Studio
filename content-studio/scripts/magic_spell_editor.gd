@@ -127,9 +127,18 @@ func _build_ui() -> void:
 	_fields["impact_effect"] = effect
 	_force_fields = VBoxContainer.new()
 	basics.add_child(_force_fields)
-	_fields["force"] = _number_field(_force_fields, "Force", 1, 2147483647, 1)
+	_fields["force"] = _number_field(_force_fields, "Base force", 1, 2147483647, 1)
 	_fields["force_falloff_per_tile"] = _number_field(_force_fields, "Force falloff / tile after first", 0, 2147483647, 0)
-	_fields["max_displacement_tiles"] = _number_field(_force_fields, "Maximum displacement tiles", 1, 2147483647, 1)
+	_fields["max_displacement_tiles"] = _number_field(_force_fields, "Base maximum displacement", 1, 2147483647, 1)
+	var mastery_heading := Label.new()
+	mastery_heading.text = "Gust/Air force mastery (all 0 = fixed force; otherwise fill all six)"
+	_force_fields.add_child(mastery_heading)
+	_fields["force_mastery_magic_levels_per_step"] = _number_field(_force_fields, "Effective Magic levels / force step", 0, 2147483647, 0)
+	_fields["force_mastery_force_per_step"] = _number_field(_force_fields, "Force gained / step", 0, 2147483647, 0)
+	_fields["force_mastery_max_force"] = _number_field(_force_fields, "Maximum mastered force", 0, 2147483647, 0)
+	_fields["displacement_mastery_magic_levels_per_step"] = _number_field(_force_fields, "Base Magic levels / displacement step", 0, 2147483647, 0)
+	_fields["displacement_mastery_tiles_per_step"] = _number_field(_force_fields, "Displacement tiles gained / step", 0, 2147483647, 0)
+	_fields["displacement_mastery_max_tiles"] = _number_field(_force_fields, "Maximum mastered displacement", 0, 2147483647, 0)
 	_matter_fields = VBoxContainer.new()
 	basics.add_child(_matter_fields)
 	_fields["manifestation_base_success_percent"] = _number_field(_matter_fields, "Base manifestation success %", 0, 100, 55)
@@ -372,7 +381,9 @@ func _draft() -> Dictionary:
 		elif control is OptionButton: draft[key] = control.get_selected_metadata()
 		elif control is CheckBox: draft[key] = control.button_pressed
 		elif control is SpinBox:
-			if key == "projectile_homing_strength": draft[key] = control.value
+			if key.begins_with("force_mastery_") or key.begins_with("displacement_mastery_"):
+				draft[key] = int(control.value) if control.value > 0 else null
+			elif key == "projectile_homing_strength": draft[key] = control.value
 			elif key.ends_with("_fps") or key.ends_with("_scale"):
 				draft[key] = control.value if control.value > 0 else null
 			else: draft[key] = int(control.value)
@@ -381,7 +392,7 @@ func _draft() -> Dictionary:
 		for row: Node in _frames[phase].get_children(): paths.append((row.get_child(0) as LineEdit).text.strip_edges())
 		draft[phase + "_frames"] = paths
 	if draft["impact_effect"] != "air_displacement":
-		for key: String in ["force", "force_falloff_per_tile", "max_displacement_tiles"]: draft[key] = null
+		for key: String in ["force", "force_falloff_per_tile", "max_displacement_tiles", "force_mastery_magic_levels_per_step", "force_mastery_force_per_step", "force_mastery_max_force", "displacement_mastery_magic_levels_per_step", "displacement_mastery_tiles_per_step", "displacement_mastery_max_tiles"]: draft[key] = null
 	if draft["impact_effect"] != "earth_matter":
 		for key: String in _fields:
 			if key.begins_with("manifestation_") or key.begins_with("matter_"): draft[key] = null

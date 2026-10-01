@@ -42,7 +42,13 @@ public sealed record MagicSpellDraft(
     [property: JsonPropertyName("matter_capacity_magic_levels_per_step")] int? MatterCapacityMagicLevelsPerStep = null,
     [property: JsonPropertyName("matter_max_active")] int? MatterMaxActive = null,
     [property: JsonPropertyName("matter_visual_texture_path")] string? MatterVisualTexturePath = null,
-    [property: JsonPropertyName("matter_visual_render_scale")] double? MatterVisualRenderScale = null);
+    [property: JsonPropertyName("matter_visual_render_scale")] double? MatterVisualRenderScale = null,
+    [property: JsonPropertyName("force_mastery_magic_levels_per_step")] int? ForceMasteryMagicLevelsPerStep = null,
+    [property: JsonPropertyName("force_mastery_force_per_step")] int? ForceMasteryForcePerStep = null,
+    [property: JsonPropertyName("force_mastery_max_force")] int? ForceMasteryMaxForce = null,
+    [property: JsonPropertyName("displacement_mastery_magic_levels_per_step")] int? DisplacementMasteryMagicLevelsPerStep = null,
+    [property: JsonPropertyName("displacement_mastery_tiles_per_step")] int? DisplacementMasteryTilesPerStep = null,
+    [property: JsonPropertyName("displacement_mastery_max_tiles")] int? DisplacementMasteryMaxTiles = null);
 public sealed record MagicSpellDefinition(
     [property: JsonPropertyName("spell_id")] string DefinitionId,
     [property: JsonPropertyName("publication_state")] string PublicationState,
