@@ -18,9 +18,13 @@ signal item_mutation_completed(payload: Dictionary)
 signal item_delete_completed(payload: Dictionary)
 signal world_object_options_received(payload: Dictionary)
 signal world_object_catalog_received(payload: Dictionary)
+signal blacksmithing_catalog_received(payload: Dictionary)
 signal world_object_definition_received(payload: Dictionary)
+signal blacksmithing_definition_received(payload: Dictionary)
 signal world_object_preview_received(payload: Dictionary)
+signal blacksmithing_preview_received(payload: Dictionary)
 signal world_object_mutation_completed(payload: Dictionary)
+signal blacksmithing_mutation_completed(payload: Dictionary)
 signal shop_options_received(payload: Dictionary)
 signal shop_catalog_received(payload: Dictionary)
 signal shop_definition_received(payload: Dictionary)
@@ -86,9 +90,13 @@ const OP_ITEM_DISABLE := "item_disable"
 const OP_ITEM_DELETE := "item_delete"
 const OP_WORLD_OBJECT_OPTIONS := "world_object_options"
 const OP_WORLD_OBJECT_CATALOG := "world_object_catalog"
+const OP_BLACKSMITHING_CATALOG := "blacksmithing_catalog"
 const OP_WORLD_OBJECT_DEFINITION := "world_object_definition"
+const OP_BLACKSMITHING_DEFINITION := "blacksmithing_definition"
 const OP_WORLD_OBJECT_PREVIEW := "world_object_preview"
+const OP_BLACKSMITHING_PREVIEW := "blacksmithing_preview"
 const OP_WORLD_OBJECT_MUTATION := "world_object_mutation"
+const OP_BLACKSMITHING_MUTATION := "blacksmithing_mutation"
 const OP_SHOP_OPTIONS := "shop_options"
 const OP_SHOP_CATALOG := "shop_catalog"
 const OP_SHOP_DEFINITION := "shop_definition"
@@ -238,6 +246,20 @@ func delete_item(item_id: String, expected_updated_at_utc: Variant, preview_sign
 	})
 
 # World Objects shares this client's transport and startup queue.
+func load_blacksmithing_recipes(search: String = "") -> void:
+	_request(OP_BLACKSMITHING_CATALOG, "/api/v1/blacksmithing-recipes?search=%s" % search.uri_encode())
+
+func load_blacksmithing(definition_id: String) -> void:
+	_request(OP_BLACKSMITHING_DEFINITION, "/api/v1/blacksmithing-recipes/%s" % definition_id.uri_encode())
+
+func preview_blacksmithing(definition_id: String, payload: Dictionary) -> void:
+	_request(OP_BLACKSMITHING_PREVIEW, "/api/v1/blacksmithing-recipes/%s/preview" % definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+func mutate_blacksmithing(definition_id: String, operation: String, payload: Dictionary) -> void:
+	var suffix := "draft" if operation == "save_draft" else operation
+	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
+	_request(OP_BLACKSMITHING_MUTATION, "/api/v1/blacksmithing-recipes/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
+
 func load_world_objects(search: String = "") -> void:
 	_request(OP_WORLD_OBJECT_CATALOG, "/api/v1/world-objects?search=%s" % search.uri_encode())
 
@@ -509,6 +531,15 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 		OP_WORLD_OBJECT_OPTIONS:
 			world_object_options_received.emit(data)
 			load_world_objects()
+		OP_BLACKSMITHING_CATALOG:
+			blacksmithing_catalog_received.emit(data)
+			_request_next_startup_operation()
+		OP_BLACKSMITHING_DEFINITION:
+			blacksmithing_definition_received.emit(data)
+		OP_BLACKSMITHING_PREVIEW:
+			blacksmithing_preview_received.emit(data)
+		OP_BLACKSMITHING_MUTATION:
+			blacksmithing_mutation_completed.emit(data)
 		OP_WORLD_OBJECT_CATALOG:
 			world_object_catalog_received.emit(data)
 			_request_next_startup_operation()
@@ -634,11 +665,11 @@ func _on_request_failed(operation: String, message: String, errors: Array) -> vo
 	if operation in CONNECTION_OPERATIONS:
 		connection_state_changed.emit("disconnected", message)
 	request_failed.emit(operation, message, errors)
-	if operation in [OP_SPELL_OPTIONS, OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_SHOP_CATALOG, OP_WORLD_OBJECT_OPTIONS, OP_WORLD_OBJECT_CATALOG, OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
+	if operation in [OP_BLACKSMITHING_CATALOG, OP_SPELL_OPTIONS, OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_SHOP_CATALOG, OP_WORLD_OBJECT_OPTIONS, OP_WORLD_OBJECT_CATALOG, OP_MOB_OPTIONS, OP_MOBS, OP_NPC_OPTIONS, OP_NPCS, OP_DIALOGUE_OPTIONS, OP_DIALOGUES, OP_QUEST_OPTIONS, OP_QUESTS]:
 		_request_next_startup_operation()
 
 func _start_workspace_initialization() -> void:
-	_startup_operations = [OP_SPELL_OPTIONS, OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_WORLD_OBJECT_OPTIONS, OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
+	_startup_operations = [OP_BLACKSMITHING_CATALOG, OP_SPELL_OPTIONS, OP_SPELL_CATALOG, OP_SHOP_OPTIONS, OP_WORLD_OBJECT_OPTIONS, OP_MOB_OPTIONS, OP_NPC_OPTIONS, OP_DIALOGUE_OPTIONS, OP_QUEST_OPTIONS]
 	_request_next_startup_operation()
 
 func _request_next_startup_operation() -> void:
@@ -646,6 +677,8 @@ func _request_next_startup_operation() -> void:
 		return
 	var operation := str(_startup_operations.pop_front())
 	match operation:
+		OP_BLACKSMITHING_CATALOG:
+			load_blacksmithing_recipes()
 		OP_SPELL_OPTIONS:
 			_request(OP_SPELL_OPTIONS, "/api/v1/spells/options")
 		OP_SPELL_CATALOG:

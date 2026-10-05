@@ -367,3 +367,14 @@ shared development DB. The copy under `integrations/mmo-project/prototype/sql` i
 byte-identical documentation/integration material, not a second migration run.
 Existing whole XP remains unchanged; a database-owned 0–9 tenths remainder awaits
 the later casting settlement implementation. M1 supplies no starter balance data.
+
+## Blacksmithing foundation
+
+The Blacksmithing workspace edits ordered ingredient quantities, output, level,
+duration and ordinary decimal XP while storing exact integer tenths. Smelt/Forge
+choices explain their station and inventory-tool rules. Apply mirrored migration092,
+then use Preview → Save Draft → reload → Preview Publish → Publish. Missing item
+art and unapproved dagger stats keep Bronze recipes in Draft. Publication uses
+`export-blacksmithing-catalog`; runtime activity and game recipe UI are later slices.
+The integration mirror of `BlacksmithingRecipe.cs` must stay byte-identical with
+MMO Project's feature contract. No tests are authorized for this B1 delivery.
