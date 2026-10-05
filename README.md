@@ -372,7 +372,7 @@ the later casting settlement implementation. M1 supplies no starter balance data
 
 The Blacksmithing workspace edits ordered ingredient quantities, output, level,
 duration and ordinary decimal XP while storing exact integer tenths. Smelt/Forge
-choices explain their station and inventory-tool rules. Apply mirrored migration092,
+choices explain their station and inventory-tool rules. Apply mirrored migrations 092 and 093,
 then use Preview → Save Draft → reload → Preview Publish → Publish. Missing item
 art and unapproved dagger stats keep Bronze recipes in Draft. Publication uses
 `export-blacksmithing-catalog`; runtime activity and game recipe UI are later slices.
