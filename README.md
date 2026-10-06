@@ -389,3 +389,6 @@ is opt-in and must be separately approved and configured; this feature does not
 activate a listener, create credentials/certificates or restart the game.
 See [Browser Items](docs/BROWSER_ITEMS.md) for field coverage, integrity/recovery,
 the read-only precision-editor boundary and the activation checklist.
+
+Mobs browser workspace: `/studio/mobs.html` — complete combat, behavior, drops and
+shared actor calibration. See [Browser Mobs](docs/BROWSER_MOBS.md) for lifecycle and validation limits.

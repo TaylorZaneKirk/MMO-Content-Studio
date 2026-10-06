@@ -57,6 +57,7 @@ app.MapBrowserBlacksmithing();
 app.MapBrowserQuests();
 app.MapBrowserDialogue();
 app.MapBrowserNpcs();
+app.MapBrowserMobs();
 app.MapBrowserActorAppearance();
 
 app.Use(async (context, next) =>

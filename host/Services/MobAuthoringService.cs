@@ -248,7 +248,7 @@ public sealed class MobAuthoringService
             var verified = await _repository.LoadAsync(stableId, cancellationToken);
             if (verified is null || !Equivalent(saved, verified))
             {
-                throw new InvalidOperationException("The saved mob aggregate failed reload-and-verify.");
+                return ReloadVerificationFailure<MobMutationResponse>(stableId);
             }
 
             return AuthoringOperationResult<MobMutationResponse>.Success(
@@ -654,7 +654,7 @@ public sealed class MobAuthoringService
             var verified = await _repository.LoadAsync(stableId, cancellationToken);
             if (verified is null || !Equivalent(saved, verified) || verified.PublicationState != publicationState)
             {
-                throw new InvalidOperationException("The mob publication change failed reload-and-verify.");
+                return ReloadVerificationFailure<MobMutationResponse>(stableId);
             }
 
             if (operation == "publish" && _runtimeCatalogPublisher is not null)
@@ -931,6 +931,11 @@ public sealed class MobAuthoringService
             $"Mob definition '{mobDefinitionId}' changed after it was loaded. Reload before applying changes.",
             ValidationSeverity.Error,
             "updated_at_utc"));
+
+    private static AuthoringOperationResult<T> ReloadVerificationFailure<T>(string id) =>
+        AuthoringOperationResult<T>.Failure(new ApiError("mob_reload_verification_failed",
+            $"Mob definition '{id}' did not match after reload verification. Reload and compare before continuing.",
+            ValidationSeverity.Error, "mob_definition_id"));
 
     private AuthoringOperationResult<T> DatabaseFailure<T>(Exception exception)
     {

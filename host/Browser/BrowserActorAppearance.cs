@@ -14,12 +14,13 @@ public sealed class BrowserActorAssets(ItemAssetService assets)
     {
         var node = JsonSerializer.SerializeToNode(value, JsonOptions);
         Sanitize(node);
-        return Json(node, status, "NPC");
+        return Json(node, status, "actor");
     }
     private void Sanitize(JsonNode? node)
     {
         if (node is JsonArray array) { foreach (var item in array) Sanitize(item); return; }
         if (node is not JsonObject obj) return;
+        if (obj.ContainsKey("attack_thrust")) { obj.Remove("isZero"); obj.Remove("is_zero"); }
         if (obj.ContainsKey("cosmetic_item_ids")) obj.Remove("containsLegacyBaseLayers");
         foreach (var key in new[] { "base_file_path", "file_path", "asset_preview_file_path" })
         {
