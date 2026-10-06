@@ -442,6 +442,7 @@ $('login-form').addEventListener('submit', async event => {
         $('password').value = ''; await refreshSession(); $('login-dialog').close(); void loadOptions(); void search(); notice('Signed in. Local edits retained.');
     } catch (error) { $('login-error').textContent = error.message; } finally { submit.disabled = false; }
 });
+$('search').value = new URLSearchParams(location.search).get('search') || '';
 installNavigation(() => dirty() || state.pending || state.uncertain, () => state.pending || state.uncertain, message => notice(message, true));
 try {
     await refreshSession();

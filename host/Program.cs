@@ -52,6 +52,7 @@ app.MapBrowserItems();
 app.MapBrowserShops();
 app.MapBrowserLootTables();
 app.MapBrowserWorldObjects();
+app.MapBrowserBlacksmithing();
 
 app.Use(async (context, next) =>
 {

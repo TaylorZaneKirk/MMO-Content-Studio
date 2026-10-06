@@ -443,6 +443,7 @@ $('login-form').addEventListener('submit',async event=>{
 $('close-assets').addEventListener('click',()=>$('asset-dialog').close());$('asset-dialog').addEventListener('cancel',event=>{if(state.pending)event.preventDefault();});
 $('asset-search').addEventListener('input',renderAssets);$('upload').addEventListener('click',upload);
 $('upload-file').addEventListener('change',()=>{$('upload-name').value=$('upload-file').files[0]?.name||'';});
+$('search').value = new URLSearchParams(location.search).get('search') || '';
 installNavigation(() => dirty() || state.pending || state.uncertain, () => state.pending || state.uncertain, message => notice(message, true));
 try{await refreshSession();if(state.session.configured&&!state.session.authenticated){notice('Sign in to load the item catalog.');$('catalog-count').textContent='Sign in required';}
     else{await loadOptionsAndAssets();await search();if(!state.session.configured && !state.session.trusted_home_lan)notice('Local read-only preview. Browser writes require host-configured credentials; none are created by this application.');}}
