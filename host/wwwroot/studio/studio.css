@@ -751,3 +751,12 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
 #blacksmithing-workspace { font-size:13px; gap:6px; }
 .reference-link { display:inline-flex; align-items:center; min-height:44px; padding:8px 4px; }
 @media(max-width:800px) { .actions .button-row #reload-recipe { flex-basis:100%; } }
+
+/* Quest state rows show direction without a precision graph canvas. */
+.quest-state-card { border:1px solid var(--line); background:var(--paper); padding:16px; border-radius:10px; margin:14px 0; }
+.quest-state-card h4 { margin:0 0 14px; }
+.quest-diagnostics { border:1px solid var(--line); border-radius:12px; padding:22px; background:white; margin:20px 0; overflow-wrap:anywhere; }
+.quest-diagnostics[data-stale=true] #graph-analysis,.quest-diagnostics[data-stale=true] #diagnostic-messages { opacity:.5; }
+.quest-analysis-row { border-top:1px solid var(--line); padding:12px 0; }
+.quest-analysis-row p { margin:6px 0; }
+@media(max-width:800px) { .actions .button-row #reload-quest { flex-basis:100%; } .quest-diagnostics { padding:18px; } .quest-state-card { padding:12px; } }
