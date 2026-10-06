@@ -713,3 +713,22 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
     .actions .button-row #reload-shop { flex-basis:100%; }
     .row-actions { flex-wrap:wrap; }
 }
+
+/* Loot Tables keep nested controls readable without a raw-JSON editing surface. */
+.loot-group,.loot-outcome { border:1px solid var(--line); border-radius:10px; margin:16px 0; background:var(--paper); min-width:0; }
+.loot-outcome { background:white; }
+.loot-group > summary,.loot-outcome > summary { padding:16px; overflow-wrap:anywhere; }
+.loot-card-content { padding:0 16px 16px; }
+.loot-card-content > .fields { margin:16px 0; }
+.loot-settings { margin:16px 0; }
+.loot-settings > summary { padding:14px 0; font-size:14px; }
+.ev-report { background:white; border:1px solid var(--line); border-radius:12px; margin-top:20px; padding:22px; overflow-wrap:anywhere; }
+.ev-report summary { min-height:44px; padding:12px 0; cursor:pointer; font-weight:600; }
+.ev-stale { display:none; color:var(--warn); }
+.ev-report[data-stale=true] .ev-stale { display:block; }
+@media(max-width:800px) {
+    .loot-card-content { padding:0 10px 14px; }
+    .loot-group > summary,.loot-outcome > summary { padding:14px 10px; font-size:14px; }
+    .actions .button-row #reload-loot { flex-basis:100%; }
+    .ev-report { padding:18px; }
+}

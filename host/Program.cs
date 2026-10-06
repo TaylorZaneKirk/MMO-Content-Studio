@@ -49,6 +49,7 @@ browserAccess.Use(app, listenUri);
 browserAccess.Map(app);
 app.MapBrowserItems();
 app.MapBrowserShops();
+app.MapBrowserLootTables();
 
 app.Use(async (context, next) =>
 {
