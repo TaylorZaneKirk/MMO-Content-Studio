@@ -1,4 +1,5 @@
 using System.Reflection;
+using MMO.ContentStudio.AuthoringHost.Browser;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
@@ -41,7 +42,12 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
+var browserAccess = BrowserAccess.Configure(builder, listenUri);
+builder.Services.AddSingleton<BrowserItemAssets>();
 var app = builder.Build();
+browserAccess.Use(app, listenUri);
+browserAccess.Map(app);
+app.MapBrowserItems();
 
 app.Use(async (context, next) =>
 {

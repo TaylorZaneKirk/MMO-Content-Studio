@@ -378,3 +378,13 @@ art and unapproved dagger stats keep Bronze recipes in Draft. Publication uses
 `export-blacksmithing-catalog`; runtime activity and game recipe UI are later slices.
 The integration mirror of `BlacksmithingRecipe.cs` must stay byte-identical with
 MMO Project's feature contract. No tests are authorized for this B1 delivery.
+
+## Items in a browser
+
+The authoring host now serves a responsive Items workspace at `/studio/`.
+It defaults to loopback and read-only browser access until owner credentials are
+explicitly configured. The Godot desktop Studio remains available. Home-LAN HTTPS
+is opt-in and must be separately approved and configured; this feature does not
+activate a listener, create credentials/certificates or restart the game.
+See [Browser Items](docs/BROWSER_ITEMS.md) for field coverage, integrity/recovery,
+the read-only precision-editor boundary and the activation checklist.
