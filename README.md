@@ -11,6 +11,12 @@ MMO Content Studio turns game-design inputs into validated, transactional
 content updates without requiring contributors or maintainers to hand-author
 SQL across multiple related tables.
 
+## Browser Tiles
+
+The web [Tiles workspace](docs/BROWSER_TILES.md) edits metadata directly in the
+approved external Tiled tilesets, with preview and whole-file conflict checks.
+Map placement and runtime publication remain separate.
+
 ## Architecture
 
 ```text

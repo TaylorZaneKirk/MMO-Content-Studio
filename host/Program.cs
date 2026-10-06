@@ -47,6 +47,7 @@ builder.Services.AddSingleton<BrowserItemAssets>();
 builder.Services.AddSingleton<BrowserActorAssets>();
 builder.Services.AddSingleton<BrowserSpellMedia>();
 builder.Services.AddSingleton<BrowserWorldObjectAssets>();
+builder.Services.AddSingleton<TileMetadataAuthoringService>();
 var app = builder.Build();
 browserAccess.Use(app, listenUri);
 browserAccess.Map(app);
@@ -61,6 +62,7 @@ app.MapBrowserNpcs();
 app.MapBrowserMobs();
 app.MapBrowserSpells();
 app.MapBrowserEnvironment();
+app.MapBrowserTiles();
 app.MapBrowserActorAppearance();
 
 app.Use(async (context, next) =>
