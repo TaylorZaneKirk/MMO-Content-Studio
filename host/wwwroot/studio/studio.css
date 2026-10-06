@@ -689,3 +689,13 @@ dialog .button-row {
         gap:13px
     }
 }
+
+/* Explicit network-authorized mode must stay visible while editing. */
+.access-notice {
+    padding: 12px 28px;
+    background: #fff3d7;
+    color: var(--warn);
+    border-bottom: 1px solid #e5c778;
+    font-size: 13px;
+    line-height: 1.5;
+}

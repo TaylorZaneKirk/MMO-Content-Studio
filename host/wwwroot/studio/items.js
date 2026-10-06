@@ -25,10 +25,10 @@ function updateActions() {
     const locked = state.pending || state.uncertain || !state.draft;
     $('new-item').disabled = state.pending || state.uncertain;
     $('operation').disabled = locked;
-    $('preview').disabled = locked || state.session.read_only || !state.session.authenticated;
-    $('apply').disabled = locked || !state.preview?.valid || state.session.read_only || !state.session.authenticated;
+    $('preview').disabled = locked || !state.session.can_edit;
+    $('apply').disabled = locked || !state.preview?.valid || !state.session.can_edit;
     $('reload-item').disabled = state.pending || !state.id;
-    $('upload').disabled = state.pending || state.session.read_only || !state.session.authenticated;
+    $('upload').disabled = state.pending || !state.session.can_edit;
     $('session-button').disabled = state.pending;
     const notes = {
         save_draft: state.item?.publication_state === 'Published' ? 'Saving as Draft removes Published state. Dependencies may prevent this.' : 'Save the complete definition. New items are saved as Draft before publication.',
@@ -49,16 +49,24 @@ async function request(path, { method = 'GET', body, raw = false } = {}) {
     if (!response.ok || data?.success === false) {
         const error = new Error(data?.errors?.map(e => e.message).join(' ') || `Request failed (${response.status}).`);
         error.status = response.status; error.errors = data?.errors || [];
-        if (response.status === 401) { state.session.authenticated = false; updateSession(); }
+        if (response.status === 401) { state.session.authenticated = false; state.session.can_edit = false; updateSession(); }
         throw error;
     }
     return data && Object.hasOwn(data, 'success') ? data.data : data;
 }
 async function refreshSession() { state.session = await request('/session'); updateSession(); }
 function updateSession() {
-    $('connection').textContent = !state.session.configured ? 'Local preview · read only' : state.session.authenticated ? state.session.read_only ? 'Signed in · read only' : 'Connected · owner' : 'Sign in to edit';
+    if (state.session.trusted_home_lan) $('connection').textContent = state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor';
+    else if (!state.session.configured) $('connection').textContent = 'Local preview · read only';
+    else if (!state.session.authenticated) $('connection').textContent = 'Sign in to edit';
+    else $('connection').textContent = state.session.read_only ? 'Signed in · read only' : 'Connected · owner';
     $('session-button').textContent = state.session.authenticated ? 'Sign out' : 'Sign in';
-    $('session-button').hidden = !state.session.configured; updateActions();
+    $('session-button').hidden = !state.session.configured || state.session.trusted_home_lan;
+    $('access-notice').hidden = !state.session.trusted_home_lan;
+    $('access-notice').textContent = state.session.read_only
+        ? 'Trusted home LAN · no individual sign-in. This host currently permits viewing only.'
+        : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete items. No individual sign-in.';
+    updateActions();
 }
 async function loadOptionsAndAssets() {
     const outcomes = await Promise.allSettled([request('/items/options'), request('/assets')]);
@@ -462,5 +470,5 @@ document.addEventListener('focusin', updateKeyboardActions);
 document.addEventListener('focusout', () => queueMicrotask(updateKeyboardActions));
 route();
 try{await refreshSession();if(state.session.configured&&!state.session.authenticated){notice('Sign in to load the item catalog.');$('catalog-count').textContent='Sign in required';}
-    else{await loadOptionsAndAssets();await search();if(!state.session.configured)notice('Local read-only preview. Browser writes require host-configured credentials; none are created by this application.');}}
+    else{await loadOptionsAndAssets();await search();if(!state.session.configured && !state.session.trusted_home_lan)notice('Local read-only preview. Browser writes require host-configured credentials; none are created by this application.');}}
 catch(error){notice(`Cannot reach Studio: ${error.message} Refresh the page to reconnect.`,true);$('connection').textContent='Disconnected';}

@@ -51,7 +51,7 @@ unsaved-change warning. Drafts are in memory, not durable browser storage.
 
 ## Access defaults and activation (not performed)
 
-With no `Browser:PasswordHash`, browser access is read-only on the existing loopback
+By default, with no `Browser:PasswordHash`, browser access is read-only on the existing loopback
 listener; no password is generated. The local shell/new-item form can be inspected
 without a database. Asset selection does not write; upload and all POST/PUT operations
 are unavailable without a configured login. `Browser:ReadOnly=true` also blocks
@@ -65,9 +65,9 @@ LAN access is opt-in using `Browser:LanUrl`. It requires all of:
   actual home subnet (usually /24), not a whole private address range.
 - `Browser:CertificatePath` and optional `Browser:CertificatePassword` for a certificate
   trusted by Taylor's phone and valid for that address.
-- `Browser:PasswordHash`, an ASP.NET Core Identity PasswordHasher-compatible hash
-  for the single Studio owner login. Choose/create it only in an approved host-side
-  credential setup step. No password or example working credential is shipped.
+- Either `Browser:PasswordHash`, an ASP.NET Core Identity PasswordHasher-compatible
+  hash for the single Studio owner login, or the explicit trusted-home-LAN mode below.
+  No password or example working credential is shipped.
 
 These settings belong in the existing ignored host configuration or protected host
 environment. Do not put secrets in Git or shell history. No configuration file is
@@ -95,6 +95,62 @@ configuration to roll back exposure; do not alter the game listener.
 The existing `AuthoringHost:ListenUrl` defaults to `http://127.0.0.1:5187`.
 A local preview may select a different loopback port with blank credentials/database
 and `Browser:ReadOnly=true`; it does not exercise persistence or authenticated flows.
+
+## Explicit passwordless home-LAN mode (not activated)
+
+Taylor requested no password for the initial home-LAN setup. The narrow opt-in is
+`Browser:TrustedHomeLanWithoutPassword=true` (default **false**). It authorizes
+browser access by network location, not by a user identity. It requires the same
+explicit private IPv4 HTTPS listener, matching Host header and allowed source subnet.
+The actual local socket address and port must also match the configured listener.
+It cannot be enabled without a LAN URL or together with a password hash; startup
+fails for either ambiguous configuration. To restore password access, remove this
+opt-in before configuring a password hash.
+
+Proposed configuration, only to be written during the separately approved activation:
+
+```json
+{
+  "Browser": {
+    "LanUrl": "https://192.168.0.96:5188",
+    "AllowedSubnet": "192.168.0.0/24",
+    "CertificatePath": "/home/taylor/.config/mmoproject/content-studio/tls/studio-server.pfx",
+    "TrustedHomeLanWithoutPassword": true,
+    "ReadOnly": false
+  }
+}
+```
+
+Omit `PasswordHash`; no password-entry helper or credential setup is needed or
+provided. The proposed certificate file does not yet exist. Private certificate/key
+material stays owner-readable on the host; only the public CA certificate is handed
+to Taylor for explicit installation/trust on the phone. Do not bypass certificate
+warnings or substitute HTTP. Recheck the address before generating the IP-SAN
+certificate or activating the listener.
+
+**Consequence:** every person, device or program able to connect from the allowed
+subnet receives the same Items access, including viewing, PNG upload, edits, publishing,
+disabling and deleting (subject to existing authoring validation/reference rules).
+This includes guests or compromised devices on that subnet. There is no individual
+login, per-user attribution, logout-based revocation or client identity check.
+Server-certificate trust authenticates the server to the phone, not the phone to the
+server; a non-browser client on the subnet is not excluded by phone trust setup.
+
+The UI clearly labels this shared access and uses an explicit `can_edit` permission;
+it does not pretend the caller signed in. HTTPS, Origin checks and antiforgery tokens
+still protect all browser writes. The anonymous antiforgery cookie is Secure over
+HTTPS and SameSite Strict; no login session or credential is manufactured. These
+protections prevent cross-origin misuse, not deliberate access by an allowed LAN
+peer. Existing asset confinement and route restrictions remain unchanged.
+
+Unconfigured loopback browser access remains read-only even when this LAN opt-in is
+set. Legacy desktop routes remain loopback-only and are never exposed on LAN.
+`Browser:ReadOnly=true` still blocks browser preview/write/upload in either mode.
+Stop the Studio host or remove this opt-in (and the LAN URL if there is no password)
+to revoke network-authorized access. Do not change the game service.
+
+This code change does not activate a listener, provision certificates, write host
+configuration, or alter firewall policy. Firewall changes require separate approval.
 
 ## Assets
 

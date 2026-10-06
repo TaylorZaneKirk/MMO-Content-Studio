@@ -382,8 +382,9 @@ MMO Project's feature contract. No tests are authorized for this B1 delivery.
 ## Items in a browser
 
 The authoring host now serves a responsive Items workspace at `/studio/`.
-It defaults to loopback and read-only browser access until owner credentials are
-explicitly configured. The Godot desktop Studio remains available. Home-LAN HTTPS
+It defaults to loopback and read-only browser access. Home-LAN editing requires
+either owner credentials or an explicit `TrustedHomeLanWithoutPassword` opt-in;
+the latter grants shared Items access to every peer on the allowed subnet. The Godot desktop Studio remains available. Home-LAN HTTPS
 is opt-in and must be separately approved and configured; this feature does not
 activate a listener, create credentials/certificates or restart the game.
 See [Browser Items](docs/BROWSER_ITEMS.md) for field coverage, integrity/recovery,
