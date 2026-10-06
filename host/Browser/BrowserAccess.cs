@@ -162,8 +162,8 @@ public sealed class BrowserAccess
             app.MapGet($"/studio/{file}", () => Results.File(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "studio", file),
                 file.EndsWith(".js") ? "text/javascript" : file.EndsWith(".css") ? "text/css" : "text/html"));
         }
+        // Routing also matches a trailing slash; a second mapping would be ambiguous.
         app.MapGet("/studio", () => Results.Redirect("/studio/index.html"));
-        app.MapGet("/studio/", () => Results.Redirect("/studio/index.html"));
     }
 
     private bool IsAllowedLanRequest(HttpContext context)
