@@ -60,6 +60,7 @@ app.MapBrowserDialogue();
 app.MapBrowserNpcs();
 app.MapBrowserMobs();
 app.MapBrowserSpells();
+app.MapBrowserEnvironment();
 app.MapBrowserActorAppearance();
 
 app.Use(async (context, next) =>

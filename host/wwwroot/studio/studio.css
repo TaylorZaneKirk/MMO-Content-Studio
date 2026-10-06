@@ -788,3 +788,19 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
 .spell-sound audio { width:100%; max-width:420px; }
 .spell-sound p,#media-status,#media-results small { overflow-wrap:anywhere; }
 @media(max-width:800px) { .actions .button-row #reload-spell { flex-basis:100%; } }
+
+/* Environment owns a read-only overview instead of the authoring list/editor split. */
+.environment-shell{grid-template-columns:210px minmax(0,1fr)}
+.environment-page main{min-width:0;max-width:1500px;width:100%;box-sizing:border-box}
+.environment-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.environment-card{padding:24px;margin-bottom:20px;border:1px solid var(--line,#dedfd8);border-radius:12px;background:var(--paper,#fff)}
+.environment-card h3{margin:0 0 16px}.environment-card .eyebrow{margin-top:0}
+.environment-catalogs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.environment-catalog{padding:16px;border:1px solid var(--line,#dedfd8);border-radius:8px;min-width:0}
+.environment-catalog a{font-weight:650;color:inherit}.environment-catalog p{margin:8px 0 0}
+.environment-row{display:flex;justify-content:space-between;gap:20px;padding:9px 0;border-bottom:1px solid var(--line,#dedfd8)}
+.environment-row span:last-child{text-align:right}.environment-row span{overflow-wrap:anywhere;min-width:0}
+.environment-checks{max-height:390px;overflow:auto}.environment-checks .environment-row{font-size:13px}
+.environment-page .error{color:#a63a32}.environment-scope{line-height:1.6}
+@media(max-width:1000px){.environment-grid{grid-template-columns:1fr}}
+@media(max-width:800px){.environment-shell{display:block}.environment-catalogs{grid-template-columns:1fr}.environment-card{padding:18px}.environment-page .editor-heading{align-items:stretch;flex-direction:column}.environment-page #refresh{width:100%}}

@@ -395,3 +395,9 @@ shared actor calibration. See [Browser Mobs](docs/BROWSER_MOBS.md) for lifecycle
 
 Spells browser workspace: `/studio/spells.html` — full mechanics, exact XP, lifecycle
 and confined image/audio presentation. See [Browser Spells](docs/BROWSER_SPELLS.md).
+
+Environment browser workspace: `/studio/environment.html` — sanitized read-only
+host/API, database/schema, asset availability and catalog summaries with refresh.
+See [Browser Environment](docs/BROWSER_ENVIRONMENT.md). All eleven desktop tabs now
+have browser workspaces; the existing Items precision grip/pose editor remains the
+explicit desktop-only exception.
