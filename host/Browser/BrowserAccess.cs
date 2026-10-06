@@ -111,7 +111,7 @@ public sealed class BrowserAccess
             if (api && !HttpMethods.IsGet(request.Method))
             {
                 if ((!Configured && !trustedHomeLan) || (ReadOnly && request.Path != "/studio/api/login" && request.Path != "/studio/api/logout"))
-                { await BrowserItems.Error("browser_read_only", "Browser writes are not enabled on this host.", 403).ExecuteAsync(context); return; }
+                { await BrowserJson.Error("browser_read_only", "Browser writes are not enabled on this host.", 403).ExecuteAsync(context); return; }
                 if (request.Headers.Origin != $"{request.Scheme}://{request.Host}")
                 { context.Response.StatusCode = 403; return; }
                 try { await context.RequestServices.GetRequiredService<IAntiforgery>().ValidateRequestAsync(context); }
@@ -124,8 +124,8 @@ public sealed class BrowserAccess
                 context.Response.Clear();
                 context.Response.Headers.CacheControl = "no-store";
                 if (exception is System.Text.Json.JsonException or FormatException or OverflowException or BadHttpRequestException)
-                { await BrowserItems.Error("invalid_request", "The request contains invalid or unsupported fields, or exceeds its size limit.", exception is BadHttpRequestException bad ? bad.StatusCode : 400).ExecuteAsync(context); return; }
-                await BrowserItems.Error("request_failed", "The request did not complete. For a write, reload and compare before trying again.", 500).ExecuteAsync(context);
+                { await BrowserJson.Error("invalid_request", "The request contains invalid or unsupported fields, or exceeds its size limit.", exception is BadHttpRequestException bad ? bad.StatusCode : 400).ExecuteAsync(context); return; }
+                await BrowserJson.Error("request_failed", "The request did not complete. For a write, reload and compare before trying again.", 500).ExecuteAsync(context);
             }
         });
     }
@@ -136,7 +136,7 @@ public sealed class BrowserAccess
         {
             var authenticated = context.User.Identity?.IsAuthenticated == true;
             var trustedHomeLan = TrustedHomeLanWithoutPassword && IsAllowedLanRequest(context);
-            return BrowserItems.Json(new
+            return BrowserJson.Json(new
             {
                 authenticated, configured = Configured, trusted_home_lan = trustedHomeLan,
                 read_only = ReadOnly || (!Configured && !trustedHomeLan),
@@ -149,14 +149,14 @@ public sealed class BrowserAccess
             var login = await context.Request.ReadFromJsonAsync<Login>();
             if (login is null || login.Password.Length > 1024 || !Configured
                 || new PasswordHasher<string>().VerifyHashedPassword("studio", PasswordHash!, login.Password) == PasswordVerificationResult.Failed)
-                return BrowserItems.Error("login_failed", "The password was not accepted.", 401);
+                return BrowserJson.Error("login_failed", "The password was not accepted.", 401);
             await context.SignInAsync("Studio", new ClaimsPrincipal(new ClaimsIdentity([new Claim(ClaimTypes.Name, "Studio owner")], "Studio")));
             return Results.NoContent();
         }).RequireRateLimiting("studio-login");
         app.MapPost("/studio/api/logout", async (HttpContext context) =>
         { await context.SignOutAsync("Studio"); return Results.NoContent(); });
         // Serve a fixed set of bundled files, never a configurable filesystem root.
-        foreach (var name in new[] { "index.html", "items.js", "studio.css" })
+        foreach (var name in new[] { "index.html", "shops.html", "items.js", "shops.js", "studio-common.js", "studio.css" })
         {
             var file = name;
             app.MapGet($"/studio/{file}", () => Results.File(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "studio", file),

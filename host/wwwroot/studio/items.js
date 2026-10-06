@@ -1,3 +1,4 @@
+import { createRequest, installNavigation } from './studio-common.js';
 // One owner for item selection, editing, preview and apply. Backend services retain all domain decisions.
 const $ = id => document.getElementById(id);
 const clone = value => structuredClone(value);
@@ -39,21 +40,7 @@ function updateActions() {
     };
     $('operation-note').textContent = notes[$('operation').value];
 }
-async function request(path, { method = 'GET', body, raw = false } = {}) {
-    const response = await fetch(`/studio/api${path}`, { method, credentials: 'same-origin', cache: 'no-store',
-        headers: { ...(body !== undefined ? { 'Content-Type': raw ? 'image/png' : 'application/json' } : {}),
-            ...(method !== 'GET' ? { 'X-Studio-CSRF': state.session.csrf_token || '' } : {}) },
-        body: body === undefined ? undefined : raw ? body : JSON.stringify(body) });
-    if (response.status === 204) return null;
-    let data; try { data = await response.json(); } catch { data = null; }
-    if (!response.ok || data?.success === false) {
-        const error = new Error(data?.errors?.map(e => e.message).join(' ') || `Request failed (${response.status}).`);
-        error.status = response.status; error.errors = data?.errors || [];
-        if (response.status === 401) { state.session.authenticated = false; state.session.can_edit = false; updateSession(); }
-        throw error;
-    }
-    return data && Object.hasOwn(data, 'success') ? data.data : data;
-}
+const request = createRequest(() => state.session, () => { state.session.authenticated = false; state.session.can_edit = false; updateSession(); });
 async function refreshSession() { state.session = await request('/session'); updateSession(); }
 function updateSession() {
     if (state.session.trusted_home_lan) $('connection').textContent = state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor';
@@ -65,7 +52,7 @@ function updateSession() {
     $('access-notice').hidden = !state.session.trusted_home_lan;
     $('access-notice').textContent = state.session.read_only
         ? 'Trusted home LAN · no individual sign-in. This host currently permits viewing only.'
-        : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete items. No individual sign-in.';
+        : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete content. No individual sign-in.';
     updateActions();
 }
 async function loadOptionsAndAssets() {
@@ -429,9 +416,6 @@ async function upload() {
     } catch(error){$('upload-status').textContent=`${error.message} If the outcome is unclear, refresh artwork or retry the same file and name; an identical asset is reused.`;}
     finally{busy(false);$('close-assets').disabled=false;}
 }
-function route() {
-    const view=location.hash.slice(1);document.body.dataset.view=['workspace','list','detail'].includes(view)?view:'workspace';
-}
 $('items-workspace').addEventListener('click',()=>location.hash='list');
 $('new-item').addEventListener('click',newItem);$('refresh-list').addEventListener('click',()=>{void search();void loadOptionsAndAssets();});
 let searchTimer;$('search').addEventListener('input',()=>{state.searchRevision++;clearTimeout(searchTimer);searchTimer=setTimeout(search,200);});
@@ -459,16 +443,7 @@ $('login-form').addEventListener('submit',async event=>{
 $('close-assets').addEventListener('click',()=>$('asset-dialog').close());$('asset-dialog').addEventListener('cancel',event=>{if(state.pending)event.preventDefault();});
 $('asset-search').addEventListener('input',renderAssets);$('upload').addEventListener('click',upload);
 $('upload-file').addEventListener('change',()=>{$('upload-name').value=$('upload-file').files[0]?.name||'';});
-window.addEventListener('hashchange',route);window.addEventListener('beforeunload',event=>{if(dirty()||state.pending||state.uncertain){event.preventDefault();event.returnValue='';}});
-function updateKeyboardActions() {
-    const editingOnPhone = matchMedia('(max-width: 800px)').matches && ['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName);
-    const keyboardShrankViewport = window.visualViewport && window.innerHeight - window.visualViewport.height > 120;
-    document.body.classList.toggle('keyboard-open', editingOnPhone || keyboardShrankViewport);
-}
-window.visualViewport?.addEventListener('resize', updateKeyboardActions);
-document.addEventListener('focusin', updateKeyboardActions);
-document.addEventListener('focusout', () => queueMicrotask(updateKeyboardActions));
-route();
+installNavigation(() => dirty() || state.pending || state.uncertain, () => state.pending || state.uncertain, message => notice(message, true));
 try{await refreshSession();if(state.session.configured&&!state.session.authenticated){notice('Sign in to load the item catalog.');$('catalog-count').textContent='Sign in required';}
     else{await loadOptionsAndAssets();await search();if(!state.session.configured && !state.session.trusted_home_lan)notice('Local read-only preview. Browser writes require host-configured credentials; none are created by this application.');}}
 catch(error){notice(`Cannot reach Studio: ${error.message} Refresh the page to reconnect.`,true);$('connection').textContent='Disconnected';}

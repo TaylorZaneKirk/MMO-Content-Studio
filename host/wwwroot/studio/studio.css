@@ -699,3 +699,17 @@ dialog .button-row {
     font-size: 13px;
     line-height: 1.5;
 }
+
+/* Workspace links share the original Items shape; Shop rows stack on phones. */
+a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; border-radius:9px; font-weight:600; }
+.workspace-link:not(.active) { background:transparent; border:1px solid var(--line); }
+.workspace-link + .workspace-link { margin-top:0; }
+.stock-results { max-height:55dvh; overflow:auto; margin-top:18px; }
+.stock-results button { display:block; width:100%; text-align:left; margin:8px 0; overflow-wrap:anywhere; }
+.stock-results small { display:block; font-weight:400; margin-top:5px; }
+.stock-summary { overflow-wrap:anywhere; }
+@media(max-width:800px) {
+    a.workspace-link { min-height:68px; }
+    .actions .button-row #reload-shop { flex-basis:100%; }
+    .row-actions { flex-wrap:wrap; }
+}

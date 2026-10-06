@@ -68,23 +68,23 @@ public sealed partial class BrowserItemAssets(ItemAssetService assets)
     public async Task<IResult> Upload(HttpRequest request, string name, CancellationToken cancellation)
     {
         if (request.ContentType != "image/png" || request.ContentLength is > MaximumBytes)
-            return BrowserItems.Error("invalid_png", "Choose a PNG no larger than 16 MiB.");
+            return BrowserJson.Error("invalid_png", "Choose a PNG no larger than 16 MiB.");
         if (!SafeName().IsMatch(name) || name.StartsWith('.') || !name.EndsWith(".png", StringComparison.OrdinalIgnoreCase))
-            return BrowserItems.Error("invalid_name", "Use a PNG filename with letters, digits, spaces, dots, hyphens or underscores; no folders.");
+            return BrowserJson.Error("invalid_name", "Use a PNG filename with letters, digits, spaces, dots, hyphens or underscores; no folders.");
         using var buffer = new MemoryStream();
         var bytes = new byte[81920];
         int count;
         while ((count = await request.Body.ReadAsync(bytes, cancellation)) > 0)
         {
-            if (buffer.Length + count > MaximumBytes) return BrowserItems.Error("png_too_large", "PNG exceeds 16 MiB.", 413);
+            if (buffer.Length + count > MaximumBytes) return BrowserJson.Error("png_too_large", "PNG exceeds 16 MiB.", 413);
             buffer.Write(bytes, 0, count);
         }
         var data = buffer.ToArray();
-        if (!ValidPng(data)) return BrowserItems.Error("invalid_png", "PNG is invalid or exceeds 4096 pixels per side / 16 million pixels.");
+        if (!ValidPng(data)) return BrowserJson.Error("invalid_png", "PNG is invalid or exceeds 4096 pixels per side / 16 million pixels.");
         var resource = Prefix + name;
         var target = Resolve(resource);
         var root = Root();
-        if (target is null || root is null) return BrowserItems.Error("asset_root_unavailable", "The host item asset folder is unavailable.");
+        if (target is null || root is null) return BrowserJson.Error("asset_root_unavailable", "The host item asset folder is unavailable.");
         Directory.CreateDirectory(root);
         if (File.Exists(target)) return await Existing(target, resource, data, cancellation);
         var temporary = Path.Combine(root, $".studio-{Guid.NewGuid():N}.tmp");
@@ -93,10 +93,10 @@ public sealed partial class BrowserItemAssets(ItemAssetService assets)
             await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
                 await file.WriteAsync(data, cancellation);
             // Recheck confinement before the atomic rename. Existing assets are never replaced.
-            if (Resolve(resource) != target) return BrowserItems.Error("asset_root_changed", "The host asset folder changed; retry after checking it.");
+            if (Resolve(resource) != target) return BrowserJson.Error("asset_root_changed", "The host asset folder changed; retry after checking it.");
             try { File.Move(temporary, target, false); }
             catch (IOException) when (File.Exists(target)) { return await Existing(target, resource, data, cancellation); }
-            return BrowserItems.Json(new { asset = Entry(resource), created = true, message = "PNG imported. Save the item to assign it." });
+            return BrowserJson.Json(new { asset = Entry(resource), created = true, message = "PNG imported. Save the item to assign it." });
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
@@ -105,8 +105,8 @@ public sealed partial class BrowserItemAssets(ItemAssetService assets)
         if (new FileInfo(target).LinkTarget is not null) return Results.NotFound();
         await using var file = File.OpenRead(target);
         if (file.Length != data.Length || !CryptographicOperations.FixedTimeEquals(await SHA256.HashDataAsync(file, cancellation), SHA256.HashData(data)))
-            return BrowserItems.Error("asset_name_conflict", "A different PNG already has that name. Choose another name.", 409);
-        return BrowserItems.Json(new { asset = Entry(resource), created = false, message = "Identical PNG already exists; selected it." });
+            return BrowserJson.Error("asset_name_conflict", "A different PNG already has that name. Choose another name.", 409);
+        return BrowserJson.Json(new { asset = Entry(resource), created = false, message = "Identical PNG already exists; selected it." });
     }
 
     // Validate bounded dimensions, chunk CRCs and the exact decompressed scanline size.

@@ -1,26 +1,17 @@
 // Thin browser transport: the existing item service owns validation and mutations.
 // Int64 values use decimal strings here; the desktop JSON contract is unchanged.
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.Json.Serialization;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using MMO.ContentStudio.AuthoringHost.Persistence;
+
+using static MMO.ContentStudio.AuthoringHost.Browser.BrowserJson;
 
 namespace MMO.ContentStudio.AuthoringHost.Browser;
 
 public static class BrowserItems
 {
-    private static readonly JsonSerializerOptions JsonOptions = CreateOptions();
-    private static JsonSerializerOptions CreateOptions()
-    {
-        var options = new JsonSerializerOptions(JsonSerializerDefaults.Web)
-        { NumberHandling = JsonNumberHandling.AllowReadingFromString, UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow };
-        options.Converters.Add(new LongStringConverter());
-        return options;
-    }
-
     public static void MapBrowserItems(this WebApplication app)
     {
         var items = app.MapGroup("/studio/api/items");
@@ -106,21 +97,6 @@ public static class BrowserItems
     private static bool Same(object? left, object? right) => JsonNode.DeepEquals(
         JsonSerializer.SerializeToNode(left, JsonOptions), JsonSerializer.SerializeToNode(right, JsonOptions));
 
-    private static async Task<T?> Read<T>(HttpRequest request, CancellationToken cancellation)
-    {
-        // Whole aggregates are bounded independently of the larger PNG upload limit.
-        if (request.ContentLength is > 1024 * 1024) throw new BadHttpRequestException("Item payload too large.", 413);
-        using var buffer = new MemoryStream();
-        var bytes = new byte[8192];
-        int count;
-        while ((count = await request.Body.ReadAsync(bytes, cancellation)) > 0)
-        {
-            if (buffer.Length + count > 1024 * 1024) throw new BadHttpRequestException("Item payload too large.", 413);
-            buffer.Write(bytes, 0, count);
-        }
-        return JsonSerializer.Deserialize<T>(buffer.ToArray(), JsonOptions);
-    }
-
     private static IResult Mutation(AuthoringOperationResult<ItemMutationResponse> result, bool exportRequested)
     {
         if (!result.Succeeded || result.Value is not { } value) return Operation(result);
@@ -138,36 +114,5 @@ public static class BrowserItems
             : result.Errors.Any(error => error.Code == "database_unavailable") ? 503
             : result.Errors.Any(error => error.Code == "item_operation_failed") ? 500 : 400;
         return Json(new { success = result.Succeeded, data = result.Value, errors = result.Errors }, status);
-    }
-    public static IResult Error(string code, string message, int status = 400) =>
-        Json(new { success = false, errors = new[] { new ApiError(code, message, ValidationSeverity.Error) } }, status);
-
-    public static IResult Json<T>(T value, int status = 200)
-    {
-        var node = JsonSerializer.SerializeToNode(value, JsonOptions);
-        RemoveHostPaths(node);
-        return Results.Json(node, JsonOptions, statusCode: status);
-    }
-    private static void RemoveHostPaths(JsonNode? node)
-    {
-        if (node is JsonObject obj)
-        {
-            foreach (var name in new[] { "file_path", "asset_preview_file_path", "source_path" }) obj.Remove(name);
-            if (obj["code"]?.GetValue<string>() is "map_catalog_publish_warning" or "map_catalog_publish_skipped")
-            {
-                obj["message"] = "The database change completed, but the equipment visual catalog was not refreshed.";
-                obj["remediation"] = "Inspect host logs and run the existing export command on the host. Do not repeat the item mutation to retry an export.";
-            }
-            // Rig discovery diagnostics may include filesystem paths. The browser only needs availability.
-            if (obj.ContainsKey("rigs") && obj.ContainsKey("available")) obj["message"] = obj["available"]?.GetValue<bool>() == true ? null : "Actor rig catalog is unavailable. Inspect host configuration.";
-            foreach (var child in obj.ToArray()) RemoveHostPaths(child.Value);
-        }
-        else if (node is JsonArray array) foreach (var child in array) RemoveHostPaths(child);
-    }
-    private sealed class LongStringConverter : JsonConverter<long>
-    {
-        public override long Read(ref Utf8JsonReader reader, Type type, JsonSerializerOptions options) =>
-            reader.TokenType == JsonTokenType.String ? long.Parse(reader.GetString()!, CultureInfo.InvariantCulture) : reader.GetInt64();
-        public override void Write(Utf8JsonWriter writer, long value, JsonSerializerOptions options) => writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
     }
 }

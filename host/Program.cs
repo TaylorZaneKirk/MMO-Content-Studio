@@ -48,6 +48,7 @@ var app = builder.Build();
 browserAccess.Use(app, listenUri);
 browserAccess.Map(app);
 app.MapBrowserItems();
+app.MapBrowserShops();
 
 app.Use(async (context, next) =>
 {
