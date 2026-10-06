@@ -1,6 +1,8 @@
 extends HBoxContainer
 class_name UnifiedItemEditor
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
 
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
@@ -13,15 +15,15 @@ const DEFAULT_BONUS_FIELDS := [
 	{"id": "attack_slash", "display_name": "Attack Slash"},
 	{"id": "attack_crush", "display_name": "Attack Crush"},
 	{"id": "attack_ranged", "display_name": "Attack Ranged"},
-	{"id": "attack_magic", "display_name": "Attack Magic"},
+	{"id": "attack_magic", "display_name": "Magic Attack"},
 	{"id": "strength_melee", "display_name": "Strength Melee"},
 	{"id": "strength_ranged", "display_name": "Strength Ranged"},
-	{"id": "strength_magic", "display_name": "Strength Magic"},
+	{"id": "magic_damage_percent", "display_name": "Magic Damage %"},
 	{"id": "defence_thrust", "display_name": "Defence Thrust"},
 	{"id": "defence_slash", "display_name": "Defence Slash"},
 	{"id": "defence_crush", "display_name": "Defence Crush"},
 	{"id": "defence_ranged", "display_name": "Defence Ranged"},
-	{"id": "defence_magic", "display_name": "Defence Magic"},
+	{"id": "defence_magic", "display_name": "Magic Defence"},
 ]
 const DEFAULT_EQUIPMENT_SLOTS := [
 	{"id": "head", "display_name": "Head"},
@@ -54,6 +56,7 @@ var _search: LineEdit
 var _list: VBoxContainer
 var _item_id: LineEdit
 var _display_name: LineEdit
+var _stackable: CheckBox
 var _icon: OptionButton
 var _icon_preview: TextureRect
 var _publication: Label
@@ -84,6 +87,7 @@ var _consumable_requirements: VBoxContainer
 var _consumable_effects: VBoxContainer
 var _equipable: CheckBox
 var _equipment_slot: OptionButton
+var _two_handed: CheckBox
 var _required_strength: SpinBox
 var _equip_note: Label
 var _appearance_section: VBoxContainer
@@ -97,7 +101,19 @@ var _bonus_controls: Dictionary = {}
 var _weapon_enabled: CheckBox
 var _weapon_profile_id: LineEdit
 var _weapon_attack_type: OptionButton
-var _weapon_accuracy_style: OptionButton
+var _melee_options_section: VBoxContainer
+var _melee_option_rows: VBoxContainer
+var _melee_option_add_button: Button
+var _weapon_ammunition_family: OptionButton
+var _weapon_ammunition_label: Label
+var _maximum_ammunition_tier: SpinBox
+var _maximum_ammunition_tier_label: Label
+var _ammunition_section: VBoxContainer
+var _ammunition_family: OptionButton
+var _ammunition_damage_type: OptionButton
+var _ammunition_tier: SpinBox
+var _weapon_ranged_damage_type: OptionButton
+var _weapon_ranged_damage_label: Label
 var _weapon_min_range: SpinBox
 var _weapon_max_range: SpinBox
 var _weapon_speed_units: SpinBox
@@ -187,17 +203,18 @@ func stage_grip_anchor_handoff(item_id: String, grip_anchors: Dictionary) -> voi
 
 
 func _build_ui() -> void:
+	theme = STUDIO_THEME.item_theme()
 	add_theme_constant_override("separation", 14)
 
 	var catalog_panel := _panel()
-	catalog_panel.custom_minimum_size = Vector2(310, 0)
+	catalog_panel.custom_minimum_size = Vector2(240, 0)
 	add_child(catalog_panel)
 	var catalog := VBoxContainer.new()
 	catalog.add_theme_constant_override("separation", 10)
 	catalog_panel.add_child(catalog)
-	catalog.add_child(_heading("Items", 20))
+	catalog.add_child(_heading("Item library", 20))
 	_search = LineEdit.new()
-	_search.placeholder_text = "Search item ID, name, or classification"
+	_search.placeholder_text = "Search items…"
 	_search.text_changed.connect(_on_search_changed.unbind(1))
 	catalog.add_child(_search)
 	var new_button := Button.new()
@@ -205,11 +222,12 @@ func _build_ui() -> void:
 	new_button.pressed.connect(_start_new)
 	catalog.add_child(new_button)
 	var refresh := Button.new()
-	refresh.text = "Refresh"
+	refresh.text = "Reload library"
 	refresh.pressed.connect(_refresh_catalog)
 	catalog.add_child(refresh)
 	var catalog_scroll := ScrollContainer.new()
 	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog.add_child(catalog_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -220,15 +238,25 @@ func _build_ui() -> void:
 	var editor_panel := _panel()
 	editor_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(editor_panel)
-	var editor_scroll := ScrollContainer.new()
-	editor_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	editor_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	editor_panel.add_child(editor_scroll)
-	var editor := VBoxContainer.new()
-	editor.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	editor.add_theme_constant_override("separation", 12)
-	editor_scroll.add_child(editor)
-	editor.add_child(_heading("Complete Item Definition", 20))
+	var editor_shell := VBoxContainer.new()
+	editor_shell.add_theme_constant_override("separation", 16)
+	editor_panel.add_child(editor_shell)
+	editor_shell.add_child(_heading("Item details", 22))
+	var guidance := Label.new()
+	guidance.text = "Edit a section, preview your changes, then apply."
+	guidance.modulate = Color("a9b8c9")
+	editor_shell.add_child(guidance)
+	var pages := TabContainer.new()
+	pages.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	pages.use_hidden_tabs_for_min_size = false
+	editor_shell.add_child(pages)
+	var basics_page := _editor_page(pages, "Basics", "Identity & inventory", "The name and icon players see in the game.")
+	var equipment_page := _editor_page(pages, "Equipment", "Equipment rules", "Choose a slot, requirements and combat properties.")
+	var appearance_page := _editor_page(pages, "Appearance", "Equipped appearance", "Enable equipability in Equipment, then align the held or worn artwork here.")
+	var consumable_page := _editor_page(pages, "Consumable", "Use & consume", "Configure what happens when this item is used.")
+	var economy_page := _editor_page(pages, "Economy", "Value & lifecycle", "Set trade, death and shop behavior.")
+	var tools_page := _editor_page(pages, "Tools", "Tool metadata", "Author capability metadata. Gameplay support is defined by each skill.")
+	var editor := basics_page
 
 	var identity_grid := _section_grid(editor, "Identity and Inventory")
 	_item_id = _add_line_field(identity_grid, "Stable item ID", "iron_ore")
@@ -238,6 +266,8 @@ func _build_ui() -> void:
 	icon_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	identity_grid.add_child(icon_row)
 	_icon = OptionButton.new()
+	_icon.fit_to_longest_item = false
+	_icon.clip_text = true
 	_icon.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_icon.item_selected.connect(_on_form_changed.unbind(1))
 	icon_row.add_child(_icon)
@@ -245,11 +275,16 @@ func _build_ui() -> void:
 	import_button.text = "Import PNG..."
 	import_button.pressed.connect(_open_import)
 	icon_row.add_child(import_button)
+	identity_grid.add_child(_field_label("Stackable"))
+	_stackable = CheckBox.new()
+	_stackable.toggled.connect(_on_form_changed.unbind(1))
+	identity_grid.add_child(_stackable)
 	_publication = _add_value_field(identity_grid, "Publication state", "No item selected")
 	_classification = _add_value_field(identity_grid, "Classification", "Unknown")
 	_kind = _add_value_field(identity_grid, "Authoring kind", "Unknown")
 	_updated = _add_value_field(identity_grid, "Last updated", "Unknown")
 
+	editor = consumable_page
 	var consumable_grid := _section_grid(editor, "Consumable Behavior")
 	consumable_grid.add_child(_field_label("Consumable"))
 	_consumable_enabled = CheckBox.new()
@@ -275,6 +310,7 @@ func _build_ui() -> void:
 	_consumable_effects = _rows()
 	editor.add_child(_consumable_effects)
 
+	editor = economy_page
 	var economy_grid := _section_grid(editor, "Economy and Lifecycle")
 	_reference_value = _add_line_field(economy_grid, "Reference value", "0")
 	_trade_policy = _add_option_field(economy_grid, "Trade policy")
@@ -295,6 +331,7 @@ func _build_ui() -> void:
 	economy_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	economy_grid.add_child(economy_note)
 
+	editor = equipment_page
 	var equip_grid := _section_grid(editor, "Equipability")
 	equip_grid.add_child(_field_label("Equipable"))
 	_equipable = CheckBox.new()
@@ -303,6 +340,11 @@ func _build_ui() -> void:
 	equip_grid.add_child(_equipable)
 	_equipment_slot = _add_option_field(equip_grid, "Equipment slot")
 	_equipment_slot.item_selected.connect(_on_slot_changed.unbind(1))
+	equip_grid.add_child(_field_label("Hand occupancy"))
+	_two_handed = CheckBox.new()
+	_two_handed.text = "Two-handed (uses right + left hand)"
+	_two_handed.toggled.connect(_on_form_changed.unbind(1))
+	equip_grid.add_child(_two_handed)
 	_required_strength = _add_spin_field(equip_grid, "Required strength", 1, 1000000, 1)
 	_equip_note = Label.new()
 	_equip_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -310,17 +352,18 @@ func _build_ui() -> void:
 	_equip_note.text = "Disabling equipability removes equipment requirements, modifiers, combat bonuses, and weapon profile. Tool capabilities and consumable behavior remain."
 	editor.add_child(_equip_note)
 
+	editor = appearance_page
 	_appearance_section = VBoxContainer.new()
 	_appearance_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_appearance_section)
 	_appearance_section.add_child(_heading("Equipped Appearance", 16))
-	var doll_row := HBoxContainer.new()
+	var doll_row := VBoxContainer.new()
 	doll_row.add_theme_constant_override("separation", 16)
 	_appearance_section.add_child(doll_row)
 	var doll_panel := PanelContainer.new()
 	var doll_style := StyleBoxFlat.new()
 	doll_style.bg_color = Color(0.045, 0.052, 0.066, 1)
-	doll_style.border_color = Color(0.19, 0.22, 0.28, 1)
+	doll_style.border_color = Color("354355")
 	doll_style.set_border_width_all(1)
 	doll_style.set_corner_radius_all(6)
 	doll_panel.add_theme_stylebox_override("panel", doll_style)
@@ -479,6 +522,7 @@ func _build_ui() -> void:
 	doll_controls.add_child(_paper_doll_status)
 	_paper_doll_preview.bind(_paper_doll_stage, _paper_doll_status)
 
+	editor = equipment_page
 	_requirements_section = VBoxContainer.new()
 	_requirements_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_requirements_section)
@@ -513,12 +557,41 @@ func _build_ui() -> void:
 	_weapon_section.add_child(weapon_grid)
 	_weapon_profile_id = _add_line_field(weapon_grid, "Profile ID", "iron_sword_melee")
 	_weapon_attack_type = _add_option_field(weapon_grid, "Attack type")
-	_weapon_accuracy_style = _add_option_field(weapon_grid, "Accuracy style")
+	_weapon_attack_type.item_selected.connect(_on_weapon_attack_type_selected)
+	_weapon_ammunition_family = _add_option_field(weapon_grid, "Ammo family")
+	_weapon_ammunition_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
+	_weapon_ammunition_family.item_selected.connect(_on_weapon_attack_type_selected)
+	_maximum_ammunition_tier = _add_spin_field(weapon_grid, "Maximum ammunition tier", 1, 1000000, 1)
+	_maximum_ammunition_tier_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
+	_maximum_ammunition_tier.value_changed.connect(_on_form_changed.unbind(1))
+	_weapon_ranged_damage_type = _add_option_field(weapon_grid, "Ranged damage type")
+	_weapon_ranged_damage_label = weapon_grid.get_child(weapon_grid.get_child_count() - 2) as Label
 	_weapon_min_range = _add_spin_field(weapon_grid, "Minimum range tiles", 0, 32, 1)
 	_weapon_max_range = _add_spin_field(weapon_grid, "Maximum range tiles", 0, 32, 1)
 	_weapon_speed_units = _add_spin_field(weapon_grid, "Attack speed units", 1, 60, 1)
 	_weapon_timing = _add_value_field(weapon_grid, "Attack interval", "4 attack units x 600 ms = 2400 ms")
+	_melee_options_section = VBoxContainer.new()
+	_weapon_section.add_child(_melee_options_section)
+	_melee_options_section.add_child(_heading("Melee Combat Options", 14))
+	_melee_option_rows = VBoxContainer.new()
+	_melee_options_section.add_child(_melee_option_rows)
+	_melee_option_add_button = Button.new()
+	_melee_option_add_button.text = "Add option"
+	_melee_option_add_button.pressed.connect(func(): _add_melee_option_row())
+	_melee_options_section.add_child(_melee_option_add_button)
 
+	_ammunition_section = VBoxContainer.new()
+	equipment_page.add_child(_ammunition_section)
+	_ammunition_section.add_child(_heading("Ammunition profile", 18))
+	var ammunition_grid := GridContainer.new()
+	ammunition_grid.columns = 2
+	_ammunition_section.add_child(ammunition_grid)
+	_ammunition_family = _add_option_field(ammunition_grid, "Ammunition family")
+	_ammunition_tier = _add_spin_field(ammunition_grid, "Ammunition tier", 1, 1000000, 1)
+	_ammunition_tier.value_changed.connect(_on_form_changed.unbind(1))
+	_ammunition_damage_type = _add_option_field(ammunition_grid, "Ranged damage type")
+
+	editor = tools_page
 	_tool_section = VBoxContainer.new()
 	_tool_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_tool_section)
@@ -532,30 +605,28 @@ func _build_ui() -> void:
 	_tool_section.add_child(_tool_rows)
 
 	var preview_panel := _panel()
-	preview_panel.custom_minimum_size = Vector2(330, 0)
+	preview_panel.custom_minimum_size = Vector2(264, 0)
 	add_child(preview_panel)
-	var preview_scroll := ScrollContainer.new()
-	preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview_panel.add_child(preview_scroll)
 	var preview := VBoxContainer.new()
 	preview.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview.add_theme_constant_override("separation", 10)
-	preview_scroll.add_child(preview)
-	preview.add_child(_heading("Preview", 20))
+	preview_panel.add_child(preview)
+	preview.add_child(_heading("Review & apply", 20))
 	_icon_preview = TextureRect.new()
-	_icon_preview.custom_minimum_size = Vector2(160, 160)
+	_icon_preview.custom_minimum_size = Vector2(80, 80)
 	_icon_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_icon_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	preview.add_child(_icon_preview)
 	preview.add_child(_heading("Operation", 16))
 	_operation = OptionButton.new()
-	for option in [["Save as Draft", "save_draft"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
+	for option in [["Save as Draft", "save_draft"], ["Save & Publish", "save_and_publish"], ["Publish", "publish"], ["Disable", "disable"], ["Delete", "delete"]]:
 		_operation.add_item(option[0])
 		_operation.set_item_metadata(_operation.item_count - 1, option[1])
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
 	preview.add_child(_operation)
 	_preview_button = Button.new()
-	_preview_button.text = "Validate and Preview Changes"
+	_preview_button.text = "1. Preview changes"
+	_preview_button.theme_type_variation = "PrimaryButton"
 	_preview_button.pressed.connect(_preview)
 	preview.add_child(_preview_button)
 	_delete_button = Button.new()
@@ -564,7 +635,7 @@ func _build_ui() -> void:
 	_delete_button.pressed.connect(_preview_delete)
 	preview.add_child(_delete_button)
 	_apply_button = Button.new()
-	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
 	preview.add_child(_apply_button)
@@ -573,12 +644,20 @@ func _build_ui() -> void:
 	_status.modulate = Color(0.7, 0.73, 0.79, 1)
 	_status.text = "Select an item or create a new one."
 	preview.add_child(_status)
-	preview.add_child(_heading("Exact Logical Changes", 16))
-	_changes = VBoxContainer.new()
-	preview.add_child(_changes)
-	preview.add_child(_heading("Validation", 16))
+	var review_scroll := ScrollContainer.new()
+	review_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	review_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	preview.add_child(review_scroll)
+	var review := VBoxContainer.new()
+	review.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	review.add_theme_constant_override("separation", 12)
+	review_scroll.add_child(review)
+	review.add_child(_heading("Validation", 16))
 	_validation = VBoxContainer.new()
-	preview.add_child(_validation)
+	review.add_child(_validation)
+	review.add_child(_heading("Changes", 16))
+	_changes = VBoxContainer.new()
+	review.add_child(_changes)
 
 	_file_dialog = FileDialog.new()
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
@@ -630,8 +709,12 @@ func _on_options_received(payload: Dictionary) -> void:
 	_fill_option(_death_behavior, _option_array("death_behaviors", [{"id": "ordinary", "display_name": "Ordinary"}, {"id": "always_keep", "display_name": "Always Keep"}, {"id": "always_destroy", "display_name": "Always Destroy"}, {"id": "transform", "display_name": "Transform"}, {"id": "reclaim", "display_name": "Reclaim"}]))
 	_fill_option(_shop_policy, _option_array("shop_policies", [{"id": "not_shop_traded", "display_name": "Not Shop Traded"}, {"id": "npc_buys", "display_name": "NPC Buys"}, {"id": "npc_sells", "display_name": "NPC Sells"}, {"id": "npc_buys_and_sells", "display_name": "NPC Buys and Sells"}]))
 	_fill_option(_reclaim_policy, _option_array("reclaim_policies", [{"id": "none", "display_name": "None"}, {"id": "fixed_cost", "display_name": "Fixed Cost"}]))
-	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}]))
-	_fill_option(_weapon_accuracy_style, _option_array("attack_styles", [{"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}, {"id": "thrust", "display_name": "Thrust"}]))
+	_fill_option(_weapon_attack_type, _option_array("attack_families", [{"id": "melee", "display_name": "Melee"}, {"id": "ranged", "display_name": "Ranged"}, {"id": "magic", "display_name": "Magic"}]))
+	_fill_option(_weapon_ammunition_family, [{"id": "", "display_name": "None (self-contained)"}, {"id": "arrow", "display_name": "Arrow"}])
+	_fill_option(_ammunition_family, [{"id": "arrow", "display_name": "Arrow"}])
+	_fill_option(_ammunition_damage_type, [{"id": "light", "display_name": "Light"}, {"id": "standard", "display_name": "Standard"}, {"id": "heavy", "display_name": "Heavy"}])
+	_fill_option(_weapon_ranged_damage_type, [{"id": "light", "display_name": "Light"}, {"id": "standard", "display_name": "Standard"}, {"id": "heavy", "display_name": "Heavy"}])
+	_update_weapon_family_fields()
 	_fill_option(_appearance_binding, _option_array("equipped_visual_binding_types", [{"id": "rig_layer", "display_name": "Rig Layer"}, {"id": "socket", "display_name": "Socket"}]))
 	_apply_actor_rig_catalog(payload.get("actor_rig_catalog", {}))
 	_rebuild_bonus_grid(_bonus_controls.get("_grid", null))
@@ -654,10 +737,12 @@ func _on_definition_received(payload: Dictionary) -> void:
 	_reload_item_id = ""
 	_cancel_paper_doll_drag()
 	_current_item = payload.duplicate(true)
+	_rebuild_list()
 	_item_id.text = str(payload.get("item_id", ""))
 	_item_id.editable = false
 	_display_name.text = str(payload.get("display_name", ""))
 	_rebuild_asset_options(str(payload.get("icon_texture_path", "")))
+	_stackable.button_pressed = bool(payload.get("stackable", false))
 	_publication.text = str(payload.get("publication_state", "Unknown"))
 	_classification.text = str(payload.get("classification_label", "Unknown"))
 	_kind.text = str(payload.get("authoring_kind", "Unknown"))
@@ -699,13 +784,13 @@ func _apply_pending_grip_anchor_handoff() -> bool:
 
 func _on_preview_received(payload: Dictionary) -> void:
 	var operation := str(payload.get("target_operation", "save_draft"))
-	var applicable := bool(payload.get("valid_for_publication", false)) if operation == "publish" else bool(payload.get("valid_for_draft", false))
+	var applicable := bool(payload.get("valid_for_publication", false)) if operation in ["publish", "save_and_publish"] else bool(payload.get("valid_for_draft", false))
 	_workspace_support.accept_preview(
 		operation,
 		str(payload.get("preview_signature", "")),
 		applicable,
 		_apply_button,
-		"Apply %s" % _workspace_support.operation_name(operation)
+		"2. Apply %s" % _workspace_support.operation_name(operation)
 	)
 	_workspace_support.render_changes(_changes, payload.get("changes", []) as Array)
 	_workspace_support.render_validation(_validation, payload.get("messages", []) as Array)
@@ -767,13 +852,16 @@ func _rebuild_list() -> void:
 			continue
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s\n%s | %s | %s" % [
+		button.clip_text = true
+		button.custom_minimum_size.y = 60
+		button.text = "%s\n%s · %s" % [
 			str(item.get("display_name", "Unnamed item")),
-			str(item.get("item_id", "")),
 			str(item.get("publication_state", "Unknown")),
 			str(item.get("classification_label", item.get("authoring_kind", "Unknown"))),
 		]
-		button.tooltip_text = str(item.get("updated_at_utc", ""))
+		button.tooltip_text = "%s\n%s" % [item.get("item_id", ""), item.get("updated_at_utc", "")]
+		button.toggle_mode = true
+		button.button_pressed = item.get("item_id", "") == _current_item.get("item_id", "")
 		button.pressed.connect(_client.load_item_definition.bind(str(item.get("item_id", ""))))
 		_list.add_child(button)
 
@@ -784,12 +872,14 @@ func _start_new() -> void:
 	_reload_item_id = ""
 	_cancel_paper_doll_drag()
 	_current_item = {}
+	_rebuild_list()
 	_has_persisted_equipped_visual = false
 	_appearance_defaults_initialized = false
 	_item_id.text = ""
 	_item_id.editable = true
 	_display_name.text = ""
 	_select_option(_icon, "")
+	_stackable.button_pressed = false
 	_publication.text = "Unsaved"
 	_classification.text = "Basic"
 	_kind.text = "Unified"
@@ -836,6 +926,7 @@ func _apply_equipment(value: Variant) -> void:
 	var equipment := value as Dictionary if enabled else {}
 	_equipable.button_pressed = enabled
 	_select_option(_equipment_slot, str(equipment.get("equipment_slot_id", "right_hand")))
+	_two_handed.button_pressed = bool(equipment.get("two_handed", false))
 	_required_strength.value = float(equipment.get("required_strength", 1))
 	_clear_rows(_requirements)
 	for variant in equipment.get("requirements", []) as Array:
@@ -848,6 +939,12 @@ func _apply_equipment(value: Variant) -> void:
 	var bonuses := equipment.get("combat_bonuses", {}) as Dictionary
 	_apply_bonus_values(bonuses)
 	_apply_weapon_profile(equipment.get("weapon_profile", null))
+	var ammunition_variant: Variant = equipment.get("ammunition_profile", null)
+	var ammunition := ammunition_variant as Dictionary if ammunition_variant is Dictionary else {}
+	_select_option(_ammunition_family, str(ammunition.get("ammunition_family", "arrow")))
+	# Legacy-transition nulls display a starting value only; Preview/Apply is still required to save it.
+	_ammunition_tier.value = float(ammunition["ammunition_tier"]) if ammunition.get("ammunition_tier") != null else 1
+	_select_option(_ammunition_damage_type, str(ammunition.get("ranged_damage_type", "standard")))
 	_apply_equipped_visual(equipment.get("equipped_visual", null))
 
 
@@ -855,6 +952,7 @@ func _payload() -> Dictionary:
 	return {
 		"display_name": _display_name.text,
 		"icon_texture_path": _selected_metadata(_icon),
+		"stackable": _stackable.button_pressed,
 		"consumable_behavior": _consumable_payload() if _consumable_enabled.button_pressed else null,
 		"equipment": _equipment_payload() if _equipable.button_pressed else null,
 		"tool_capabilities": _collect_tool_capabilities(),
@@ -900,6 +998,10 @@ func _apply() -> void:
 	var item_id := _item_id.text.strip_edges()
 	var expected: Variant = _current_item.get("updated_at_utc", null)
 	match operation:
+		"save_and_publish":
+			var payload := _payload()
+			payload["preview_signature"] = preview_signature
+			_client.save_and_publish_item(item_id, payload)
 		"publish":
 			_client.publish_item(item_id, expected, preview_signature)
 		"disable":
@@ -1005,11 +1107,17 @@ func _has_valid_economy_integers() -> bool:
 func _equipment_payload() -> Dictionary:
 	return {
 		"equipment_slot_id": _selected_metadata(_equipment_slot),
+		"two_handed": _two_handed.button_pressed and _selected_metadata(_equipment_slot) == "right_hand",
 		"required_strength": int(_required_strength.value),
 		"requirements": _collect_requirements(),
 		"skill_modifiers": _collect_modifiers(),
 		"combat_bonuses": _collect_bonuses(),
 		"weapon_profile": _weapon_profile_payload(),
+		"ammunition_profile": {
+			"ammunition_family": _selected_metadata(_ammunition_family),
+			"ammunition_tier": int(_ammunition_tier.value),
+			"ranged_damage_type": _selected_metadata(_ammunition_damage_type),
+		} if _selected_metadata(_equipment_slot) == "ammo" else null,
 		"equipped_visual": _equipped_visual_payload(),
 	}
 
@@ -1020,11 +1128,104 @@ func _weapon_profile_payload() -> Variant:
 	return {
 		"profile_id": _weapon_profile_id.text.strip_edges(),
 		"attack_type": _selected_metadata(_weapon_attack_type),
-		"accuracy_style": _selected_metadata(_weapon_accuracy_style),
+		"melee_combat_options": _collect_melee_options() if _selected_metadata(_weapon_attack_type) == "melee" else [],
+		"ranged_damage_type": _selected_metadata(_weapon_ranged_damage_type) if _selected_metadata(_weapon_attack_type) == "ranged" and _selected_metadata(_weapon_ammunition_family).is_empty() else null,
+		"ammunition_family": _optional_payload(_selected_metadata(_weapon_ammunition_family)) if _selected_metadata(_weapon_attack_type) == "ranged" else null,
+		"maximum_ammunition_tier": int(_maximum_ammunition_tier.value) if _selected_metadata(_weapon_attack_type) == "ranged" and not _selected_metadata(_weapon_ammunition_family).is_empty() else null,
 		"minimum_range_tiles": int(_weapon_min_range.value),
 		"maximum_range_tiles": int(_weapon_max_range.value),
 		"attack_speed_units": int(_weapon_speed_units.value),
 	}
+
+
+func _add_melee_option_row(value: Dictionary = {}) -> void:
+	if _melee_option_rows.get_child_count() >= 4:
+		return
+	var row := VBoxContainer.new()
+	_melee_option_rows.add_child(row)
+	var heading := HBoxContainer.new()
+	heading.name = "OptionHeader"
+	row.add_child(heading)
+	var slot_label := Label.new()
+	slot_label.name = "SlotLabel"
+	heading.add_child(slot_label)
+	var up := Button.new()
+	up.text = "↑"
+	up.pressed.connect(_move_melee_option.bind(row, -1))
+	heading.add_child(up)
+	var down := Button.new()
+	down.text = "↓"
+	down.pressed.connect(_move_melee_option.bind(row, 1))
+	heading.add_child(down)
+	var remove := Button.new()
+	remove.text = "Remove"
+	remove.pressed.connect(func():
+		_melee_option_rows.remove_child(row)
+		row.queue_free()
+		_renumber_melee_options()
+		_clear_preview())
+	heading.add_child(remove)
+	var fields := GridContainer.new()
+	fields.name = "OptionFields"
+	fields.columns = 2
+	row.add_child(fields)
+	fields.add_child(_heading("ID", 11))
+	var option_id := LineEdit.new()
+	option_id.name = "OptionId"
+	option_id.text = str(value.get("option_id", ""))
+	option_id.text_changed.connect(_on_form_changed.unbind(1))
+	fields.add_child(option_id)
+	fields.add_child(_heading("Name", 11))
+	var display_name := LineEdit.new()
+	display_name.name = "DisplayName"
+	display_name.text = str(value.get("display_name", ""))
+	display_name.text_changed.connect(_on_form_changed.unbind(1))
+	fields.add_child(display_name)
+	fields.add_child(_heading("Combat style", 11))
+	var combat_style := OptionButton.new()
+	combat_style.name = "CombatStyle"
+	_fill_option(combat_style, [{"id": "accurate", "display_name": "Accurate"}, {"id": "aggressive", "display_name": "Aggressive"}, {"id": "defensive", "display_name": "Defensive"}, {"id": "controlled", "display_name": "Controlled"}])
+	_select_option(combat_style, str(value.get("combat_style", "accurate")))
+	combat_style.item_selected.connect(_on_form_changed.unbind(1))
+	fields.add_child(combat_style)
+	fields.add_child(_heading("Accuracy type", 11))
+	var accuracy_style := OptionButton.new()
+	accuracy_style.name = "AccuracyStyle"
+	_fill_option(accuracy_style, _option_array("attack_styles", [{"id": "thrust", "display_name": "Thrust"}, {"id": "slash", "display_name": "Slash"}, {"id": "crush", "display_name": "Crush"}]))
+	_select_option(accuracy_style, str(value.get("accuracy_style", "slash")))
+	accuracy_style.item_selected.connect(_on_form_changed.unbind(1))
+	fields.add_child(accuracy_style)
+	_renumber_melee_options()
+	_clear_preview()
+
+
+func _move_melee_option(row: VBoxContainer, direction: int) -> void:
+	var destination := row.get_index() + direction
+	if destination < 0 or destination >= _melee_option_rows.get_child_count():
+		return
+	_melee_option_rows.move_child(row, destination)
+	_renumber_melee_options()
+	_clear_preview()
+
+
+func _renumber_melee_options() -> void:
+	for slot in _melee_option_rows.get_child_count():
+		var row := _melee_option_rows.get_child(slot) as VBoxContainer
+		(row.get_node("OptionHeader/SlotLabel") as Label).text = "Slot %d" % slot
+
+
+func _collect_melee_options() -> Array:
+	var options: Array = []
+	for slot in _melee_option_rows.get_child_count():
+		var row := _melee_option_rows.get_child(slot) as VBoxContainer
+		options.append({
+			"option_slot": slot,
+			"option_id": (row.get_node("OptionFields/OptionId") as LineEdit).text.strip_edges(),
+			"display_name": (row.get_node("OptionFields/DisplayName") as LineEdit).text.strip_edges(),
+			"combat_style": _selected_metadata(row.get_node("OptionFields/CombatStyle") as OptionButton),
+			"accuracy_style": _selected_metadata(row.get_node("OptionFields/AccuracyStyle") as OptionButton),
+		})
+	return options
 
 
 func _equipped_visual_payload() -> Variant:
@@ -1582,8 +1783,11 @@ func _add_consumable_effect_row(initial: Dictionary = {}) -> void:
 	_select_option(target, str(initial.get("target_id", "health")))
 	row.add_child(target)
 	# The authored amount passes unchanged through preview and save to the host.
+	var amount_label := Label.new()
+	amount_label.text = "Restore amount"
+	row.add_child(amount_label)
 	var amount := _row_spin(1, 1000000, float(initial.get("amount", 1)))
-	amount.tooltip_text = "Restore amount"
+	amount.tooltip_text = "Fixed restore amount"
 	row.add_child(amount)
 	var remove := _remove_button(row)
 	row.add_child(remove)
@@ -1755,10 +1959,17 @@ func _apply_weapon_profile(profile_variant: Variant) -> void:
 	_weapon_enabled.button_pressed = has_profile
 	_weapon_profile_id.text = str(profile.get("profile_id", ""))
 	_select_option(_weapon_attack_type, str(profile.get("attack_type", "melee")))
-	_select_option(_weapon_accuracy_style, str(profile.get("accuracy_style", "slash")))
+	_clear_rows(_melee_option_rows)
+	for option_variant: Variant in profile.get("melee_combat_options", []):
+		if option_variant is Dictionary:
+			_add_melee_option_row(option_variant as Dictionary)
+	_select_option(_weapon_ranged_damage_type, str(profile.get("ranged_damage_type", "standard")))
+	_select_option(_weapon_ammunition_family, str(profile.get("ammunition_family")) if profile.get("ammunition_family") != null else "")
+	_update_weapon_family_fields()
 	_weapon_min_range.value = float(profile.get("minimum_range_tiles", 1))
 	_weapon_max_range.value = float(profile.get("maximum_range_tiles", 1))
 	_weapon_speed_units.value = float(profile.get("attack_speed_units", 4))
+	_maximum_ammunition_tier.value = float(profile["maximum_ammunition_tier"]) if profile.get("maximum_ammunition_tier") != null else 1
 	_update_weapon_timing()
 
 
@@ -1870,6 +2081,7 @@ func _update_contextual_sections() -> void:
 	_requirements_section.visible = equipment_enabled
 	_combat_bonus_section.visible = equipment_enabled
 	_weapon_section.visible = weapon_capable
+	_ammunition_section.visible = equipment_enabled and _selected_metadata(_equipment_slot) == "ammo"
 	_tool_section.visible = true
 	_set_consumable_controls_enabled(_consumable_enabled.button_pressed)
 	_set_equipment_controls_enabled(equipment_enabled)
@@ -1880,12 +2092,15 @@ func _update_contextual_sections() -> void:
 func _set_form_enabled(enabled: bool) -> void:
 	for edit in [_item_id, _display_name, _result_item_id, _success_message, _animation_id, _sound_path, _weapon_profile_id, _reference_value, _npc_buy_price, _npc_sell_price, _reclaim_value, _death_transform_item_id, _condition_policy_id, _repair_policy_id]:
 		edit.editable = enabled and (edit != _item_id or _current_item.is_empty())
-	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_accuracy_style, _operation]:
+	for option in [_icon, _use_action, _equipment_slot, _weapon_attack_type, _weapon_ranged_damage_type, _weapon_ammunition_family, _ammunition_family, _ammunition_damage_type, _operation]:
 		option.disabled = not enabled
-	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units]:
+	for spin in [_consume_quantity, _cooldown_ms, _required_strength, _weapon_min_range, _weapon_max_range, _weapon_speed_units, _ammunition_tier, _maximum_ammunition_tier]:
 		spin.editable = enabled
-	for toggle in [_consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
+	for toggle in [_stackable, _consumable_enabled, _usable_in_combat, _equipable, _weapon_enabled]:
 		toggle.disabled = not enabled
+	_melee_option_add_button.disabled = not enabled
+	for row in _melee_option_rows.get_children():
+		_set_row_enabled(row, enabled)
 	_preview_button.disabled = not enabled
 	_delete_button.disabled = not enabled or _current_item.is_empty()
 	if not enabled:
@@ -1906,6 +2121,10 @@ func _set_consumable_controls_enabled(enabled: bool) -> void:
 
 func _set_equipment_controls_enabled(enabled: bool) -> void:
 	_equipment_slot.disabled = not enabled
+	_ammunition_tier.editable = enabled and _selected_metadata(_equipment_slot) == "ammo"
+	_two_handed.disabled = not enabled or _selected_metadata(_equipment_slot) != "right_hand"
+	if _two_handed.disabled:
+		_two_handed.set_pressed_no_signal(false)
 	_required_strength.editable = enabled
 	for row in _requirements.get_children() + _modifiers.get_children():
 		_set_row_enabled(row, enabled)
@@ -1917,10 +2136,15 @@ func _set_equipment_controls_enabled(enabled: bool) -> void:
 func _set_weapon_controls_enabled(enabled: bool) -> void:
 	_weapon_profile_id.editable = enabled
 	_weapon_attack_type.disabled = not enabled
-	_weapon_accuracy_style.disabled = not enabled
+	_weapon_ranged_damage_type.disabled = not enabled
+	_weapon_ammunition_family.disabled = not enabled
 	_weapon_min_range.editable = enabled
 	_weapon_max_range.editable = enabled
 	_weapon_speed_units.editable = enabled
+	_melee_option_add_button.disabled = not enabled
+	for row in _melee_option_rows.get_children():
+		_set_row_enabled(row, enabled)
+	_update_weapon_family_fields()
 
 
 func _set_appearance_controls_enabled(equipment_enabled: bool, authored_visual: bool, socket_binding: bool) -> void:
@@ -1980,6 +2204,8 @@ func _set_row_enabled(row: Node, enabled: bool) -> void:
 			(child as LineEdit).editable = enabled
 		elif child is Button:
 			(child as Button).disabled = not enabled
+		elif child.get_child_count() > 0:
+			_set_row_enabled(child, enabled)
 
 
 func _update_operation_default() -> void:
@@ -1991,6 +2217,25 @@ func _update_weapon_timing() -> void:
 	var units := int(_weapon_speed_units.value) if _weapon_speed_units != null else 4
 	var milliseconds := int(_options.get("combat_unit_milliseconds", COMBAT_UNIT_MILLISECONDS))
 	_weapon_timing.text = "%d attack units x %d ms = %d ms" % [units, milliseconds, units * milliseconds]
+
+
+func _on_weapon_attack_type_selected(_index: int) -> void:
+	_update_weapon_family_fields()
+	_clear_preview()
+
+
+func _update_weapon_family_fields() -> void:
+	var ranged := _selected_metadata(_weapon_attack_type) == "ranged"
+	_melee_options_section.visible = _selected_metadata(_weapon_attack_type) == "melee" and _weapon_enabled.button_pressed
+	_weapon_ammunition_label.visible = ranged
+	_weapon_ammunition_family.visible = ranged
+	var uses_ammunition := ranged and _weapon_enabled.button_pressed and not _selected_metadata(_weapon_ammunition_family).is_empty()
+	_maximum_ammunition_tier.visible = uses_ammunition
+	_maximum_ammunition_tier_label.visible = uses_ammunition
+	_maximum_ammunition_tier.editable = uses_ammunition and not _weapon_ammunition_family.disabled
+	var self_contained := ranged and _selected_metadata(_weapon_ammunition_family).is_empty()
+	_weapon_ranged_damage_label.visible = self_contained
+	_weapon_ranged_damage_type.visible = self_contained
 
 
 func _rebuild_asset_options(selected_path: String = "") -> void:
@@ -2070,10 +2315,27 @@ func _import_selected(path: String) -> void:
 	_status.text = "Importing PNG into the canonical item asset directory..."
 
 
+func _editor_page(pages: TabContainer, title: String, heading: String, description: String) -> VBoxContainer:
+	var scroll := ScrollContainer.new()
+	scroll.name = title
+	pages.add_child(scroll)
+	var page := VBoxContainer.new()
+	page.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	page.add_theme_constant_override("separation", 18)
+	scroll.add_child(page)
+	page.add_child(_heading(heading, 20))
+	var note := Label.new()
+	note.text = description
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.modulate = Color("a9b8c9")
+	page.add_child(note)
+	return page
+
+
 func _panel() -> PanelContainer:
 	var panel := PanelContainer.new()
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.086, 0.098, 0.122, 1)
+	style.bg_color = Color("17212e")
 	style.border_color = Color(0.19, 0.22, 0.28, 1)
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(8)
@@ -2111,6 +2373,8 @@ func _section_grid(parent: Node, title: String) -> GridContainer:
 	parent.add_child(_heading(title, 16))
 	var grid := GridContainer.new()
 	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 16)
+	grid.add_theme_constant_override("v_separation", 12)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	parent.add_child(grid)
 	return grid
@@ -2307,7 +2571,7 @@ func _has_error_code(errors: Array, code: String) -> bool:
 
 
 func _clear_preview() -> void:
-	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+	_workspace_support.clear_preview(_apply_button, _changes, _validation, "2. Apply changes")
 
 
 func _initialize_authored_appearance_defaults() -> void:

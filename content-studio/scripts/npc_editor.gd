@@ -4,6 +4,8 @@ class_name NpcEditor
 signal workspace_open_requested(workspace_id: String, resource_id: String)
 signal item_grip_handoff_requested(item_id: String, grip_anchors: Dictionary)
 
+const STUDIO_THEME := preload("res://scripts/studio_theme.gd")
+
 const WORKSPACE_SUPPORT_SCRIPT := preload("res://scripts/authoring_workspace_support.gd")
 const RIGGED_PREVIEW_LAYOUT := preload("res://scripts/rigged_sprite_preview_layout.gd")
 const CATALOG_PANE_TOGGLE := preload("res://scripts/catalog_pane_toggle.gd")
@@ -155,6 +157,9 @@ var _movement_guidance: Label
 var _interaction_enabled: CheckBox
 var _interaction_range: SpinBox
 var _default_interaction: OptionButton
+var _shop_options: OptionButton
+var _open_shop_button: Button
+var _shop_id := ""
 var _dialogue_id: LineEdit
 var _dialogue_options: OptionButton
 var _open_dialogue_button: Button
@@ -203,6 +208,7 @@ func _ready() -> void:
 
 
 func _connect_client() -> void:
+	_client.shop_options_received.connect(_on_shop_options_received)
 	_client.health_received.connect(_on_health_received)
 	_client.npc_options_received.connect(_on_npc_options_received)
 	_client.npc_catalog_received.connect(_on_npc_catalog_received)
@@ -216,7 +222,7 @@ func _connect_client() -> void:
 func _build_ui() -> void:
 	add_theme_constant_override("separation", 14)
 
-	var catalog_panel := _panel(Vector2(310, 0))
+	var catalog_panel := _panel(Vector2(240, 0))
 	add_child(catalog_panel)
 	var catalog_content := _vbox(catalog_panel)
 	_add_heading(catalog_content, "NPCs", 20)
@@ -234,6 +240,7 @@ func _build_ui() -> void:
 	catalog_content.add_child(_new_button)
 	var catalog_scroll := ScrollContainer.new()
 	catalog_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	catalog_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	catalog_content.add_child(catalog_scroll)
 	_list = VBoxContainer.new()
 	_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -241,36 +248,33 @@ func _build_ui() -> void:
 	catalog_scroll.add_child(_list)
 	CATALOG_PANE_TOGGLE.attach(self, catalog_panel)
 
-	var form_panel := _panel(Vector2(540, 0))
+	var form_panel := _panel(Vector2(0, 0))
 	form_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	add_child(form_panel)
-	var form_scroll := ScrollContainer.new()
-	form_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	form_panel.add_child(form_scroll)
-	var form := VBoxContainer.new()
-	form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	form.add_theme_constant_override("separation", 12)
-	form_scroll.add_child(form)
-	_add_identity_section(form)
-	_add_visual_section(form)
-	_add_movement_section(form)
-	_add_interaction_section(form)
-	_add_dialogue_section(form)
-	_add_notes_section(form)
-	_add_runtime_guidance_section(form)
+	var form := _vbox(form_panel)
+	_add_heading(form, "NPC details", 22)
+	var pages := STUDIO_THEME.pages(form)
+	var basics_page := STUDIO_THEME.page(pages, "Basics")
+	_add_identity_section(basics_page)
+	var appearance_page := STUDIO_THEME.page(pages, "Appearance")
+	_add_visual_section(appearance_page)
+	var behavior_page := STUDIO_THEME.page(pages, "Behavior")
+	_add_movement_section(behavior_page)
+	_add_interaction_section(behavior_page)
+	var dialogue_page := STUDIO_THEME.page(pages, "Dialogue")
+	_add_dialogue_section(dialogue_page)
+	var notes_page := STUDIO_THEME.page(pages, "Notes")
+	_add_notes_section(notes_page)
+	_add_runtime_guidance_section(notes_page)
+	var preview_page := STUDIO_THEME.page(pages, "Preview")
 
-	var preview_panel := _panel(Vector2(330, 0))
+	var preview_panel := _panel(Vector2(264, 0))
 	add_child(preview_panel)
-	var preview_scroll := ScrollContainer.new()
-	preview_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	preview_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	preview_panel.add_child(preview_scroll)
 	var preview_content := VBoxContainer.new()
 	preview_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	preview_content.add_theme_constant_override("separation", 10)
-	preview_scroll.add_child(preview_content)
-	_add_preview_section(preview_content)
+	preview_panel.add_child(preview_content)
+	_add_preview_section(preview_page, preview_content)
 
 
 func _add_identity_section(parent: VBoxContainer) -> void:
@@ -364,6 +368,34 @@ func _add_dialogue_section(parent: VBoxContainer) -> void:
 	_dialogue_guidance = _wrapped_label("This field links to the current MMO Project dialogue definition. Dialogue and quest authoring remain separate future work.")
 	parent.add_child(_dialogue_guidance)
 
+	_add_heading(parent, "Shop capability", 18)
+	var shop_grid := _grid(parent)
+	_shop_options = _option_field(shop_grid, "Shop")
+	_shop_options.add_item("No shop")
+	_shop_options.set_item_metadata(0, "")
+	_shop_options.item_selected.connect(func(_index: int):
+		_shop_id = _selected_metadata(_shop_options)
+		_open_shop_button.disabled = _shop_id.is_empty()
+		_on_form_changed())
+	shop_grid.add_child(_label("Workspace"))
+	_open_shop_button = Button.new()
+	_open_shop_button.text = "Open Shop"
+	_open_shop_button.disabled = true
+	_open_shop_button.pressed.connect(func(): workspace_open_requested.emit("shops", _shop_id))
+	shop_grid.add_child(_open_shop_button)
+	parent.add_child(_wrapped_label("A draft may reference any existing Shop. Publishing requires a Published Shop and interaction enabled. Talk-to remains the default."))
+
+
+func _on_shop_options_received(payload: Dictionary) -> void:
+	_shop_options.clear()
+	_shop_options.add_item("No shop")
+	_shop_options.set_item_metadata(0, "")
+	for shop: Dictionary in payload.get("shops", []):
+		_shop_options.add_item("%s [%s] — %s" % [shop["display_name"], shop["publication_state"], shop["shop_definition_id"]])
+		_shop_options.set_item_metadata(_shop_options.item_count - 1, shop["shop_definition_id"])
+	_select_option(_shop_options, _shop_id)
+	_open_shop_button.disabled = _shop_id.is_empty()
+
 
 func _add_notes_section(parent: VBoxContainer) -> void:
 	_add_heading(parent, "Authoring Notes", 18)
@@ -391,7 +423,7 @@ func _add_runtime_guidance_section(parent: VBoxContainer) -> void:
 	parent.add_child(_placement_guidance)
 
 
-func _add_preview_section(parent: VBoxContainer) -> void:
+func _add_preview_section(parent: VBoxContainer, review: VBoxContainer) -> void:
 	_add_heading(parent, "Preview", 20)
 	_visual_preview = NpcVisualPreview.new()
 	parent.add_child(_visual_preview)
@@ -427,40 +459,42 @@ func _add_preview_section(parent: VBoxContainer) -> void:
 	_socket_calibration_editor.calibration_saved.connect(_on_socket_calibration_saved)
 	_socket_calibration_editor.item_grip_handoff_requested.connect(_on_item_grip_handoff_requested)
 	parent.add_child(_socket_calibration_editor)
-	_add_heading(parent, "Operation", 16)
+	_add_heading(review, "Review & apply", 20)
 	_operation = OptionButton.new()
 	_add_operation("Save as Draft", "save_draft")
 	_add_operation("Publish", "publish")
 	_add_operation("Disable", "disable")
 	_add_operation("Delete", "delete")
 	_operation.item_selected.connect(_on_operation_changed.unbind(1))
-	parent.add_child(_operation)
+	review.add_child(_operation)
 	_preview_button = Button.new()
-	_preview_button.text = "Validate and Preview Changes"
+	_preview_button.theme_type_variation = "PrimaryButton"
+	_preview_button.text = "1. Preview changes"
 	_preview_button.pressed.connect(_preview)
-	parent.add_child(_preview_button)
+	review.add_child(_preview_button)
 	_delete_button = Button.new()
 	_delete_button.text = "Delete"
 	_delete_button.disabled = true
 	_delete_button.pressed.connect(_preview_delete)
-	parent.add_child(_delete_button)
+	review.add_child(_delete_button)
 	_apply_button = Button.new()
-	_apply_button.text = "Apply Previewed Operation"
+	_apply_button.text = "2. Apply changes"
 	_apply_button.disabled = true
 	_apply_button.pressed.connect(_apply)
-	parent.add_child(_apply_button)
+	review.add_child(_apply_button)
 	_status = _wrapped_label("Load or create an NPC definition.")
-	parent.add_child(_status)
-	_add_heading(parent, "Reference Diagnostics", 16)
+	review.add_child(_status)
+	var feedback := STUDIO_THEME.scroll_content(review)
+	_add_heading(feedback, "Reference Diagnostics", 16)
 	_reference_summary = VBoxContainer.new()
 	_reference_summary.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	parent.add_child(_reference_summary)
-	_add_heading(parent, "Exact Logical Changes", 16)
+	feedback.add_child(_reference_summary)
+	_add_heading(feedback, "Exact Logical Changes", 16)
 	_changes = VBoxContainer.new()
-	parent.add_child(_changes)
-	_add_heading(parent, "Validation", 16)
+	feedback.add_child(_changes)
+	_add_heading(feedback, "Validation", 16)
 	_validation = VBoxContainer.new()
-	parent.add_child(_validation)
+	feedback.add_child(_validation)
 
 
 func _on_health_received(payload: Dictionary) -> void:
@@ -604,18 +638,10 @@ func _rebuild_list() -> void:
 			continue
 		var button := Button.new()
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.text = "%s\n%s | %s | %s | %s | %s" % [
-			str(npc.get("display_name", "Unnamed NPC")),
-			str(npc.get("npc_definition_id", "")),
-			str(npc.get("publication_state", "Unknown")),
-			str(npc.get("movement_behavior", "static")),
-			"talk" if bool(npc.get("interaction_enabled", false)) else "no interaction",
-			dialogue if not dialogue.is_empty() else "no dialogue",
-		]
-		button.tooltip_text = "%s\nUpdated %s" % [
-			str(npc.get("visual_texture_path", "")),
-			str(npc.get("updated_at_utc", "")),
-		]
+		button.clip_text = true
+		button.custom_minimum_size.y = 60
+		button.text = "%s\n%s" % [npc.get("display_name", "Unnamed"), npc.get("publication_state", "Unknown")]
+		button.tooltip_text = "%s\nUpdated %s" % [npc.get("npc_definition_id", ""), npc.get("updated_at_utc", "")]
 		button.pressed.connect(_load_npc_id.bind(str(npc.get("npc_definition_id", ""))))
 		_list.add_child(button)
 
@@ -653,6 +679,9 @@ func _load_npc(payload: Dictionary) -> void:
 	_interaction_enabled.button_pressed = bool(payload.get("interaction_enabled", true))
 	_interaction_range.value = int(payload.get("interaction_range_tiles", 1))
 	_select_option(_default_interaction, str(payload.get("default_interaction", "talk")))
+	_shop_id = _nullable_string(payload.get("shop_definition_id", ""))
+	_select_option(_shop_options, _shop_id)
+	_open_shop_button.disabled = _shop_id.is_empty()
 	_dialogue_id.text = _nullable_string(payload.get("default_dialogue_id", ""))
 	_select_option(_dialogue_options, _dialogue_id.text.strip_edges())
 	_notes.text = _nullable_string(payload.get("notes", ""))
@@ -696,6 +725,9 @@ func _start_new_npc() -> void:
 	_interaction_enabled.button_pressed = bool(defaults.get("interaction_enabled", true))
 	_interaction_range.value = int(defaults.get("interaction_range_tiles", 1))
 	_select_option(_default_interaction, str(defaults.get("default_interaction", "talk")))
+	_shop_id = ""
+	_select_option(_shop_options, "")
+	_open_shop_button.disabled = true
 	_dialogue_id.text = ""
 	_select_option(_dialogue_options, "")
 	_notes.text = ""
@@ -785,6 +817,7 @@ func _payload() -> Dictionary:
 		"interaction_enabled": interaction_enabled,
 		"interaction_range_tiles": int(_interaction_range.value),
 		"default_interaction": _selected_metadata(_default_interaction),
+		"shop_definition_id": _optional_payload(_shop_id),
 		"default_dialogue_id": _optional_payload(dialogue_value),
 		"notes": _optional_payload(_notes.text),
 		"expected_updated_at_utc": _current_npc.get("updated_at_utc", null),
@@ -1376,7 +1409,7 @@ func _set_form_enabled(enabled: bool) -> void:
 
 func _clear_preview() -> void:
 	_visual_preview.set_rigged_sprite_preview({})
-	_workspace_support.clear_preview(_apply_button, _changes, _validation)
+	_workspace_support.clear_preview(_apply_button, _changes, _validation, "2. Apply changes")
 	_render_reference_summary({})
 
 
@@ -1502,8 +1535,8 @@ func _panel(minimum_size: Vector2) -> PanelContainer:
 
 func _panel_style() -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.086, 0.098, 0.122, 1)
-	style.border_color = Color(0.19, 0.22, 0.28, 1)
+	style.bg_color = Color("17212e")
+	style.border_color = Color("354355")
 	style.set_border_width_all(1)
 	style.set_corner_radius_all(8)
 	style.content_margin_left = 16

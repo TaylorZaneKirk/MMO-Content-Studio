@@ -11,6 +11,12 @@ MMO Content Studio turns game-design inputs into validated, transactional
 content updates without requiring contributors or maintainers to hand-author
 SQL across multiple related tables.
 
+## Browser Tiles
+
+The web [Tiles workspace](docs/BROWSER_TILES.md) edits metadata directly in the
+approved external Tiled tilesets, with preview and whole-file conflict checks.
+Map placement and runtime publication remain separate.
+
 ## Architecture
 
 ```text
@@ -27,6 +33,40 @@ Godot owns forms and rendering previews so authored items, equipment, mobs, and
 NPCs can use the same visual rules as the game client. The .NET host owns
 database access, validation, publication, and filesystem mutations. Godot does
 not issue arbitrary SQL or connect directly to PostgreSQL.
+
+## Refreshing assets
+
+Use **Refresh** in the top header after adding assets to the configured folders.
+Confirm to reload Studio through its ordinary startup flow, fetching current
+asset lists and workspace options without restarting the host. Save edits first:
+refresh discards unsaved workspace changes. Refresh is blocked while host requests
+are running so it cannot interrupt an in-flight save or publication.
+
+## Editing published items
+
+Save as Draft and Disable may unpublish an item that already exists in inventory,
+equipment or ground-item rows. Existing possessions retain their item identity;
+live references still block deletion. Published-content dependencies and frozen
+settlement guards remain in force. Apply migration
+`064_allow_draft_items_with_live_possessions.sql` from the MMO Project SQL directory
+(or its integration mirror) for this behavior. Draft still means runtime-disabled:
+finish editing and publish again before restarting the game with that content.
+
+## World Objects M0
+
+The **World Objects** tab authors reusable definitions through `/api/v1/world-objects`:
+search/load, ordered interactions and animation frames, preview, Save Draft,
+Publish, Disable and Delete. Mutations use preview signatures, aggregate versions,
+transactional child replacement and reload verification. Tiled retains placements.
+
+Apply MMO Project migrations 061 and 062 (mirrored under `integrations/`), then
+start Studio normally. The seed preserves the 13 existing shared runtime definitions.
+Publication changes refresh `export-world-object-catalog` through the existing
+runtime catalog publisher; failures return a warning/manual command. The command
+also participates in `export-runtime-catalogs`. Do not hand-edit the production
+World Object catalog. Regenerate maps, package and restart the game after changes.
+Mining mechanics, rocks, tools, XP, depletion/respawn and placement editing remain
+outside M0. Older interactable-object design documents are future context only.
 
 ## Current state: D5 Dialogue Runtime Verification
 
@@ -305,3 +345,73 @@ server-authoritative runtime execution. See
 - [`docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md`](docs/INTERACTABLE_WORLD_OBJECTS_DESIGN.md)
 - [`integrations/mmo-project/README.md`](integrations/mmo-project/README.md)
 - [`docs/ROADMAP.md`](docs/ROADMAP.md)
+
+## Magic M1 authoring
+
+The **Spells** workspace authors ordinary selected combat spells: stable Spell ID,
+Display Name, Tier (1–4), Element (air/earth/fire/water), Required Magic Level
+(1–99), positive Crystal Shard cost, successful-hit minimum damage, base maximum
+hit, and base cast XP in integer tenths (15 means 1.5 XP). These are content facts;
+the workspace does not execute casts or author effect graphs.
+
+Create a new definition or load one from the library. Choose Save Draft or Save &
+Publish, Preview, then Apply. Publish, Disable and Delete also use preview; delete
+requires Disabled state. Editing invalidates the preview. Concurrent edits are
+rejected using the loaded `updated_at` timestamp; reload and preview again.
+A spell does not require an icon or projectile asset to publish.
+
+In **Items**, choose the Magic weapon family for a right-hand standard focus.
+Author its range and attack speed; accuracy style and all Ranged/ammunition fields
+are null. **Magic Attack**, **Magic Damage %**, and **Magic Defence** are distinct
+bonuses. There is no attached spell, charge store or legacy `strength_magic` alias.
+In **Mobs**, author **Magic level** independently of physical Defence and retain
+Magic Defence as a bonus. The combat-level preview uses the approved strongest
+melee-or-Magic component, with zero Magic contributing zero.
+
+Apply MMO Project migration `077_magic_authoring_foundation.sql` once against the
+shared development DB. The copy under `integrations/mmo-project/prototype/sql` is
+byte-identical documentation/integration material, not a second migration run.
+Existing whole XP remains unchanged; a database-owned 0–9 tenths remainder awaits
+the later casting settlement implementation. M1 supplies no starter balance data.
+
+## Blacksmithing foundation
+
+The Blacksmithing workspace edits ordered ingredient quantities, output, level,
+duration and ordinary decimal XP while storing exact integer tenths. Smelt/Forge
+choices explain their station and inventory-tool rules. Apply mirrored migrations 092 and 093,
+then use Preview → Save Draft → reload → Preview Publish → Publish. Missing item
+art and unapproved dagger stats keep Bronze recipes in Draft. Publication uses
+`export-blacksmithing-catalog`; runtime activity and game recipe UI are later slices.
+The integration mirror of `BlacksmithingRecipe.cs` must stay byte-identical with
+MMO Project's feature contract. No tests are authorized for this B1 delivery.
+
+## Items in a browser
+
+The authoring host now serves a responsive Items workspace at `/studio/`.
+It defaults to loopback and read-only browser access. Home-LAN editing requires
+either owner credentials or an explicit `TrustedHomeLanWithoutPassword` opt-in;
+the latter grants shared Items access to every peer on the allowed subnet. The Godot desktop Studio remains available. Home-LAN HTTPS
+is opt-in and must be separately approved and configured; this feature does not
+activate a listener, create credentials/certificates or restart the game.
+See [Browser Items](docs/BROWSER_ITEMS.md) for field coverage, integrity/recovery,
+the read-only precision-editor boundary and the activation checklist.
+
+Mobs browser workspace: `/studio/mobs.html` — complete combat, behavior, drops and
+shared actor calibration. See [Browser Mobs](docs/BROWSER_MOBS.md) for lifecycle and validation limits.
+
+Spells browser workspace: `/studio/spells.html` — full mechanics, exact XP, lifecycle
+and confined image/audio presentation. See [Browser Spells](docs/BROWSER_SPELLS.md).
+
+Environment browser workspace: `/studio/environment.html` — sanitized read-only
+host/API, database/schema, asset availability and catalog summaries with refresh.
+See [Browser Environment](docs/BROWSER_ENVIRONMENT.md). All eleven desktop tabs now
+have browser workspaces; the existing Items precision grip/pose editor remains the
+explicit desktop-only exception.
+
+## Repository-local delivery guidance
+
+The [studio-delivery skill](.agents/skills/studio-delivery/SKILL.md) records the
+verified validation, optional activation and paired Studio/parent Git workflow.
+It follows current AGENTS and task authority; it grants no standing permissions.
+The [disposable sandbox proposal](docs/STUDIO_SANDBOX_PROPOSAL.md) remains gated
+before any provisioning or security configuration.

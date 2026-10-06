@@ -25,7 +25,7 @@ public static partial class UnifiedItemDomainRules
         ItemConsumableBehaviorDraft? consumableBehavior,
         ItemEquipmentMetadataDraft? equipment,
         IReadOnlyList<ItemToolCapabilityDraft>? toolCapabilities,
-        ItemEconomyLifecycleDraft? economyLifecycle = null)
+        ItemEconomyLifecycleDraft? economyLifecycle = null, bool stackable = false)
     {
         var normalizedEquipment = NormalizeEquipment(equipment);
         return new NormalizedItemDraft(
@@ -34,7 +34,7 @@ public static partial class UnifiedItemDomainRules
             NormalizeConsumable(consumableBehavior),
             normalizedEquipment,
             NormalizeToolCapabilities(toolCapabilities),
-            NormalizeEconomyLifecycle(economyLifecycle));
+            NormalizeEconomyLifecycle(economyLifecycle), stackable);
     }
 
     public static NormalizedItemDraft FromRecord(UnifiedItemRecord record) =>
@@ -75,7 +75,8 @@ public static partial class UnifiedItemDomainRules
                             record.EquippedVisual.GripAnchors,
                             record.EquippedVisual.FlipXByPose,
                             record.EquippedVisual.HiddenPoses,
-                            record.EquippedVisual.ItemOverGripByPose))
+                            record.EquippedVisual.ItemOverGripByPose),
+                    record.AmmunitionProfile, record.TwoHanded)
                 : null,
             record.ToolCapabilities.Select(value => new ItemToolCapabilityDraft(
                 value.CapabilityId,
@@ -95,7 +96,7 @@ public static partial class UnifiedItemDomainRules
                     record.EconomyLifecycle.ReclaimPolicy,
                     record.EconomyLifecycle.ReclaimValue,
                     record.EconomyLifecycle.ConditionPolicyId,
-                    record.EconomyLifecycle.RepairPolicyId));
+                    record.EconomyLifecycle.RepairPolicyId), record.Stackable);
 
     private static ItemEconomyLifecycleDraft NormalizeEconomyLifecycle(ItemEconomyLifecycleDraft? value) =>
         new(
@@ -216,7 +217,7 @@ public static partial class UnifiedItemDomainRules
             return null;
         }
 
-        var weaponProfile = IsHandSlot(slotId)
+        var weaponProfile = IsHandSlot(slotId) || slotId == "ammo"
             ? NormalizeWeaponProfile(equipment.WeaponProfile)
             : null;
         return new NormalizedItemEquipmentMetadata(
@@ -236,7 +237,10 @@ public static partial class UnifiedItemDomainRules
                 .ToArray(),
             equipment.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero,
             weaponProfile,
-            NormalizeEquippedVisual(equipment.EquippedVisual));
+            NormalizeEquippedVisual(equipment.EquippedVisual),
+            equipment.AmmunitionProfile is null ? null : new ItemAmmunitionProfileDefinition(
+                NormalizeRequired(equipment.AmmunitionProfile.AmmunitionFamily),
+                NormalizeRequired(equipment.AmmunitionProfile.RangedDamageType), equipment.AmmunitionProfile.AmmunitionTier), equipment.TwoHanded);
     }
 
     private static EquipmentCombatProfileDefinition? NormalizeWeaponProfile(
@@ -250,10 +254,13 @@ public static partial class UnifiedItemDomainRules
         return new EquipmentCombatProfileDefinition(
             NormalizeRequired(profile.ProfileId),
             NormalizeRequired(profile.AttackType),
-            NormalizeOptional(profile.AccuracyStyle),
             profile.MinimumRangeTiles,
             profile.MaximumRangeTiles,
-            profile.AttackSpeedUnits);
+            profile.AttackSpeedUnits,
+            NormalizeOptional(profile.RangedDamageType), NormalizeOptional(profile.AmmunitionFamily), profile.MaximumAmmunitionTier,
+            (profile.MeleeCombatOptions ?? []).Select(option => new MeleeCombatOptionDefinition(
+                option.OptionSlot, NormalizeRequired(option.OptionId), NormalizeRequired(option.DisplayName),
+                NormalizeRequired(option.CombatStyle), NormalizeRequired(option.AccuracyStyle))).ToArray());
     }
 
     private static IReadOnlyList<ItemToolCapabilityDraft> NormalizeToolCapabilities(
@@ -401,7 +408,7 @@ public sealed record NormalizedItemDraft(
     NormalizedItemConsumableBehavior? ConsumableBehavior,
     NormalizedItemEquipmentMetadata? Equipment,
     IReadOnlyList<ItemToolCapabilityDraft> ToolCapabilities,
-    ItemEconomyLifecycleDraft EconomyLifecycle);
+    ItemEconomyLifecycleDraft EconomyLifecycle, bool Stackable);
 
 public sealed record NormalizedItemConsumableBehavior(
     string UseAction,
@@ -422,7 +429,8 @@ public sealed record NormalizedItemEquipmentMetadata(
     IReadOnlyList<EquipmentSkillModifierDraft> SkillModifiers,
     EquipmentCombatBonusDefinition CombatBonuses,
     EquipmentCombatProfileDefinition? WeaponProfile,
-    NormalizedItemEquippedVisual? EquippedVisual);
+    NormalizedItemEquippedVisual? EquippedVisual,
+    ItemAmmunitionProfileDefinition? AmmunitionProfile = null, bool TwoHanded = false);
 
 public sealed record NormalizedItemEquippedVisual(
     string? AssetKey,

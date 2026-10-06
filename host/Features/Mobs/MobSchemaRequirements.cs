@@ -1,3 +1,4 @@
+// Declares database schema requirements for the Mob authoring workspace.
 using MMO.ContentStudio.AuthoringHost.Health;
 
 namespace MMO.ContentStudio.AuthoringHost.Features.Mobs;
@@ -12,6 +13,8 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Table("mob_faction_dispositions"),
         AuthoringSchemaRequirement.Table("mob_definitions"),
         AuthoringSchemaRequirement.Table("mob_combat_profiles"),
+        AuthoringSchemaRequirement.Column("mob_combat_profiles", "physical_weight"),
+        AuthoringSchemaRequirement.Constraint("mob_combat_profiles_physical_weight_check"),
         AuthoringSchemaRequirement.Table("mob_combat_bonuses"),
         AuthoringSchemaRequirement.Table("mob_drops"),
         AuthoringSchemaRequirement.Column("mob_factions", "faction_id"),
@@ -59,6 +62,8 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "attack_level"),
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "strength_level"),
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "defence_level"),
+        AuthoringSchemaRequirement.Column("mob_combat_profiles", "magic_level"),
+        AuthoringSchemaRequirement.Constraint("mob_combat_profiles_magic_level_check"),
         AuthoringSchemaRequirement.Column("mob_combat_profiles", "updated_at"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_thrust"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_slash"),
@@ -67,11 +72,12 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "attack_magic"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "strength_melee"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "strength_ranged"),
-        AuthoringSchemaRequirement.Column("mob_combat_bonuses", "strength_magic"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_thrust"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_slash"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_crush"),
-        AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_ranged"),
+        AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_ranged_light"),
+        AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_ranged_standard"),
+        AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_ranged_heavy"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "defence_magic"),
         AuthoringSchemaRequirement.Column("mob_combat_bonuses", "updated_at"),
         AuthoringSchemaRequirement.Column("mob_drops", "mob_definition_id"),

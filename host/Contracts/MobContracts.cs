@@ -1,3 +1,4 @@
+// Defines Mob authoring payloads; explicit combat levels and bonuses survive preview and persistence.
 using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
@@ -53,7 +54,7 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("mob_target_scan_interval_ms")] int MobTargetScanIntervalMs,
     [property: JsonPropertyName("mob_target_scan_candidate_limit")] int MobTargetScanCandidateLimit,
     [property: JsonPropertyName("primary_combat_profile")] MobCombatProfileDefinition? PrimaryCombatProfile,
-    [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
+    [property: JsonPropertyName("combat_bonuses")] MobCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("guaranteed_drops")] IReadOnlyList<MobDropDefinition> GuaranteedDrops,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
@@ -73,7 +74,9 @@ public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits,
     [property: JsonPropertyName("attack_level")] int AttackLevel,
     [property: JsonPropertyName("strength_level")] int StrengthLevel,
-    [property: JsonPropertyName("defence_level")] int DefenceLevel);
+    [property: JsonPropertyName("defence_level")] int DefenceLevel,
+    [property: JsonPropertyName("magic_level")] int MagicLevel = 0,
+    [property: JsonPropertyName("physical_weight")] int PhysicalWeight = 100);
 
 public sealed record MobDropDefinition(
     [property: JsonPropertyName("drop_order")] int DropOrder,
@@ -110,7 +113,7 @@ public sealed record SaveMobDraftRequest(
     [property: JsonPropertyName("mob_target_scan_interval_ms")] int MobTargetScanIntervalMs,
     [property: JsonPropertyName("mob_target_scan_candidate_limit")] int MobTargetScanCandidateLimit,
     [property: JsonPropertyName("primary_combat_profile")] MobCombatProfileDefinition? PrimaryCombatProfile,
-    [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
+    [property: JsonPropertyName("combat_bonuses")] MobCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("guaranteed_drops")] IReadOnlyList<MobDropDraft>? GuaranteedDrops,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
@@ -142,7 +145,7 @@ public sealed record MobPreviewRequest(
     [property: JsonPropertyName("mob_target_scan_interval_ms")] int MobTargetScanIntervalMs,
     [property: JsonPropertyName("mob_target_scan_candidate_limit")] int MobTargetScanCandidateLimit,
     [property: JsonPropertyName("primary_combat_profile")] MobCombatProfileDefinition? PrimaryCombatProfile,
-    [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
+    [property: JsonPropertyName("combat_bonuses")] MobCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("guaranteed_drops")] IReadOnlyList<MobDropDraft>? GuaranteedDrops,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("target_operation")] string TargetOperation,
@@ -250,3 +253,27 @@ public sealed record MobAuthoringDefaults(
     [property: JsonPropertyName("mob_detection_radius_tiles")] int MobDetectionRadiusTiles,
     [property: JsonPropertyName("mob_target_scan_interval_ms")] int MobTargetScanIntervalMs,
     [property: JsonPropertyName("mob_target_scan_candidate_limit")] int MobTargetScanCandidateLimit);
+
+public sealed record MobCombatBonusDefinition(
+    [property: JsonPropertyName("attack_thrust")] int AttackThrust,
+    [property: JsonPropertyName("attack_slash")] int AttackSlash,
+    [property: JsonPropertyName("attack_crush")] int AttackCrush,
+    [property: JsonPropertyName("attack_ranged")] int AttackRanged,
+    [property: JsonPropertyName("attack_magic")] int AttackMagic,
+    [property: JsonPropertyName("strength_melee")] int StrengthMelee,
+    [property: JsonPropertyName("strength_ranged")] int StrengthRanged,
+    [property: JsonPropertyName("defence_thrust")] int DefenceThrust,
+    [property: JsonPropertyName("defence_slash")] int DefenceSlash,
+    [property: JsonPropertyName("defence_crush")] int DefenceCrush,
+    [property: JsonPropertyName("defence_ranged_light")] int DefenceRangedLight,
+    [property: JsonPropertyName("defence_ranged_standard")] int DefenceRangedStandard,
+    [property: JsonPropertyName("defence_ranged_heavy")] int DefenceRangedHeavy,
+    [property: JsonPropertyName("defence_magic")] int DefenceMagic)
+{
+    public static MobCombatBonusDefinition Zero { get; } = new(
+        0, 0, 0, 0, 0,
+        0, 0,
+        0, 0, 0, 0, 0, 0, 0);
+
+    public bool IsZero => this == Zero;
+}

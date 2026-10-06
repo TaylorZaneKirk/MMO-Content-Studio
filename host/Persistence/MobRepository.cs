@@ -1,3 +1,4 @@
+// Reads and writes the complete Mob aggregate under the existing authoring transaction.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
@@ -373,7 +374,7 @@ public sealed class MobRepository : IMobRepository
     {
         const string sql = """
             select attack_type, accuracy_style, minimum_range_tiles, maximum_range_tiles,
-                attack_speed_units, attack_level, strength_level, defence_level
+                attack_speed_units, attack_level, strength_level, defence_level, magic_level, physical_weight
             from mob_combat_profiles
             where mob_definition_id = @mob_definition_id;
             """;
@@ -394,10 +395,12 @@ public sealed class MobRepository : IMobRepository
             reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
             reader.GetInt32(reader.GetOrdinal("attack_level")),
             reader.GetInt32(reader.GetOrdinal("strength_level")),
-            reader.GetInt32(reader.GetOrdinal("defence_level")));
+            reader.GetInt32(reader.GetOrdinal("defence_level")),
+            reader.GetInt32(reader.GetOrdinal("magic_level")),
+            reader.GetInt32(reader.GetOrdinal("physical_weight")));
     }
 
-    private static async Task<EquipmentCombatBonusDefinition?> LoadCombatBonusesAsync(
+    private static async Task<MobCombatBonusDefinition?> LoadCombatBonusesAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         string mobDefinitionId,
@@ -405,8 +408,8 @@ public sealed class MobRepository : IMobRepository
     {
         const string sql = """
             select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
-                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic
+                strength_melee, strength_ranged,
+                defence_thrust, defence_slash, defence_crush, defence_ranged_light, defence_ranged_standard, defence_ranged_heavy, defence_magic
             from mob_combat_bonuses
             where mob_definition_id = @mob_definition_id;
             """;
@@ -414,7 +417,7 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("mob_definition_id", mobDefinitionId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
-            ? new EquipmentCombatBonusDefinition(
+            ? new MobCombatBonusDefinition(
                 reader.GetInt32(reader.GetOrdinal("attack_thrust")),
                 reader.GetInt32(reader.GetOrdinal("attack_slash")),
                 reader.GetInt32(reader.GetOrdinal("attack_crush")),
@@ -422,11 +425,12 @@ public sealed class MobRepository : IMobRepository
                 reader.GetInt32(reader.GetOrdinal("attack_magic")),
                 reader.GetInt32(reader.GetOrdinal("strength_melee")),
                 reader.GetInt32(reader.GetOrdinal("strength_ranged")),
-                reader.GetInt32(reader.GetOrdinal("strength_magic")),
                 reader.GetInt32(reader.GetOrdinal("defence_thrust")),
                 reader.GetInt32(reader.GetOrdinal("defence_slash")),
                 reader.GetInt32(reader.GetOrdinal("defence_crush")),
-                reader.GetInt32(reader.GetOrdinal("defence_ranged")),
+                reader.GetInt32(reader.GetOrdinal("defence_ranged_light")),
+                reader.GetInt32(reader.GetOrdinal("defence_ranged_standard")),
+                reader.GetInt32(reader.GetOrdinal("defence_ranged_heavy")),
                 reader.GetInt32(reader.GetOrdinal("defence_magic")))
             : null;
     }
@@ -608,6 +612,8 @@ public sealed class MobRepository : IMobRepository
                 attack_level,
                 strength_level,
                 defence_level,
+                magic_level,
+                physical_weight,
                 updated_at
             ) values (
                 @mob_definition_id,
@@ -619,6 +625,8 @@ public sealed class MobRepository : IMobRepository
                 @attack_level,
                 @strength_level,
                 @defence_level,
+                @magic_level,
+                @physical_weight,
                 now()
             )
             on conflict (mob_definition_id) do update set
@@ -630,6 +638,8 @@ public sealed class MobRepository : IMobRepository
                 attack_level = excluded.attack_level,
                 strength_level = excluded.strength_level,
                 defence_level = excluded.defence_level,
+                magic_level = excluded.magic_level,
+                physical_weight = excluded.physical_weight,
                 updated_at = now();
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -643,6 +653,8 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("attack_level", profile.AttackLevel);
         command.Parameters.AddWithValue("strength_level", profile.StrengthLevel);
         command.Parameters.AddWithValue("defence_level", profile.DefenceLevel);
+        command.Parameters.AddWithValue("magic_level", profile.MagicLevel);
+        command.Parameters.AddWithValue("physical_weight", profile.PhysicalWeight);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -650,7 +662,7 @@ public sealed class MobRepository : IMobRepository
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string mobDefinitionId,
-        EquipmentCombatBonusDefinition bonuses,
+        MobCombatBonusDefinition bonuses,
         CancellationToken cancellationToken)
     {
         if (bonuses.IsZero)
@@ -663,14 +675,14 @@ public sealed class MobRepository : IMobRepository
             insert into mob_combat_bonuses (
                 mob_definition_id,
                 attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
-                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
+                strength_melee, strength_ranged,
+                defence_thrust, defence_slash, defence_crush, defence_ranged_light, defence_ranged_standard, defence_ranged_heavy, defence_magic,
                 updated_at
             ) values (
                 @mob_definition_id,
                 @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
-                @strength_melee, @strength_ranged, @strength_magic,
-                @defence_thrust, @defence_slash, @defence_crush, @defence_ranged, @defence_magic,
+                @strength_melee, @strength_ranged,
+                @defence_thrust, @defence_slash, @defence_crush, @defence_ranged_light, @defence_ranged_standard, @defence_ranged_heavy, @defence_magic,
                 now()
             )
             on conflict (mob_definition_id) do update set
@@ -681,11 +693,12 @@ public sealed class MobRepository : IMobRepository
                 attack_magic = excluded.attack_magic,
                 strength_melee = excluded.strength_melee,
                 strength_ranged = excluded.strength_ranged,
-                strength_magic = excluded.strength_magic,
                 defence_thrust = excluded.defence_thrust,
                 defence_slash = excluded.defence_slash,
                 defence_crush = excluded.defence_crush,
-                defence_ranged = excluded.defence_ranged,
+                defence_ranged_light = excluded.defence_ranged_light,
+                defence_ranged_standard = excluded.defence_ranged_standard,
+                defence_ranged_heavy = excluded.defence_ranged_heavy,
                 defence_magic = excluded.defence_magic,
                 updated_at = now();
             """;
@@ -783,7 +796,7 @@ public sealed class MobRepository : IMobRepository
 
     private static void AddCombatBonusParameters(
         NpgsqlCommand command,
-        EquipmentCombatBonusDefinition bonuses)
+        MobCombatBonusDefinition bonuses)
     {
         command.Parameters.AddWithValue("attack_thrust", bonuses.AttackThrust);
         command.Parameters.AddWithValue("attack_slash", bonuses.AttackSlash);
@@ -792,18 +805,19 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("attack_magic", bonuses.AttackMagic);
         command.Parameters.AddWithValue("strength_melee", bonuses.StrengthMelee);
         command.Parameters.AddWithValue("strength_ranged", bonuses.StrengthRanged);
-        command.Parameters.AddWithValue("strength_magic", bonuses.StrengthMagic);
         command.Parameters.AddWithValue("defence_thrust", bonuses.DefenceThrust);
         command.Parameters.AddWithValue("defence_slash", bonuses.DefenceSlash);
         command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);
-        command.Parameters.AddWithValue("defence_ranged", bonuses.DefenceRanged);
+        command.Parameters.AddWithValue("defence_ranged_light", bonuses.DefenceRangedLight);
+        command.Parameters.AddWithValue("defence_ranged_standard", bonuses.DefenceRangedStandard);
+        command.Parameters.AddWithValue("defence_ranged_heavy", bonuses.DefenceRangedHeavy);
         command.Parameters.AddWithValue("defence_magic", bonuses.DefenceMagic);
     }
 
     private static MobDefinitionRecord ReadBaseRecord(
         NpgsqlDataReader reader,
         MobCombatProfileDefinition? profile,
-        EquipmentCombatBonusDefinition? bonuses,
+        MobCombatBonusDefinition? bonuses,
         IReadOnlyList<MobDropDefinition> drops,
         bool hasCombatProfile)
     {
@@ -903,7 +917,7 @@ public sealed record MobDefinitionRecord(
     int MobTargetScanIntervalMs,
     int MobTargetScanCandidateLimit,
     MobCombatProfileDefinition? PrimaryCombatProfile,
-    EquipmentCombatBonusDefinition? CombatBonuses,
+    MobCombatBonusDefinition? CombatBonuses,
     IReadOnlyList<MobDropDefinition> GuaranteedDrops,
     bool HasCombatProfile,
     int GuaranteedDropCount,

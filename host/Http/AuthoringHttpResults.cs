@@ -1,3 +1,4 @@
+// Maps common authoring operation results to versioned HTTP responses.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 
@@ -8,6 +9,7 @@ public static class AuthoringHttpResults
     private static readonly HashSet<string> ConflictCodes = new(StringComparer.Ordinal)
     {
         "item_version_conflict",
+        "world_object_version_conflict",
         "wrong_authoring_workspace",
         "item_has_live_references",
         "item_has_published_consumable_references",
@@ -37,7 +39,7 @@ public static class AuthoringHttpResults
             .Select(error => error.Code)
             .ToHashSet(StringComparer.Ordinal);
 
-        if (codes.Contains("item_not_found"))
+        if ((codes.Contains("item_not_found") || codes.Contains("world_object_not_found")))
         {
             return Results.NotFound(envelope);
         }

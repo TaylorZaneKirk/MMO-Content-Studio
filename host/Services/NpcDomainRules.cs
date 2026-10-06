@@ -120,7 +120,8 @@ public static class NpcDomainRules
             interactionEnabled ? NormalizeOptional(draft.DefaultDialogueId) : null,
             NormalizeOptional(draft.Notes),
             draft.ExpectedUpdatedAtUtc,
-            draft.PreviewSignature);
+            draft.PreviewSignature,
+            ShopDefinitionId: NormalizeOptional(draft.ShopDefinitionId));
     }
 
     public static string BuildSemanticComparisonInput(NpcDraft draft)
@@ -145,6 +146,7 @@ public static class NpcDomainRules
             normalized.InteractionRangeTiles,
             normalized.DefaultInteraction,
             normalized.DefaultDialogueId ?? string.Empty,
+            normalized.ShopDefinitionId ?? string.Empty,
             normalized.Notes ?? string.Empty);
     }
 

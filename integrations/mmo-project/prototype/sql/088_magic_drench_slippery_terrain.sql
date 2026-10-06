@@ -1,0 +1,35 @@
+-- Water surface facts; preserve every existing Published spell shape.
+BEGIN;
+ALTER TABLE magic_combat_spells
+    DROP CONSTRAINT magic_spells_impact_effect_check,
+    DROP CONSTRAINT magic_spells_published_shape_check,
+    ADD COLUMN slick_base_success_percent INTEGER NULL
+        CONSTRAINT magic_spells_slick_base_success_percent_check CHECK (slick_base_success_percent IS NULL OR (slick_base_success_percent BETWEEN 0 AND 100)),
+    ADD COLUMN slick_magic_levels_per_step INTEGER NULL
+        CONSTRAINT magic_spells_slick_magic_levels_per_step_check CHECK (slick_magic_levels_per_step IS NULL OR (slick_magic_levels_per_step > 0)),
+    ADD COLUMN slick_success_percent_per_step INTEGER NULL
+        CONSTRAINT magic_spells_slick_success_percent_per_step_check CHECK (slick_success_percent_per_step IS NULL OR (slick_success_percent_per_step BETWEEN 0 AND 100)),
+    ADD COLUMN slick_lifetime_milliseconds INTEGER NULL
+        CONSTRAINT magic_spells_slick_lifetime_milliseconds_check CHECK (slick_lifetime_milliseconds IS NULL OR (slick_lifetime_milliseconds > 0)),
+    ADD COLUMN slick_capacity_magic_levels_per_step INTEGER NULL
+        CONSTRAINT magic_spells_slick_capacity_magic_levels_per_step_check CHECK (slick_capacity_magic_levels_per_step IS NULL OR (slick_capacity_magic_levels_per_step > 0)),
+    ADD COLUMN slick_max_active INTEGER NULL
+        CONSTRAINT magic_spells_slick_max_active_check CHECK (slick_max_active IS NULL OR (slick_max_active > 0)),
+    ADD COLUMN slick_visual_frames TEXT[] NULL
+        CONSTRAINT magic_spells_slick_visual_frames_check CHECK (slick_visual_frames IS NULL OR (cardinality(slick_visual_frames) <= 64 AND array_position(slick_visual_frames, NULL) IS NULL AND magic_spell_burning_visual_frames_valid(slick_visual_frames))),
+    ADD COLUMN slick_visual_animation_fps DOUBLE PRECISION NULL
+        CONSTRAINT magic_spells_slick_visual_animation_fps_check CHECK (slick_visual_animation_fps IS NULL OR (slick_visual_animation_fps > 0 AND slick_visual_animation_fps < 'Infinity'::double precision)),
+    ADD COLUMN slick_visual_render_scale DOUBLE PRECISION NULL
+        CONSTRAINT magic_spells_slick_visual_render_scale_check CHECK (slick_visual_render_scale IS NULL OR (slick_visual_render_scale > 0 AND slick_visual_render_scale < 'Infinity'::double precision)),
+    ADD CONSTRAINT magic_spells_impact_effect_check CHECK (impact_effect IS NULL OR impact_effect IN ('air_displacement', 'earth_matter', 'burning_terrain', 'slippery_terrain')),
+    ADD CONSTRAINT magic_spells_slick_shape_check CHECK (COALESCE(impact_effect = 'slippery_terrain', false) OR (slick_base_success_percent IS NULL AND slick_magic_levels_per_step IS NULL AND slick_success_percent_per_step IS NULL AND slick_lifetime_milliseconds IS NULL AND slick_capacity_magic_levels_per_step IS NULL AND slick_max_active IS NULL AND COALESCE(cardinality(slick_visual_frames), 0) = 0 AND slick_visual_animation_fps IS NULL AND slick_visual_render_scale IS NULL)),
+    ADD CONSTRAINT magic_spells_published_shape_check CHECK (publication_state <> 'Published' OR COALESCE(
+        (cast_mode = 'selected_combat' AND target_mode = 'mob' AND impact_effect IS NULL AND force IS NULL AND force_falloff_per_tile IS NULL AND max_displacement_tiles IS NULL AND manifestation_base_success_percent IS NULL AND manifestation_magic_levels_per_step IS NULL AND manifestation_success_percent_per_step IS NULL AND matter_lifetime_milliseconds IS NULL AND matter_capacity_magic_levels_per_step IS NULL AND matter_max_active IS NULL AND matter_visual_texture_path IS NULL AND matter_visual_render_scale IS NULL)
+        OR (cast_mode = 'explicit_technique' AND target_mode = 'physical' AND element = 'air' AND impact_effect = 'air_displacement' AND successful_hit_min_damage = 0 AND base_max_hit = 0 AND manifestation_base_success_percent IS NULL AND manifestation_magic_levels_per_step IS NULL AND manifestation_success_percent_per_step IS NULL AND matter_lifetime_milliseconds IS NULL AND matter_capacity_magic_levels_per_step IS NULL AND matter_max_active IS NULL AND matter_visual_texture_path IS NULL AND matter_visual_render_scale IS NULL)
+        OR (cast_mode = 'explicit_technique' AND target_mode = 'tile' AND element = 'earth' AND impact_effect = 'earth_matter' AND successful_hit_min_damage = 0 AND base_max_hit = 0 AND force IS NULL AND force_falloff_per_tile IS NULL AND max_displacement_tiles IS NULL AND manifestation_base_success_percent IS NOT NULL AND manifestation_magic_levels_per_step IS NOT NULL AND manifestation_success_percent_per_step IS NOT NULL AND matter_lifetime_milliseconds IS NOT NULL AND matter_capacity_magic_levels_per_step IS NOT NULL AND matter_max_active IS NOT NULL AND matter_physical_weight IS NOT NULL AND matter_visual_texture_path IS NOT NULL AND matter_visual_render_scale IS NOT NULL)
+        OR (cast_mode = 'explicit_technique' AND target_mode = 'tile' AND element = 'fire' AND impact_effect = 'burning_terrain' AND successful_hit_min_damage = 0 AND base_max_hit = 0 AND force IS NULL AND force_falloff_per_tile IS NULL AND max_displacement_tiles IS NULL AND force_mastery_magic_levels_per_step IS NULL AND force_mastery_force_per_step IS NULL AND force_mastery_max_force IS NULL AND displacement_mastery_magic_levels_per_step IS NULL AND displacement_mastery_tiles_per_step IS NULL AND displacement_mastery_max_tiles IS NULL AND manifestation_base_success_percent IS NULL AND manifestation_magic_levels_per_step IS NULL AND manifestation_success_percent_per_step IS NULL AND matter_lifetime_milliseconds IS NULL AND matter_capacity_magic_levels_per_step IS NULL AND matter_max_active IS NULL AND matter_physical_weight IS NULL AND matter_visual_texture_path IS NULL AND matter_visual_render_scale IS NULL AND ignition_base_success_percent IS NOT NULL AND ignition_magic_levels_per_step IS NOT NULL AND ignition_success_percent_per_step IS NOT NULL AND burning_lifetime_milliseconds IS NOT NULL AND burning_capacity_magic_levels_per_step IS NOT NULL AND burning_max_active IS NOT NULL AND burning_min_damage IS NOT NULL AND burning_max_damage IS NOT NULL AND burning_hazard_cooldown_milliseconds IS NOT NULL AND cardinality(burning_visual_frames) >= 2 AND burning_visual_animation_fps IS NOT NULL AND burning_visual_render_scale IS NOT NULL)
+        OR (cast_mode = 'explicit_technique' AND target_mode = 'tile' AND element = 'water' AND impact_effect = 'slippery_terrain' AND successful_hit_min_damage = 0 AND base_max_hit = 0 AND slick_base_success_percent IS NOT NULL AND slick_magic_levels_per_step IS NOT NULL AND slick_success_percent_per_step IS NOT NULL AND slick_lifetime_milliseconds IS NOT NULL AND slick_capacity_magic_levels_per_step IS NOT NULL AND slick_max_active IS NOT NULL AND slick_visual_animation_fps IS NOT NULL AND slick_visual_render_scale IS NOT NULL AND cardinality(slick_visual_frames) >= 1), false));
+INSERT INTO schema_migrations(migration_file, migration_number, migration_name, notes)
+VALUES ('088_magic_drench_slippery_terrain.sql', 88, 'magic_drench_slippery_terrain',
+    'Water slick manifestation, lifetime, capacity and authored persistent presentation.');
+COMMIT;

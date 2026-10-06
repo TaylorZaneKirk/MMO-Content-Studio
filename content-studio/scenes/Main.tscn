@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
@@ -8,6 +8,13 @@
 [ext_resource type="Script" path="res://scripts/dialogue_editor.gd" id="6_dialogue"]
 [ext_resource type="Script" path="res://scripts/loot_table_editor.gd" id="7_loot"]
 [ext_resource type="Script" path="res://scripts/quest_editor.gd" id="8_quest"]
+
+[ext_resource type="Script" path="res://scripts/world_object_editor.gd" id="9_world_objects"]
+
+[ext_resource type="Script" path="res://scripts/shop_editor.gd" id="10_shops"]
+[ext_resource type="Script" path="res://scripts/magic_spell_editor.gd" id="11_spells"]
+
+[ext_resource type="Script" path="res://scripts/blacksmithing_editor.gd" id="12_blacksmithing"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -69,7 +76,14 @@ text = "MMO Content Studio"
 [node name="Subtitle" type="Label" parent="Margin/Root/Header/TitleBlock"]
 layout_mode = 2
 modulate = Color(0.7, 0.73, 0.79, 1)
-text = "U3 Unified Item Authoring"
+text = "Create, review and publish game content"
+
+[node name="RefreshButton" type="Button" parent="Margin/Root/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 4
+text = "Refresh"
+tooltip_text = "Reload Studio and discover newly created assets. Save edits first."
 
 [node name="ConnectionBlock" type="VBoxContainer" parent="Margin/Root/Header"]
 layout_mode = 2
@@ -133,6 +147,11 @@ script = ExtResource("6_dialogue")
 unique_name_in_owner = true
 layout_mode = 2
 script = ExtResource("8_quest")
+
+[node name="World Objects" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("9_world_objects")
 
 [node name="Environment" type="HBoxContainer" parent="Margin/Root/Tabs"]
 layout_mode = 2
@@ -222,3 +241,26 @@ title = "Import Item PNG"
 file_mode = 0
 access = 2
 filters = PackedStringArray("*.png ; PNG Images")
+
+[node name="RefreshConfirmation" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "Refresh Content Studio"
+dialog_text = "Reload all workspaces and asset lists? Unsaved edits will be discarded."
+ok_button_text = "Refresh"
+
+[node name="Shops" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+script = ExtResource("10_shops")
+
+[node name="Blacksmithing" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("12_blacksmithing")
+
+[node name="Spells" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+script = ExtResource("11_spells")

@@ -40,7 +40,8 @@ public sealed record ItemDefinitionSummary(
     [property: JsonPropertyName("has_equipment_metadata")] bool HasEquipmentMetadata,
     [property: JsonPropertyName("has_weapon_profile")] bool HasWeaponProfile,
     [property: JsonPropertyName("has_tool_capabilities")] bool HasToolCapabilities,
-    [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc);
+    [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
+    [property: JsonPropertyName("stackable")] bool Stackable = false);
 
 public sealed record ItemDefinition(
     [property: JsonPropertyName("item_id")] string ItemId,
@@ -54,7 +55,8 @@ public sealed record ItemDefinition(
     [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     [property: JsonPropertyName("updated_at_utc")] DateTimeOffset UpdatedAtUtc,
     [property: JsonPropertyName("asset_preview_file_path")] string? AssetPreviewFilePath,
-    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDefinition? EconomyLifecycle = null);
+    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDefinition? EconomyLifecycle = null,
+    [property: JsonPropertyName("stackable")] bool Stackable = false);
 
 public sealed record ItemConsumableBehaviorDefinition(
     [property: JsonPropertyName("use_action")] string UseAction,
@@ -76,7 +78,9 @@ public sealed record ItemEquipmentMetadataDefinition(
     [property: JsonPropertyName("skill_modifiers")] IReadOnlyList<EquipmentSkillModifierDefinition> SkillModifiers,
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition CombatBonuses,
     [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
-    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition? EquippedVisual);
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDefinition? EquippedVisual,
+    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null,
+    [property: JsonPropertyName("two_handed")] bool TwoHanded = false);
 
 public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -86,7 +90,8 @@ public sealed record SaveItemDraftRequest(
     [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDraft>? ToolCapabilities,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
-    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDraft? EconomyLifecycle = null);
+    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDraft? EconomyLifecycle = null,
+    [property: JsonPropertyName("stackable")] bool Stackable = false);
 
 public sealed record PreviewItemRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -96,7 +101,8 @@ public sealed record PreviewItemRequest(
     [property: JsonPropertyName("tool_capabilities")] IReadOnlyList<ItemToolCapabilityDraft>? ToolCapabilities,
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
     [property: JsonPropertyName("target_operation")] string TargetOperation,
-    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDraft? EconomyLifecycle = null);
+    [property: JsonPropertyName("economy_lifecycle")] ItemEconomyLifecycleDraft? EconomyLifecycle = null,
+    [property: JsonPropertyName("stackable")] bool Stackable = false);
 
 public sealed record ItemEconomyLifecycleDefinition(
     [property: JsonPropertyName("reference_value")] long ReferenceValue,
@@ -143,7 +149,9 @@ public sealed record ItemEquipmentMetadataDraft(
     [property: JsonPropertyName("skill_modifiers")] IReadOnlyList<EquipmentSkillModifierDraft>? SkillModifiers,
     [property: JsonPropertyName("combat_bonuses")] EquipmentCombatBonusDefinition? CombatBonuses,
     [property: JsonPropertyName("weapon_profile")] EquipmentCombatProfileDefinition? WeaponProfile,
-    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDraft? EquippedVisual);
+    [property: JsonPropertyName("equipped_visual")] ItemEquippedVisualDraft? EquippedVisual,
+    [property: JsonPropertyName("ammunition_profile")] ItemAmmunitionProfileDefinition? AmmunitionProfile = null,
+    [property: JsonPropertyName("two_handed")] bool TwoHanded = false);
 
 public sealed record ItemEquippedVisualDefinition(
     [property: JsonPropertyName("asset_key")] string AssetKey,

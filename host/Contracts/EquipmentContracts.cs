@@ -1,3 +1,4 @@
+// Defines the normalized equipment payload, including separate Magic accuracy and damage percentage facts.
 using System.Text.Json.Serialization;
 
 namespace MMO.ContentStudio.AuthoringHost.Contracts;
@@ -23,10 +24,25 @@ public sealed record EquipmentSkillModifierDraft(
 public sealed record EquipmentCombatProfileDefinition(
     [property: JsonPropertyName("profile_id")] string ProfileId,
     [property: JsonPropertyName("attack_type")] string AttackType,
-    [property: JsonPropertyName("accuracy_style")] string? AccuracyStyle,
     [property: JsonPropertyName("minimum_range_tiles")] int MinimumRangeTiles,
     [property: JsonPropertyName("maximum_range_tiles")] int MaximumRangeTiles,
-    [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits);
+    [property: JsonPropertyName("attack_speed_units")] int AttackSpeedUnits,
+    [property: JsonPropertyName("ranged_damage_type")] string? RangedDamageType = null,
+    [property: JsonPropertyName("ammunition_family")] string? AmmunitionFamily = null,
+    [property: JsonPropertyName("maximum_ammunition_tier")] int? MaximumAmmunitionTier = null,
+    [property: JsonPropertyName("melee_combat_options")] IReadOnlyList<MeleeCombatOptionDefinition>? MeleeCombatOptions = null);
+
+public sealed record MeleeCombatOptionDefinition(
+    [property: JsonPropertyName("option_slot")] short OptionSlot,
+    [property: JsonPropertyName("option_id")] string OptionId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("combat_style")] string CombatStyle,
+    [property: JsonPropertyName("accuracy_style")] string AccuracyStyle);
+
+public sealed record ItemAmmunitionProfileDefinition(
+    [property: JsonPropertyName("ammunition_family")] string AmmunitionFamily,
+    [property: JsonPropertyName("ranged_damage_type")] string RangedDamageType,
+    [property: JsonPropertyName("ammunition_tier")] int? AmmunitionTier = null);
 
 public sealed record EquipmentCombatBonusDefinition(
     [property: JsonPropertyName("attack_thrust")] int AttackThrust,
@@ -36,7 +52,7 @@ public sealed record EquipmentCombatBonusDefinition(
     [property: JsonPropertyName("attack_magic")] int AttackMagic,
     [property: JsonPropertyName("strength_melee")] int StrengthMelee,
     [property: JsonPropertyName("strength_ranged")] int StrengthRanged,
-    [property: JsonPropertyName("strength_magic")] int StrengthMagic,
+    [property: JsonPropertyName("magic_damage_percent")] int MagicDamagePercent,
     [property: JsonPropertyName("defence_thrust")] int DefenceThrust,
     [property: JsonPropertyName("defence_slash")] int DefenceSlash,
     [property: JsonPropertyName("defence_crush")] int DefenceCrush,

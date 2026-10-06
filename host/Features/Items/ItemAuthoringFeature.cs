@@ -88,6 +88,16 @@ public static class ItemAuthoringFeature
                 context,
                 await service.SaveDraftAsync(itemId, request, cancellationToken)));
 
+        items.MapPost("/{itemId}/save-and-publish", async (
+            HttpContext context,
+            string itemId,
+            SaveItemDraftRequest request,
+            UnifiedItemAuthoringService service,
+            CancellationToken cancellationToken) =>
+            AuthoringHttpResults.FromOperation(
+                context,
+                await service.SaveAndPublishAsync(itemId, request, cancellationToken)));
+
         items.MapPost("/{itemId}/publish", async (
             HttpContext context,
             string itemId,

@@ -349,7 +349,8 @@ public sealed class NpcAuthoringService
             request.ExpectedUpdatedAtUtc,
             request.PreviewSignature,
             request.VisualMode,
-            request.CompositeVisual);
+            request.CompositeVisual,
+            request.ShopDefinitionId);
 
     public static NpcDraft Normalize(PreviewNpcRequest request) =>
         Normalize(
@@ -374,7 +375,8 @@ public sealed class NpcAuthoringService
             request.ExpectedUpdatedAtUtc,
             null,
             request.VisualMode,
-            request.CompositeVisual);
+            request.CompositeVisual,
+            request.ShopDefinitionId);
 
     public static NpcDraft Normalize(
         string displayName,
@@ -398,7 +400,8 @@ public sealed class NpcAuthoringService
         DateTimeOffset? expectedUpdatedAtUtc,
         string? previewSignature,
         string? visualMode = ActorVisualModes.FlatSprite,
-        RiggedSpriteVisualDescriptor? compositeVisual = null)
+        RiggedSpriteVisualDescriptor? compositeVisual = null,
+        string? shopDefinitionId = null)
     {
         var movement = NpcDomainRules.NormalizeMovementBehavior(movementBehavior);
         var interaction = interactionEnabled;
@@ -425,7 +428,8 @@ public sealed class NpcAuthoringService
             expectedUpdatedAtUtc,
             previewSignature,
             presentation.VisualMode,
-            presentation.CompositeVisual);
+            presentation.CompositeVisual,
+            NpcDomainRules.NormalizeOptional(shopDefinitionId));
     }
 
     public static NpcDraft FromRecord(NpcDefinitionRecord record) =>
@@ -451,7 +455,8 @@ public sealed class NpcAuthoringService
             null,
             null,
             record.VisualMode,
-            record.CompositeVisual);
+            record.CompositeVisual,
+            record.ShopDefinitionId);
 
     public static string ComputePreviewSignature(
         string npcDefinitionId,
@@ -499,6 +504,7 @@ public sealed class NpcAuthoringService
         && record.InteractionRangeTiles == draft.InteractionRangeTiles
         && record.DefaultInteraction == draft.DefaultInteraction
         && string.Equals(record.DefaultDialogueId, draft.DefaultDialogueId, StringComparison.Ordinal)
+        && record.ShopDefinitionId == draft.ShopDefinitionId
         && string.Equals(record.Notes, draft.Notes, StringComparison.Ordinal)
         && string.Equals(record.VisualMode, draft.VisualMode, StringComparison.Ordinal)
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual);
@@ -523,6 +529,7 @@ public sealed class NpcAuthoringService
         && left.InteractionRangeTiles == right.InteractionRangeTiles
         && left.DefaultInteraction == right.DefaultInteraction
         && left.DefaultDialogueId == right.DefaultDialogueId
+        && left.ShopDefinitionId == right.ShopDefinitionId
         && left.Notes == right.Notes
         && left.VisualMode == right.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual);
@@ -642,7 +649,8 @@ public sealed class NpcAuthoringService
             asset.FilePath,
             record.VisualMode,
             record.CompositeVisual,
-            ResolvePersistedRiggedSpritePreview(record, asset));
+            ResolvePersistedRiggedSpritePreview(record, asset),
+            record.ShopDefinitionId);
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
@@ -673,7 +681,8 @@ public sealed class NpcAuthoringService
             true,
             record.UpdatedAtUtc,
             record.VisualMode,
-            record.CompositeVisual);
+            record.CompositeVisual,
+            record.ShopDefinitionId);
 
     private static IReadOnlyList<AuthoringChange> CalculateChanges(
         string npcDefinitionId,
@@ -701,6 +710,7 @@ public sealed class NpcAuthoringService
         AddChange(changes, "interaction_enabled", existing?.InteractionEnabled.ToString(), requested.InteractionEnabled.ToString());
         AddChange(changes, "interaction_range_tiles", existing?.InteractionRangeTiles.ToString(), requested.InteractionRangeTiles.ToString());
         AddChange(changes, "default_interaction", existing?.DefaultInteraction, requested.DefaultInteraction);
+        AddChange(changes, "shop_definition_id", existing?.ShopDefinitionId, requested.ShopDefinitionId);
         AddChange(changes, "default_dialogue_id", existing?.DefaultDialogueId, requested.DefaultDialogueId);
         AddChange(changes, "notes", existing?.Notes, requested.Notes);
         var targetState = operation switch
@@ -1034,6 +1044,7 @@ public sealed class NpcAuthoringService
         draft.InteractionRangeTiles,
         draft.DefaultInteraction,
         draft.DefaultDialogueId,
+        draft.ShopDefinitionId,
         draft.Notes,
         draft.VisualMode,
         draft.CompositeVisual

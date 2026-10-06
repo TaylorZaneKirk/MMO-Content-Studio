@@ -1,0 +1,21 @@
+/* Tiles reuse Studio's accepted shell; phone panes remain workspace / browse / detail. */
+.tiles-page .shell { grid-template-columns:210px minmax(285px,360px) minmax(0,1fr) }
+.tiles-page .catalog { padding:24px 16px; min-width:0 }
+.tiles-page main { min-width:0 }
+.tiles-page .tile-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:18px 0 }
+.tile-card { padding:6px; min-width:0; display:flex; flex-direction:column; align-items:center; gap:4px }
+.tile-card small { overflow-wrap:anywhere; font-size:10px; font-weight:400 }
+.tile-card.selected { border:2px solid var(--green); background:var(--soft) }
+.tile-thumb { width:100%; height:76px; object-fit:contain; image-rendering:pixelated }
+.tile-preview { max-width:100%; image-rendering:pixelated; background:var(--soft); border-radius:12px }
+.tiles-page fieldset { padding:0; border:0; display:grid; gap:18px; min-width:0 }
+.tiles-page .field { min-width:0 }
+.tiles-page .field input { margin-bottom:8px }
+.tiles-page .field small { display:block; overflow-wrap:anywhere; margin-top:6px }
+.tiles-page details,.tiles-page #review,.tiles-page #comparison { border:1px solid var(--line); border-radius:12px; padding:16px; margin:20px 0; overflow-wrap:anywhere }
+.tiles-page .tile-warning { background:#fff3db; border-radius:8px; padding:12px; overflow-wrap:anywhere }
+.tiles-page #tile-subtitle,.tiles-page #notice,.tiles-page #diagnostics { overflow-wrap:anywhere }
+.tiles-page .tile-actions { position:sticky; bottom:0; padding:14px 0; background:var(--paper); display:flex; flex-wrap:wrap; gap:8px; border-top:1px solid var(--line) }
+.tiles-page #tile-fields select { text-overflow:ellipsis }
+@media(max-width:1100px) and (min-width:801px) { .tiles-page .shell { grid-template-columns:170px 280px minmax(0,1fr) } }
+@media(max-width:800px) { .tiles-page .shell { display:block } .tiles-page .catalog { padding:18px 16px } .tiles-page .tile-grid { grid-template-columns:repeat(3,minmax(0,1fr)) } .tiles-page main { padding-bottom:20px } .tiles-page.keyboard-open .tile-actions { position:static } }

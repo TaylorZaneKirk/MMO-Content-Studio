@@ -1,3 +1,4 @@
+// Normalizes Mob authoring facts and derives permanent combat level from authored stats.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
@@ -140,13 +141,16 @@ public static class MobDomainRules
     public static bool IsLevelSupported(int level) =>
         level is >= 0 and <= MobAuthoringRegistry.MaxMobLevel;
 
+    // The approved combat-level formula uses the strongest offensive component.
+    // Magic zero contributes zero; physical Defence is never a Magic-level fallback.
     public static int CalculateDerivedCombatLevel(
         int attackLevel,
         int strengthLevel,
         int defenceLevel,
-        int maxHealth)
+        int maxHealth,
+        int magicLevel = 0)
     {
-        if (attackLevel < 0 || strengthLevel < 0 || defenceLevel < 0 || maxHealth < 0)
+        if (attackLevel < 0 || strengthLevel < 0 || defenceLevel < 0 || maxHealth < 0 || magicLevel < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(attackLevel), "Combat-level inputs must be nonnegative.");
         }
@@ -155,13 +159,13 @@ public static class MobDomainRules
         {
             return Math.Max(
                 1,
-                (10 * (defenceLevel + maxHealth) + 13 * (attackLevel + strengthLevel)) / 40);
+                (10 * (defenceLevel + maxHealth) + 13 * Math.Max(attackLevel + strengthLevel, (3 * magicLevel) / 2)) / 40);
         }
     }
 
     public static MobCombatLevelDiagnosticsDefinition CalculateCombatLevelDiagnostics(
         MobCombatProfileDefinition profile,
-        EquipmentCombatBonusDefinition bonuses)
+        MobCombatBonusDefinition bonuses)
     {
         var style = NormalizeAccuracyStyle(profile.AccuracyStyle) ?? "crush";
         var selectedAttackBonus = style switch

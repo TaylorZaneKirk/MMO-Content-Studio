@@ -1,3 +1,4 @@
+// Lists the supported authored weapon families and physical accuracy styles.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 
 namespace MMO.ContentStudio.AuthoringHost.Services;
@@ -9,7 +10,9 @@ public sealed class ItemAuthoringRegistry
 
     private static readonly AuthoringOption[] AttackFamilies =
     [
-        new("melee", "Melee")
+        new("melee", "Melee"),
+        new("ranged", "Ranged"),
+        new("magic", "Magic")
     ];
 
     private static readonly AuthoringOption[] MeleeAttackStyles =

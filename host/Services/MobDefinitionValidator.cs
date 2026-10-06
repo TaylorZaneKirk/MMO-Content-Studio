@@ -1,3 +1,4 @@
+// Validates supported Mob content for Draft and Published authoring operations.
 using System.Text.RegularExpressions;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
@@ -499,9 +500,13 @@ public sealed partial class MobDefinitionValidator
                 ValidationSeverity.Error,
                 "primary_combat_profile.attack_speed_units"));
         }
+        if (profile.PhysicalWeight is < 1 or > 1_000_000)
+            messages.Add(new ApiError("invalid_physical_weight", "Physical weight must be 1–1,000,000; weight resists forced displacement.",
+                ValidationSeverity.Error, "primary_combat_profile.physical_weight"));
         if (!MobDomainRules.IsLevelSupported(profile.AttackLevel)
             || !MobDomainRules.IsLevelSupported(profile.StrengthLevel)
-            || !MobDomainRules.IsLevelSupported(profile.DefenceLevel))
+            || !MobDomainRules.IsLevelSupported(profile.DefenceLevel)
+            || !MobDomainRules.IsLevelSupported(profile.MagicLevel))
         {
             messages.Add(new ApiError(
                 "invalid_mob_combat_level",
@@ -512,7 +517,7 @@ public sealed partial class MobDefinitionValidator
     }
 
     public static void ValidateBonuses(
-        EquipmentCombatBonusDefinition bonuses,
+        MobCombatBonusDefinition bonuses,
         ICollection<ApiError> messages)
     {
         foreach (var pair in CombatBonusValues(bonuses))
@@ -599,7 +604,7 @@ public sealed partial class MobDefinitionValidator
     }
 
     private static IReadOnlyDictionary<string, int> CombatBonusValues(
-        EquipmentCombatBonusDefinition bonuses) =>
+        MobCombatBonusDefinition bonuses) =>
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["attack_thrust"] = bonuses.AttackThrust,
@@ -609,11 +614,12 @@ public sealed partial class MobDefinitionValidator
             ["attack_magic"] = bonuses.AttackMagic,
             ["strength_melee"] = bonuses.StrengthMelee,
             ["strength_ranged"] = bonuses.StrengthRanged,
-            ["strength_magic"] = bonuses.StrengthMagic,
             ["defence_thrust"] = bonuses.DefenceThrust,
             ["defence_slash"] = bonuses.DefenceSlash,
             ["defence_crush"] = bonuses.DefenceCrush,
-            ["defence_ranged"] = bonuses.DefenceRanged,
+            ["defence_ranged_light"] = bonuses.DefenceRangedLight,
+            ["defence_ranged_standard"] = bonuses.DefenceRangedStandard,
+            ["defence_ranged_heavy"] = bonuses.DefenceRangedHeavy,
             ["defence_magic"] = bonuses.DefenceMagic
         };
 
@@ -645,7 +651,7 @@ public sealed record NormalizedMobDraft(
     int MobTargetScanIntervalMs,
     int MobTargetScanCandidateLimit,
     MobCombatProfileDefinition? PrimaryCombatProfile,
-    EquipmentCombatBonusDefinition CombatBonuses,
+    MobCombatBonusDefinition CombatBonuses,
     IReadOnlyList<MobDropDraft> GuaranteedDrops,
     string VisualMode,
     RiggedSpriteVisualDescriptor? CompositeVisual,

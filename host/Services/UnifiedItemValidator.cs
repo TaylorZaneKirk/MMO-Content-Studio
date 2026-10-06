@@ -1,3 +1,4 @@
+// Validates the unified Item aggregate for supported draft and publication shapes.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
 
@@ -48,6 +49,23 @@ public sealed class UnifiedItemValidator
     {
         var messages = new List<ApiError>();
         ValidateIdentity(itemId, draft.DisplayName, messages);
+        if (forPublication && !draft.Stackable &&
+            await _repository.HasIncompatibleStackQuantitiesAsync(itemId, cancellationToken))
+        {
+            messages.Add(new ApiError("incompatible_stack_quantity",
+                "Cannot publish a non-stackable item while retained inventory or equipment quantities require stacks, or the item is equipped as Ammo.",
+                ValidationSeverity.Error, "stackable"));
+        }
+        if (forPublication)
+        {
+            var shops = await _repository.LoadIncompatiblePublishedShopsAsync(itemId,
+                draft.EconomyLifecycle.ShopPolicy ?? string.Empty, draft.EconomyLifecycle.NpcBuyPrice,
+                draft.EconomyLifecycle.NpcSellPrice, cancellationToken);
+            if (shops.Count > 0)
+                messages.Add(new ApiError("incompatible_published_shop_stock",
+                    $"This economic policy would invalidate stock in Published Shops: {string.Join(", ", shops)}. Keep a compatible policy or edit those Shops first.",
+                    ValidationSeverity.Error, "economy_lifecycle.shop_policy"));
+        }
         var asset = _assetService.Resolve(draft.IconTexturePath);
         if (!asset.Exists)
         {
@@ -65,6 +83,17 @@ public sealed class UnifiedItemValidator
         if (draft.Equipment is not null)
         {
             await ValidateEquipmentAsync(draft.Equipment, forPublication, messages, cancellationToken);
+            ValidateAmmunition(draft.Equipment, draft.Stackable, forPublication, messages);
+            if (draft.Equipment.TwoHanded)
+            {
+                if (draft.Equipment.EquipmentSlotId != "right_hand")
+                    messages.Add(new ApiError("invalid_two_handed_slot",
+                        "Two-handed equipment must use right_hand.", ValidationSeverity.Error, "equipment.two_handed"));
+                if (await _repository.HasTwoHandedEquipmentConflictAsync(itemId, cancellationToken))
+                    messages.Add(new ApiError("two_handed_equipment_conflict",
+                        "This item is already equipped alongside a left-hand item or outside right_hand. Unequip the conflicting equipment in game before authoring it as two-handed.",
+                        ValidationSeverity.Error, "equipment.two_handed"));
+            }
         }
         await ValidateToolCapabilitiesAsync(draft.ToolCapabilities, messages, cancellationToken);
         await ValidateEconomyLifecycleAsync(itemId, draft.EconomyLifecycle, forPublication, messages, cancellationToken);
@@ -572,6 +601,27 @@ public sealed class UnifiedItemValidator
         }
     }
 
+    private static void ValidateAmmunition(
+        NormalizedItemEquipmentMetadata equipment, bool stackable, bool forPublication,
+        ICollection<ApiError> messages)
+    {
+        var profile = equipment.AmmunitionProfile;
+        if (profile is not null && (equipment.EquipmentSlotId != "ammo" ||
+            profile.AmmunitionFamily != "arrow" || profile.RangedDamageType is not ("light" or "standard" or "heavy")))
+            messages.Add(new ApiError("invalid_ammunition_profile",
+                "Ammunition profiles belong only to Ammo equipment and require Arrow family with Light, Standard or Heavy damage type.",
+                ValidationSeverity.Error, "equipment.ammunition_profile"));
+        if (profile is not null && profile.AmmunitionTier is not (>= 1 and <= UnifiedItemDomainRules.MaximumMagnitude))
+            messages.Add(new ApiError("invalid_ammunition_tier",
+                "Ammunition tier must be an integer from 1 to 1,000,000.",
+                ValidationSeverity.Error, "equipment.ammunition_profile.ammunition_tier"));
+        if (equipment.EquipmentSlotId == "ammo" && forPublication &&
+            (!stackable || profile is null || equipment.WeaponProfile is not null))
+            messages.Add(new ApiError("invalid_ammunition_equipment",
+                "Published Ammo must be stackable, have an ammunition profile, and have no weapon profile.",
+                ValidationSeverity.Error, "equipment"));
+    }
+
     private void ValidateWeaponProfile(
         NormalizedItemEquipmentMetadata equipment,
         bool forPublication,
@@ -625,14 +675,57 @@ public sealed class UnifiedItemValidator
                 ValidationSeverity.Error,
                 "equipment.weapon_profile.attack_type"));
         }
-        if (profile.AccuracyStyle is null || !_registry.SupportedAttackStyles.Contains(profile.AccuracyStyle))
+        var meleeOptions = profile.MeleeCombatOptions ?? [];
+        if (profile.AttackType == "melee" &&
+            (profile.RangedDamageType is not null || profile.AmmunitionFamily is not null))
         {
             messages.Add(new ApiError(
-                "unsupported_attack_style",
-                "Melee weapon profiles must use thrust, slash, or crush accuracy style.",
+                "invalid_melee_weapon_profile",
+                "Melee weapons have no ammunition family or Ranged damage type.",
                 ValidationSeverity.Error,
-                "equipment.weapon_profile.accuracy_style"));
+                "equipment.weapon_profile"));
         }
+        if (profile.AttackType == "melee" && (meleeOptions.Count > 4 || (forPublication && meleeOptions.Count == 0)))
+            messages.Add(new ApiError("melee_options_required", "Published Melee weapons require 1-4 combat options.",
+                ValidationSeverity.Error, "equipment.weapon_profile.melee_combat_options"));
+        if (profile.AttackType != "melee" && meleeOptions.Count > 0)
+            messages.Add(new ApiError("melee_options_wrong_family", "Only Melee weapons may have Melee combat options.",
+                ValidationSeverity.Error, "equipment.weapon_profile.melee_combat_options"));
+        if (meleeOptions.Select(option => option.OptionSlot).Distinct().Count() != meleeOptions.Count ||
+            meleeOptions.Select(option => option.OptionId).Distinct(StringComparer.Ordinal).Count() != meleeOptions.Count ||
+            meleeOptions.Any(option => option.OptionSlot is < 0 or > 3 ||
+                !System.Text.RegularExpressions.Regex.IsMatch(option.OptionId, "^[a-z][a-z0-9_]*$") ||
+                string.IsNullOrWhiteSpace(option.DisplayName) ||
+                option.CombatStyle is not ("accurate" or "aggressive" or "defensive" or "controlled") ||
+                !_registry.SupportedAttackStyles.Contains(option.AccuracyStyle)))
+            messages.Add(new ApiError("invalid_melee_options",
+                "Melee options need unique slots and IDs, names, combat styles and accuracy types.",
+                ValidationSeverity.Error, "equipment.weapon_profile.melee_combat_options"));
+        if (profile.AttackType == "ranged" &&
+            (!((profile.AmmunitionFamily is null && profile.RangedDamageType is "light" or "standard" or "heavy") ||
+               (profile.AmmunitionFamily == "arrow" && profile.RangedDamageType is null))))
+        {
+            messages.Add(new ApiError(
+                "invalid_ranged_weapon_profile",
+                "Ranged weapons need either Arrow ammunition with no weapon damage type, or a self-contained Light/Standard/Heavy damage type.",
+                ValidationSeverity.Error,
+                "equipment.weapon_profile.ranged_damage_type"));
+        }
+        if (profile.AttackType == "magic" && (profile.RangedDamageType is not null || profile.AmmunitionFamily is not null ||
+            profile.MaximumAmmunitionTier is not null))
+        {
+            messages.Add(new ApiError("invalid_magic_weapon_profile",
+                "Magic focuses have no Ranged damage type or ammunition fields.",
+                ValidationSeverity.Error, "equipment.weapon_profile"));
+        }
+
+        var usesAmmunition = profile.AttackType == "ranged" && profile.AmmunitionFamily is not null;
+        if (usesAmmunition
+            ? profile.MaximumAmmunitionTier is not (>= 1 and <= UnifiedItemDomainRules.MaximumMagnitude)
+            : profile.MaximumAmmunitionTier is not null)
+            messages.Add(new ApiError("invalid_maximum_ammunition_tier",
+                "Ammo-using Ranged weapons require a maximum ammunition tier from 1 to 1,000,000; other weapons must leave it empty.",
+                ValidationSeverity.Error, "equipment.weapon_profile.maximum_ammunition_tier"));
         if (profile.MinimumRangeTiles < (forPublication ? 1 : 0)
             || profile.MaximumRangeTiles < profile.MinimumRangeTiles
             || profile.MaximumRangeTiles > UnifiedItemDomainRules.MaximumRangeTiles)
@@ -957,7 +1050,7 @@ public sealed class UnifiedItemValidator
             ["attack_magic"] = bonuses.AttackMagic,
             ["strength_melee"] = bonuses.StrengthMelee,
             ["strength_ranged"] = bonuses.StrengthRanged,
-            ["strength_magic"] = bonuses.StrengthMagic,
+            ["magic_damage_percent"] = bonuses.MagicDamagePercent,
             ["defence_thrust"] = bonuses.DefenceThrust,
             ["defence_slash"] = bonuses.DefenceSlash,
             ["defence_crush"] = bonuses.DefenceCrush,

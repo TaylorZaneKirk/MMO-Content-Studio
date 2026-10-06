@@ -1,3 +1,4 @@
+// Persists the unified Item aggregate and its equipment, consumable and tool facts.
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Services;
 using Npgsql;
@@ -26,6 +27,14 @@ public interface IUnifiedItemRepository
 
     Task<IReadOnlyList<AuthoringOption>> LoadPublishedItemOptionsAsync(
         CancellationToken cancellationToken = default);
+
+    Task<bool> HasTwoHandedEquipmentConflictAsync(
+        string itemId, CancellationToken cancellationToken = default);
+
+    Task<bool> HasIncompatibleStackQuantitiesAsync(
+        string itemId, CancellationToken cancellationToken = default);
+
+    Task<bool> HasShopReferencesAsync(string itemId, bool publishedOnly, CancellationToken cancellationToken = default);
 
     Task<bool> HasLiveReferencesAsync(
         string itemId,
@@ -58,6 +67,14 @@ public interface IUnifiedItemRepository
         bool expectNew,
         CancellationToken cancellationToken = default);
 
+    Task<UnifiedItemRecord> SaveAndPublishAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>> LoadIncompatiblePublishedShopsAsync(
+        string itemId, string shopPolicy, long? npcBuyPrice, long? npcSellPrice,
+        CancellationToken cancellationToken = default);
+
     Task<UnifiedItemRecord> SetPublicationAsync(
         string itemId,
         bool runtimeEnabled,
@@ -88,7 +105,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 i.item_id,
                 i.item_name,
                 i.icon_texture_path,
+                i.stackable,
                 i.equipment_slot_id,
+                i.two_handed,
                 slot.display_name as equipment_slot_display_name,
                 i.runtime_enabled,
                 i.required_strength,
@@ -235,6 +254,68 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return records;
     }
 
+    public async Task<bool> HasTwoHandedEquipmentConflictAsync(
+        string itemId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select exists (
+                select 1 from character_equipment ce
+                where ce.item_id = @item and (ce.slot_id <> 'right_hand' or exists (
+                    select 1 from character_equipment offhand
+                    where offhand.character_id = ce.character_id and offhand.slot_id = 'left_hand')));
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    public async Task<bool> HasIncompatibleStackQuantitiesAsync(
+        string itemId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select exists (select 1 from character_inventory where item_id = @item and stack_count <> 1)
+                or exists (select 1 from character_equipment where item_id = @item and (stack_count <> 1 or slot_id = 'ammo'));
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    public async Task<IReadOnlyList<string>> LoadIncompatiblePublishedShopsAsync(
+        string itemId, string shopPolicy, long? npcBuyPrice, long? npcSellPrice,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select shop.shop_definition_id from shop_stock_items stock
+            join shop_definitions shop using (shop_definition_id)
+            where stock.item_id = @item and shop.publication_state = 'Published'
+              and not shop_stock_item_is_valid(true, @policy, @buy, @sell, stock.default_stock)
+            order by shop.shop_definition_id;
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        command.Parameters.AddWithValue("policy", shopPolicy);
+        command.Parameters.Add("buy", NpgsqlDbType.Bigint).Value = (object?)npcBuyPrice ?? DBNull.Value;
+        command.Parameters.Add("sell", NpgsqlDbType.Bigint).Value = (object?)npcSellPrice ?? DBNull.Value;
+        var shops = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken)) shops.Add(reader.GetString(0));
+        return shops;
+    }
+
+    public async Task<bool> HasShopReferencesAsync(string itemId, bool publishedOnly, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand("""
+            select exists (select 1 from shop_stock_items stock
+                join shop_definitions shop using (shop_definition_id)
+                where stock.item_id = @item and (not @published_only or shop.publication_state = 'Published'));
+            """, connection);
+        command.Parameters.AddWithValue("item", itemId);
+        command.Parameters.AddWithValue("published_only", publishedOnly);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
     public async Task<bool> HasLiveReferencesAsync(
         string itemId,
         CancellationToken cancellationToken = default)
@@ -244,8 +325,6 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 select 1 from character_inventory where item_id = @item_id
                 union all
                 select 1 from character_equipment where item_id = @item_id
-                union all
-                select 1 from ground_items where item_id = @item_id
             );
             """;
 
@@ -333,12 +412,21 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             reader.GetBoolean(reader.GetOrdinal("runtime_enabled")));
     }
 
-    public async Task<UnifiedItemRecord> SaveDraftAsync(
-        string itemId,
-        NormalizedItemDraft draft,
-        DateTimeOffset? expectedUpdatedAtUtc,
-        bool expectNew,
-        CancellationToken cancellationToken = default)
+    public Task<UnifiedItemRecord> SaveDraftAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        bool expectNew, CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, draft, expectedUpdatedAtUtc, expectNew, false, cancellationToken);
+
+    public Task<UnifiedItemRecord> SaveAndPublishAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, draft, expectedUpdatedAtUtc, false, true, cancellationToken);
+
+    // Both saves replace the complete aggregate in one transaction. A published
+    // edit never passes through runtime_enabled=false, so valid dependents stay live.
+    private async Task<UnifiedItemRecord> SaveAsync(
+        string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+        bool expectNew, bool publish, CancellationToken cancellationToken)
     {
         await using var connection = await _connectionFactory.OpenAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
@@ -349,9 +437,13 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
         }
         EnsureExpectedVersion(existing, expectedUpdatedAtUtc, itemId);
+        if (publish && existing is null)
+            throw new UnifiedItemNotFoundException(itemId);
+        if (publish && !existing!.RuntimeEnabled)
+            throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
         if (existing?.RuntimeEnabled == true)
         {
-            await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, "save_draft", cancellationToken);
+            await EnsureNoPendingDialogueSettlementReferencesAsync(connection, transaction, itemId, publish ? "save_and_publish" : "save_draft", cancellationToken);
         }
 
         const string sql = """
@@ -359,7 +451,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 item_id,
                 item_name,
                 icon_texture_path,
+                stackable,
                 equipment_slot_id,
+                two_handed,
                 runtime_enabled,
                 required_strength,
                 reference_value,
@@ -378,8 +472,10 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @item_id,
                 @item_name,
                 @icon_texture_path,
+                @stackable,
                 @equipment_slot_id,
-                false,
+                @two_handed,
+                @runtime_enabled,
                 @required_strength,
                 @reference_value,
                 @trade_policy,
@@ -398,7 +494,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             do update set
                 item_name = excluded.item_name,
                 icon_texture_path = excluded.icon_texture_path,
+                stackable = excluded.stackable,
                 equipment_slot_id = excluded.equipment_slot_id,
+                two_handed = excluded.two_handed,
                 required_strength = excluded.required_strength,
                 reference_value = excluded.reference_value,
                 trade_policy = excluded.trade_policy,
@@ -411,14 +509,17 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reclaim_value = excluded.reclaim_value,
                 condition_policy_id = excluded.condition_policy_id,
                 repair_policy_id = excluded.repair_policy_id,
-                runtime_enabled = false,
+                runtime_enabled = excluded.runtime_enabled,
                 updated_at = now();
             """;
         await using (var command = new NpgsqlCommand(sql, connection, transaction))
         {
             command.Parameters.AddWithValue("item_id", itemId);
+            command.Parameters.AddWithValue("runtime_enabled", publish);
             command.Parameters.AddWithValue("item_name", draft.DisplayName);
             command.Parameters.AddWithValue("icon_texture_path", draft.IconTexturePath);
+            command.Parameters.AddWithValue("stackable", draft.Stackable);
+            command.Parameters.AddWithValue("two_handed", draft.Equipment?.TwoHanded ?? false);
             command.Parameters.Add("equipment_slot_id", NpgsqlDbType.Text).Value =
                 (object?)draft.Equipment?.EquipmentSlotId ?? DBNull.Value;
             command.Parameters.AddWithValue("required_strength", draft.Equipment?.RequiredStrength ?? 1);
@@ -545,6 +646,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             Requirements = await LoadRequirementsAsync(connection, transaction, itemId, cancellationToken),
             SkillModifiers = await LoadModifiersAsync(connection, transaction, itemId, cancellationToken),
             WeaponProfile = await LoadWeaponProfileAsync(connection, transaction, itemId, cancellationToken),
+            AmmunitionProfile = await LoadAmmunitionProfileAsync(connection, transaction, itemId, cancellationToken),
             CombatBonuses = await LoadCombatBonusesAsync(connection, transaction, itemId, cancellationToken),
             EquippedVisual = await LoadEquippedVisualAsync(connection, transaction, itemId, cancellationToken),
             ToolCapabilities = await LoadToolCapabilitiesAsync(connection, transaction, itemId, cancellationToken)
@@ -690,7 +792,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 i.item_id,
                 i.item_name,
                 i.icon_texture_path,
+                i.stackable,
                 i.equipment_slot_id,
+                i.two_handed,
                 slot.display_name as equipment_slot_display_name,
                 i.runtime_enabled,
                 i.required_strength,
@@ -874,26 +978,71 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         CancellationToken cancellationToken)
     {
         const string sql = """
-            select profile_id, attack_type, accuracy_style,
-                minimum_range_tiles, maximum_range_tiles, attack_speed_units
+            select profile_id, attack_type, ranged_damage_type,
+                minimum_range_tiles, maximum_range_tiles, attack_speed_units, ammunition_family, maximum_ammunition_tier
             from item_combat_profiles
             where item_id = @item_id;
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         command.Parameters.AddWithValue("item_id", itemId);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!await reader.ReadAsync(cancellationToken))
+        EquipmentCombatProfileDefinition? profile;
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
-            return null;
+            if (!await reader.ReadAsync(cancellationToken)) return null;
+            profile = new EquipmentCombatProfileDefinition(
+                reader.GetString(reader.GetOrdinal("profile_id")),
+                reader.GetString(reader.GetOrdinal("attack_type")),
+                reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
+                reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
+                reader.GetInt32(reader.GetOrdinal("attack_speed_units")),
+                ReadNullableString(reader, "ranged_damage_type"), ReadNullableString(reader, "ammunition_family"),
+                reader.IsDBNull(reader.GetOrdinal("maximum_ammunition_tier")) ? null : reader.GetInt32(reader.GetOrdinal("maximum_ammunition_tier")));
         }
+        var options = new List<MeleeCombatOptionDefinition>();
+        await using var optionCommand = new NpgsqlCommand("""
+            select option_slot, option_id, display_name, combat_style, accuracy_style
+            from item_melee_combat_options where item_id = @item_id order by option_slot;
+            """, connection, transaction);
+        optionCommand.Parameters.AddWithValue("item_id", itemId);
+        await using var optionReader = await optionCommand.ExecuteReaderAsync(cancellationToken);
+        while (await optionReader.ReadAsync(cancellationToken))
+            options.Add(new MeleeCombatOptionDefinition(optionReader.GetInt16(0), optionReader.GetString(1),
+                optionReader.GetString(2), optionReader.GetString(3), optionReader.GetString(4)));
+        return profile with { MeleeCombatOptions = options };
+    }
 
-        return new EquipmentCombatProfileDefinition(
-            reader.GetString(reader.GetOrdinal("profile_id")),
-            reader.GetString(reader.GetOrdinal("attack_type")),
-            ReadNullableString(reader, "accuracy_style"),
-            reader.GetInt32(reader.GetOrdinal("minimum_range_tiles")),
-            reader.GetInt32(reader.GetOrdinal("maximum_range_tiles")),
-            reader.GetInt32(reader.GetOrdinal("attack_speed_units")));
+    private static async Task<ItemAmmunitionProfileDefinition?> LoadAmmunitionProfileAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, string itemId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("""
+            select ammunition_family, ranged_damage_type, ammunition_tier from item_ammunition_profiles where item_id = @item;
+            """, connection, transaction);
+        command.Parameters.AddWithValue("item", itemId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? new(reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetInt32(2)) : null;
+    }
+
+    private static async Task ReplaceAmmunitionProfileAsync(
+        NpgsqlConnection connection, NpgsqlTransaction transaction, string itemId,
+        ItemAmmunitionProfileDefinition? profile, CancellationToken cancellationToken)
+    {
+        if (profile is null)
+        {
+            await ExecuteDeleteAsync(connection, transaction, "item_ammunition_profiles", itemId, cancellationToken);
+            return;
+        }
+        await using var command = new NpgsqlCommand("""
+            insert into item_ammunition_profiles (item_id, ammunition_family, ranged_damage_type, ammunition_tier)
+            values (@item, @family, @damage, @tier)
+            on conflict (item_id) do update set ammunition_family = excluded.ammunition_family,
+                ranged_damage_type = excluded.ranged_damage_type, ammunition_tier = excluded.ammunition_tier, updated_at = now();
+            """, connection, transaction);
+        command.Parameters.AddWithValue("item", itemId);
+        command.Parameters.AddWithValue("family", profile.AmmunitionFamily);
+        command.Parameters.AddWithValue("damage", profile.RangedDamageType);
+        command.Parameters.Add("tier", NpgsqlDbType.Integer).Value = (object?)profile.AmmunitionTier ?? DBNull.Value;
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static async Task<EquipmentCombatBonusDefinition?> LoadCombatBonusesAsync(
@@ -904,7 +1053,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         const string sql = """
             select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
+                strength_melee, strength_ranged, magic_damage_percent,
                 defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic
             from item_combat_bonuses
             where item_id = @item_id;
@@ -921,7 +1070,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reader.GetInt32(reader.GetOrdinal("attack_magic")),
                 reader.GetInt32(reader.GetOrdinal("strength_melee")),
                 reader.GetInt32(reader.GetOrdinal("strength_ranged")),
-                reader.GetInt32(reader.GetOrdinal("strength_magic")),
+                reader.GetInt32(reader.GetOrdinal("magic_damage_percent")),
                 reader.GetInt32(reader.GetOrdinal("defence_thrust")),
                 reader.GetInt32(reader.GetOrdinal("defence_slash")),
                 reader.GetInt32(reader.GetOrdinal("defence_crush")),
@@ -1342,6 +1491,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         {
             await ExecuteDeleteAsync(connection, transaction, "item_skill_requirements", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_skill_modifiers", itemId, cancellationToken);
+            await ExecuteDeleteAsync(connection, transaction, "item_ammunition_profiles", itemId, cancellationToken);
+            await ExecuteDeleteAsync(connection, transaction, "item_melee_combat_options", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_bonuses", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_equipped_visual_pose_anchors", itemId, cancellationToken);
@@ -1352,6 +1503,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         await ReplaceRequirementsAsync(connection, transaction, itemId, equipment.Requirements, cancellationToken);
         await ReplaceModifiersAsync(connection, transaction, itemId, equipment.SkillModifiers, cancellationToken);
         await ReplaceWeaponProfileAsync(connection, transaction, itemId, equipment.WeaponProfile, cancellationToken);
+        await ReplaceAmmunitionProfileAsync(connection, transaction, itemId, equipment.AmmunitionProfile, cancellationToken);
         await ReplaceCombatBonusesAsync(connection, transaction, itemId, equipment.CombatBonuses, cancellationToken);
         await ReplaceEquippedVisualAsync(connection, transaction, itemId, equipment.EquippedVisual, cancellationToken);
     }
@@ -1409,6 +1561,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
     {
         if (profile is null)
         {
+            await ExecuteDeleteAsync(connection, transaction, "item_melee_combat_options", itemId, cancellationToken);
             await ExecuteDeleteAsync(connection, transaction, "item_combat_profiles", itemId, cancellationToken);
             return;
         }
@@ -1418,7 +1571,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 item_id,
                 profile_id,
                 attack_type,
-                accuracy_style,
+                ranged_damage_type,
+                ammunition_family,
+                maximum_ammunition_tier,
                 minimum_range_tiles,
                 maximum_range_tiles,
                 attack_speed_units,
@@ -1427,7 +1582,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 @item_id,
                 @profile_id,
                 @attack_type,
-                @accuracy_style,
+                @ranged_damage_type,
+                @ammunition_family,
+                @maximum_ammunition_tier,
                 @minimum_range_tiles,
                 @maximum_range_tiles,
                 @attack_speed_units,
@@ -1436,7 +1593,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             on conflict (item_id) do update set
                 profile_id = excluded.profile_id,
                 attack_type = excluded.attack_type,
-                accuracy_style = excluded.accuracy_style,
+                ranged_damage_type = excluded.ranged_damage_type,
+                ammunition_family = excluded.ammunition_family,
+                maximum_ammunition_tier = excluded.maximum_ammunition_tier,
                 minimum_range_tiles = excluded.minimum_range_tiles,
                 maximum_range_tiles = excluded.maximum_range_tiles,
                 attack_speed_units = excluded.attack_speed_units,
@@ -1446,12 +1605,32 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("item_id", itemId);
         command.Parameters.AddWithValue("profile_id", profile.ProfileId);
         command.Parameters.AddWithValue("attack_type", profile.AttackType);
-        command.Parameters.Add("accuracy_style", NpgsqlDbType.Text).Value =
-            (object?)profile.AccuracyStyle ?? DBNull.Value;
+        command.Parameters.Add("ranged_damage_type", NpgsqlDbType.Text).Value =
+            (object?)profile.RangedDamageType ?? DBNull.Value;
+        command.Parameters.Add("ammunition_family", NpgsqlDbType.Text).Value =
+            (object?)profile.AmmunitionFamily ?? DBNull.Value;
+        command.Parameters.Add("maximum_ammunition_tier", NpgsqlDbType.Integer).Value =
+            (object?)profile.MaximumAmmunitionTier ?? DBNull.Value;
         command.Parameters.AddWithValue("minimum_range_tiles", profile.MinimumRangeTiles);
         command.Parameters.AddWithValue("maximum_range_tiles", profile.MaximumRangeTiles);
         command.Parameters.AddWithValue("attack_speed_units", profile.AttackSpeedUnits);
         await command.ExecuteNonQueryAsync(cancellationToken);
+        await ExecuteDeleteAsync(connection, transaction, "item_melee_combat_options", itemId, cancellationToken);
+        foreach (var option in profile.MeleeCombatOptions ?? [])
+        {
+            await using var optionCommand = new NpgsqlCommand("""
+                insert into item_melee_combat_options
+                    (item_id, option_slot, option_id, display_name, combat_style, accuracy_style)
+                values (@item_id, @option_slot, @option_id, @display_name, @combat_style, @accuracy_style);
+                """, connection, transaction);
+            optionCommand.Parameters.AddWithValue("item_id", itemId);
+            optionCommand.Parameters.AddWithValue("option_slot", option.OptionSlot);
+            optionCommand.Parameters.AddWithValue("option_id", option.OptionId);
+            optionCommand.Parameters.AddWithValue("display_name", option.DisplayName);
+            optionCommand.Parameters.AddWithValue("combat_style", option.CombatStyle);
+            optionCommand.Parameters.AddWithValue("accuracy_style", option.AccuracyStyle);
+            await optionCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
     }
 
     private static async Task ReplaceCombatBonusesAsync(
@@ -1471,13 +1650,13 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
             insert into item_combat_bonuses (
                 item_id,
                 attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
-                strength_melee, strength_ranged, strength_magic,
+                strength_melee, strength_ranged, magic_damage_percent,
                 defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
                 updated_at
             ) values (
                 @item_id,
                 @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
-                @strength_melee, @strength_ranged, @strength_magic,
+                @strength_melee, @strength_ranged, @magic_damage_percent,
                 @defence_thrust, @defence_slash, @defence_crush, @defence_ranged, @defence_magic,
                 now()
             )
@@ -1489,7 +1668,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 attack_magic = excluded.attack_magic,
                 strength_melee = excluded.strength_melee,
                 strength_ranged = excluded.strength_ranged,
-                strength_magic = excluded.strength_magic,
+                magic_damage_percent = excluded.magic_damage_percent,
                 defence_thrust = excluded.defence_thrust,
                 defence_slash = excluded.defence_slash,
                 defence_crush = excluded.defence_crush,
@@ -1506,7 +1685,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("attack_magic", bonuses.AttackMagic);
         command.Parameters.AddWithValue("strength_melee", bonuses.StrengthMelee);
         command.Parameters.AddWithValue("strength_ranged", bonuses.StrengthRanged);
-        command.Parameters.AddWithValue("strength_magic", bonuses.StrengthMagic);
+        command.Parameters.AddWithValue("magic_damage_percent", bonuses.MagicDamagePercent);
         command.Parameters.AddWithValue("defence_thrust", bonuses.DefenceThrust);
         command.Parameters.AddWithValue("defence_slash", bonuses.DefenceSlash);
         command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);
@@ -1808,7 +1987,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reader.GetString(reader.GetOrdinal("reclaim_policy")),
                 ReadNullableInt64(reader, "reclaim_value"),
                 ReadNullableString(reader, "condition_policy_id"),
-                ReadNullableString(reader, "repair_policy_id")));
+                ReadNullableString(reader, "repair_policy_id")),
+            reader.GetBoolean(reader.GetOrdinal("stackable")),
+            TwoHanded: reader.GetBoolean(reader.GetOrdinal("two_handed")));
     }
 
     private static string? ReadNullableString(NpgsqlDataReader reader, string column)
@@ -1871,7 +2052,8 @@ public sealed record UnifiedItemRecord(
     ItemEquippedVisualDefinition? EquippedVisual,
     IReadOnlyList<ItemToolCapabilityDefinition> ToolCapabilities,
     DateTimeOffset UpdatedAtUtc,
-    ItemEconomyLifecycleDefinition? EconomyLifecycle = null);
+    ItemEconomyLifecycleDefinition? EconomyLifecycle = null, bool Stackable = false,
+    ItemAmmunitionProfileDefinition? AmmunitionProfile = null, bool TwoHanded = false);
 
 public sealed record ConsumableProfileDraft(
     string UseAction,

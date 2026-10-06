@@ -86,6 +86,8 @@ func operation_name(operation: String) -> String:
 	match operation:
 		"save_draft":
 			return "Save Draft"
+		"save_and_publish":
+			return "Save & Publish"
 		"publish":
 			return "Publish"
 		"disable":

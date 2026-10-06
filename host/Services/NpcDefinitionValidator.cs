@@ -22,9 +22,11 @@ public sealed partial class NpcDefinitionValidator
         "npc_unsupported_interaction",
         "npc_invalid_interaction_range",
         "npc_invalid_dialogue_reference",
+        "npc_invalid_shop_reference",
         "npc_invalid_notes"
     };
 
+    private readonly ShopRepository? _shopRepository;
     private readonly ItemAssetService _assetService;
     private readonly NpcDialogueReferenceProvider _dialogueReferences;
     private readonly ActorAppearanceCatalogService? _actorAppearanceCatalogService;
@@ -34,12 +36,14 @@ public sealed partial class NpcDefinitionValidator
         ItemAssetService assetService,
         NpcDialogueReferenceProvider dialogueReferences,
         ActorAppearanceCatalogService? actorAppearanceCatalogService = null,
-        IUnifiedItemRepository? itemRepository = null)
+        IUnifiedItemRepository? itemRepository = null,
+        ShopRepository? shopRepository = null)
     {
         _assetService = assetService;
         _dialogueReferences = dialogueReferences;
         _actorAppearanceCatalogService = actorAppearanceCatalogService;
         _itemRepository = itemRepository;
+        _shopRepository = shopRepository;
     }
 
     public async Task<NpcValidationOutcome> ValidateAsync(
@@ -54,6 +58,14 @@ public sealed partial class NpcDefinitionValidator
         ValidateVisuals(draft, messages, forPublication);
         ValidateMovement(draft, messages);
         await ValidateInteractionAsync(draft, messages, forPublication, cancellationToken);
+        if (draft.ShopDefinitionId is not null)
+        {
+            var shop = _shopRepository is null ? null : await _shopRepository.LoadAsync(draft.ShopDefinitionId, cancellationToken);
+            if (shop is null)
+                messages.Add(new ApiError("npc_invalid_shop_reference", "Select an existing Shop definition.", ValidationSeverity.Error, "shop_definition_id"));
+            else if (shop.PublicationState != "Published" || !draft.InteractionEnabled)
+                messages.Add(new ApiError("npc_shop_not_publishable", "A shopkeeper needs a Published Shop and interaction enabled before NPC publication.", forPublication ? ValidationSeverity.Error : ValidationSeverity.Warning, "shop_definition_id"));
+        }
         ValidateNotes(draft, messages);
         await ValidateRiggedSpriteVisualAsync(draft, messages, cancellationToken);
 

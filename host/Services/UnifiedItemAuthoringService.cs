@@ -1,3 +1,4 @@
+// Owns unified Item preview and publication decisions over repository-owned persistence.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -141,16 +142,18 @@ public sealed class UnifiedItemAuthoringService
                 existing is not null
                 && operation is "publish" or "disable" or "delete"
                 && !EquivalentDraft(existing, requested);
-            var effective = operation == "save_draft" || hasUnsavedOperationChanges
+            var effective = operation is "save_draft" or "save_and_publish" || hasUnsavedOperationChanges
                 ? requested
                 : UnifiedItemDomainRules.FromRecord(existing!);
             var validation = await _validator.ValidateAsync(
                 itemId,
                 effective,
                 existing,
-                operation == "publish" && !hasUnsavedOperationChanges,
+                operation is "publish" or "save_and_publish" && !hasUnsavedOperationChanges,
                 cancellationToken);
             var messages = validation.Messages.ToList();
+            if (operation == "save_and_publish" && existing?.RuntimeEnabled != true)
+                messages.Add(SaveAndPublishRequiresPublished());
             if (hasUnsavedOperationChanges)
             {
                 messages.Add(new ApiError(
@@ -177,27 +180,36 @@ public sealed class UnifiedItemAuthoringService
         }
     }
 
-    public async Task<AuthoringOperationResult<ItemMutationResponse>> SaveDraftAsync(
-        string itemId,
-        SaveItemDraftRequest request,
-        CancellationToken cancellationToken = default)
+    public Task<AuthoringOperationResult<ItemMutationResponse>> SaveDraftAsync(
+        string itemId, SaveItemDraftRequest request, CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, request, false, cancellationToken);
+
+    public Task<AuthoringOperationResult<ItemMutationResponse>> SaveAndPublishAsync(
+        string itemId, SaveItemDraftRequest request, CancellationToken cancellationToken = default) =>
+        SaveAsync(itemId, request, true, cancellationToken);
+
+    private async Task<AuthoringOperationResult<ItemMutationResponse>> SaveAsync(
+        string itemId, SaveItemDraftRequest request, bool publish, CancellationToken cancellationToken)
     {
+        var operation = publish ? "save_and_publish" : "save_draft";
         try
         {
             var existing = await _repository.LoadAsync(itemId, cancellationToken);
             var wasRuntimeEnabled = existing?.RuntimeEnabled == true;
+            if (publish && !wasRuntimeEnabled)
+                return AuthoringOperationResult<ItemMutationResponse>.Failure(SaveAndPublishRequiresPublished());
             var draft = Normalize(request);
-            if (!IsMatchingPreview(itemId, "save_draft", draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature))
+            if (!IsMatchingPreview(itemId, operation, draft, request.ExpectedUpdatedAtUtc, request.PreviewSignature))
             {
-                return AuthoringOperationResult<ItemMutationResponse>.Failure(PreviewMismatch("save_draft"));
+                return AuthoringOperationResult<ItemMutationResponse>.Failure(PreviewMismatch(operation));
             }
 
-            var validation = await _validator.ValidateAsync(itemId, draft, existing, false, cancellationToken);
-            if (!validation.ValidForDraft)
+            var validation = await _validator.ValidateAsync(itemId, draft, existing, publish, cancellationToken);
+            if (publish ? !validation.ValidForPublication : !validation.ValidForDraft)
             {
                 return AuthoringOperationResult<ItemMutationResponse>.Failure(validation.Messages);
             }
-            if (wasRuntimeEnabled)
+            if (wasRuntimeEnabled && !publish)
             {
                 var referenceErrors = new List<ApiError>();
                 await AddDisableReferenceErrorsAsync(itemId, referenceErrors, cancellationToken);
@@ -207,14 +219,16 @@ public sealed class UnifiedItemAuthoringService
                 }
             }
 
-            var saved = await _repository.SaveDraftAsync(
+            var saved = publish
+                ? await _repository.SaveAndPublishAsync(itemId, draft, request.ExpectedUpdatedAtUtc, cancellationToken)
+                : await _repository.SaveDraftAsync(
                 itemId,
                 draft,
                 request.ExpectedUpdatedAtUtc,
                 existing is null,
                 cancellationToken);
             var verified = await _repository.LoadAsync(itemId, cancellationToken);
-            if (verified is null || !Equivalent(saved, verified))
+            if (verified is null || !Equivalent(saved, verified) || verified.RuntimeEnabled != publish)
             {
                 throw new InvalidOperationException("The saved item aggregate failed reload-and-verify.");
             }
@@ -228,7 +242,14 @@ public sealed class UnifiedItemAuthoringService
             }
 
             return AuthoringOperationResult<ItemMutationResponse>.Success(
-                new ItemMutationResponse("save_draft", ToDefinition(verified), messages));
+                new ItemMutationResponse(operation, ToDefinition(verified), messages));
+        }
+        catch (PostgresException exception) when (publish && exception.SqlState == "P0001"
+            && (exception.MessageText.StartsWith("Published Shop stock depends on item", StringComparison.Ordinal)
+                || exception.MessageText.StartsWith("Cannot publish non-stackable item", StringComparison.Ordinal)))
+        {
+            return AuthoringOperationResult<ItemMutationResponse>.Failure(new ApiError(
+                "publication_dependency_changed", exception.MessageText, ValidationSeverity.Error));
         }
         catch (PostgresException exception) when (IsLiveReferenceGuard(exception))
         {
@@ -428,8 +449,16 @@ public sealed class UnifiedItemAuthoringService
         }
         if (operation == "delete")
         {
+            // Draft/Disable retain the definition and existing possessions.
+            // Deletion must still protect rows that reference that identity.
+            if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
+            {
+                messages.Add(LiveReferenceError(itemId));
+            }
             await AddDisableReferenceErrorsAsync(itemId, messages, cancellationToken);
         }
+        if (operation == "delete" && await _repository.HasShopReferencesAsync(itemId, false, cancellationToken))
+            messages.Add(new ApiError("shop_stock_reference", "Remove this item from all Shop stock before deletion.", ValidationSeverity.Error, "item_id"));
         if (operation == "delete" && existing?.RuntimeEnabled == true)
         {
             messages.Add(DeleteRequiresDisabledError(itemId));
@@ -441,10 +470,8 @@ public sealed class UnifiedItemAuthoringService
         ICollection<ApiError> messages,
         CancellationToken cancellationToken)
     {
-        if (await _repository.HasLiveReferencesAsync(itemId, cancellationToken))
-        {
-            messages.Add(LiveReferenceError(itemId));
-        }
+        if (await _repository.HasShopReferencesAsync(itemId, true, cancellationToken))
+            messages.Add(new ApiError("published_shop_stock_reference", "This item is stock in a Published Shop. Use Save & Publish for compatible edits. Unpublish the Shop before saving this item as Draft or disabling it.", ValidationSeverity.Error, "item_id"));
         if (await _repository.HasPendingDialogueSettlementReferencesAsync(itemId, cancellationToken))
         {
             messages.Add(PendingDialogueSettlementReferenceError(itemId));
@@ -475,7 +502,7 @@ public sealed class UnifiedItemAuthoringService
             request.ConsumableBehavior,
             request.Equipment,
             request.ToolCapabilities,
-            request.EconomyLifecycle);
+            request.EconomyLifecycle, request.Stackable);
 
     private NormalizedItemDraft Normalize(SaveItemDraftRequest request) =>
         UnifiedItemDomainRules.Normalize(
@@ -484,7 +511,7 @@ public sealed class UnifiedItemAuthoringService
             request.ConsumableBehavior,
             request.Equipment,
             request.ToolCapabilities,
-            request.EconomyLifecycle);
+            request.EconomyLifecycle, request.Stackable);
 
     private ItemDefinitionSummary ToSummary(UnifiedItemRecord record)
     {
@@ -504,7 +531,7 @@ public sealed class UnifiedItemAuthoringService
             hasEquipment,
             hasWeapon,
             hasTools,
-            record.UpdatedAtUtc);
+            record.UpdatedAtUtc, record.Stackable);
     }
 
     private ItemDefinition ToDefinition(UnifiedItemRecord record)
@@ -524,7 +551,7 @@ public sealed class UnifiedItemAuthoringService
             record.ToolCapabilities,
             record.UpdatedAtUtc,
             asset.FilePath,
-            record.EconomyLifecycle);
+            record.EconomyLifecycle, record.Stackable);
     }
 
     private static ItemConsumableBehaviorDefinition ToConsumableDefinition(NormalizedItemConsumableBehavior consumable) =>
@@ -568,7 +595,8 @@ public sealed class UnifiedItemAuthoringService
                     equipment.EquippedVisual.GripAnchors,
                     equipment.EquippedVisual.FlipXByPose,
                     equipment.EquippedVisual.HiddenPoses,
-                    equipment.EquippedVisual.ItemOverGripByPose));
+                    equipment.EquippedVisual.ItemOverGripByPose),
+            equipment.AmmunitionProfile, equipment.TwoHanded);
 
     private static string ClassifySummary(
         bool hasConsumable,
@@ -605,6 +633,7 @@ public sealed class UnifiedItemAuthoringService
         var changes = new List<AuthoringChange>();
         AddChange(changes, "display_name", current?.DisplayName, requested.DisplayName);
         AddChange(changes, "icon_texture_path", current?.IconTexturePath, requested.IconTexturePath);
+        AddChange(changes, "stackable", Serialize(current?.Stackable), Serialize(requested.Stackable));
         AddChange(changes, "consumable_behavior", Serialize(current?.ConsumableBehavior), Serialize(requested.ConsumableBehavior));
         AddChange(changes, "equipment", Serialize(current?.Equipment), Serialize(requested.Equipment));
         AddChange(changes, "tool_capabilities", Serialize(current?.ToolCapabilities ?? []), Serialize(requested.ToolCapabilities));
@@ -612,7 +641,7 @@ public sealed class UnifiedItemAuthoringService
         var before = existing?.RuntimeEnabled == true ? "Published" : existing is null ? null : "Draft";
         var after = operation switch
         {
-            "publish" => "Published",
+            "publish" or "save_and_publish" => "Published",
             "delete" => "Deleted",
             _ => "Draft"
         };
@@ -670,7 +699,7 @@ public sealed class UnifiedItemAuthoringService
     private static string? NormalizePreviewOperation(string? operation)
     {
         var normalized = (operation ?? string.Empty).Trim();
-        return normalized is "save_draft" or "publish" or "disable" or "delete"
+        return normalized is "save_draft" or "save_and_publish" or "publish" or "disable" or "delete"
             ? normalized
             : null;
     }
@@ -685,15 +714,15 @@ public sealed class UnifiedItemAuthoringService
         new("attack_slash", "Attack Slash"),
         new("attack_crush", "Attack Crush"),
         new("attack_ranged", "Attack Ranged"),
-        new("attack_magic", "Attack Magic"),
+        new("attack_magic", "Magic Attack"),
         new("strength_melee", "Strength Melee"),
         new("strength_ranged", "Strength Ranged"),
-        new("strength_magic", "Strength Magic"),
+        new("magic_damage_percent", "Magic Damage %"),
         new("defence_thrust", "Defence Thrust"),
         new("defence_slash", "Defence Slash"),
         new("defence_crush", "Defence Crush"),
         new("defence_ranged", "Defence Ranged"),
-        new("defence_magic", "Defence Magic")
+        new("defence_magic", "Magic Defence")
     ];
 
     private static ApiError ItemNotFound(string itemId) => new(
@@ -702,9 +731,13 @@ public sealed class UnifiedItemAuthoringService
         ValidationSeverity.Error,
         "item_id");
 
+    private static ApiError SaveAndPublishRequiresPublished() => new(
+        "save_and_publish_requires_published", "Save & Publish edits an existing Published item. For a new or Draft item, Save Draft then Publish.",
+        ValidationSeverity.Error, "publication_state");
+
     private static ApiError InvalidTargetOperation() => new(
         "invalid_target_operation",
-        "Target operation must be save_draft, publish, disable, or delete.",
+        "Target operation must be save_draft, save_and_publish, publish, disable, or delete.",
         ValidationSeverity.Error,
         "target_operation");
 
@@ -722,7 +755,7 @@ public sealed class UnifiedItemAuthoringService
 
     private static ApiError LiveReferenceError(string itemId) => new(
         "item_has_live_references",
-        $"Item '{itemId}' is referenced by live inventory, equipment, or ground-item state.",
+        $"Item '{itemId}' is referenced by durable inventory or equipment state.",
         ValidationSeverity.Error,
         "publication_state");
 

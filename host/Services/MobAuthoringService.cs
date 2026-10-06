@@ -1,3 +1,4 @@
+// Owns Mob authoring previews and lifecycle decisions over the complete aggregate.
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -247,7 +248,7 @@ public sealed class MobAuthoringService
             var verified = await _repository.LoadAsync(stableId, cancellationToken);
             if (verified is null || !Equivalent(saved, verified))
             {
-                throw new InvalidOperationException("The saved mob aggregate failed reload-and-verify.");
+                return ReloadVerificationFailure<MobMutationResponse>(stableId);
             }
 
             return AuthoringOperationResult<MobMutationResponse>.Success(
@@ -423,7 +424,7 @@ public sealed class MobAuthoringService
         int mobTargetScanIntervalMs,
         int mobTargetScanCandidateLimit,
         MobCombatProfileDefinition? primaryCombatProfile,
-        EquipmentCombatBonusDefinition? combatBonuses,
+        MobCombatBonusDefinition? combatBonuses,
         IReadOnlyList<MobDropDraft>? guaranteedDrops,
         string? visualMode = ActorVisualModes.FlatSprite,
         RiggedSpriteVisualDescriptor? compositeVisual = null,
@@ -464,8 +465,8 @@ public sealed class MobAuthoringService
                     primaryCombatProfile.AttackSpeedUnits,
                     primaryCombatProfile.AttackLevel,
                     primaryCombatProfile.StrengthLevel,
-                    primaryCombatProfile.DefenceLevel),
-            combatBonuses ?? EquipmentCombatBonusDefinition.Zero,
+                    primaryCombatProfile.DefenceLevel, primaryCombatProfile.MagicLevel, primaryCombatProfile.PhysicalWeight),
+            combatBonuses ?? MobCombatBonusDefinition.Zero,
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
             presentation.CompositeVisual,
@@ -560,7 +561,7 @@ public sealed class MobAuthoringService
         && record.MobTargetScanIntervalMs == draft.MobTargetScanIntervalMs
         && record.MobTargetScanCandidateLimit == draft.MobTargetScanCandidateLimit
         && record.PrimaryCombatProfile == draft.PrimaryCombatProfile
-        && (record.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == draft.CombatBonuses
+        && (record.CombatBonuses ?? MobCombatBonusDefinition.Zero) == draft.CombatBonuses
         && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops)
         && record.VisualMode == draft.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
@@ -592,7 +593,7 @@ public sealed class MobAuthoringService
         && left.MobTargetScanIntervalMs == right.MobTargetScanIntervalMs
         && left.MobTargetScanCandidateLimit == right.MobTargetScanCandidateLimit
         && left.PrimaryCombatProfile == right.PrimaryCombatProfile
-        && (left.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero) == (right.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero)
+        && (left.CombatBonuses ?? MobCombatBonusDefinition.Zero) == (right.CombatBonuses ?? MobCombatBonusDefinition.Zero)
         && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops)
         && left.VisualMode == right.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
@@ -653,7 +654,7 @@ public sealed class MobAuthoringService
             var verified = await _repository.LoadAsync(stableId, cancellationToken);
             if (verified is null || !Equivalent(saved, verified) || verified.PublicationState != publicationState)
             {
-                throw new InvalidOperationException("The mob publication change failed reload-and-verify.");
+                return ReloadVerificationFailure<MobMutationResponse>(stableId);
             }
 
             if (operation == "publish" && _runtimeCatalogPublisher is not null)
@@ -775,7 +776,7 @@ public sealed class MobAuthoringService
                 draft.PrimaryCombatProfile.AttackLevel,
                 draft.PrimaryCombatProfile.StrengthLevel,
                 draft.PrimaryCombatProfile.DefenceLevel,
-                draft.MaxHealth);
+                draft.MaxHealth, draft.PrimaryCombatProfile.MagicLevel);
     }
 
     private static MobCombatLevelDiagnosticsDefinition? CalculateCombatLevelDiagnostics(NormalizedMobDraft draft)
@@ -820,7 +821,7 @@ public sealed class MobAuthoringService
         AddChange(changes, "mob_target_scan_interval_ms", existing?.MobTargetScanIntervalMs.ToString(), requested.MobTargetScanIntervalMs.ToString());
         AddChange(changes, "mob_target_scan_candidate_limit", existing?.MobTargetScanCandidateLimit.ToString(), requested.MobTargetScanCandidateLimit.ToString());
         AddChange(changes, "primary_combat_profile", JsonSerializer.Serialize(existing?.PrimaryCombatProfile), JsonSerializer.Serialize(requested.PrimaryCombatProfile));
-        AddChange(changes, "combat_bonuses", JsonSerializer.Serialize(existing?.CombatBonuses ?? EquipmentCombatBonusDefinition.Zero), JsonSerializer.Serialize(requested.CombatBonuses));
+        AddChange(changes, "combat_bonuses", JsonSerializer.Serialize(existing?.CombatBonuses ?? MobCombatBonusDefinition.Zero), JsonSerializer.Serialize(requested.CombatBonuses));
         AddChange(changes, "guaranteed_drops", SerializeDrops(existing?.GuaranteedDrops ?? []), JsonSerializer.Serialize(requested.GuaranteedDrops));
         AddChange(changes, "root_loot_table_id", existing?.RootLootTableId, requested.RootLootTableId);
         var targetState = operation switch
@@ -930,6 +931,11 @@ public sealed class MobAuthoringService
             $"Mob definition '{mobDefinitionId}' changed after it was loaded. Reload before applying changes.",
             ValidationSeverity.Error,
             "updated_at_utc"));
+
+    private static AuthoringOperationResult<T> ReloadVerificationFailure<T>(string id) =>
+        AuthoringOperationResult<T>.Failure(new ApiError("mob_reload_verification_failed",
+            $"Mob definition '{id}' did not match after reload verification. Reload and compare before continuing.",
+            ValidationSeverity.Error, "mob_definition_id"));
 
     private AuthoringOperationResult<T> DatabaseFailure<T>(Exception exception)
     {

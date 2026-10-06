@@ -1,4 +1,5 @@
 using System.Reflection;
+using MMO.ContentStudio.AuthoringHost.Browser;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Options;
 using MMO.ContentStudio.AuthoringHost.Configuration;
@@ -41,7 +42,28 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
 });
 
+var browserAccess = BrowserAccess.Configure(builder, listenUri);
+builder.Services.AddSingleton<BrowserItemAssets>();
+builder.Services.AddSingleton<BrowserActorAssets>();
+builder.Services.AddSingleton<BrowserSpellMedia>();
+builder.Services.AddSingleton<BrowserWorldObjectAssets>();
+builder.Services.AddSingleton<TileMetadataAuthoringService>();
 var app = builder.Build();
+browserAccess.Use(app, listenUri);
+browserAccess.Map(app);
+app.MapBrowserItems();
+app.MapBrowserShops();
+app.MapBrowserLootTables();
+app.MapBrowserWorldObjects();
+app.MapBrowserBlacksmithing();
+app.MapBrowserQuests();
+app.MapBrowserDialogue();
+app.MapBrowserNpcs();
+app.MapBrowserMobs();
+app.MapBrowserSpells();
+app.MapBrowserEnvironment();
+app.MapBrowserTiles();
+app.MapBrowserActorAppearance();
 
 app.Use(async (context, next) =>
 {

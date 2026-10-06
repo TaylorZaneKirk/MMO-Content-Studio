@@ -1,5 +1,15 @@
 # MMO Project integration
 
+## Ranged R1 authoring seam
+
+`prototype/sql/069_ranged_authoring_facts.sql` mirrors the MMO Project forward
+migration. Apply it before running this version of Content Studio. Item weapon
+profiles now choose melee accuracy style or Ranged damage type (`light`,
+`standard`, `heavy`) according to attack family. Mob authoring uses three Ranged
+defence fields; the old singular Mob value seeds all three during migration.
+The Wooden Bow is a right-hand Shortbow POC. Its +3 Ranged Strength is temporary
+until ammunition owns that contribution. R1 does not resolve Ranged attacks.
+
 `prototype/sql/029_item_economy_policy.sql` mirrors the reviewed Item Economy
 Policy V1 migration. It adds definition metadata and reference/publication
 guards only; no death consequence, shop, trade, reclaim, condition, or repair
