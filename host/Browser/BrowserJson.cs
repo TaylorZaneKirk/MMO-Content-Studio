@@ -45,7 +45,7 @@ internal static class BrowserJson
     {
         if (node is JsonObject obj)
         {
-            foreach (var name in new[] { "file_path", "asset_preview_file_path", "source_path" }) obj.Remove(name);
+            foreach (var name in new[] { "file_path", "asset_preview_file_path", "source_path", "game_assets_root" }) obj.Remove(name);
             if (obj["code"]?.GetValue<string>() is "map_catalog_publish_warning" or "map_catalog_publish_skipped")
             {
                 obj["message"] = $"The database change completed, but the {catalogName} catalog was not refreshed.";

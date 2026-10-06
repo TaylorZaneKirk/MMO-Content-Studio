@@ -732,3 +732,17 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
     .actions .button-row #reload-loot { flex-basis:100%; }
     .ev-report { padding:18px; }
 }
+
+/* World Objects: numeric alignment and explicit frame controls also work by touch. */
+#alignment-canvas { display:block; width:100%; height:auto; border:1px solid var(--line); border-radius:12px; margin:20px 0 10px; }
+.world-thumbnail { width:80px; height:80px; object-fit:contain; image-rendering:pixelated; background:#edf3f0; border-radius:8px; }
+.art-controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.world-art-results { display:grid; grid-template-columns:repeat(auto-fill,minmax(175px,1fr)); gap:12px; max-height:52dvh; overflow:auto; margin-top:16px; }
+.world-art-results button { display:flex; flex-direction:column; text-align:left; gap:8px; min-width:0; overflow-wrap:anywhere; }
+.world-art-results img { width:100%; height:90px; object-fit:contain; image-rendering:pixelated; background:#edf3f0; }
+.world-art-results small { font-size:11px; font-weight:400; }
+.upload-label { display:flex; flex-direction:column; gap:5px; min-height:44px; max-width:100%; }
+.upload-label input { max-width:100%; }
+@media(max-width:800px) { .actions .button-row #reload-object { flex-basis:100%; } .world-art-results { grid-template-columns:1fr 1fr; } }
+
+#world-objects-workspace { font-size:13px; gap:6px; }

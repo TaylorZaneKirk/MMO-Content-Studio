@@ -44,12 +44,14 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var browserAccess = BrowserAccess.Configure(builder, listenUri);
 builder.Services.AddSingleton<BrowserItemAssets>();
+builder.Services.AddSingleton<BrowserWorldObjectAssets>();
 var app = builder.Build();
 browserAccess.Use(app, listenUri);
 browserAccess.Map(app);
 app.MapBrowserItems();
 app.MapBrowserShops();
 app.MapBrowserLootTables();
+app.MapBrowserWorldObjects();
 
 app.Use(async (context, next) =>
 {
