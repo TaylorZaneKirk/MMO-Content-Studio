@@ -780,3 +780,11 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
 .calibration-canvas{display:block;touch-action:none;image-rendering:pixelated;max-width:none}
 .actor-panel fieldset{min-width:0;border:0;padding:0;margin:12px 0}.actor-panel button{margin:5px 3px;min-height:44px}.calibration-compare{border:2px solid #d39432;padding:16px;border-radius:10px}
 @media(max-width:800px){.actor-panel{padding:16px}.calibration-viewport{max-height:380px}}
+
+/* Spell media stays within the existing responsive detail column. */
+.spell-asset { min-width:0; }
+.spell-asset button { margin-top:8px; }
+#spell-canvas { width:100%; height:auto; background:repeating-conic-gradient(#eef2ec 0% 25%,#fff 0% 50%) 50% / 20px 20px; image-rendering:pixelated; border:1px solid var(--line); border-radius:12px; margin-top:16px; }
+.spell-sound audio { width:100%; max-width:420px; }
+.spell-sound p,#media-status,#media-results small { overflow-wrap:anywhere; }
+@media(max-width:800px) { .actions .button-row #reload-spell { flex-basis:100%; } }

@@ -123,7 +123,7 @@ public partial class BrowserPngAssets(ItemAssetService assets, string readFolder
 
     // Validate bounded dimensions, chunk CRCs and the exact decompressed scanline size.
     // This accepts ordinary and Adam7 PNGs without loading an unbounded image decoder.
-    private static bool ValidPng(byte[] data)
+    internal static bool ValidPng(byte[] data)
     {
         try
         {

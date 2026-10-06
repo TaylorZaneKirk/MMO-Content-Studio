@@ -392,3 +392,6 @@ the read-only precision-editor boundary and the activation checklist.
 
 Mobs browser workspace: `/studio/mobs.html` — complete combat, behavior, drops and
 shared actor calibration. See [Browser Mobs](docs/BROWSER_MOBS.md) for lifecycle and validation limits.
+
+Spells browser workspace: `/studio/spells.html` — full mechanics, exact XP, lifecycle
+and confined image/audio presentation. See [Browser Spells](docs/BROWSER_SPELLS.md).
