@@ -21,7 +21,7 @@ public sealed class BrowserActorAssets(ItemAssetService assets)
         if (node is JsonArray array) { foreach (var item in array) Sanitize(item); return; }
         if (node is not JsonObject obj) return;
         if (obj.ContainsKey("attack_thrust")) { obj.Remove("isZero"); obj.Remove("is_zero"); }
-        if (obj.ContainsKey("cosmetic_item_ids")) obj.Remove("containsLegacyBaseLayers");
+        if (obj.ContainsKey("cosmetic_item_ids")) { obj.Remove("containsLegacyBaseLayers"); obj.Remove("contains_legacy_base_layers"); }
         foreach (var key in new[] { "base_file_path", "file_path", "asset_preview_file_path" })
         {
             if (obj[key] is JsonValue path && path.TryGetValue<string>(out var value))
