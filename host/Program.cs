@@ -54,6 +54,7 @@ app.MapBrowserLootTables();
 app.MapBrowserWorldObjects();
 app.MapBrowserBlacksmithing();
 app.MapBrowserQuests();
+app.MapBrowserDialogue();
 
 app.Use(async (context, next) =>
 {

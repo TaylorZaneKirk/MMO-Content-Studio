@@ -1,8 +1,8 @@
 // Small transport and page-navigation helpers; each workspace owns its editor workflow.
 export function createRequest(getSession, onUnauthorized) {
-return async function request(path, { method = 'GET', body, raw = false } = {}) {
+return async function request(path, { method = 'GET', body, raw = false, headers = {} } = {}) {
     const response = await fetch(`/studio/api${path}`, { method, credentials: 'same-origin', cache: 'no-store',
-        headers: { ...(body !== undefined ? { 'Content-Type': raw ? 'image/png' : 'application/json' } : {}),
+        headers: { ...headers, ...(body !== undefined ? { 'Content-Type': raw ? 'image/png' : 'application/json' } : {}),
             ...(method !== 'GET' ? { 'X-Studio-CSRF': getSession().csrf_token || '' } : {}) },
         body: body === undefined ? undefined : raw ? body : JSON.stringify(body) });
     if (response.status === 204) return null;

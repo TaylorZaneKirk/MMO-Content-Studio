@@ -760,3 +760,16 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
 .quest-analysis-row { border-top:1px solid var(--line); padding:12px 0; }
 .quest-analysis-row p { margin:6px 0; }
 @media(max-width:800px) { .actions .button-row #reload-quest { flex-basis:100%; } .quest-diagnostics { padding:18px; } .quest-state-card { padding:12px; } }
+
+/* Dialogue keeps node selection and graph viewing separate from authored layout. */
+.dialogue-node-layout{display:grid;grid-template-columns:minmax(140px,220px) minmax(0,1fr);gap:18px;align-items:start}
+.dialogue-node-list{display:grid;gap:8px;max-height:560px;overflow:auto}
+.dialogue-node-pick{display:grid;text-align:left;gap:5px;min-height:48px;overflow-wrap:anywhere;width:100%;min-width:0}
+.dialogue-node-pick small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dialogue-node-pick.selected{border-color:var(--accent,#65bdb0);background:#dceee7;color:#163d37}
+.dialogue-inspector{min-width:0}.dialogue-graph{width:100%;height:auto;display:block;border-radius:10px;touch-action:none;margin-top:12px}
+.dialogue-choice{border:1px solid var(--border,#b9c8bf);border-radius:10px;margin:16px 0}.dialogue-choice>summary{padding:14px;font-weight:700;cursor:pointer;min-height:48px}
+.dialogue-checkbox{display:flex;align-items:center;gap:10px;min-height:48px}.dialogue-checkbox input{width:22px;height:22px}
+.dialogue-diagnostics,.dialogue-simulation{padding:22px;background:var(--surface,#fff);border:1px solid var(--border,#ccd5ce);border-radius:14px;margin:20px 0;overflow-wrap:anywhere}
+.dialogue-diagnostics[data-stale=true]{border-style:dashed}.dialogue-spoken{white-space:pre-wrap;font-size:1.1rem;line-height:1.6}
+@media(max-width:1150px){.dialogue-node-layout{grid-template-columns:1fr}.dialogue-node-list{max-height:240px}.dialogue-diagnostics,.dialogue-simulation{padding:16px}}
