@@ -72,6 +72,9 @@ write boundary on loopback without changing production code or enabling LAN trus
 The prepared local foreground .NET helper uses the existing ASP.NET
 Core Identity PasswordHasher implementation. Taylor runs `<root>/setup-browser-password`
 in a local interactive terminal and enters/confirms a password
+(at least four characters, explicitly approved by Taylor for this localhost-only
+sandbox). The minimum is enforced only by this generated local helper; no general
+or LAN login/access code was changed. Taylor enters the password
 through masked `Console.ReadKey(intercept: true)` input. The helper writes only the
 hash to `<root>/host/appsettings.Local.json` (0600); plaintext is not echoed, logged,
 returned through Codex, included in argv/environment, or saved. Taylor enters that
