@@ -773,3 +773,10 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
 .dialogue-diagnostics,.dialogue-simulation{padding:22px;background:var(--surface,#fff);border:1px solid var(--border,#ccd5ce);border-radius:14px;margin:20px 0;overflow-wrap:anywhere}
 .dialogue-diagnostics[data-stale=true]{border-style:dashed}.dialogue-spoken{white-space:pre-wrap;font-size:1.1rem;line-height:1.6}
 @media(max-width:1150px){.dialogue-node-layout{grid-template-columns:1fr}.dialogue-node-list{max-height:240px}.dialogue-diagnostics,.dialogue-simulation{padding:16px}}
+
+.actor-panel{padding:22px;background:#fff;border:1px solid #ccd5ce;border-radius:14px;margin:20px 0;overflow-wrap:anywhere;min-width:0}
+#actor-preview{width:100%;height:auto;background:repeating-conic-gradient(#e1e8e5 0% 25%,#f4f7f5 0% 50%) 50%/20px 20px;border-radius:10px;margin:12px 0;image-rendering:pixelated}
+.calibration-viewport{overflow:auto;max-height:520px;border:1px solid #819b91;border-radius:8px;background:repeating-conic-gradient(#e1e8e5 0% 25%,#f4f7f5 0% 50%) 50%/20px 20px;margin:16px 0}
+.calibration-canvas{display:block;touch-action:none;image-rendering:pixelated;max-width:none}
+.actor-panel fieldset{min-width:0;border:0;padding:0;margin:12px 0}.actor-panel button{margin:5px 3px;min-height:44px}.calibration-compare{border:2px solid #d39432;padding:16px;border-radius:10px}
+@media(max-width:800px){.actor-panel{padding:16px}.calibration-viewport{max-height:380px}}

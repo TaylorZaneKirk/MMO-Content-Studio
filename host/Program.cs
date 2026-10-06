@@ -44,6 +44,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 var browserAccess = BrowserAccess.Configure(builder, listenUri);
 builder.Services.AddSingleton<BrowserItemAssets>();
+builder.Services.AddSingleton<BrowserActorAssets>();
 builder.Services.AddSingleton<BrowserWorldObjectAssets>();
 var app = builder.Build();
 browserAccess.Use(app, listenUri);
@@ -55,6 +56,8 @@ app.MapBrowserWorldObjects();
 app.MapBrowserBlacksmithing();
 app.MapBrowserQuests();
 app.MapBrowserDialogue();
+app.MapBrowserNpcs();
+app.MapBrowserActorAppearance();
 
 app.Use(async (context, next) =>
 {

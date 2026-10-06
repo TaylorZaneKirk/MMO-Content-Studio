@@ -156,7 +156,7 @@ public sealed class BrowserAccess
         app.MapPost("/studio/api/logout", async (HttpContext context) =>
         { await context.SignOutAsync("Studio"); return Results.NoContent(); });
         // Serve a fixed set of bundled files, never a configurable filesystem root.
-        foreach (var name in new[] { "index.html", "shops.html", "loot-tables.html", "items.js", "shops.js", "loot-tables.js", "world-objects.html", "world-objects.js", "blacksmithing.html", "blacksmithing.js", "quests.html", "quests.js", "dialogue.html", "dialogue.js", "studio-common.js", "studio.css" })
+        foreach (var name in new[] { "index.html", "shops.html", "loot-tables.html", "items.js", "shops.js", "loot-tables.js", "world-objects.html", "world-objects.js", "blacksmithing.html", "blacksmithing.js", "quests.html", "quests.js", "dialogue.html", "dialogue.js", "npcs.html", "npcs.js", "actor-appearance.js", "studio-common.js", "studio.css" })
         {
             var file = name;
             app.MapGet($"/studio/{file}", () => Results.File(Path.Combine(app.Environment.ContentRootPath, "wwwroot", "studio", file),

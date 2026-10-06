@@ -39,6 +39,17 @@ public partial class BrowserPngAssets(ItemAssetService assets, string readFolder
         }
         return path;
     }
+    // Convert only already-confined PNGs to browser identities; never expose host paths.
+    public bool CanRead(string resource) => Resolve(resource) is { } path && File.Exists(path) && new FileInfo(path).Length <= MaximumBytes;
+    public string? UrlForFile(string? file)
+    {
+        var root = Root();
+        if (root is null || string.IsNullOrWhiteSpace(file)) return null;
+        var full = Path.GetFullPath(file);
+        var relative = Path.GetRelativePath(root, full).Replace('\\', '/');
+        var resource = Prefix + relative;
+        return Resolve(resource) == full && CanRead(resource) ? imageEndpoint + "?resource=" + Uri.EscapeDataString(resource) : null;
+    }
     public object Catalog()
     {
         var root = Root();
