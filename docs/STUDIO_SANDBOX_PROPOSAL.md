@@ -1,8 +1,12 @@
-# Disposable Studio sandbox — proposal only
+# Disposable Studio sandbox — approved provisioning design
 
-Prepared 2026-10-06. No database, role, credential, authentication rule, configuration
-or listener has been created. These are exact proposed targets for the next approval,
-not defaults for other machines or standing permission in the delivery skill.
+Prepared 2026-10-06; Taylor subsequently approved the exact isolated provisioning
+and reversible manual authoring QA. Provisioning is complete; current process and
+credential-handoff status belongs in the parent CURRENT_HANDOFF.md. These targets
+remain machine-specific evidence, not defaults or standing skill authorization.
+Taylor must personally enter/confirm the browser password. No agent credential entry,
+resource teardown, irreversible purge or deletion of existing data is authorized.
+The earlier proposal wording below is historical; current direction governs.
 
 ## Finding and recommended boundary
 
@@ -65,13 +69,18 @@ sandbox-only connection from the host; no live credentials enter subprocess args
 A database password is unnecessary with the private peer-mapped cluster. A **new,
 sandbox-only browser login password** is necessary to enable the existing browser
 write boundary on loopback without changing production code or enabling LAN trust.
-After approval, provide a local foreground .NET helper using the existing ASP.NET
-Core Identity PasswordHasher implementation. Taylor enters and confirms a password
+The prepared local foreground .NET helper uses the existing ASP.NET
+Core Identity PasswordHasher implementation. Taylor runs `<root>/setup-browser-password`
+in a local interactive terminal and enters/confirms a password
 through masked `Console.ReadKey(intercept: true)` input. The helper writes only the
 hash to `<root>/host/appsettings.Local.json` (0600); plaintext is not echoed, logged,
 returned through Codex, included in argv/environment, or saved. Taylor enters that
 password in the ordinary Studio login form. Do not ask for it in chat. Losing it
-means resetting only this sandbox hash after approval. No credential is set now.
+means resetting only this sandbox hash after approval. No credential was set by the agent. The helper was compiled and source-reviewed,
+not executed; it requires a Linux interactive terminal, refuses arguments/redirected
+input and refuses replacing an existing hash. Its source is under
+`<root>/password-setup/Program.cs`. After Taylor completes it, restart only the
+sandbox host and have Taylor sign into its browser locally before manual QA.
 
 ## Asset/export copies and fixtures
 
@@ -106,9 +115,9 @@ copy real rows. Invalid/missing references are preview-only rejection fixtures.
 Manually exercise real lifecycle, uploads, exact integer round trips, dirty navigation,
 two-session versions/signatures/calibration hashes and explicit reload/compare after
 sandbox-only uncertain writes. Inspect actual DB/export/file outcomes separately.
-No automated tests. No physical-phone/LAN access in this proposal. Teardown is limited
-to these two sandbox processes and this exact root after checking their identities;
-never stop a process merely because it occupies the proposed port.
+No automated tests. No physical-phone/LAN access in this proposal. Any teardown or deletion now requires separate specific approval. An approved
+sandbox-only reload must verify the exact process identity; never stop a process
+merely because it occupies the proposed port.
 
 ## Proposed approval wording
 
@@ -124,3 +133,36 @@ Studio, game, global authentication, certificates, firewall or network exposure.
 
 Any required deviation, inaccessible dependency or request for privileged live
 credentials returns for a concrete decision. This proposal itself approves nothing.
+
+## Provisioning evidence and narrow health correction
+
+The sandbox replay applied 86 repository schema files through093 and omitted nine
+historical authored/dev content seeds. Sandbox-only copies of014/015/035/052/089
+preserve DDL while omitting named authored content and keeping an honest applied
+ledger. Source migrations remain unchanged. See the private sandbox's
+`schema/replay-manifest.json`, `fixtures/initial-authoring.sql`, `copy-manifest.json`
+and `schema/app-grants.sql` for exact bootstrap inputs. No live data dump was used.
+
+The app receives SELECT on public tables, authoring-prefix table CRUD, sequence
+access and reviewed trigger/helper execution. It cannot write player/account tables,
+create schema objects, truncate tables, administer roles/databases or inherit roles.
+Account/character/inventory/equipment counts were zero. Synthetic fixture counts:
+Items6, Shops2, LootTables2, WorldObjects4, Blacksmithing2, Quests1, Dialogue1, NPCs2,
+Mobs2, Spells4. Required fixed station/tool IDs contain synthetic Sandbox content.
+Fixtures include exact large integers, nested/no-drop loot, flat/composite actors,
+Draft/Published/Disabled examples and generated short WAV/OGG/MP3 tones. They are
+provisioning fixtures; real browser mutation/export/recovery acceptance is pending.
+
+A restricted role initially reported four false missing-schema objects because
+[table_constraints](https://www.postgresql.org/docs/16/infoschema-table-constraints.html)
+and [triggers](https://www.postgresql.org/docs/16/infoschema-triggers.html) filter out
+tables without ownership or non-SELECT privileges. SchemaHealthInspector now uses
+pg_catalog for constraint/trigger existence, preserving public-schema/name and
+trigger table/noninternal checks. This avoids granting gameplay writes merely to
+read health metadata. All742 checks passed afterward without widening privileges.
+
+The copied production host, password helper and MapPublisher/server compile dependency
+built successfully. The helper build was warning-free; host/MapPublisher restore
+reported NU1900 vulnerability-audit feed unavailability, not a compile failure.
+The copied server was never started. No automated tests or password-helper execution.
+Only the sandbox host reloaded; existing LAN Studio/game remained untouched.

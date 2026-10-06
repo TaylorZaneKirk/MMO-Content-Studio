@@ -108,6 +108,8 @@ public sealed class SchemaHealthInspector
                 $"Required column '{tableName}.{columnName}' is missing.");
     }
 
+    // information_schema hides constraints/triggers unless the role owns or can
+    // modify the table. Health needs metadata existence, not player-table writes.
     private static async Task<HealthCheck> CheckConstraintAsync(
         NpgsqlConnection connection,
         string constraintName,
@@ -116,9 +118,10 @@ public sealed class SchemaHealthInspector
         const string sql = """
             select exists (
                 select 1
-                from information_schema.table_constraints
-                where constraint_schema = 'public'
-                  and constraint_name = @constraint_name
+                from pg_catalog.pg_constraint c
+                join pg_catalog.pg_namespace n on n.oid = c.connamespace
+                where n.nspname = 'public'
+                  and c.conname = @constraint_name
             );
             """;
 
@@ -147,10 +150,13 @@ public sealed class SchemaHealthInspector
         const string sql = """
             select exists (
                 select 1
-                from information_schema.triggers
-                where event_object_schema = 'public'
-                  and event_object_table = @table_name
-                  and trigger_name = @trigger_name
+                from pg_catalog.pg_trigger t
+                join pg_catalog.pg_class r on r.oid = t.tgrelid
+                join pg_catalog.pg_namespace n on n.oid = r.relnamespace
+                where n.nspname = 'public'
+                  and r.relname = @table_name
+                  and t.tgname = @trigger_name
+                  and not t.tgisinternal
             );
             """;
 

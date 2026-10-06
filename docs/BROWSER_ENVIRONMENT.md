@@ -36,6 +36,8 @@ revision checks and cancellation prevent superseded results from reappearing.
 Unavailable/denied/timed-out reads have explicit retry guidance. Sign-in/out use
 the existing session routes. Refresh does not initiate any authoring operation.
 Schema checks default to failures and support searching or viewing all checks.
+Constraint/trigger existence uses pg_catalog so a role with only SELECT on gameplay
+tables can inspect metadata without false failures or added gameplay write privileges.
 Each successful panel shows its observation time. Counts represent separate reads,
 not a transactionally consistent snapshot or the running game's loaded content.
 
