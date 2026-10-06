@@ -401,3 +401,11 @@ host/API, database/schema, asset availability and catalog summaries with refresh
 See [Browser Environment](docs/BROWSER_ENVIRONMENT.md). All eleven desktop tabs now
 have browser workspaces; the existing Items precision grip/pose editor remains the
 explicit desktop-only exception.
+
+## Repository-local delivery guidance
+
+The [studio-delivery skill](.agents/skills/studio-delivery/SKILL.md) records the
+verified validation, optional activation and paired Studio/parent Git workflow.
+It follows current AGENTS and task authority; it grants no standing permissions.
+The [disposable sandbox proposal](docs/STUDIO_SANDBOX_PROPOSAL.md) remains gated
+before any provisioning or security configuration.
