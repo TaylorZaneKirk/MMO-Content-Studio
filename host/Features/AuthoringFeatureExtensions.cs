@@ -1,6 +1,7 @@
 using MMO.ContentStudio.AuthoringHost.Features.Blacksmithing;
 using MMO.ContentStudio.AuthoringHost.Features.Farming;
 using MMO.ContentStudio.AuthoringHost.Features.Alchemy;
+using MMO.ContentStudio.AuthoringHost.Features.Crafting;
 // Composes the supported authoring features into the existing host and route tree.
 using MMO.ContentStudio.AuthoringHost.Features.Catalog;
 using MMO.ContentStudio.AuthoringHost.Features.ActorAppearance;
@@ -32,6 +33,7 @@ public static class AuthoringFeatureExtensions
         services.AddBlacksmithingAuthoring();
         services.AddFarmingAuthoring();
         services.AddAlchemyAuthoring();
+        services.AddCraftingAuthoring();
         services.AddDialogueAuthoring();
         services.AddQuestAuthoring();
         services.AddSingleton<IRuntimeCatalogPublisher, RuntimeCatalogPublisherService>();
@@ -52,6 +54,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapBlacksmithingAuthoring();
         endpoints.MapFarmingAuthoring();
         endpoints.MapAlchemyAuthoring();
+        endpoints.MapCraftingAuthoring();
         endpoints.MapDialogueAuthoring();
         endpoints.MapQuestAuthoring();
         return endpoints;

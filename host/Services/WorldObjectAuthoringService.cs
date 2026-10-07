@@ -89,6 +89,10 @@ public sealed class WorldObjectAuthoringService(
             messages.Add(Error("unsaved_world_object_changes", "Save edited fields as a draft before this operation."));
         if (operation == "delete" && existing?.PublicationState == "Published")
             messages.Add(Error("world_object_still_published", "Disable the definition before deleting it."));
+        // Unlike freely placed Tiled objects, this fixture is required by every
+        // starter-home template even while its Crafting recipes are disabled.
+        if (definitionId == "home_workbench" && existing is not null && operation is "save_draft" or "disable" or "delete")
+            messages.Add(Error("starter_home_fixture_required", "The fixed starter-home workbench must remain Published. Its template dependency prevents drafting, disabling or deleting it."));
         var draft = request.Draft;
         if (draft is null)
         {
