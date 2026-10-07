@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/authoring_host_client.gd" id="2_client"]
@@ -18,6 +18,7 @@
 [ext_resource type="Script" path="res://scripts/farming_editor.gd" id="13_farming"]
 [ext_resource type="Script" path="res://scripts/alchemy_editor.gd" id="14_alchemy"]
 [ext_resource type="Script" path="res://scripts/crafting_editor.gd" id="15_crafting"]
+[ext_resource type="Script" path="res://scripts/lore_editor.gd" id="16_lore"]
 
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
@@ -285,3 +286,8 @@ unique_name_in_owner = true
 visible = false
 layout_mode = 2
 script = ExtResource("11_spells")
+
+[node name="Lore" type="VBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("16_lore")

@@ -12,6 +12,7 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
     private static readonly (RuntimeCatalogPublicationScope Scope, string Command, string Label, string OutputPath)[] Exports =
     [
         (RuntimeCatalogPublicationScope.Farming, "export-farming-catalog", "Farming", "shared/farming/catalog.json"),
+        (RuntimeCatalogPublicationScope.Lore, "export-lore-catalog", "Lore", "shared/lore/catalog.json"),
         (RuntimeCatalogPublicationScope.Crafting, "export-crafting-catalog", "Crafting", "shared/crafting/catalog.json"),
         (RuntimeCatalogPublicationScope.Alchemy, "export-alchemy-catalog", "Alchemy", "shared/alchemy/catalog.json"),
         (RuntimeCatalogPublicationScope.Blacksmithing, "export-blacksmithing-catalog", "Blacksmithing", "shared/blacksmithing/catalog.json"),

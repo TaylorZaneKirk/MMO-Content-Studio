@@ -183,6 +183,9 @@ func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> 
 		"farming":
 			_open_tab(%Farming)
 			%Farming.open_resource(resource_id)
+		"lore":
+			_open_tab(%Lore)
+			%Lore.open_resource(resource_id)
 		"crafting":
 			_open_tab(%Crafting)
 			%Crafting.open_resource(resource_id)

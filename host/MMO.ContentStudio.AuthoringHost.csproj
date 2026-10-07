@@ -17,6 +17,7 @@
   <ItemGroup>
     <Compile Include="../integrations/mmo-project/FarmingSettings.cs" Link="Contracts/FarmingSettings.cs" />
     <Compile Include="../integrations/mmo-project/CraftingSettings.cs" Link="Contracts/CraftingSettings.cs" />
+    <Compile Include="../integrations/mmo-project/LoreSettings.cs" Link="Contracts/LoreSettings.cs" />
     <Compile Include="../integrations/mmo-project/AlchemySettings.cs" Link="Contracts/AlchemySettings.cs" />
     <Compile Include="../integrations/mmo-project/BlacksmithingRecipe.cs" Link="Contracts/BlacksmithingRecipe.cs" />
   </ItemGroup>

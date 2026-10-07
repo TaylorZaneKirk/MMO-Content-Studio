@@ -21,21 +21,25 @@ signal world_object_catalog_received(payload: Dictionary)
 signal blacksmithing_catalog_received(payload: Dictionary)
 signal farming_catalog_received(payload: Dictionary)
 signal alchemy_catalog_received(payload: Dictionary)
+signal lore_catalog_received(payload: Dictionary)
 signal crafting_catalog_received(payload: Dictionary)
 signal world_object_definition_received(payload: Dictionary)
 signal blacksmithing_definition_received(payload: Dictionary)
 signal farming_definition_received(payload: Dictionary)
 signal alchemy_definition_received(payload: Dictionary)
+signal lore_definition_received(payload: Dictionary)
 signal crafting_definition_received(payload: Dictionary)
 signal world_object_preview_received(payload: Dictionary)
 signal blacksmithing_preview_received(payload: Dictionary)
 signal farming_preview_received(payload: Dictionary)
 signal alchemy_preview_received(payload: Dictionary)
+signal lore_preview_received(payload: Dictionary)
 signal crafting_preview_received(payload: Dictionary)
 signal world_object_mutation_completed(payload: Dictionary)
 signal blacksmithing_mutation_completed(payload: Dictionary)
 signal farming_mutation_completed(payload: Dictionary)
 signal alchemy_mutation_completed(payload: Dictionary)
+signal lore_mutation_completed(payload: Dictionary)
 signal crafting_mutation_completed(payload: Dictionary)
 signal shop_options_received(payload: Dictionary)
 signal shop_catalog_received(payload: Dictionary)
@@ -105,21 +109,25 @@ const OP_WORLD_OBJECT_CATALOG := "world_object_catalog"
 const OP_BLACKSMITHING_CATALOG := "blacksmithing_catalog"
 const OP_FARMING_CATALOG := "farming_catalog"
 const OP_ALCHEMY_CATALOG := "alchemy_catalog"
+const OP_LORE_CATALOG := "lore_catalog"
 const OP_CRAFTING_CATALOG := "crafting_catalog"
 const OP_WORLD_OBJECT_DEFINITION := "world_object_definition"
 const OP_BLACKSMITHING_DEFINITION := "blacksmithing_definition"
 const OP_FARMING_DEFINITION := "farming_definition"
 const OP_ALCHEMY_DEFINITION := "alchemy_definition"
+const OP_LORE_DEFINITION := "lore_definition"
 const OP_CRAFTING_DEFINITION := "crafting_definition"
 const OP_WORLD_OBJECT_PREVIEW := "world_object_preview"
 const OP_BLACKSMITHING_PREVIEW := "blacksmithing_preview"
 const OP_FARMING_PREVIEW := "farming_preview"
 const OP_ALCHEMY_PREVIEW := "alchemy_preview"
+const OP_LORE_PREVIEW := "lore_preview"
 const OP_CRAFTING_PREVIEW := "crafting_preview"
 const OP_WORLD_OBJECT_MUTATION := "world_object_mutation"
 const OP_BLACKSMITHING_MUTATION := "blacksmithing_mutation"
 const OP_FARMING_MUTATION := "farming_mutation"
 const OP_ALCHEMY_MUTATION := "alchemy_mutation"
+const OP_LORE_MUTATION := "lore_mutation"
 const OP_CRAFTING_MUTATION := "crafting_mutation"
 const OP_SHOP_OPTIONS := "shop_options"
 const OP_SHOP_CATALOG := "shop_catalog"
@@ -616,18 +624,26 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			farming_mutation_completed.emit(data)
 		OP_ALCHEMY_CATALOG:
 			alchemy_catalog_received.emit(data)
+		OP_LORE_CATALOG:
+			lore_catalog_received.emit(data)
 		OP_CRAFTING_CATALOG:
 			crafting_catalog_received.emit(data)
 		OP_ALCHEMY_DEFINITION:
 			alchemy_definition_received.emit(data)
+		OP_LORE_DEFINITION:
+			lore_definition_received.emit(data)
 		OP_CRAFTING_DEFINITION:
 			crafting_definition_received.emit(data)
 		OP_ALCHEMY_PREVIEW:
 			alchemy_preview_received.emit(data)
+		OP_LORE_PREVIEW:
+			lore_preview_received.emit(data)
 		OP_CRAFTING_PREVIEW:
 			crafting_preview_received.emit(data)
 		OP_ALCHEMY_MUTATION:
 			alchemy_mutation_completed.emit(data)
+		OP_LORE_MUTATION:
+			lore_mutation_completed.emit(data)
 		OP_CRAFTING_MUTATION:
 			crafting_mutation_completed.emit(data)
 		OP_WORLD_OBJECT_CATALOG:
@@ -785,3 +801,20 @@ func _request_next_startup_operation() -> void:
 			_request(OP_DIALOGUE_OPTIONS, "/api/v1/dialogues/options")
 		OP_QUEST_OPTIONS:
 			_request(OP_QUEST_OPTIONS, "/api/v1/quests/options")
+
+func load_lore_recipes(search: String = "") -> void:
+	_request(OP_LORE_CATALOG, "/api/v1/lore-definitions?search=%s" % search.uri_encode())
+
+
+func load_lore(definition_id: String) -> void:
+	_request(OP_LORE_DEFINITION, "/api/v1/lore-definitions/%s" % definition_id.uri_encode())
+
+
+func preview_lore(definition_id: String, payload: Dictionary) -> void:
+	_request(OP_LORE_PREVIEW, "/api/v1/lore-definitions/%s/preview" % definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+
+func mutate_lore(definition_id: String, operation: String, payload: Dictionary) -> void:
+	var suffix := "draft" if operation == "save_draft" else operation
+	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
+	_request(OP_LORE_MUTATION, "/api/v1/lore-definitions/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
