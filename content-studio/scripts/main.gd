@@ -180,6 +180,9 @@ func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> 
 		"loot_tables":
 			_open_tab(loot_table_editor)
 			loot_table_editor.open_resource(resource_id)
+		"farming":
+			_open_tab(%Farming)
+			%Farming.open_resource(resource_id)
 		"blacksmithing":
 			_open_tab(blacksmithing_editor)
 			blacksmithing_editor.open_resource(resource_id)

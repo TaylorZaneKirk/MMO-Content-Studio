@@ -19,12 +19,16 @@ signal item_delete_completed(payload: Dictionary)
 signal world_object_options_received(payload: Dictionary)
 signal world_object_catalog_received(payload: Dictionary)
 signal blacksmithing_catalog_received(payload: Dictionary)
+signal farming_catalog_received(payload: Dictionary)
 signal world_object_definition_received(payload: Dictionary)
 signal blacksmithing_definition_received(payload: Dictionary)
+signal farming_definition_received(payload: Dictionary)
 signal world_object_preview_received(payload: Dictionary)
 signal blacksmithing_preview_received(payload: Dictionary)
+signal farming_preview_received(payload: Dictionary)
 signal world_object_mutation_completed(payload: Dictionary)
 signal blacksmithing_mutation_completed(payload: Dictionary)
+signal farming_mutation_completed(payload: Dictionary)
 signal shop_options_received(payload: Dictionary)
 signal shop_catalog_received(payload: Dictionary)
 signal shop_definition_received(payload: Dictionary)
@@ -91,12 +95,16 @@ const OP_ITEM_DELETE := "item_delete"
 const OP_WORLD_OBJECT_OPTIONS := "world_object_options"
 const OP_WORLD_OBJECT_CATALOG := "world_object_catalog"
 const OP_BLACKSMITHING_CATALOG := "blacksmithing_catalog"
+const OP_FARMING_CATALOG := "farming_catalog"
 const OP_WORLD_OBJECT_DEFINITION := "world_object_definition"
 const OP_BLACKSMITHING_DEFINITION := "blacksmithing_definition"
+const OP_FARMING_DEFINITION := "farming_definition"
 const OP_WORLD_OBJECT_PREVIEW := "world_object_preview"
 const OP_BLACKSMITHING_PREVIEW := "blacksmithing_preview"
+const OP_FARMING_PREVIEW := "farming_preview"
 const OP_WORLD_OBJECT_MUTATION := "world_object_mutation"
 const OP_BLACKSMITHING_MUTATION := "blacksmithing_mutation"
+const OP_FARMING_MUTATION := "farming_mutation"
 const OP_SHOP_OPTIONS := "shop_options"
 const OP_SHOP_CATALOG := "shop_catalog"
 const OP_SHOP_DEFINITION := "shop_definition"
@@ -259,6 +267,20 @@ func mutate_blacksmithing(definition_id: String, operation: String, payload: Dic
 	var suffix := "draft" if operation == "save_draft" else operation
 	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
 	_request(OP_BLACKSMITHING_MUTATION, "/api/v1/blacksmithing-recipes/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
+
+func load_farming_recipes(search: String = "") -> void:
+	_request(OP_FARMING_CATALOG, "/api/v1/farming-definitions?search=%s" % search.uri_encode())
+
+func load_farming(definition_id: String) -> void:
+	_request(OP_FARMING_DEFINITION, "/api/v1/farming-definitions/%s" % definition_id.uri_encode())
+
+func preview_farming(definition_id: String, payload: Dictionary) -> void:
+	_request(OP_FARMING_PREVIEW, "/api/v1/farming-definitions/%s/preview" % definition_id.uri_encode(), HTTPClient.METHOD_POST, payload)
+
+func mutate_farming(definition_id: String, operation: String, payload: Dictionary) -> void:
+	var suffix := "draft" if operation == "save_draft" else operation
+	var method := HTTPClient.METHOD_PUT if operation == "save_draft" else HTTPClient.METHOD_POST
+	_request(OP_FARMING_MUTATION, "/api/v1/farming-definitions/%s/%s" % [definition_id.uri_encode(), suffix], method, payload)
 
 func load_world_objects(search: String = "") -> void:
 	_request(OP_WORLD_OBJECT_CATALOG, "/api/v1/world-objects?search=%s" % search.uri_encode())
@@ -540,6 +562,14 @@ func _on_request_succeeded(operation: String, data: Dictionary) -> void:
 			blacksmithing_preview_received.emit(data)
 		OP_BLACKSMITHING_MUTATION:
 			blacksmithing_mutation_completed.emit(data)
+		OP_FARMING_CATALOG:
+			farming_catalog_received.emit(data)
+		OP_FARMING_DEFINITION:
+			farming_definition_received.emit(data)
+		OP_FARMING_PREVIEW:
+			farming_preview_received.emit(data)
+		OP_FARMING_MUTATION:
+			farming_mutation_completed.emit(data)
 		OP_WORLD_OBJECT_CATALOG:
 			world_object_catalog_received.emit(data)
 			_request_next_startup_operation()

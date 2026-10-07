@@ -14,7 +14,8 @@ public enum RuntimeCatalogPublicationScope
     Quest = 1 << 4,
     WorldObject = 1 << 5,
     Shop = 1 << 6,
-    Blacksmithing = 1 << 7
+    Blacksmithing = 1 << 7,
+    Farming = 1 << 8
 }
 
 public interface IRuntimeCatalogPublisher
