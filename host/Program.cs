@@ -57,6 +57,7 @@ app.MapBrowserLootTables();
 app.MapBrowserWorldObjects();
 app.MapBrowserBlacksmithing();
 app.MapBrowserFarming();
+app.MapBrowserAlchemy();
 app.MapBrowserQuests();
 app.MapBrowserDialogue();
 app.MapBrowserNpcs();
