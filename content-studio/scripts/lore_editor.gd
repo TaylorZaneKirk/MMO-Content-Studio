@@ -1,7 +1,7 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const FIELDS := [["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["goo_item_id", "Goo item ID"], ["mob_definition_id", "Mob definition ID"], ["study_level", "Study level"], ["study_duration_ms", "Study duration (milliseconds)"], ["study_xp", "Insight XP per study"], ["mastery_studies", "Studies required"], ["mastery_level", "Permanent Insight level required"], ["accuracy_basis_points", "Accuracy bonus (basis points; 50 = 0.5%)"]]
+const FIELDS := [["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["study_duration_ms", "Inventory study duration (milliseconds)"]]
 var _fields: Dictionary = {}
 var _current: Dictionary = {}
 var _request: Dictionary = {}
@@ -9,6 +9,9 @@ var _operation: OptionButton
 var _apply: Button
 var _status: Label
 var _busy := false
+var _members: LineEdit
+var _specimens: VBoxContainer
+var _progression: Label
 
 func _ready() -> void:
 	(get_parent() as TabContainer).set_tab_title(get_index(), "Insight")
@@ -37,6 +40,24 @@ func _ready() -> void:
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
+	var member_label := Label.new()
+	member_label.text = "Slime family members (published Mob IDs, separated by commas)"
+	form.add_child(member_label)
+	_members = LineEdit.new()
+	_members.text_changed.connect(func(_value: String): _apply.disabled = true)
+	form.add_child(_members)
+	_specimens = VBoxContainer.new()
+	form.add_child(_specimens)
+	var add_specimen := Button.new()
+	add_specimen.text = "Add study specimen"
+	add_specimen.pressed.connect(func():
+		if not _busy:
+			_add_specimen({})
+			_apply.disabled = true)
+	form.add_child(add_specimen)
+	_progression = Label.new()
+	_progression.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	form.add_child(_progression)
 	_operation = OptionButton.new()
 	_operation.add_item("Save draft")
 	_operation.add_item("Publish saved settings")
@@ -71,6 +92,16 @@ func _loaded(data: Dictionary) -> void:
 	_current = data
 	for key: String in _fields:
 		_fields[key].text = str(data.get("draft", {}).get(key, ""))
+	_members.text = ", ".join(data.get("draft", {}).get("family", {}).get("mob_definition_ids", []))
+	for row in _specimens.get_children():
+		_specimens.remove_child(row)
+		row.queue_free()
+	for specimen: Dictionary in data.get("draft", {}).get("specimens", []):
+		_add_specimen(specimen)
+	var progression_lines: Array[String] = ["Approved milestones (read only):"]
+	for milestone: Dictionary in data.get("mastery_preview", []):
+		progression_lines.append("%d: %d points, Insight %d — %s +%s%%" % [int(milestone["milestone"]), int(milestone["points"]), int(milestone["required_level"]), str(milestone["category"]), str(float(milestone["total_basis_points"]) / 100.0)])
+	_progression.text = "\n".join(progression_lines)
 	_apply.disabled = true
 	_status.text = "Loaded %s. Draft edits retain the previous published rules." % str(data.get("publication_state", ""))
 
@@ -82,11 +113,29 @@ func _preview() -> void:
 		var value: String = _fields[key].text.strip_edges()
 		if key.ends_with("_id"):
 			draft[key] = value
-		elif not value.is_valid_float():
-			_status.text = "Enter a number for " + key
+		elif not value.is_valid_int():
+			_status.text = "Enter a whole number for " + key
 			return
 		else:
 			draft[key] = int(value)
+	var member_ids: Array[String] = []
+	for member: String in _members.text.split(",", false):
+		if not member.strip_edges().is_empty():
+			member_ids.append(member.strip_edges())
+	draft["family"] = {"family_id": "slime", "display_name": "Slime", "defence_style": "melee", "mob_definition_ids": member_ids}
+	var specimens: Array[Dictionary] = []
+	for row in _specimens.get_children():
+		var specimen := {"family_id": "slime"}
+		for field in row.get_children():
+			if field is LineEdit:
+				var key := str(field.get_meta("field"))
+				var value: String = field.text.strip_edges()
+				if key != "item_id" and not value.is_valid_int():
+					_status.text = "Enter a whole number for " + key
+					return
+				specimen[key] = value if key == "item_id" else int(value)
+		specimens.append(specimen)
+	draft["specimens"] = specimens
 	_request = {"draft": draft, "expected_updated_at_utc": _current.get("updated_at_utc"), "target_operation": "save_draft" if _operation.selected == 0 else "publish"}
 	_apply.disabled = true
 	_set_busy(true)
@@ -122,3 +171,30 @@ func _set_busy(value: bool) -> void:
 	for field: LineEdit in _fields.values():
 		field.editable = not value
 	_operation.disabled = value
+	_members.editable = not value
+	for row in _specimens.get_children():
+		for field in row.get_children():
+			if field is LineEdit:
+				field.editable = not value
+
+# A row owns only editable specimen values; this editor owns the complete draft.
+func _add_specimen(specimen: Dictionary) -> void:
+	var row := VBoxContainer.new()
+	_specimens.add_child(row)
+	for spec: Array in [["item_id", "Specimen item ID"], ["required_level", "Minimum Insight"], ["base_xp", "Base XP"], ["mastery_points", "Mastery points"]]:
+		var label := Label.new()
+		label.text = str(spec[1])
+		row.add_child(label)
+		var field := LineEdit.new()
+		field.set_meta("field", spec[0])
+		field.text = str(specimen.get(spec[0], ""))
+		field.text_changed.connect(func(_value: String): _apply.disabled = true)
+		row.add_child(field)
+	var remove := Button.new()
+	remove.text = "Remove specimen"
+	remove.pressed.connect(func():
+		if not _busy:
+			_specimens.remove_child(row)
+			row.queue_free()
+			_apply.disabled = true)
+	row.add_child(remove)
