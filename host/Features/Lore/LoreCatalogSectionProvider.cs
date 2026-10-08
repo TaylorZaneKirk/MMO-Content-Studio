@@ -11,7 +11,7 @@ public sealed class LoreCatalogSectionProvider(LoreAuthoringService recipes) : I
     public async Task<ContentCatalogSection> LoadAsync(CancellationToken cancellationToken)
     {
         var result = await recipes.ListAsync(null, cancellationToken);
-        return new(ContentType, "Lore", true, result.Value?.Items.Select(item =>
+        return new(ContentType, "Insight", true, result.Value?.Items.Select(item =>
             new ContentCatalogEntry(item.DefinitionId, item.DisplayName, item.PublicationState)).ToArray() ?? []);
     }
 }

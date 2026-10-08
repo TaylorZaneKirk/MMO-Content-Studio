@@ -13,7 +13,7 @@ public sealed class LoreRepository(AuthoringDatabaseConnectionFactory factory)
     public async Task<IReadOnlyList<LoreSummary>> ListAsync(string? search, CancellationToken ct)
     {
         var row = await LoadAsync("v1", ct);
-        return row is null ? [] : [new("v1", "Lore V1", row.PublicationState)];
+        return row is null ? [] : [new("v1", "Insight foundation", row.PublicationState)];
     }
     public async Task<LoreDefinition?> LoadAsync(string id, CancellationToken ct)
     {
@@ -42,6 +42,10 @@ public sealed class LoreRepository(AuthoringDatabaseConnectionFactory factory)
         command.Parameters.AddWithValue("mob", settings.MobDefinitionId);
         command.Parameters.AddWithValue("goo", settings.GooItemId);
         if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish the Slime and enabled, nonstackable, tradeable Goo first.");
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM world_object_definitions WHERE definition_id=@lectern AND publication_state='Published' AND footprint_width_tiles=1 AND footprint_height_tiles=1) AND (SELECT count(*) FROM world_object_interactions WHERE definition_id=@lectern AND action_id IN ('restore_concentration','study_manual','study_auto'))=3 AND NOT EXISTS(SELECT 1 FROM character_stats WHERE concentration_drain_ticks>=@drainTicks)";
+        command.Parameters.AddWithValue("lectern", settings.LecternDefinitionId);
+        command.Parameters.AddWithValue("drainTicks", TimeSpan.FromMilliseconds(settings.FocusDrainMs).Ticks);
+        if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish a one-tile lectern with restore/manual/automatic actions. A shorter drain interval requires saved remainders to be reconciled before publication.");
         return errors;
     }
 

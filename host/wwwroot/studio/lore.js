@@ -2,7 +2,7 @@ import {
     createRequest
 }
 from './studio-common.js';
-const fields=[["goo_item_id", "Goo item ID"], ["mob_definition_id", "Mob definition ID"], ["study_level", "Study level"], ["study_duration_ms", "Study duration (milliseconds)"], ["study_xp", "Lore XP per study"], ["mastery_studies", "Studies required"], ["mastery_level", "Permanent Lore level required"], ["accuracy_basis_points", "Accuracy bonus (basis points; 50 = 0.5%)"]];
+const fields=[["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["goo_item_id", "Goo item ID"], ["mob_definition_id", "Mob definition ID"], ["study_level", "Study level"], ["study_duration_ms", "Study duration (milliseconds)"], ["study_xp", "Insight XP per study"], ["mastery_studies", "Studies required"], ["mastery_level", "Permanent Insight level required"], ["accuracy_basis_points", "Accuracy bonus (basis points; 50 = 0.5%)"]];
 let session={
 }, current=null, prepared=null, busy=false, revision=0;
 const $=id=>document.getElementById(id);

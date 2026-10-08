@@ -66,7 +66,7 @@ public sealed class LoreAuthoringService(
             request.ExpectedUpdatedAtUtc, cancellationToken);
         var verified = await repository.LoadAsync(definitionId, cancellationToken);
         if (JsonSerializer.Serialize(saved) != JsonSerializer.Serialize(verified))
-            throw new InvalidOperationException("Lore rules mutation failed reload-and-verify.");
+            throw new InvalidOperationException("Insight rules mutation failed reload-and-verify.");
         if (existing?.PublicationState == "Published" || saved?.PublicationState == "Published")
             messages.AddRange(await publisher.PublishCatalogsAsync(RuntimeCatalogPublicationScope.Lore, cancellationToken));
         return AuthoringOperationResult<LoreMutation>.Success(new(operation, verified, messages));
@@ -112,8 +112,8 @@ public sealed class LoreAuthoringService(
         { return AuthoringOperationResult<T>.Failure(Error("publication_reference_conflict", error.MessageText)); }
         catch (Exception error) when (error is NpgsqlException or AuthoringDatabaseUnavailableException)
         {
-            logger.LogError(error, "Lore rules database operation failed.");
-            return AuthoringOperationResult<T>.Failure(Error("database_unavailable", "Lore rules database operation failed. Check schema health and host logs."));
+            logger.LogError(error, "Insight rules database operation failed.");
+            return AuthoringOperationResult<T>.Failure(Error("database_unavailable", "Insight rules database operation failed. Check schema health and host logs."));
         }
     }
 }
