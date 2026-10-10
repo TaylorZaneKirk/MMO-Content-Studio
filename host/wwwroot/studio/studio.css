@@ -804,3 +804,16 @@ a.workspace-link { text-decoration:none; min-height:44px; padding:10px 14px; bor
 .environment-page .error{color:#a63a32}.environment-scope{line-height:1.6}
 @media(max-width:1000px){.environment-grid{grid-template-columns:1fr}}
 @media(max-width:800px){.environment-shell{display:block}.environment-catalogs{grid-template-columns:1fr}.environment-card{padding:18px}.environment-page .editor-heading{align-items:stretch;flex-direction:column}.environment-page #refresh{width:100%}}
+
+/* Insight is a single-page editor, independent of the shell's phone panes.
+   Keep its layout here because the browser CSP disallows inline styles. */
+main.lore-editor {
+    display:block;
+    max-width:850px;
+    margin:2rem auto;
+    padding:1rem
+}
+.lore-editor pre {
+    white-space:pre-wrap;
+    overflow-wrap:anywhere
+}
