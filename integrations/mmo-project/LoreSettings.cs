@@ -32,11 +32,27 @@ public sealed record LoreSettings
     [JsonPropertyName("measured_force_minimum_strength")] public int MeasuredForceMinimumStrength { get; init; } = 1;
     [JsonPropertyName("measured_force_drain_ms")] public int MeasuredForceDrainMs { get; init; } = 36000;
     [JsonPropertyName("measured_force_ready_ms")] public int MeasuredForceReadyMs { get; init; } = 600;
+    [JsonPropertyName("steady_hand_level")] public int SteadyHandLevel { get; init; } = 7;
+    [JsonPropertyName("steady_hand_attack_percent")] public int SteadyHandAttackPercent { get; init; } = 5;
+    [JsonPropertyName("steady_hand_minimum_attack")] public int SteadyHandMinimumAttack { get; init; } = 1;
+    [JsonPropertyName("steady_hand_drain_ms")] public int SteadyHandDrainMs { get; init; } = 36000;
+    [JsonPropertyName("steady_hand_ready_ms")] public int SteadyHandReadyMs { get; init; } = 600;
+    [JsonPropertyName("keen_aim_level")] public int KeenAimLevel { get; init; } = 8;
+    [JsonPropertyName("keen_aim_ranged_percent")] public int KeenAimRangedPercent { get; init; } = 5;
+    [JsonPropertyName("keen_aim_minimum_ranged")] public int KeenAimMinimumRanged { get; init; } = 1;
+    [JsonPropertyName("keen_aim_drain_ms")] public int KeenAimDrainMs { get; init; } = 36000;
+    [JsonPropertyName("keen_aim_ready_ms")] public int KeenAimReadyMs { get; init; } = 600;
+    [JsonPropertyName("arcane_clarity_level")] public int ArcaneClarityLevel { get; init; } = 9;
+    [JsonPropertyName("arcane_clarity_magic_accuracy_percent")] public int ArcaneClarityMagicAccuracyPercent { get; init; } = 5;
+    [JsonPropertyName("arcane_clarity_minimum_magic_accuracy")] public int ArcaneClarityMinimumMagicAccuracy { get; init; } = 1;
+    [JsonPropertyName("arcane_clarity_drain_ms")] public int ArcaneClarityDrainMs { get; init; } = 36000;
+    [JsonPropertyName("arcane_clarity_ready_ms")] public int ArcaneClarityReadyMs { get; init; } = 600;
     // Both rates spend exact integer units per 100 ns gameplay tick. Publication
     // cannot change the denominator while any saved partial point remains.
     [JsonIgnore] public long ConcentrationUnitsPerPoint => checked((long)FocusDrainMs * GuardedMindDrainMs * TimeSpan.TicksPerMillisecond);
     [JsonIgnore] public IReadOnlyList<InsightFocus> Focuses => [
         new("guarded_mind", GuardedMindLevel), new("measured_force", MeasuredForceLevel),
+        new("steady_hand", SteadyHandLevel), new("keen_aim", KeenAimLevel), new("arcane_clarity", ArcaneClarityLevel),
         new("fishing", FishingFocusLevel), new("cooking", CookingFocusLevel),
         new("mining", MiningFocusLevel), new("blacksmithing", BlacksmithingFocusLevel),
         new("woodcutting", WoodcuttingFocusLevel), new("crafting", CraftingFocusLevel),
@@ -117,6 +133,15 @@ public sealed record LoreSettings
         if (MeasuredForceLevel != 4 || MeasuredForceStrengthPercent != 5 || MeasuredForceMinimumStrength != 1 ||
             MeasuredForceDrainMs != GuardedMindDrainMs || MeasuredForceReadyMs != GuardedMindReadyMs)
             errors.Add("Measured Force remains Insight 4, +5% melee Strength (minimum +1), 36000 ms drain and 600 ms readiness.");
+        if (SteadyHandLevel != 7 || SteadyHandAttackPercent != 5 || SteadyHandMinimumAttack != 1 ||
+            SteadyHandDrainMs != GuardedMindDrainMs || SteadyHandReadyMs != GuardedMindReadyMs)
+            errors.Add("Steady Hand remains Insight 7, +5% effective attack (minimum +1), 36000 ms drain and 600 ms readiness.");
+        if (KeenAimLevel != 8 || KeenAimRangedPercent != 5 || KeenAimMinimumRanged != 1 ||
+            KeenAimDrainMs != GuardedMindDrainMs || KeenAimReadyMs != GuardedMindReadyMs)
+            errors.Add("Keen Aim remains Insight 8, +5% effective ranged (minimum +1), 36000 ms drain and 600 ms readiness.");
+        if (ArcaneClarityLevel != 9 || ArcaneClarityMagicAccuracyPercent != 5 || ArcaneClarityMinimumMagicAccuracy != 1 ||
+            ArcaneClarityDrainMs != GuardedMindDrainMs || ArcaneClarityReadyMs != GuardedMindReadyMs)
+            errors.Add("Arcane Clarity remains Insight 9, +5% effective magic accuracy (minimum +1), 36000 ms drain and 600 ms readiness.");
         return errors;
     }
     public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items) =>
