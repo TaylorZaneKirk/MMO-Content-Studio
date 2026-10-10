@@ -24,15 +24,28 @@ for(const [key,label] of fields){
     $('fields').append(row);
 }
 const familyRows=document.createElement('div'); $('fields').append(familyRows);
+// Each row retains its family identity; this page builds the complete draft.
 function addFamily(family) {
-    const label=document.createElement('label'); label.style.display='block';
-    label.textContent=`${family.display_name} — Insight ${family.required_level}, melee defence. Published Mob IDs, one per line`;
-    const members=document.createElement('textarea'); members.rows=4; members.style.width='100%'; members.style.boxSizing='border-box';
-    members.dataset.family=JSON.stringify(family); members.value=(family.mob_definition_ids??[]).join('\n');
-    members.addEventListener('input',invalidate); label.append(members); familyRows.append(label);
+    const row=document.createElement('fieldset'); row.dataset.family=JSON.stringify(family);
+    const legend=document.createElement('legend'); legend.textContent=family.display_name; row.append(legend);
+    if(family.family_id==='flowers') {
+        for(const [key,label,value] of [['required_level','Base Insight required for all milestones',family.required_level],
+            ...(family.milestone_points??[]).map((points,i)=>['milestone_'+i,`Milestone ${i+1}: total points (+${i+1}% extra flower chance)`,points])]) {
+            const wrapper=document.createElement('label'); wrapper.style.display='block'; wrapper.textContent=label;
+            const input=document.createElement('input'); input.type='number'; input.step='1'; input.dataset.field=key; input.value=value;
+            input.addEventListener('input',invalidate); wrapper.append(input); row.append(wrapper);
+        }
+        const note=document.createElement('p'); note.textContent='Five harvest milestones, capped at 5%. New crops snapshot the outcome; no combat bonus or extra Farming XP.'; row.append(note);
+    } else {
+        const label=document.createElement('label'); label.textContent=`Insight ${family.required_level}, melee defence. Published Mob IDs, one per line`;
+        const members=document.createElement('textarea'); members.rows=4; members.style.width='100%'; members.style.boxSizing='border-box';
+        members.value=(family.mob_definition_ids??[]).join('\n'); members.addEventListener('input',invalidate);
+        label.append(members); row.append(label);
+    }
+    familyRows.append(row);
 }
 const specimenRows=document.createElement('div'); $('fields').append(specimenRows);
-const specimenColumns=[['item_id','Item ID'],['family_id','Family ID (slime or beasts)'],['required_level','Minimum Insight'],['base_xp','Base XP'],['mastery_points','Mastery points']];
+const specimenColumns=[['item_id','Item ID'],['family_id','Family ID (slime, beasts or flowers)'],['required_level','Minimum Insight'],['base_xp','Base XP'],['mastery_points','Mastery points']];
 function addSpecimen(specimen={}) {
     const row=document.createElement('fieldset'); row.className='specimen-row';
     const legend=document.createElement('legend'); legend.textContent='Study specimen'; row.append(legend);
@@ -57,7 +70,7 @@ function invalidate(){
 // Compare raw inputs, not parsed numbers: even an incomplete edit must be retained.
 function localInputs(){
     const local=Object.fromEntries(fields.map(([key])=>[key,$(key).value]));
-    local.family_members=[...familyRows.querySelectorAll('textarea')].map(input=>input.value);
+    local.families=[...familyRows.children].map(row=>[...row.querySelectorAll('input,textarea')].map(input=>input.value));
     local.specimens=[...specimenRows.children].map(row=>Object.fromEntries(
         [...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value])));
     return local;
@@ -167,7 +180,14 @@ $('preview').onclick=async()=>{
             const value=$(key).value;
             draft[key]=key.endsWith('_id')?value.trim():Number(value);
         }
-        draft.families=[...familyRows.querySelectorAll('textarea')].map(input=>({...JSON.parse(input.dataset.family),mob_definition_ids:input.value.split('\n').map(s=>s.trim()).filter(Boolean)}));
+        draft.families=[...familyRows.children].map(row=>{
+            const family=JSON.parse(row.dataset.family);
+            if(family.family_id==='flowers') {
+                family.required_level=Number(row.querySelector('[data-field="required_level"]').value);
+                family.milestone_points=[...row.querySelectorAll('[data-field^="milestone_"]')].map(input=>Number(input.value));
+            } else family.mob_definition_ids=row.querySelector('textarea').value.split('\n').map(s=>s.trim()).filter(Boolean);
+            return family;
+        });
         draft.specimens=[...specimenRows.children].map(row=>{
             const specimen={};
             for(const input of row.querySelectorAll('input'))specimen[input.dataset.field]=input.dataset.field.endsWith('_id')?input.value.trim():Number(input.value);

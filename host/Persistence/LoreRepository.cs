@@ -13,7 +13,7 @@ public sealed class LoreRepository(AuthoringDatabaseConnectionFactory factory)
     public async Task<IReadOnlyList<LoreSummary>> ListAsync(string? search, CancellationToken ct)
     {
         var row = await LoadAsync("v1", ct);
-        return row is null ? [] : [new("v1", "Insight — creature family mastery", row.PublicationState)];
+        return row is null ? [] : [new("v1", "Insight — subject family mastery", row.PublicationState)];
     }
     public async Task<LoreDefinition?> LoadAsync(string id, CancellationToken ct)
     {

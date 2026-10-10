@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 namespace MMO.Project.Lore;
 
-// The authored study document. Explicit creature families share the approved curve; specimens carry
+// The authored study document. Creature families use combat milestones; Flowers uses five harvest milestones. Specimens carry
 // independent eligibility, XP and point weights. Focus rules share this document.
 public sealed record LoreSettings
 {
@@ -28,7 +28,7 @@ public sealed record LoreSettings
         new("woodcutting", WoodcuttingFocusLevel), new("crafting", CraftingFocusLevel),
         new("farming", FarmingFocusLevel), new("alchemy", AlchemyFocusLevel)];
 
-    public LoreSpecimen? FindSpecimen(string itemId) => Specimens.FirstOrDefault(s => s.ItemId == itemId);
+    public LoreSpecimen? FindSpecimen(string itemId) => Specimens?.FirstOrDefault(s => s is not null && s.ItemId == itemId);
     public LoreFamily? FindFamily(string familyId) => Families.FirstOrDefault(f => f.FamilyId == familyId);
     public LoreFamily? FamilyForMob(string definitionId) => Families.FirstOrDefault(f => f.MobDefinitionIds.Contains(definitionId, StringComparer.Ordinal));
 
@@ -36,13 +36,24 @@ public sealed record LoreSettings
     {
         var errors = new List<string>();
         if (Families is null || Families.Length == 0 || Families.Any(f => f is null))
-            return ["Explicit creature families are required."];
+            return ["Explicit subject families are required."];
         if (Families.Select(f => f.FamilyId).Distinct(StringComparer.Ordinal).Count() != Families.Length)
             errors.Add("Each family ID may appear once.");
         foreach (var family in Families)
         {
-            // Only the two approved families exist in this slice. More content needs
-            // a deliberate classification and gate, not name or artwork inference.
+            // Flower tuning is explicit and bounded; it has no creature members
+            // or combat rewards. Do not infer future plant families from item names.
+            if (family.IsFlowers)
+            {
+                if (family.DisplayName != "Flowers" || family.RequiredLevel is < 1 or > 99 ||
+                    family.DefenceStyle != "none" || family.MobDefinitionIds is null || family.MobDefinitionIds.Length != 0 ||
+                    family.MilestonePoints is not { Length: 5 } thresholds ||
+                    thresholds.Any(value => value is < 1 or > 1000000000) ||
+                    thresholds.Zip(thresholds.Skip(1)).Any(pair => pair.First >= pair.Second))
+                    errors.Add("Flowers requires no Mob members, no defence, Insight 1–99 and five strictly increasing positive point thresholds.");
+                continue;
+            }
+            if (family.MilestonePoints is not null) errors.Add("Only Flowers authors milestone point thresholds.");
             if (family.FamilyId is not ("slime" or "beasts") ||
                 family.DisplayName != (family.FamilyId == "slime" ? "Slime" : "Beasts") ||
                 family.RequiredLevel != (family.FamilyId == "slime" ? 3 : 5) || family.DefenceStyle != "melee" ||
@@ -76,6 +87,10 @@ public sealed record LoreSettings
                 { FamilyId: "beasts", RequiredLevel: 5, BaseXp: 10, MasteryPoints: 2 })
                 errors.Add("Rat Tail remains level 5, 10 XP and 2 Beast mastery points.");
         }
+        if (FindFamily("flowers") is not null && (FindSpecimen("inventory_484_flowers") is not
+                { FamilyId: "flowers", RequiredLevel: 1, BaseXp: 10, MasteryPoints: 1 } ||
+                (Specimens ?? []).Any(s => s is not null && s.FamilyId == "flowers" && s.ItemId != "inventory_484_flowers")))
+            errors.Add("Flowers studies only inventory_484_flowers at Insight 1 for 10 XP and 1 point.");
         if (StudyDurationMs != 1800) errors.Add("Inventory study remains 1800 milliseconds.");
         if (LecternDefinitionId != "study_lectern") errors.Add("Insight requires study_lectern.");
         if (StationXpPercent != 125 || StationAutoMs != 1800 || StationManualMs != 600)
@@ -94,7 +109,20 @@ public sealed record LoreFamily(
     [property: JsonPropertyName("display_name")] string DisplayName,
     [property: JsonPropertyName("mob_definition_ids")] string[] MobDefinitionIds,
     [property: JsonPropertyName("defence_style")] string DefenceStyle,
-    [property: JsonPropertyName("required_level")] int RequiredLevel);
+    [property: JsonPropertyName("required_level")] int RequiredLevel,
+    [property: JsonPropertyName("milestone_points"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] long[]? MilestonePoints = null)
+{
+    [JsonIgnore] public bool IsFlowers => FamilyId == "flowers";
+    [JsonIgnore] public int MilestoneCount => IsFlowers ? 5 : FamilyMastery.MaximumMilestones;
+    public long Threshold(int milestone) => IsFlowers ? MilestonePoints![milestone - 1] : FamilyMastery.Threshold(milestone);
+    public int EligibleMilestones(long points, int level)
+    {
+        if (level < RequiredLevel) return 0;
+        var earned = 0;
+        while (earned < MilestoneCount && points >= Threshold(earned + 1)) earned++;
+        return earned;
+    }
+}
 public sealed record LoreSpecimen(
     [property: JsonPropertyName("item_id")] string ItemId,
     [property: JsonPropertyName("family_id")] string FamilyId,
