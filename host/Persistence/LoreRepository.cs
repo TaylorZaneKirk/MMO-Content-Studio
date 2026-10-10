@@ -46,10 +46,11 @@ public sealed class LoreRepository(AuthoringDatabaseConnectionFactory factory)
         command.Parameters.AddWithValue("specimens", settings.Specimens.Select(s => s.ItemId).ToArray());
         if (Convert.ToInt64(await command.ExecuteScalarAsync(ct)) != settings.Specimens.Length)
             errors.Add("Every specimen must reference an enabled, nonstackable, tradeable item.");
-        command.CommandText = "SELECT EXISTS(SELECT 1 FROM world_object_definitions WHERE definition_id=@lectern AND publication_state='Published' AND footprint_width_tiles=1 AND footprint_height_tiles=1) AND (SELECT count(*) FROM world_object_interactions WHERE definition_id=@lectern AND action_id IN ('restore_concentration','study_manual','study_auto'))=3 AND NOT EXISTS(SELECT 1 FROM character_stats WHERE concentration_drain_ticks>=@drainTicks)";
+        command.CommandText = "SELECT EXISTS(SELECT 1 FROM world_object_definitions WHERE definition_id=@lectern AND publication_state='Published' AND footprint_width_tiles=1 AND footprint_height_tiles=1) AND (SELECT count(*) FROM world_object_interactions WHERE definition_id=@lectern AND action_id IN ('restore_concentration','study_manual','study_auto'))=3 AND NOT EXISTS(SELECT 1 FROM character_stats WHERE concentration_spent_units>=@units OR (concentration_spent_units>0 AND @drainMs<>(SELECT (published_settings->>'focus_drain_ms')::int FROM lore_definitions WHERE definition_id='v1')))";
         command.Parameters.AddWithValue("lectern", settings.LecternDefinitionId);
-        command.Parameters.AddWithValue("drainTicks", TimeSpan.FromMilliseconds(settings.FocusDrainMs).Ticks);
-        if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish a one-tile lectern with restore/manual/automatic actions. A shorter drain interval requires saved remainders to be reconciled before publication.");
+        command.Parameters.AddWithValue("units", settings.ConcentrationUnitsPerPoint);
+        command.Parameters.AddWithValue("drainMs", settings.FocusDrainMs);
+        if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish a one-tile lectern with restore/manual/automatic actions. Changing a drain interval requires stopped consumers and zero saved fractional Concentration spending; never discard an offline balance.");
         return errors;
     }
 

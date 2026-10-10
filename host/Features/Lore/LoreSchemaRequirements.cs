@@ -12,6 +12,6 @@ public sealed class LoreSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("character_lore", "mastery_points"),
         AuthoringSchemaRequirement.Column("character_lore", "unlocked_milestones"),
         AuthoringSchemaRequirement.Column("character_lore", "legacy_accuracy_basis_points"),
-        AuthoringSchemaRequirement.Column("character_stats", "concentration_drain_ticks"),
+        AuthoringSchemaRequirement.Column("character_stats", "concentration_spent_units"),
         AuthoringSchemaRequirement.Column("character_skills", "experience_hundredths_remainder")];
 }

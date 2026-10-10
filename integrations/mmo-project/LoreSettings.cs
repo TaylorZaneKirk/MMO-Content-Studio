@@ -22,7 +22,16 @@ public sealed record LoreSettings
     [JsonPropertyName("crafting_focus_level")] public int CraftingFocusLevel { get; init; } = 20;
     [JsonPropertyName("farming_focus_level")] public int FarmingFocusLevel { get; init; } = 23;
     [JsonPropertyName("alchemy_focus_level")] public int AlchemyFocusLevel { get; init; } = 26;
+    [JsonPropertyName("guarded_mind_level")] public int GuardedMindLevel { get; init; } = 1;
+    [JsonPropertyName("guarded_mind_defence_percent")] public int GuardedMindDefencePercent { get; init; } = 5;
+    [JsonPropertyName("guarded_mind_minimum_defence")] public int GuardedMindMinimumDefence { get; init; } = 1;
+    [JsonPropertyName("guarded_mind_drain_ms")] public int GuardedMindDrainMs { get; init; } = 36000;
+    [JsonPropertyName("guarded_mind_ready_ms")] public int GuardedMindReadyMs { get; init; } = 600;
+    // Both rates spend exact integer units per 100 ns gameplay tick. Publication
+    // cannot change the denominator while any saved partial point remains.
+    [JsonIgnore] public long ConcentrationUnitsPerPoint => checked((long)FocusDrainMs * GuardedMindDrainMs * TimeSpan.TicksPerMillisecond);
     [JsonIgnore] public IReadOnlyList<InsightFocus> Focuses => [
+        new("guarded_mind", GuardedMindLevel),
         new("fishing", FishingFocusLevel), new("cooking", CookingFocusLevel),
         new("mining", MiningFocusLevel), new("blacksmithing", BlacksmithingFocusLevel),
         new("woodcutting", WoodcuttingFocusLevel), new("crafting", CraftingFocusLevel),
@@ -97,6 +106,9 @@ public sealed record LoreSettings
             errors.Add("Lectern study remains 125% XP, 1800 ms automatic and 600 ms manual.");
         if (FocusDrainMs is < 1000 or > 60000 || FocusReductionPercent is < 1 or > 20 || Focuses.Any(f => f.Level is < 1 or > 99))
             errors.Add("Focus drain must be 1000–60000 ms, reduction 1–20 percent and levels 1–99.");
+        if (GuardedMindLevel != 1 || GuardedMindDefencePercent != 5 || GuardedMindMinimumDefence != 1 ||
+            GuardedMindDrainMs != 36000 || GuardedMindReadyMs != 600)
+            errors.Add("Guarded Mind remains Insight 1, +5% Defence (minimum +1), 36000 ms drain and 600 ms readiness.");
         return errors;
     }
     public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items) =>

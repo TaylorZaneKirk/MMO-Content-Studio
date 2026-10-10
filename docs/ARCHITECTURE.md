@@ -440,3 +440,16 @@ authored first-quest content remain deferred.
 The host's existing native handshake adds `build_identity`, the loaded assembly's `ManifestModule.ModuleVersionId`. The same assembly accepts `--print-build-identity` and exits before configuration, listeners or database setup. Identity is a compiled-code check, not a claim about database content, configuration, or separately served browser assets. This is standard deterministic compiler metadata, not a source-version registry ([Microsoft compiler reference](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/code-generation)).
 
 The launcher compares that field with its candidate before reusing a healthy host and again before launching the client. Missing, malformed or different identity refuses clearly. An older host needs an explicitly authorized deployment/restart; the launcher does not kill an externally owned process. Builds from other checkouts or with other compiler settings/output mapping can be conservatively rejected. If no host responds, the launcher starts its exact candidate from the normal host content directory, retaining local configuration behavior, and only stops its own child on exit. Temporary candidate files are then removed. No service configuration is changed.
+
+
+### Guarded Mind settings
+
+Insight's existing complete settings document now includes fixed Guarded Mind
+values: level 1, 5% Defence, minimum +1, 36000 ms drain and 600 ms readiness.
+Native/browser editors preserve these read-only fields through draft, preview and
+publication; shared validation rejects other values. Migration 103 is required for
+normalized Concentration spending. Skilling drain-rate changes require stopped,
+drained consumers and zero saved partial spending; offline fractions are preserved,
+not reset to make tuning pass. Deploy matching host/game binaries and exported Lore
+only through separately authorized activation. The existing export/signature and
+security boundaries are unchanged.
