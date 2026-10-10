@@ -285,6 +285,18 @@ public sealed class UnifiedItemValidator
         ValidateEquipmentRequirements(equipment.Requirements, knownSkills, messages);
         ValidateEquipmentModifiers(equipment.SkillModifiers, knownSkills, messages);
         ValidateBonuses(equipment.CombatBonuses, messages);
+        var responses = equipment.CombatBonuses;
+        if (responses.ParryBaseChanceBasisPoints is < 0 or > 1000 ||
+            (responses.ParryBaseChanceBasisPoints > 0 &&
+                (equipment.EquipmentSlotId != "right_hand" || equipment.WeaponProfile?.AttackType != "melee")))
+            messages.Add(new ApiError("invalid_parry_chance",
+                "Parry: 0 disables; 1..1000 basis points explicitly enables a right-hand melee weapon (100 bp = 1%).",
+                ValidationSeverity.Error, "equipment.combat_bonuses.parry_base_chance_basis_points"));
+        if (responses.BlockBaseChanceBasisPoints is < 0 or > 1000 ||
+            (responses.BlockBaseChanceBasisPoints > 0 && equipment.EquipmentSlotId != "left_hand"))
+            messages.Add(new ApiError("invalid_block_chance",
+                "Shield block: 0 disables; 1..1000 basis points explicitly marks a left-hand shield. Never infer a shield from slot or name.",
+                ValidationSeverity.Error, "equipment.combat_bonuses.block_base_chance_basis_points"));
         ValidateWeaponProfile(equipment, forPublication, messages);
         ValidateEquippedVisual(equipment.EquippedVisual, forPublication, messages);
     }

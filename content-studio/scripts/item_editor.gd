@@ -24,6 +24,8 @@ const DEFAULT_BONUS_FIELDS := [
 	{"id": "defence_crush", "display_name": "Defence Crush"},
 	{"id": "defence_ranged", "display_name": "Defence Ranged"},
 	{"id": "defence_magic", "display_name": "Magic Defence"},
+	{"id": "parry_base_chance_basis_points", "display_name": "Parry base (bp)"},
+	{"id": "block_base_chance_basis_points", "display_name": "Block base (bp)"},
 ]
 const DEFAULT_EQUIPMENT_SLOTS := [
 	{"id": "head", "display_name": "Head"},
@@ -537,6 +539,10 @@ func _build_ui() -> void:
 	_combat_bonus_section.add_theme_constant_override("separation", 8)
 	editor.add_child(_combat_bonus_section)
 	_combat_bonus_section.add_child(_heading("Combat Bonuses", 16))
+	var response_help := Label.new()
+	response_help.text = "Passive responses: 100 bp = 1%. Zero disables; positive chance explicitly enables a melee weapon parry or shield block. Base Defence adds 5 bp per level above 1, capped at 1000 bp each. No Concentration cost. The Block attack style is separate."
+	response_help.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_combat_bonus_section.add_child(response_help)
 	var bonus_grid := GridContainer.new()
 	bonus_grid.columns = 4
 	bonus_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -2498,8 +2504,9 @@ func _rebuild_bonus_grid(grid_variant: Variant) -> void:
 		var id := str(option.get("id", ""))
 		grid.add_child(_field_label(str(option.get("display_name", id))))
 		var spin := SpinBox.new()
-		spin.min_value = -1000000
-		spin.max_value = 1000000
+		var response_chance := id in ["parry_base_chance_basis_points", "block_base_chance_basis_points"]
+		spin.min_value = 0 if response_chance else -1000000
+		spin.max_value = 1000 if response_chance else 1000000
 		spin.value_changed.connect(_on_form_changed.unbind(1))
 		grid.add_child(spin)
 		_bonus_controls[id] = spin

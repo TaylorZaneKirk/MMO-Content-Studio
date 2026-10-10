@@ -183,3 +183,14 @@ for mutation acceptance. Do not create or change live content merely for QA.
 
 Framework boundary follows ordinary ASP.NET Core facilities:
 [Kestrel endpoint configuration](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/servers/kestrel/endpoints?view=aspnetcore-10.0).
+
+## Passive defensive responses
+
+Combat bonuses include `parry_base_chance_basis_points` and
+`block_base_chance_basis_points` in native and browser editors, catalog detail,
+preview and save/publish. Zero disables eligibility; 100 bp is 1%. Parry requires
+a right-hand melee weapon; positive block explicitly declares a left-hand shield.
+The approved starter values are 500 bp. Base Defence adds 5 bp per level above 1,
+capped at 1000 per response. No Concentration cost; the outgoing Block combat style
+is separate. Migration 106 is required before activating these host binaries.
+These gameplay facts load from SQL; the equipment visual export stays appearance-only.

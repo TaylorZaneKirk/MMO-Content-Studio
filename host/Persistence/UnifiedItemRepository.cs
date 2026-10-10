@@ -1054,7 +1054,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         const string sql = """
             select attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
                 strength_melee, strength_ranged, magic_damage_percent,
-                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic
+                defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
+                parry_base_chance_basis_points, block_base_chance_basis_points
             from item_combat_bonuses
             where item_id = @item_id;
             """;
@@ -1075,7 +1076,9 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 reader.GetInt32(reader.GetOrdinal("defence_slash")),
                 reader.GetInt32(reader.GetOrdinal("defence_crush")),
                 reader.GetInt32(reader.GetOrdinal("defence_ranged")),
-                reader.GetInt32(reader.GetOrdinal("defence_magic")))
+                reader.GetInt32(reader.GetOrdinal("defence_magic")),
+                reader.GetInt32(reader.GetOrdinal("parry_base_chance_basis_points")),
+                reader.GetInt32(reader.GetOrdinal("block_base_chance_basis_points")))
             : null;
     }
 
@@ -1652,12 +1655,14 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 attack_thrust, attack_slash, attack_crush, attack_ranged, attack_magic,
                 strength_melee, strength_ranged, magic_damage_percent,
                 defence_thrust, defence_slash, defence_crush, defence_ranged, defence_magic,
+                parry_base_chance_basis_points, block_base_chance_basis_points,
                 updated_at
             ) values (
                 @item_id,
                 @attack_thrust, @attack_slash, @attack_crush, @attack_ranged, @attack_magic,
                 @strength_melee, @strength_ranged, @magic_damage_percent,
                 @defence_thrust, @defence_slash, @defence_crush, @defence_ranged, @defence_magic,
+                @parry_base_chance_basis_points, @block_base_chance_basis_points,
                 now()
             )
             on conflict (item_id) do update set
@@ -1674,6 +1679,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
                 defence_crush = excluded.defence_crush,
                 defence_ranged = excluded.defence_ranged,
                 defence_magic = excluded.defence_magic,
+                parry_base_chance_basis_points = excluded.parry_base_chance_basis_points,
+                block_base_chance_basis_points = excluded.block_base_chance_basis_points,
                 updated_at = now();
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -1691,6 +1698,8 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         command.Parameters.AddWithValue("defence_crush", bonuses.DefenceCrush);
         command.Parameters.AddWithValue("defence_ranged", bonuses.DefenceRanged);
         command.Parameters.AddWithValue("defence_magic", bonuses.DefenceMagic);
+        command.Parameters.AddWithValue("parry_base_chance_basis_points", bonuses.ParryBaseChanceBasisPoints);
+        command.Parameters.AddWithValue("block_base_chance_basis_points", bonuses.BlockBaseChanceBasisPoints);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

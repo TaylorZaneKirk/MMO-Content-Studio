@@ -722,7 +722,9 @@ public sealed class UnifiedItemAuthoringService
         new("defence_slash", "Defence Slash"),
         new("defence_crush", "Defence Crush"),
         new("defence_ranged", "Defence Ranged"),
-        new("defence_magic", "Magic Defence")
+        new("defence_magic", "Magic Defence"),
+        new("parry_base_chance_basis_points", "Parry base (bp)"),
+        new("block_base_chance_basis_points", "Block base (bp)")
     ];
 
     private static ApiError ItemNotFound(string itemId) => new(

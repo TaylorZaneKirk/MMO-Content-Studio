@@ -5,7 +5,7 @@ const clone = value => structuredClone(value);
 const state = { session: {}, options: {}, assets: [], item: null, draft: null, base: null, id: '', version: null,
     preview: null, editRevision: 0, loadRevision: 0, searchRevision: 0, pending: false, uncertain: false, remote: null };
 const fields = new Map();
-const bonusNames = ['attack_thrust','attack_slash','attack_crush','attack_ranged','attack_magic','strength_melee','strength_ranged','magic_damage_percent','defence_thrust','defence_slash','defence_crush','defence_ranged','defence_magic'];
+const bonusNames = ['attack_thrust','attack_slash','attack_crush','attack_ranged','attack_magic','strength_melee','strength_ranged','magic_damage_percent','defence_thrust','defence_slash','defence_crush','defence_ranged','defence_magic','parry_base_chance_basis_points','block_base_chance_basis_points'];
 const title = name => name.replaceAll('_', ' ').replace(/^./, x => x.toUpperCase());
 const assetUrl = resource => `/studio/api/asset?resource=${encodeURIComponent(resource)}`;
 function element(tag, text, className) { const node = document.createElement(tag); if (text != null) node.textContent = text; if (className) node.className = className; return node; }
@@ -241,7 +241,12 @@ function render() {
             field(form,row,'skill_id','Skill',{choices:options('skills'),path:path+'.skill_id'}); field(form,row,'modifier_value','Modifier',{kind:'integer',path:path+'.modifier_value'});
         });
         part.append(element('h3','Combat bonuses','subheading')); form=grid(part);
-        for(const key of bonusNames) field(form,value.combat_bonuses,key,title(key),{kind:'integer',path:prefix+'combat_bonuses.'+key});
+        for(const key of bonusNames) {
+            const label = key === 'parry_base_chance_basis_points' ? 'Melee parry base chance (bp)'
+                : key === 'block_base_chance_basis_points' ? 'Shield block base chance (bp)' : title(key);
+            field(form,value.combat_bonuses,key,label,{kind:'integer',path:prefix+'combat_bonuses.'+key});
+        }
+        part.append(element('p','Passive responses: 100 bp = 1%. Zero disables; positive chance explicitly enables a right-hand melee weapon parry or left-hand shield block. Base Defence adds 5 bp per level above 1, capped at 1000 bp each. No Concentration cost. The Block attack style is separate.','muted'));
         part.append(element('h3','Weapon profile','subheading'));
         optional(part,value,'weapon_profile','Weapon profile',()=>({profile_id:'',attack_type:'melee',minimum_range_tiles:1,maximum_range_tiles:1,attack_speed_units:4,ranged_damage_type:null,ammunition_family:null,maximum_ammunition_tier:null,melee_combat_options:[]}),weapon=>{
             const form=grid(part), base=prefix+'weapon_profile.';

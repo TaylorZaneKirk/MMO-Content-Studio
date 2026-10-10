@@ -57,7 +57,11 @@ public sealed record EquipmentCombatBonusDefinition(
     [property: JsonPropertyName("defence_slash")] int DefenceSlash,
     [property: JsonPropertyName("defence_crush")] int DefenceCrush,
     [property: JsonPropertyName("defence_ranged")] int DefenceRanged,
-    [property: JsonPropertyName("defence_magic")] int DefenceMagic)
+    [property: JsonPropertyName("defence_magic")] int DefenceMagic,
+    // 0 disables eligibility. Positive values are explicit per-hand capabilities,
+    // not additive defence bonuses; 100 basis points = one percentage point.
+    [property: JsonPropertyName("parry_base_chance_basis_points")] int ParryBaseChanceBasisPoints = 0,
+    [property: JsonPropertyName("block_base_chance_basis_points")] int BlockBaseChanceBasisPoints = 0)
 {
     public static EquipmentCombatBonusDefinition Zero { get; } = new(
         0, 0, 0, 0, 0,
