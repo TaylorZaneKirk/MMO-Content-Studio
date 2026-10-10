@@ -23,19 +23,23 @@ for(const [key,label] of fields){
     row.append(input);
     $('fields').append(row);
 }
-const familyLabel=document.createElement('label');
-familyLabel.textContent='Slime family members (published Mob IDs, one per line)';
-const members=document.createElement('textarea'); members.rows=3;
-members.addEventListener('input',invalidate); familyLabel.append(members); $('fields').append(familyLabel);
+const familyRows=document.createElement('div'); $('fields').append(familyRows);
+function addFamily(family) {
+    const label=document.createElement('label'); label.style.display='block';
+    label.textContent=`${family.display_name} — Insight ${family.required_level}, melee defence. Published Mob IDs, one per line`;
+    const members=document.createElement('textarea'); members.rows=4; members.style.width='100%'; members.style.boxSizing='border-box';
+    members.dataset.family=JSON.stringify(family); members.value=(family.mob_definition_ids??[]).join('\n');
+    members.addEventListener('input',invalidate); label.append(members); familyRows.append(label);
+}
 const specimenRows=document.createElement('div'); $('fields').append(specimenRows);
-const specimenColumns=[['item_id','Item ID'],['required_level','Minimum Insight'],['base_xp','Base XP'],['mastery_points','Mastery points']];
+const specimenColumns=[['item_id','Item ID'],['family_id','Family ID (slime or beasts)'],['required_level','Minimum Insight'],['base_xp','Base XP'],['mastery_points','Mastery points']];
 function addSpecimen(specimen={}) {
     const row=document.createElement('fieldset'); row.className='specimen-row';
-    const legend=document.createElement('legend'); legend.textContent='Study specimen — Slime family'; row.append(legend);
+    const legend=document.createElement('legend'); legend.textContent='Study specimen'; row.append(legend);
     for(const [key,label] of specimenColumns){
         const wrapper=document.createElement('label'); wrapper.textContent=label;
         const input=document.createElement('input'); input.dataset.field=key;
-        input.type=key==='item_id'?'text':'number'; input.step='1'; input.value=specimen[key]??'';
+        input.type=key.endsWith('_id')?'text':'number'; input.step='1'; input.value=specimen[key]??'';
         input.addEventListener('input',invalidate); wrapper.append(input); row.append(wrapper);
     }
     const remove=document.createElement('button'); remove.type='button'; remove.textContent='Remove specimen';
@@ -53,7 +57,7 @@ function invalidate(){
 // Compare raw inputs, not parsed numbers: even an incomplete edit must be retained.
 function localInputs(){
     const local=Object.fromEntries(fields.map(([key])=>[key,$(key).value]));
-    local.family_members=members.value;
+    local.family_members=[...familyRows.querySelectorAll('textarea')].map(input=>input.value);
     local.specimens=[...specimenRows.children].map(row=>Object.fromEntries(
         [...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value])));
     return local;
@@ -61,10 +65,11 @@ function localInputs(){
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
 function renderDefinition(definition){
     for(const [key] of fields)$(key).value=definition.draft[key];
-    members.value=(definition.draft.family?.mob_definition_ids??[]).join('\n');
+    familyRows.replaceChildren();
+    for(const family of definition.draft.families??[])addFamily(family);
     specimenRows.replaceChildren();
     for(const specimen of definition.draft.specimens??[])addSpecimen(specimen);
-    progressionText.textContent=(definition.mastery_preview??[]).map(m=>`${m.milestone}: ${m.points} points, Insight ${m.required_level} — ${m.category} ${(m.total_basis_points/100).toFixed(1)}%`).join('\n');
+    progressionText.textContent=(definition.mastery_preview??[]).map(m=>`${m.family_id} ${m.milestone}: ${m.points} points, Insight ${m.required_level} — ${m.category} ${(m.total_basis_points/100).toFixed(1)}%`).join('\n');
 }
 function adopt(definition){
     current=definition;
@@ -162,10 +167,10 @@ $('preview').onclick=async()=>{
             const value=$(key).value;
             draft[key]=key.endsWith('_id')?value.trim():Number(value);
         }
-        draft.family={family_id:'slime',display_name:'Slime',defence_style:'melee',mob_definition_ids:members.value.split('\n').map(s=>s.trim()).filter(Boolean)};
+        draft.families=[...familyRows.querySelectorAll('textarea')].map(input=>({...JSON.parse(input.dataset.family),mob_definition_ids:input.value.split('\n').map(s=>s.trim()).filter(Boolean)}));
         draft.specimens=[...specimenRows.children].map(row=>{
-            const specimen={family_id:'slime'};
-            for(const input of row.querySelectorAll('input'))specimen[input.dataset.field]=input.dataset.field==='item_id'?input.value.trim():Number(input.value);
+            const specimen={};
+            for(const input of row.querySelectorAll('input'))specimen[input.dataset.field]=input.dataset.field.endsWith('_id')?input.value.trim():Number(input.value);
             return specimen;
         });
         const body={

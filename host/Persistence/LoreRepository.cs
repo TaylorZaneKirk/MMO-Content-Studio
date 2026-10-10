@@ -13,7 +13,7 @@ public sealed class LoreRepository(AuthoringDatabaseConnectionFactory factory)
     public async Task<IReadOnlyList<LoreSummary>> ListAsync(string? search, CancellationToken ct)
     {
         var row = await LoadAsync("v1", ct);
-        return row is null ? [] : [new("v1", "Insight — Slime family mastery", row.PublicationState)];
+        return row is null ? [] : [new("v1", "Insight — creature family mastery", row.PublicationState)];
     }
     public async Task<LoreDefinition?> LoadAsync(string id, CancellationToken ct)
     {
@@ -39,8 +39,8 @@ public sealed class LoreRepository(AuthoringDatabaseConnectionFactory factory)
             while (await reader.ReadAsync(ct)) items.Add(reader.GetString(0), reader.GetBoolean(1));
         var errors = settings.Validate(items.Keys.ToHashSet(StringComparer.Ordinal)).Concat(settings.ValidateItemShapes(items)).ToList();
         command.CommandText = "SELECT count(*) FROM mob_definitions WHERE mob_definition_id=ANY(@members) AND publication_state='Published'";
-        command.Parameters.AddWithValue("members", settings.Family!.MobDefinitionIds);
-        if (Convert.ToInt64(await command.ExecuteScalarAsync(ct)) != settings.Family.MobDefinitionIds.Length)
+        command.Parameters.AddWithValue("members", settings.Families.SelectMany(f => f.MobDefinitionIds).ToArray());
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(ct)) != settings.Families.Sum(f => f.MobDefinitionIds.Length))
             errors.Add("Every authored family member must reference a published Mob definition.");
         command.CommandText = "SELECT count(*) FROM item_definitions WHERE item_id=ANY(@specimens) AND runtime_enabled AND NOT stackable AND trade_policy='tradeable'";
         command.Parameters.AddWithValue("specimens", settings.Specimens.Select(s => s.ItemId).ToArray());

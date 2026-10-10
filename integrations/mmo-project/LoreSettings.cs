@@ -1,12 +1,12 @@
 using System.Text.Json.Serialization;
 namespace MMO.Project.Lore;
 
-// The authored study document. One Slime family is supported; specimens carry
+// The authored study document. Explicit creature families share the approved curve; specimens carry
 // independent eligibility, XP and point weights. Focus rules share this document.
 public sealed record LoreSettings
 {
     [JsonPropertyName("study_duration_ms")] public int StudyDurationMs { get; init; } = 1800;
-    [JsonPropertyName("family")] public LoreFamily? Family { get; init; }
+    [JsonPropertyName("families")] public LoreFamily[] Families { get; init; } = [];
     [JsonPropertyName("specimens")] public LoreSpecimen[] Specimens { get; init; } = [];
     [JsonPropertyName("lectern_definition_id")] public string LecternDefinitionId { get; init; } = "study_lectern";
     [JsonPropertyName("station_xp_percent")] public int StationXpPercent { get; init; } = 125;
@@ -29,16 +29,32 @@ public sealed record LoreSettings
         new("farming", FarmingFocusLevel), new("alchemy", AlchemyFocusLevel)];
 
     public LoreSpecimen? FindSpecimen(string itemId) => Specimens.FirstOrDefault(s => s.ItemId == itemId);
-    public bool IncludesMob(string definitionId) => Family?.MobDefinitionIds.Contains(definitionId, StringComparer.Ordinal) == true;
+    public LoreFamily? FindFamily(string familyId) => Families.FirstOrDefault(f => f.FamilyId == familyId);
+    public LoreFamily? FamilyForMob(string definitionId) => Families.FirstOrDefault(f => f.MobDefinitionIds.Contains(definitionId, StringComparer.Ordinal));
 
     public IReadOnlyList<string> Validate(IReadOnlySet<string>? items = null)
     {
         var errors = new List<string>();
-        if (Family is null || Family.FamilyId != "slime" || Family.DisplayName != "Slime" || Family.DefenceStyle != "melee" ||
-            Family.MobDefinitionIds is null || Family.MobDefinitionIds.Length == 0 ||
-            Family.MobDefinitionIds.Any(string.IsNullOrWhiteSpace) || !Family.MobDefinitionIds.Contains("slime", StringComparer.Ordinal) ||
-            Family.MobDefinitionIds.Distinct(StringComparer.Ordinal).Count() != Family.MobDefinitionIds.Length)
-            errors.Add("Slime requires an explicit unique member list and melee defence.");
+        if (Families is null || Families.Length == 0 || Families.Any(f => f is null))
+            return ["Explicit creature families are required."];
+        if (Families.Select(f => f.FamilyId).Distinct(StringComparer.Ordinal).Count() != Families.Length)
+            errors.Add("Each family ID may appear once.");
+        foreach (var family in Families)
+        {
+            // Only the two approved families exist in this slice. More content needs
+            // a deliberate classification and gate, not name or artwork inference.
+            if (family.FamilyId is not ("slime" or "beasts") ||
+                family.DisplayName != (family.FamilyId == "slime" ? "Slime" : "Beasts") ||
+                family.RequiredLevel != (family.FamilyId == "slime" ? 3 : 5) || family.DefenceStyle != "melee" ||
+                family.MobDefinitionIds is null || family.MobDefinitionIds.Length == 0 || family.MobDefinitionIds.Any(string.IsNullOrWhiteSpace))
+                errors.Add("Slime (Insight 3) and Beasts (Insight 5) require explicit members and melee defence.");
+        }
+        var members = Families.SelectMany(f => f.MobDefinitionIds ?? []).ToArray();
+        if (members.Distinct(StringComparer.Ordinal).Count() != members.Length)
+            errors.Add("Each Mob definition may belong to only one family.");
+        if (FindFamily("slime") is not { } slime || slime.MobDefinitionIds is null ||
+            !slime.MobDefinitionIds.Contains("slime") || !slime.MobDefinitionIds.Contains("cellar_slime"))
+            errors.Add("Preserve both existing Slime members.");
         if (Specimens is null || Specimens.Length == 0 || Specimens.Any(s => s is null))
             errors.Add("At least one complete specimen is required.");
         else
@@ -46,15 +62,19 @@ public sealed record LoreSettings
             if (Specimens.Select(s => s.ItemId).Distinct(StringComparer.Ordinal).Count() != Specimens.Length)
                 errors.Add("Each specimen item may appear once.");
             foreach (var specimen in Specimens)
-                if (string.IsNullOrWhiteSpace(specimen.ItemId) || specimen.FamilyId != "slime" ||
+                if (string.IsNullOrWhiteSpace(specimen.ItemId) || FindFamily(specimen.FamilyId) is null ||
                     specimen.RequiredLevel is < 1 or > 99 || specimen.BaseXp is < 1 or > 100000 ||
                     specimen.MasteryPoints is < 1 or > 1000000 || items is not null && !items.Contains(specimen.ItemId))
-                    errors.Add("Specimens require an enabled item, Slime family, level 1–99 and bounded positive XP/points.");
-            if (Specimens.Any(higher => Specimens.Any(lower => higher.RequiredLevel > lower.RequiredLevel &&
+                    errors.Add("Specimens require an enabled item, an authored family, level 1–99 and bounded positive XP/points.");
+            if (Specimens.Any(higher => Specimens.Any(lower => higher.FamilyId == lower.FamilyId && higher.RequiredLevel > lower.RequiredLevel &&
                 (higher.BaseXp <= lower.BaseXp || higher.MasteryPoints <= lower.MasteryPoints))))
                 errors.Add("Higher-level specimens must award more XP and mastery points than lower-level specimens.");
             if (FindSpecimen("slime_goo") is not { RequiredLevel: 1, BaseXp: 5, MasteryPoints: 1 })
                 errors.Add("Basic Goo remains level 1, 5 XP and 1 mastery point.");
+            if (FindSpecimen("slime_goo")?.FamilyId != "slime") errors.Add("Goo remains a Slime specimen.");
+            if (FindFamily("beasts") is not null && FindSpecimen("rat_tail") is not
+                { FamilyId: "beasts", RequiredLevel: 5, BaseXp: 10, MasteryPoints: 2 })
+                errors.Add("Rat Tail remains level 5, 10 XP and 2 Beast mastery points.");
         }
         if (StudyDurationMs != 1800) errors.Add("Inventory study remains 1800 milliseconds.");
         if (LecternDefinitionId != "study_lectern") errors.Add("Insight requires study_lectern.");
@@ -73,7 +93,8 @@ public sealed record LoreFamily(
     [property: JsonPropertyName("family_id")] string FamilyId,
     [property: JsonPropertyName("display_name")] string DisplayName,
     [property: JsonPropertyName("mob_definition_ids")] string[] MobDefinitionIds,
-    [property: JsonPropertyName("defence_style")] string DefenceStyle);
+    [property: JsonPropertyName("defence_style")] string DefenceStyle,
+    [property: JsonPropertyName("required_level")] int RequiredLevel);
 public sealed record LoreSpecimen(
     [property: JsonPropertyName("item_id")] string ItemId,
     [property: JsonPropertyName("family_id")] string FamilyId,
@@ -84,14 +105,13 @@ public sealed record InsightFocus(string SkillId, int Level);
 
 // Shared deterministic arithmetic for runtime rewards and Studio's milestone
 // preview. These approved constants are not a generic reward scripting system.
-public static class SlimeMastery
+public static class FamilyMastery
 {
-    public const int RequiredLevel = 3;
     public const int MaximumMilestones = 140;
     public static long Threshold(int milestone) => checked(20L * milestone + (long)milestone * (milestone - 1) / 2);
-    public static int EligibleMilestones(long points, int baseLevel)
+    public static int EligibleMilestones(long points, int baseLevel, int requiredLevel)
     {
-        if (baseLevel < RequiredLevel) return 0;
+        if (baseLevel < requiredLevel) return 0;
         var earned = 0;
         while (earned < MaximumMilestones && points >= Threshold(earned + 1)) earned++;
         return earned;

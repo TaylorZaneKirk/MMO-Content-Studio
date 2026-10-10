@@ -7,6 +7,7 @@ public sealed class LoreSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Table("lore_definitions"),
         AuthoringSchemaRequirement.Column("lore_definitions","published_settings"),
         AuthoringSchemaRequirement.Table("character_lore"),
+        AuthoringSchemaRequirement.Column("character_lore", "family_id"),
         AuthoringSchemaRequirement.Column("character_lore", "mastery_points"),
         AuthoringSchemaRequirement.Column("character_lore", "unlocked_milestones"),
         AuthoringSchemaRequirement.Column("character_lore", "legacy_accuracy_basis_points"),

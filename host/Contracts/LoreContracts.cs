@@ -11,12 +11,13 @@ public sealed record LoreDefinition(
 {
     // Read-only approved progression preview, shared by native and browser editors.
     [JsonPropertyName("mastery_preview")]
-    public IReadOnlyList<LoreMilestonePreview> MasteryPreview => Enumerable.Range(1, SlimeMastery.MaximumMilestones)
-        .Select(n => new LoreMilestonePreview(n, SlimeMastery.Threshold(n), SlimeMastery.RequiredLevel,
+    public IReadOnlyList<LoreMilestonePreview> MasteryPreview => Draft.Families.SelectMany(family => Enumerable.Range(1, FamilyMastery.MaximumMilestones)
+        .Select(n => new LoreMilestonePreview(family.FamilyId, n, FamilyMastery.Threshold(n), family.RequiredLevel,
             new[] { "Melee accuracy", "Ranged accuracy", "Magic accuracy", "Melee defence", "Melee strength", "Ranged strength", "Magic strength" }[(n - 1) % 7],
-            ((n - 1) / 7 + 1) * 50)).ToArray();
+            ((n - 1) / 7 + 1) * 50))).ToArray();
 }
 public sealed record LoreMilestonePreview(
+    [property: JsonPropertyName("family_id")] string FamilyId,
     [property: JsonPropertyName("milestone")] int Milestone,
     [property: JsonPropertyName("points")] long Points,
     [property: JsonPropertyName("required_level")] int RequiredLevel,

@@ -9,14 +9,14 @@ var _operation: OptionButton
 var _apply: Button
 var _status: Label
 var _busy := false
-var _members: LineEdit
+var _families: VBoxContainer
 var _specimens: VBoxContainer
 var _progression: Label
 
 func _ready() -> void:
 	(get_parent() as TabContainer).set_tab_title(get_index(), "Insight")
 	var title := Label.new()
-	title.text = "Insight — Goo study and Slime mastery"
+	title.text = "Insight — Creature family mastery"
 	add_child(title)
 	var reload_button := Button.new()
 	reload_button.text = "Load / reload saved settings"
@@ -40,12 +40,8 @@ func _ready() -> void:
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
-	var member_label := Label.new()
-	member_label.text = "Slime family members (published Mob IDs, separated by commas)"
-	form.add_child(member_label)
-	_members = LineEdit.new()
-	_members.text_changed.connect(func(_value: String): _apply.disabled = true)
-	form.add_child(_members)
+	_families = VBoxContainer.new()
+	form.add_child(_families)
 	_specimens = VBoxContainer.new()
 	form.add_child(_specimens)
 	var add_specimen := Button.new()
@@ -92,7 +88,19 @@ func _loaded(data: Dictionary) -> void:
 	_current = data
 	for key: String in _fields:
 		_fields[key].text = str(data.get("draft", {}).get(key, ""))
-	_members.text = ", ".join(data.get("draft", {}).get("family", {}).get("mob_definition_ids", []))
+	for row in _families.get_children():
+		_families.remove_child(row)
+		row.queue_free()
+	for family: Dictionary in data.get("draft", {}).get("families", []):
+		var label := Label.new()
+		label.text = "%s — Insight %d, melee defence. Published Mob IDs, comma-separated" % [str(family["display_name"]), int(family["required_level"])]
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_families.add_child(label)
+		var members := LineEdit.new()
+		members.text = ", ".join(family.get("mob_definition_ids", []))
+		members.set_meta("family", family.duplicate(true))
+		members.text_changed.connect(func(_value: String): _apply.disabled = true)
+		_families.add_child(members)
 	for row in _specimens.get_children():
 		_specimens.remove_child(row)
 		row.queue_free()
@@ -100,7 +108,7 @@ func _loaded(data: Dictionary) -> void:
 		_add_specimen(specimen)
 	var progression_lines: Array[String] = ["Approved milestones (read only):"]
 	for milestone: Dictionary in data.get("mastery_preview", []):
-		progression_lines.append("%d: %d points, Insight %d — %s +%s%%" % [int(milestone["milestone"]), int(milestone["points"]), int(milestone["required_level"]), str(milestone["category"]), str(float(milestone["total_basis_points"]) / 100.0)])
+		progression_lines.append("%s %d: %d points, Insight %d — %s +%s%%" % [str(milestone["family_id"]), int(milestone["milestone"]), int(milestone["points"]), int(milestone["required_level"]), str(milestone["category"]), str(float(milestone["total_basis_points"]) / 100.0)])
 	_progression.text = "\n".join(progression_lines)
 	_apply.disabled = true
 	_status.text = "Loaded %s. Draft edits retain the previous published rules." % str(data.get("publication_state", ""))
@@ -118,22 +126,28 @@ func _preview() -> void:
 			return
 		else:
 			draft[key] = int(value)
-	var member_ids: Array[String] = []
-	for member: String in _members.text.split(",", false):
-		if not member.strip_edges().is_empty():
-			member_ids.append(member.strip_edges())
-	draft["family"] = {"family_id": "slime", "display_name": "Slime", "defence_style": "melee", "mob_definition_ids": member_ids}
+	var families: Array[Dictionary] = []
+	for field in _families.get_children():
+		if field is LineEdit:
+			var family: Dictionary = field.get_meta("family").duplicate(true)
+			var member_ids: Array[String] = []
+			for member: String in field.text.split(",", false):
+				if not member.strip_edges().is_empty():
+					member_ids.append(member.strip_edges())
+			family["mob_definition_ids"] = member_ids
+			families.append(family)
+	draft["families"] = families
 	var specimens: Array[Dictionary] = []
 	for row in _specimens.get_children():
-		var specimen := {"family_id": "slime"}
+		var specimen: Dictionary = {}
 		for field in row.get_children():
 			if field is LineEdit:
 				var key := str(field.get_meta("field"))
 				var value: String = field.text.strip_edges()
-				if key != "item_id" and not value.is_valid_int():
+				if not key.ends_with("_id") and not value.is_valid_int():
 					_status.text = "Enter a whole number for " + key
 					return
-				specimen[key] = value if key == "item_id" else int(value)
+				specimen[key] = value if key.ends_with("_id") else int(value)
 		specimens.append(specimen)
 	draft["specimens"] = specimens
 	_request = {"draft": draft, "expected_updated_at_utc": _current.get("updated_at_utc"), "target_operation": "save_draft" if _operation.selected == 0 else "publish"}
@@ -171,7 +185,9 @@ func _set_busy(value: bool) -> void:
 	for field: LineEdit in _fields.values():
 		field.editable = not value
 	_operation.disabled = value
-	_members.editable = not value
+	for field in _families.get_children():
+		if field is LineEdit:
+			field.editable = not value
 	for row in _specimens.get_children():
 		for field in row.get_children():
 			if field is LineEdit:
@@ -181,7 +197,7 @@ func _set_busy(value: bool) -> void:
 func _add_specimen(specimen: Dictionary) -> void:
 	var row := VBoxContainer.new()
 	_specimens.add_child(row)
-	for spec: Array in [["item_id", "Specimen item ID"], ["required_level", "Minimum Insight"], ["base_xp", "Base XP"], ["mastery_points", "Mastery points"]]:
+	for spec: Array in [["item_id", "Specimen item ID"], ["family_id", "Family ID (slime or beasts)"], ["required_level", "Minimum Insight"], ["base_xp", "Base XP"], ["mastery_points", "Mastery points"]]:
 		var label := Label.new()
 		label.text = str(spec[1])
 		row.add_child(label)
