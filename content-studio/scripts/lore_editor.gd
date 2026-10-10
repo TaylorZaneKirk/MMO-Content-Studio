@@ -1,7 +1,7 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const FIELDS := [["guarded_mind_level", "Guarded Mind: Insight level (fixed 1)"], ["guarded_mind_defence_percent", "Guarded Mind: Defence percent (fixed 5)"], ["guarded_mind_minimum_defence", "Guarded Mind: minimum Defence bonus (fixed 1)"], ["guarded_mind_drain_ms", "Guarded Mind: drain milliseconds (fixed 36000)"], ["guarded_mind_ready_ms", "Guarded Mind: readiness milliseconds (fixed 600)"], ["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["study_duration_ms", "Inventory study duration (milliseconds)"]]
+const FIELDS := [["measured_force_level", "Measured Force: Insight level (fixed 4)"], ["measured_force_strength_percent", "Measured Force: melee Strength percent (fixed 5)"], ["measured_force_minimum_strength", "Measured Force: minimum Strength bonus (fixed 1)"], ["measured_force_drain_ms", "Measured Force: drain milliseconds (fixed 36000)"], ["measured_force_ready_ms", "Measured Force: readiness milliseconds (fixed 600)"], ["guarded_mind_level", "Guarded Mind: Insight level (fixed 1)"], ["guarded_mind_defence_percent", "Guarded Mind: Defence percent (fixed 5)"], ["guarded_mind_minimum_defence", "Guarded Mind: minimum Defence bonus (fixed 1)"], ["guarded_mind_drain_ms", "Guarded Mind: drain milliseconds (fixed 36000)"], ["guarded_mind_ready_ms", "Guarded Mind: readiness milliseconds (fixed 600)"], ["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["study_duration_ms", "Inventory study duration (milliseconds)"]]
 var _fields: Dictionary = {}
 var _current: Dictionary = {}
 var _request: Dictionary = {}
@@ -37,7 +37,7 @@ func _ready() -> void:
 		label.text = str(spec[1])
 		form.add_child(label)
 		var field := LineEdit.new()
-		field.editable = not str(spec[0]).begins_with("guarded_mind_")
+		field.editable = not (str(spec[0]).begins_with("guarded_mind_") or str(spec[0]).begins_with("measured_force_"))
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
@@ -200,7 +200,7 @@ func _failed(_operation_name: String, _message: String, _errors: Array) -> void:
 func _set_busy(value: bool) -> void:
 	_busy = value
 	for key in _fields:
-		_fields[key].editable = not value and not str(key).begins_with("guarded_mind_")
+		_fields[key].editable = not value and not (str(key).begins_with("guarded_mind_") or str(key).begins_with("measured_force_"))
 	_operation.disabled = value
 	for row in _families.get_children():
 		for field in row.get_children():

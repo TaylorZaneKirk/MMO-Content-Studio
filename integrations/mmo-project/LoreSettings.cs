@@ -27,11 +27,16 @@ public sealed record LoreSettings
     [JsonPropertyName("guarded_mind_minimum_defence")] public int GuardedMindMinimumDefence { get; init; } = 1;
     [JsonPropertyName("guarded_mind_drain_ms")] public int GuardedMindDrainMs { get; init; } = 36000;
     [JsonPropertyName("guarded_mind_ready_ms")] public int GuardedMindReadyMs { get; init; } = 600;
+    [JsonPropertyName("measured_force_level")] public int MeasuredForceLevel { get; init; } = 4;
+    [JsonPropertyName("measured_force_strength_percent")] public int MeasuredForceStrengthPercent { get; init; } = 5;
+    [JsonPropertyName("measured_force_minimum_strength")] public int MeasuredForceMinimumStrength { get; init; } = 1;
+    [JsonPropertyName("measured_force_drain_ms")] public int MeasuredForceDrainMs { get; init; } = 36000;
+    [JsonPropertyName("measured_force_ready_ms")] public int MeasuredForceReadyMs { get; init; } = 600;
     // Both rates spend exact integer units per 100 ns gameplay tick. Publication
     // cannot change the denominator while any saved partial point remains.
     [JsonIgnore] public long ConcentrationUnitsPerPoint => checked((long)FocusDrainMs * GuardedMindDrainMs * TimeSpan.TicksPerMillisecond);
     [JsonIgnore] public IReadOnlyList<InsightFocus> Focuses => [
-        new("guarded_mind", GuardedMindLevel),
+        new("guarded_mind", GuardedMindLevel), new("measured_force", MeasuredForceLevel),
         new("fishing", FishingFocusLevel), new("cooking", CookingFocusLevel),
         new("mining", MiningFocusLevel), new("blacksmithing", BlacksmithingFocusLevel),
         new("woodcutting", WoodcuttingFocusLevel), new("crafting", CraftingFocusLevel),
@@ -109,6 +114,9 @@ public sealed record LoreSettings
         if (GuardedMindLevel != 1 || GuardedMindDefencePercent != 5 || GuardedMindMinimumDefence != 1 ||
             GuardedMindDrainMs != 36000 || GuardedMindReadyMs != 600)
             errors.Add("Guarded Mind remains Insight 1, +5% Defence (minimum +1), 36000 ms drain and 600 ms readiness.");
+        if (MeasuredForceLevel != 4 || MeasuredForceStrengthPercent != 5 || MeasuredForceMinimumStrength != 1 ||
+            MeasuredForceDrainMs != GuardedMindDrainMs || MeasuredForceReadyMs != GuardedMindReadyMs)
+            errors.Add("Measured Force remains Insight 4, +5% melee Strength (minimum +1), 36000 ms drain and 600 ms readiness.");
         return errors;
     }
     public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items) =>

@@ -3,7 +3,7 @@ import {
     createRequest, installNavigation
 }
 from './studio-common.js';
-const fields=[["guarded_mind_level", "Guarded Mind: Insight level (fixed 1)"], ["guarded_mind_defence_percent", "Guarded Mind: Defence percent (fixed 5)"], ["guarded_mind_minimum_defence", "Guarded Mind: minimum Defence bonus (fixed 1)"], ["guarded_mind_drain_ms", "Guarded Mind: drain milliseconds (fixed 36000)"], ["guarded_mind_ready_ms", "Guarded Mind: readiness milliseconds (fixed 600)"], ["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["study_duration_ms", "Inventory study duration (ms)"]];
+const fields=[["measured_force_level", "Measured Force: Insight level (fixed 4)"], ["measured_force_strength_percent", "Measured Force: melee Strength percent (fixed 5)"], ["measured_force_minimum_strength", "Measured Force: minimum Strength bonus (fixed 1)"], ["measured_force_drain_ms", "Measured Force: drain milliseconds (fixed 36000)"], ["measured_force_ready_ms", "Measured Force: readiness milliseconds (fixed 600)"], ["guarded_mind_level", "Guarded Mind: Insight level (fixed 1)"], ["guarded_mind_defence_percent", "Guarded Mind: Defence percent (fixed 5)"], ["guarded_mind_minimum_defence", "Guarded Mind: minimum Defence bonus (fixed 1)"], ["guarded_mind_drain_ms", "Guarded Mind: drain milliseconds (fixed 36000)"], ["guarded_mind_ready_ms", "Guarded Mind: readiness milliseconds (fixed 600)"], ["lectern_definition_id", "Lectern definition id"], ["station_xp_percent", "Station xp percent"], ["station_auto_ms", "Station auto ms"], ["station_manual_ms", "Station manual ms"], ["focus_drain_ms", "Focus drain ms"], ["focus_reduction_percent", "Focus reduction percent"], ["fishing_focus_level", "Fishing focus level"], ["cooking_focus_level", "Cooking focus level"], ["mining_focus_level", "Mining focus level"], ["blacksmithing_focus_level", "Blacksmithing focus level"], ["woodcutting_focus_level", "Woodcutting focus level"], ["crafting_focus_level", "Crafting focus level"], ["farming_focus_level", "Farming focus level"], ["alchemy_focus_level", "Alchemy focus level"], ["study_duration_ms", "Inventory study duration (ms)"]];
 let session={
 }, current=null, prepared=null, busy=false, uncertain=false, remote=undefined, base=null, retainedEdits=false;
 const $=id=>document.getElementById(id);
@@ -19,7 +19,7 @@ for(const [key,label] of fields){
     input.id=key;
     input.type=key.endsWith('_id')?'text':'number';
     input.step=key.endsWith('_percent')?'any':'1';
-    input.readOnly=key.startsWith('guarded_mind_');
+    input.readOnly=(key.startsWith('guarded_mind_') || key.startsWith('measured_force_'));
     input.addEventListener('input',invalidate);
     row.append(input);
     $('fields').append(row);
