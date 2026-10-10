@@ -432,3 +432,11 @@ QV3/QV4 intentionally expose only typed predicates and typed choice effects.
 Objective progress, story flags, broader rewards, content gates, arbitrary
 scripts, portraits, localization, cutscenes, hot reload, Quest Studio, and
 authored first-quest content remain deferred.
+
+## Development launcher build identity
+
+`tools/dev.sh` builds the current checkout in a disposable SDK artifacts directory. It retains the existing optional checks; their .NET output also goes into that directory. `--skip-check` skips those checks, never the build or identity comparison. The temporary output path is mapped to a stable compiler path so two equivalent builds in the same checkout produce the same module ID; the checkout source path itself remains significant.
+
+The host's existing native handshake adds `build_identity`, the loaded assembly's `ManifestModule.ModuleVersionId`. The same assembly accepts `--print-build-identity` and exits before configuration, listeners or database setup. Identity is a compiled-code check, not a claim about database content, configuration, or separately served browser assets. This is standard deterministic compiler metadata, not a source-version registry ([Microsoft compiler reference](https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/code-generation)).
+
+The launcher compares that field with its candidate before reusing a healthy host and again before launching the client. Missing, malformed or different identity refuses clearly. An older host needs an explicitly authorized deployment/restart; the launcher does not kill an externally owned process. Builds from other checkouts or with other compiler settings/output mapping can be conservatively rejected. If no host responds, the launcher starts its exact candidate from the normal host content directory, retaining local configuration behavior, and only stops its own child on exit. Temporary candidate files are then removed. No service configuration is changed.

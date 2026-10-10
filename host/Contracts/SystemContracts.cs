@@ -7,7 +7,8 @@ public sealed record HandshakeResponse(
     [property: JsonPropertyName("host_version")] string HostVersion,
     [property: JsonPropertyName("api_version")] string ApiVersion,
     [property: JsonPropertyName("supported_api_versions")] IReadOnlyList<string> SupportedApiVersions,
-    [property: JsonPropertyName("server_time_utc")] DateTimeOffset ServerTimeUtc);
+    [property: JsonPropertyName("server_time_utc")] DateTimeOffset ServerTimeUtc,
+    [property: JsonPropertyName("build_identity")] string BuildIdentity);
 
 public sealed record AuthoringHealthResponse(
     [property: JsonPropertyName("overall_status")] HealthState OverallStatus,

@@ -9,6 +9,15 @@ using MMO.ContentStudio.AuthoringHost.Health;
 using MMO.ContentStudio.AuthoringHost.Http;
 using MMO.ContentStudio.AuthoringHost.Services;
 
+// Read the loaded module, not a DLL on disk that a later build might replace.
+// The launcher can inspect a candidate without loading configuration or opening DB/listeners.
+var buildIdentity = Assembly.GetExecutingAssembly().ManifestModule.ModuleVersionId.ToString("D");
+if (args is ["--print-build-identity"])
+{
+    Console.WriteLine(buildIdentity);
+    return;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
@@ -86,7 +95,8 @@ app.MapGet($"{AuthoringApi.RoutePrefix}/system/handshake", (
         version,
         AuthoringApi.CurrentVersion,
         AuthoringApi.SupportedVersions,
-        DateTimeOffset.UtcNow);
+        DateTimeOffset.UtcNow,
+        buildIdentity);
 
     return AuthoringHttpResults.Ok(context, response);
 });
