@@ -374,7 +374,7 @@ public sealed class MobRepository : IMobRepository
     {
         const string sql = """
             select attack_type, accuracy_style, minimum_range_tiles, maximum_range_tiles,
-                attack_speed_units, attack_level, strength_level, defence_level, magic_level, physical_weight
+                attack_speed_units, attack_level, strength_level, defence_level, magic_level, physical_weight, ranged_level, spell_max_hit, projectile_visual
             from mob_combat_profiles
             where mob_definition_id = @mob_definition_id;
             """;
@@ -397,7 +397,9 @@ public sealed class MobRepository : IMobRepository
             reader.GetInt32(reader.GetOrdinal("strength_level")),
             reader.GetInt32(reader.GetOrdinal("defence_level")),
             reader.GetInt32(reader.GetOrdinal("magic_level")),
-            reader.GetInt32(reader.GetOrdinal("physical_weight")));
+            reader.GetInt32(reader.GetOrdinal("physical_weight")),
+            reader.GetInt32(reader.GetOrdinal("ranged_level")), reader.GetInt32(reader.GetOrdinal("spell_max_hit")),
+            reader.GetString(reader.GetOrdinal("projectile_visual")));
     }
 
     private static async Task<MobCombatBonusDefinition?> LoadCombatBonusesAsync(
@@ -613,7 +615,7 @@ public sealed class MobRepository : IMobRepository
                 strength_level,
                 defence_level,
                 magic_level,
-                physical_weight,
+                physical_weight, ranged_level, spell_max_hit, projectile_visual,
                 updated_at
             ) values (
                 @mob_definition_id,
@@ -626,7 +628,7 @@ public sealed class MobRepository : IMobRepository
                 @strength_level,
                 @defence_level,
                 @magic_level,
-                @physical_weight,
+                @physical_weight, @ranged_level, @spell_max_hit, @projectile_visual,
                 now()
             )
             on conflict (mob_definition_id) do update set
@@ -640,6 +642,7 @@ public sealed class MobRepository : IMobRepository
                 defence_level = excluded.defence_level,
                 magic_level = excluded.magic_level,
                 physical_weight = excluded.physical_weight,
+                ranged_level = excluded.ranged_level, spell_max_hit = excluded.spell_max_hit, projectile_visual = excluded.projectile_visual,
                 updated_at = now();
             """;
         await using var command = new NpgsqlCommand(sql, connection, transaction);
@@ -655,6 +658,9 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("defence_level", profile.DefenceLevel);
         command.Parameters.AddWithValue("magic_level", profile.MagicLevel);
         command.Parameters.AddWithValue("physical_weight", profile.PhysicalWeight);
+        command.Parameters.AddWithValue("ranged_level", profile.RangedLevel);
+        command.Parameters.AddWithValue("spell_max_hit", profile.SpellMaxHit);
+        command.Parameters.AddWithValue("projectile_visual", profile.ProjectileVisual);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 

@@ -58,10 +58,10 @@ public static class MobDomainRules
         NormalizePublicationState(value) is "Draft" or "Published" or "Disabled";
 
     public static bool IsSupportedAttackType(string value) =>
-        NormalizeAttackType(value) == "melee";
+        NormalizeAttackType(value) is "melee" or "ranged" or "magic";
 
     public static bool IsSupportedAccuracyStyle(string? value) =>
-        NormalizeAccuracyStyle(value) is "thrust" or "slash" or "crush";
+        NormalizeAccuracyStyle(value) is "thrust" or "slash" or "crush" or "ranged" or "magic";
 
     public static bool IsSupportedMovementBehavior(string value) =>
         NormalizeMovementBehavior(value) is "static" or "random_wander";
@@ -148,9 +148,9 @@ public static class MobDomainRules
         int strengthLevel,
         int defenceLevel,
         int maxHealth,
-        int magicLevel = 0)
+        int magicLevel = 0, int rangedLevel = 0)
     {
-        if (attackLevel < 0 || strengthLevel < 0 || defenceLevel < 0 || maxHealth < 0 || magicLevel < 0)
+        if (attackLevel < 0 || strengthLevel < 0 || defenceLevel < 0 || maxHealth < 0 || magicLevel < 0 || rangedLevel < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(attackLevel), "Combat-level inputs must be nonnegative.");
         }
@@ -159,7 +159,7 @@ public static class MobDomainRules
         {
             return Math.Max(
                 1,
-                (10 * (defenceLevel + maxHealth) + 13 * Math.Max(attackLevel + strengthLevel, (3 * magicLevel) / 2)) / 40);
+                (10 * (defenceLevel + maxHealth) + 13 * Math.Max(attackLevel + strengthLevel, Math.Max((3 * magicLevel) / 2, (3 * rangedLevel) / 2))) / 40);
         }
     }
 

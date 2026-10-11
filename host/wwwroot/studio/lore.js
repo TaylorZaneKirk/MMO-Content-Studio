@@ -38,7 +38,7 @@ function addFamily(family) {
         }
         const note=document.createElement('p'); note.textContent='Five harvest milestones, capped at 5%. New crops snapshot the outcome; no combat bonus or extra Farming XP.'; row.append(note);
     } else {
-        const label=document.createElement('label'); label.textContent=`Insight ${family.required_level}, melee defence. Published Mob IDs, one per line`;
+        const label=document.createElement('label'); label.textContent=`Insight ${family.required_level}, melee/ranged/magic defence. Published Mob IDs, one per line`;
         const members=document.createElement('textarea'); members.rows=4; members.style.width='100%'; members.style.boxSizing='border-box';
         members.value=(family.mob_definition_ids??[]).join('\n'); members.addEventListener('input',invalidate);
         label.append(members); row.append(label);

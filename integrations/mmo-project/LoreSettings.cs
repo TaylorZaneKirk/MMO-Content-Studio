@@ -86,9 +86,9 @@ public sealed record LoreSettings
             if (family.MilestonePoints is not null) errors.Add("Only Flowers authors milestone point thresholds.");
             if (family.FamilyId is not ("slime" or "beasts") ||
                 family.DisplayName != (family.FamilyId == "slime" ? "Slime" : "Beasts") ||
-                family.RequiredLevel != (family.FamilyId == "slime" ? 3 : 5) || family.DefenceStyle != "melee" ||
+                family.RequiredLevel != (family.FamilyId == "slime" ? 3 : 5) || family.DefenceStyle != "all" ||
                 family.MobDefinitionIds is null || family.MobDefinitionIds.Length == 0 || family.MobDefinitionIds.Any(string.IsNullOrWhiteSpace))
-                errors.Add("Slime (Insight 3) and Beasts (Insight 5) require explicit members and melee defence.");
+                errors.Add("Slime (Insight 3) and Beasts (Insight 5) require explicit members and all three combat defences.");
         }
         var members = Families.SelectMany(f => f.MobDefinitionIds ?? []).ToArray();
         if (members.Distinct(StringComparer.Ordinal).Count() != members.Length)
@@ -180,8 +180,29 @@ public sealed record InsightFocus(string SkillId, int Level);
 // preview. These approved constants are not a generic reward scripting system.
 public static class FamilyMastery
 {
-    public const int MaximumMilestones = 140;
-    public static long Threshold(int milestone) => checked(20L * milestone + (long)milestone * (milestone - 1) / 2);
+    public const int CategoriesPerCycle = 9;
+    public const int MaximumMilestones = 180;
+    public const int MeleeAccuracy = 0, RangedAccuracy = 1, MagicAccuracy = 2;
+    public const int MeleeDefence = 3, RangedDefence = 4, MagicDefence = 5;
+    public const int MeleeStrength = 6, RangedStrength = 7, MagicStrength = 8;
+    public static readonly string[] CategoryNames =
+        ["Melee accuracy", "Ranged accuracy", "Magic accuracy", "Melee defence", "Ranged defence",
+         "Magic defence", "Melee strength", "Ranged strength", "Magic strength"];
+
+    // Preserve all seven original rewards at their original point totals. The two
+    // new defences split the existing gap after melee defence into three parts.
+    public static long Threshold(int milestone)
+    {
+        if (milestone is < 1 or > MaximumMilestones) throw new ArgumentOutOfRangeException(nameof(milestone));
+        var cycle = (milestone - 1) / CategoriesPerCycle;
+        var step = (milestone - 1) % CategoriesPerCycle + 1;
+        static long Original(int n) => checked(20L * n + (long)n * (n - 1) / 2);
+        if (step <= 4) return Original(cycle * 7 + step);
+        if (step >= 7) return Original(cycle * 7 + step - 2);
+        var before = Original(cycle * 7 + 4);
+        var gap = Original(cycle * 7 + 5) - before;
+        return before + gap * (step - 4) / 3;
+    }
     public static int EligibleMilestones(long points, int baseLevel, int requiredLevel)
     {
         if (baseLevel < requiredLevel) return 0;
@@ -189,11 +210,12 @@ public static class FamilyMastery
         while (earned < MaximumMilestones && points >= Threshold(earned + 1)) earned++;
         return earned;
     }
-    // Category order: melee/ranged/magic accuracy, melee defence, then the three
-    // strengths. Legacy accuracy is a floor, never an extra milestone or bonus.
+    // Each milestone advances exactly one category. Legacy accuracy remains a
+    // floor for the first three categories, never an added reward.
     public static int Bonus(int milestones, int category, int legacyAccuracy = 0)
     {
-        var earned = Math.Clamp((milestones + 6 - category) / 7, 0, 20) * 50;
+        if (category is < 0 or >= CategoriesPerCycle) throw new ArgumentOutOfRangeException(nameof(category));
+        var earned = Math.Clamp((milestones + CategoriesPerCycle - 1 - category) / CategoriesPerCycle, 0, 20) * 50;
         return Math.Max(earned, category < 3 ? legacyAccuracy : 0);
     }
 }

@@ -198,6 +198,9 @@ var _combat_level_warnings: Label
 var _attack_level: SpinBox
 var _strength_level: SpinBox
 var _defence_level: SpinBox
+var _ranged_level: SpinBox
+var _spell_max_hit: SpinBox
+var _projectile_visual: LineEdit
 var _magic_level: SpinBox
 var _physical_weight: SpinBox
 var _drops: VBoxContainer
@@ -478,12 +481,16 @@ func _add_attack_section(parent: VBoxContainer) -> void:
 	_attack_level = _spin_field(grid, "Attack level", 1, 1000, 1, 1)
 	_strength_level = _spin_field(grid, "Strength level", 1, 1000, 1, 1)
 	_defence_level = _spin_field(grid, "Defence level", 1, 1000, 1, 1)
-	_magic_level = _spin_field(grid, "Magic level", 0, 1000000, 1, 0)
-	_physical_weight = _spin_field(grid, "Physical weight", 1, 1000000, 1, 100)
+	_magic_level = _spin_field(grid, "Magic level", 0, 1000000, 0, 1)
+	_ranged_level = _spin_field(grid, "Ranged level", 0, 1000000, 0, 1)
+	_spell_max_hit = _spin_field(grid, "Spell maximum hit", 0, 1000000, 0, 1)
+	_projectile_visual = _line_field(grid, "Projectile: seed / arcane", "")
+	_projectile_visual.tooltip_text = "Empty for melee, seed for Ranged, arcane for Magic. Spell damage rolls from zero to maximum."
+	_physical_weight = _spin_field(grid, "Physical weight", 1, 1000000, 100, 1)
 	_physical_weight.tooltip_text = "Weight resists forced displacement."
 	_derived_combat_level = _value_label(grid, "Derived combat level", "1")
 	_combat_level_diagnostics = _value_label(grid, "Innate-bonus diagnostics", "Attack 1.0 / Strength 1.0 / Defence T 1.0, S 1.0, C 1.0")
-	parent.add_child(_wrapped_label("Combat level combines Defence + maximum Health with whichever offensive component is stronger: Melee from Attack + Strength, or Magic from floor(3 x Magic / 2). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
+	parent.add_child(_wrapped_label("Combat level combines Defence + maximum Health with whichever offensive component is stronger: Melee from Attack + Strength, Ranged from floor(3 x Ranged / 2), or Magic from floor(3 x Magic / 2). Bonuses, attack speed and range do not change this baseline summary. It is not an encounter difficulty rating."))
 	_combat_level_warnings = _wrapped_label("")
 	parent.add_child(_combat_level_warnings)
 
@@ -742,6 +749,9 @@ func _start_new_mob() -> void:
 	_strength_level.value = 1
 	_defence_level.value = 1
 	_magic_level.value = 0
+	_ranged_level.value = 0
+	_spell_max_hit.value = 0
+	_projectile_visual.text = ""
 	_physical_weight.value = 100
 	_zero_bonuses()
 	_load_drops([])
@@ -777,6 +787,9 @@ func _load_combat_profile(profile_variant: Variant) -> void:
 	_strength_level.value = int(profile.get("strength_level", 1))
 	_defence_level.value = int(profile.get("defence_level", 1))
 	_magic_level.value = int(profile.get("magic_level", 0))
+	_ranged_level.value = int(profile.get("ranged_level", 0))
+	_spell_max_hit.value = int(profile.get("spell_max_hit", 0))
+	_projectile_visual.text = str(profile.get("projectile_visual", ""))
 	_physical_weight.value = int(profile.get("physical_weight", 100))
 
 
@@ -897,6 +910,9 @@ func _combat_profile_payload() -> Dictionary:
 		"strength_level": int(_strength_level.value),
 		"defence_level": int(_defence_level.value),
 		"magic_level": int(_magic_level.value),
+		"ranged_level": int(_ranged_level.value),
+		"spell_max_hit": int(_spell_max_hit.value),
+		"projectile_visual": _projectile_visual.text.strip_edges(),
 		"physical_weight": int(_physical_weight.value),
 	}
 
@@ -1442,9 +1458,10 @@ func _update_behavior_controls() -> void:
 
 func _update_attack_controls() -> void:
 	var enabled := _form_editable and _attack_enabled.button_pressed
+	_projectile_visual.editable = enabled
 	for control in [_attack_type, _accuracy_style]:
 		(control as OptionButton).disabled = not enabled
-	for control in [_minimum_range, _maximum_range, _attack_speed_units, _attack_level, _strength_level, _defence_level, _magic_level, _physical_weight]:
+	for control in [_minimum_range, _maximum_range, _attack_speed_units, _attack_level, _strength_level, _defence_level, _magic_level, _ranged_level, _spell_max_hit, _physical_weight]:
 		(control as SpinBox).editable = enabled
 	_update_attack_interval()
 
@@ -1472,7 +1489,7 @@ func _update_derived_combat_level() -> void:
 	var strength := int(_strength_level.value) if _strength_level != null else 1
 	var defence := int(_defence_level.value) if _defence_level != null else 1
 	var health := int(_max_health.value) if _max_health != null else 1
-	var level := maxi(1, int((10 * (defence + health) + 13 * maxi(attack + strength, (3 * int(_magic_level.value)) / 2)) / 40))
+	var level := maxi(1, int((10 * (defence + health) + 13 * maxi(attack + strength, maxi((3 * int(_magic_level.value)) / 2, (3 * int(_ranged_level.value)) / 2))) / 40))
 	_set_derived_combat_level(level)
 	_set_combat_level_diagnostics(_local_combat_level_diagnostics(attack, strength, defence))
 
@@ -1485,6 +1502,10 @@ func _set_derived_combat_level(level: int) -> void:
 
 func _set_combat_level_diagnostics(diagnostics: Dictionary) -> void:
 	if _combat_level_diagnostics == null:
+		return
+	if _selected_metadata(_attack_type) != "melee":
+		_combat_level_diagnostics.text = "Equivalent-level diagnostics apply to melee profiles only. Projectile profiles use their authored Ranged/Magic level and bonuses; Magic damage uses spell maximum hit."
+		_combat_level_warnings.text = ""
 		return
 	var style := str(diagnostics.get("selected_accuracy_style", "crush"))
 	_combat_level_diagnostics.text = (

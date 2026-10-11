@@ -34,14 +34,14 @@ public sealed class MobAuthoringRegistry
 
     private static readonly AuthoringOption[] AttackTypes =
     [
-        new("melee", "Melee")
+        new("melee", "Melee"), new("ranged", "Ranged"), new("magic", "Magic")
     ];
 
     private static readonly AuthoringOption[] AccuracyStyles =
     [
         new("thrust", "Thrust"),
         new("slash", "Slash"),
-        new("crush", "Crush")
+        new("crush", "Crush"), new("ranged", "Ranged"), new("magic", "Magic")
     ];
 
     private static readonly AuthoringOption[] MovementBehaviors =

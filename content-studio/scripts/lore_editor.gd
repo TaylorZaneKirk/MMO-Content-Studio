@@ -102,7 +102,7 @@ func _loaded(data: Dictionary) -> void:
 			for i in range(points.size()):
 				_add_family_field(row, "milestone_%d" % i, "Milestone %d: total points (+%d%% extra flower chance)" % [i + 1, i + 1], str(points[i]))
 		else:
-			_add_family_field(row, "members", "%s — Insight %d, melee defence. Published Mob IDs, comma-separated" % [str(family["display_name"]), int(family["required_level"])], ", ".join(family.get("mob_definition_ids", [])))
+			_add_family_field(row, "members", "%s — Insight %d, melee/ranged/magic defence. Published Mob IDs, comma-separated" % [str(family["display_name"]), int(family["required_level"])], ", ".join(family.get("mob_definition_ids", [])))
 	for row in _specimens.get_children():
 		_specimens.remove_child(row)
 		row.queue_free()

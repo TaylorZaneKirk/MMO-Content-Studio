@@ -451,7 +451,7 @@ public sealed partial class MobDefinitionValidator
             {
                 messages.Add(new ApiError(
                     "mob_combat_profile_required",
-                    "Published mob definitions require a primary melee combat profile.",
+                    "Published mob definitions require a primary combat profile.",
                     ValidationSeverity.Error,
                     "primary_combat_profile"));
             }
@@ -460,11 +460,20 @@ public sealed partial class MobDefinitionValidator
         }
 
         var profile = draft.PrimaryCombatProfile;
+        var shapeValid = profile.AttackType switch
+        {
+            "melee" => profile.AccuracyStyle is "thrust" or "slash" or "crush" && profile.MinimumRangeTiles == 1 && profile.MaximumRangeTiles == 1 && profile.ProjectileVisual == "" && profile.SpellMaxHit == 0,
+            "ranged" => profile.AccuracyStyle == "ranged" && profile.RangedLevel > 0 && profile.ProjectileVisual == "seed" && profile.SpellMaxHit == 0,
+            "magic" => profile.AccuracyStyle == "magic" && profile.MagicLevel > 0 && profile.ProjectileVisual == "arcane" && profile.SpellMaxHit is >= 1 and <= 1000000,
+            _ => false
+        };
+        if (!shapeValid || profile.MinimumRangeTiles < 1 || profile.MaximumRangeTiles > 10 || !MobDomainRules.IsLevelSupported(profile.RangedLevel))
+            messages.Add(new ApiError("invalid_mob_attack_profile", "Use cardinal melee, seed Ranged, or an ordinary arcane spell; travelling range must be 1–10.", ValidationSeverity.Error, "primary_combat_profile"));
         if (!MobDomainRules.IsSupportedAttackType(profile.AttackType))
         {
             messages.Add(new ApiError(
                 "unsupported_mob_attack_type",
-                "T4 mobs currently support only the melee attack type.",
+                "Supported attack types are melee, ranged and magic.",
                 ValidationSeverity.Error,
                 "primary_combat_profile.attack_type"));
         }

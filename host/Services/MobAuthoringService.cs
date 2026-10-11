@@ -465,7 +465,7 @@ public sealed class MobAuthoringService
                     primaryCombatProfile.AttackSpeedUnits,
                     primaryCombatProfile.AttackLevel,
                     primaryCombatProfile.StrengthLevel,
-                    primaryCombatProfile.DefenceLevel, primaryCombatProfile.MagicLevel, primaryCombatProfile.PhysicalWeight),
+                    primaryCombatProfile.DefenceLevel, primaryCombatProfile.MagicLevel, primaryCombatProfile.PhysicalWeight, primaryCombatProfile.RangedLevel, primaryCombatProfile.SpellMaxHit, primaryCombatProfile.ProjectileVisual.Trim()),
             combatBonuses ?? MobCombatBonusDefinition.Zero,
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
@@ -776,12 +776,13 @@ public sealed class MobAuthoringService
                 draft.PrimaryCombatProfile.AttackLevel,
                 draft.PrimaryCombatProfile.StrengthLevel,
                 draft.PrimaryCombatProfile.DefenceLevel,
-                draft.MaxHealth, draft.PrimaryCombatProfile.MagicLevel);
+                draft.MaxHealth, draft.PrimaryCombatProfile.MagicLevel, draft.PrimaryCombatProfile.RangedLevel);
     }
 
     private static MobCombatLevelDiagnosticsDefinition? CalculateCombatLevelDiagnostics(NormalizedMobDraft draft)
     {
-        return draft.PrimaryCombatProfile is null
+        // The existing equivalent-level diagnostic describes melee bonuses only.
+        return draft.PrimaryCombatProfile is null || draft.PrimaryCombatProfile.AttackType != "melee"
             ? null
             : MobDomainRules.CalculateCombatLevelDiagnostics(
                 draft.PrimaryCombatProfile,

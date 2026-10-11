@@ -198,13 +198,14 @@ function render(){
     reference(g,d,'combat_faction_id','Combat faction','faction',(state.options.factions||[]).map(f=>({id:f.faction_id,display_name:f.display_name})));
     checkField(p,d,'can_proactively_target_hostile_mobs','Proactively target hostile mobs');g=grid(p);
     field(g,d,'mob_detection_radius_tiles','Mob detection radius · tiles',{kind:'integer'});field(g,d,'mob_target_scan_interval_ms','Target scan interval · milliseconds',{kind:'integer'});field(g,d,'mob_target_scan_candidate_limit','Target scan candidate limit',{kind:'integer'});
-    p=section('Combat profile',true,'The existing service supports melee attacks. Levels and bonuses feed the derived diagnostics; Magic level and physical weight are preserved as authored.');
-    if(!d.primary_combat_profile)p.append(element('p','No primary combat profile.'),button('Add combat profile',()=>{const v=state.options.defaults||{};d.primary_combat_profile={attack_type:v.attack_type||'melee',accuracy_style:v.accuracy_style||'crush',minimum_range_tiles:v.minimum_range_tiles??1,maximum_range_tiles:v.maximum_range_tiles??1,attack_speed_units:v.attack_speed_units??4,attack_level:1,strength_level:1,defence_level:1,magic_level:0,physical_weight:100};render();}));
+    p=section('Combat profile',true,'One attack style per Mob. Ranged uses seed projectiles; Magic uses an arcane projectile and authored maximum hit. Damage can roll zero.');
+    if(!d.primary_combat_profile)p.append(element('p','No primary combat profile.'),button('Add combat profile',()=>{const v=state.options.defaults||{};d.primary_combat_profile={attack_type:v.attack_type||'melee',accuracy_style:v.accuracy_style||'crush',minimum_range_tiles:v.minimum_range_tiles??1,maximum_range_tiles:v.maximum_range_tiles??1,attack_speed_units:v.attack_speed_units??4,attack_level:1,strength_level:1,defence_level:1,magic_level:0,ranged_level:0,spell_max_hit:0,projectile_visual:'',physical_weight:100};render();}));
     else {
         const v=d.primary_combat_profile;g=grid(p);
         selectField(g,v,'attack_type','Attack type',options('attack_types',['melee']),'primary_combat_profile.attack_type');
         selectField(g,v,'accuracy_style','Accuracy style',options('accuracy_styles',['thrust','slash','crush']),'primary_combat_profile.accuracy_style');
-        for(const [key,label] of [['attack_level','Attack level'],['strength_level','Strength level'],['defence_level','Defence level'],['magic_level','Magic level'],['physical_weight','Physical weight · percent'],['minimum_range_tiles','Minimum range · tiles'],['maximum_range_tiles','Maximum range · tiles'],['attack_speed_units','Attack speed · units']])field(g,v,key,label,{kind:'integer',path:`primary_combat_profile.${key}`});
+        for(const [key,label] of [['attack_level','Attack level'],['strength_level','Strength level'],['defence_level','Defence level'],['magic_level','Magic level'],['ranged_level','Ranged level'],['spell_max_hit','Spell maximum hit'],['physical_weight','Physical weight · percent'],['minimum_range_tiles','Minimum range · tiles'],['maximum_range_tiles','Maximum range · tiles'],['attack_speed_units','Attack speed · units']])field(g,v,key,label,{kind:'integer',path:`primary_combat_profile.${key}`});
+        selectField(g,v,'projectile_visual','Projectile visual',[{id:'',display_name:'None (melee)'},{id:'seed',display_name:'Physical seed'},{id:'arcane',display_name:'Arcane spell'}],'primary_combat_profile.projectile_visual');
         const timing=element('p',null,'muted');timing.id='combat-timing';p.append(timing);
         p.append(button('Remove combat profile',()=>{if(confirm('Remove the complete primary combat profile? Bonuses and drops remain.')){d.primary_combat_profile=null;render();}}));
     }
@@ -235,6 +236,7 @@ function showDiagnostics(value, saved=false){
     panel.append(element('p',`Derived combat level: ${value.derived_combat_level??'unavailable without a valid profile'}`));
     const diag=value.combat_level_diagnostics;
     if(diag){const rows=element('dl');for(const [key,v] of Object.entries(diag))rows.append(element('dt',key.replaceAll('_',' ')),element('dd',String(v)));panel.append(rows);}
+    if(!diag)panel.append(element('p','Equivalent-level bonus diagnostics apply to melee profiles only. Projectile profiles use authored Ranged/Magic level and bonuses; Magic damage uses spell maximum hit.','muted'));
     if(saved&&value.root_loot_table_expected_value){const report=value.root_loot_table_expected_value;panel.append(element('h4','Saved root loot expected value'),element('p',`Reference value: ${report.total_reference_value.display} · No-drop probability: ${report.no_drop_probability.display}`));const detail=element('details');detail.append(element('summary','Complete exact loot report'),element('pre',JSON.stringify(report,null,2),'readonly'));panel.append(detail);}
     panel.append(element('p','Derived values are calculated by the existing host. EnemySpawn reference checks remain deferred in the Mob service; publication/delete previews report its warnings.','muted'));
 }

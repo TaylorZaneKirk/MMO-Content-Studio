@@ -13,8 +13,8 @@ public sealed record LoreDefinition(
     [JsonPropertyName("mastery_preview")]
     public IReadOnlyList<LoreMilestonePreview> MasteryPreview => Draft.Families.SelectMany(family => Enumerable.Range(1, family.MilestoneCount)
         .Select(n => new LoreMilestonePreview(family.FamilyId, n, family.Threshold(n), family.RequiredLevel,
-            family.IsFlowers ? "Extra flower chance" : new[] { "Melee accuracy", "Ranged accuracy", "Magic accuracy", "Melee defence", "Melee strength", "Ranged strength", "Magic strength" }[(n - 1) % 7],
-            family.IsFlowers ? n * 100 : ((n - 1) / 7 + 1) * 50))).ToArray();
+            family.IsFlowers ? "Extra flower chance" : FamilyMastery.CategoryNames[(n - 1) % FamilyMastery.CategoriesPerCycle],
+            family.IsFlowers ? n * 100 : ((n - 1) / FamilyMastery.CategoriesPerCycle + 1) * 50))).ToArray();
 }
 public sealed record LoreMilestonePreview(
     [property: JsonPropertyName("family_id")] string FamilyId,
