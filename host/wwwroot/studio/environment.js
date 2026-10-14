@@ -21,15 +21,21 @@ function message(id, text, failed = false) { $(id).textContent = text; $(id).cla
 function time() { return new Date().toLocaleTimeString(); }
 function updateSession() {
     const session = state.session;
-    $('connection').textContent = session.trusted_home_lan ? 'Home LAN · read-only status'
+    $('connection').textContent = (session.trusted_home_lan || session.external_without_password) ? 'Home LAN · read-only status'
         : !session.configured ? 'Local preview · read only' : session.authenticated ? 'Connected · owner' : 'Sign in required';
     $('session-button').textContent = session.authenticated ? 'Sign out' : 'Sign in';
-    $('session-button').hidden = !session.configured || session.trusted_home_lan;
+    $('session-button').hidden = !session.configured || (session.trusted_home_lan || session.external_without_password);
     $('session-button').disabled = state.pending;
-    $('access-notice').hidden = !session.trusted_home_lan;
+    $('access-notice').hidden = !(session.trusted_home_lan || session.external_without_password);
     $('access-notice').textContent = session.read_only
         ? 'Trusted home LAN · no individual sign-in. This host currently permits viewing only.'
         : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete content. No individual sign-in. Environment only reads status.';
+    if (session.external_without_password) {
+        $('connection').textContent = 'External access · read-only status';
+        $('access-notice').textContent = session.read_only
+            ? 'External access without sign-in. This host currently permits viewing only.'
+            : 'External access without sign-in. Anyone who can reach this address can view and edit content. Environment only reads status.';
+    }
 }
 // Never display response bodies as errors: even a proxy failure can contain private details.
 async function read(path, signal) {
@@ -100,7 +106,7 @@ async function refresh() {
         state.session = await read('/session', controller.signal);
         if (revision !== state.revision) return;
         updateSession();
-        if (state.session.configured && !state.session.authenticated && !state.session.trusted_home_lan) {
+        if (state.session.configured && !state.session.authenticated && !(state.session.trusted_home_lan || state.session.external_without_password)) {
             markAllUnavailable('Sign in to read status.'); message('notice', 'Sign in, then refresh to read Environment.'); return;
         }
         await Promise.all([

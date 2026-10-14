@@ -19,8 +19,13 @@ public sealed class BrowserAccess
     public string? PasswordHash { get; init; }
     public bool ReadOnly { get; init; }
     public bool TrustedHomeLanWithoutPassword { get; init; }
+    // Explicit anonymous internet access is separate from trusted LAN authorization.
+    // ExternalUrl is the browser's HTTPS authority, not a local bind address.
+    public string? ExternalUrl { get; init; }
+    public bool AllowExternalWithoutPassword { get; init; }
     public bool Configured => !string.IsNullOrWhiteSpace(PasswordHash);
     private Uri? _lan;
+    private Uri? _external;
     private System.Net.IPNetwork? _subnet;
 
     public static BrowserAccess Configure(WebApplicationBuilder builder, Uri loopback)
@@ -28,15 +33,27 @@ public sealed class BrowserAccess
         var access = builder.Configuration.GetSection("Browser").Get<BrowserAccess>() ?? new();
         if (access.TrustedHomeLanWithoutPassword && (string.IsNullOrWhiteSpace(access.LanUrl) || access.Configured))
             throw new InvalidOperationException("TrustedHomeLanWithoutPassword requires an explicit LAN URL and no password hash. Remove this opt-in before configuring password access.");
+        if (access.AllowExternalWithoutPassword)
+        {
+            if (access.Configured || string.IsNullOrWhiteSpace(access.LanUrl)
+                || !Uri.TryCreate(access.ExternalUrl, UriKind.Absolute, out var external)
+                || external.Scheme != "https" || external.AbsolutePath != "/"
+                || external.Query != "" || external.Fragment != "" || external.UserInfo != ""
+                || !IPAddress.TryParse(external.Host, out var externalAddress)
+                || externalAddress.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork
+                || IPAddress.IsLoopback(externalAddress) || IsPrivateV4(externalAddress))
+                throw new InvalidOperationException("External password-free access requires an explicit public IPv4 HTTPS URL, an existing LAN HTTPS listener, and no password hash.");
+            access._external = external;
+        }
         if (!string.IsNullOrWhiteSpace(access.LanUrl))
         {
             if (!Uri.TryCreate(access.LanUrl, UriKind.Absolute, out var lan)
                 || lan.Scheme != "https" || lan.AbsolutePath != "/" || lan.Query != "" || lan.UserInfo != ""
                 || !IPAddress.TryParse(lan.Host, out var address) || !IsPrivateV4(address)
-                || lan.Port == loopback.Port || (!access.Configured && !access.TrustedHomeLanWithoutPassword) || string.IsNullOrWhiteSpace(access.CertificatePath)
+                || lan.Port == loopback.Port || (!access.Configured && !access.TrustedHomeLanWithoutPassword && !access.AllowExternalWithoutPassword) || string.IsNullOrWhiteSpace(access.CertificatePath)
                 || !System.Net.IPNetwork.TryParse(access.AllowedSubnet, out var subnet)
                 || !IsPrivateV4(subnet.BaseAddress) || subnet.PrefixLength < 16 || !subnet.Contains(address))
-                throw new InvalidOperationException("Browser LAN access requires an explicit private IPv4 HTTPS URL on a separate port, a private subnet (/16 or narrower), certificate, and either a password hash or explicit TrustedHomeLanWithoutPassword opt-in.");
+                throw new InvalidOperationException("Browser LAN access requires an explicit private IPv4 HTTPS URL on a separate port, a private subnet (/16 or narrower), certificate, and a password hash or an explicit password-free access opt-in.");
             access._lan = lan;
             access._subnet = subnet;
             builder.WebHost.ConfigureKestrel(server =>
@@ -88,7 +105,7 @@ public sealed class BrowserAccess
             var desktopListener = local is not null && IPAddress.IsLoopback(local) && context.Connection.LocalPort == loopback.Port;
             var allowedHost = desktopListener
                 ? request.Host.Port == loopback.Port && (request.Host.Host == "localhost" || IPAddress.TryParse(request.Host.Host, out var hostIp) && IPAddress.IsLoopback(hostIp))
-                : IsAllowedLanRequest(context);
+                : IsAllowedLanRequest(context) || IsAllowedExternalRequest(context);
             if (!allowedHost) { context.Response.StatusCode = 403; return; }
             var browser = request.Path.StartsWithSegments("/studio");
             if (!browser)
@@ -102,15 +119,17 @@ public sealed class BrowserAccess
             context.Response.Headers["X-Content-Type-Options"] = "nosniff";
             context.Response.Headers["Referrer-Policy"] = "no-referrer";
             context.Response.Headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
-            // Network authorization applies only to this HTTPS listener, never to loopback or legacy routes.
+            // Password-free authorization applies only to the configured HTTPS listener, never to loopback or legacy routes.
             var trustedHomeLan = TrustedHomeLanWithoutPassword && IsAllowedLanRequest(context);
+            var externalWithoutPassword = IsAllowedExternalRequest(context);
+            var passwordFree = trustedHomeLan || externalWithoutPassword;
             var api = request.Path.StartsWithSegments("/studio/api");
             var session = request.Path == "/studio/api/session" || request.Path == "/studio/api/login";
-            if (api && !session && !trustedHomeLan && Configured && context.User.Identity?.IsAuthenticated != true)
+            if (api && !session && !passwordFree && Configured && context.User.Identity?.IsAuthenticated != true)
             { context.Response.StatusCode = 401; return; }
             if (api && !HttpMethods.IsGet(request.Method))
             {
-                if ((!Configured && !trustedHomeLan) || (ReadOnly && request.Path != "/studio/api/login" && request.Path != "/studio/api/logout"))
+                if ((!Configured && !passwordFree) || (ReadOnly && request.Path != "/studio/api/login" && request.Path != "/studio/api/logout"))
                 { await BrowserJson.Error("browser_read_only", "Browser writes are not enabled on this host.", 403).ExecuteAsync(context); return; }
                 if (request.Headers.Origin != $"{request.Scheme}://{request.Host}")
                 { context.Response.StatusCode = 403; return; }
@@ -136,11 +155,14 @@ public sealed class BrowserAccess
         {
             var authenticated = context.User.Identity?.IsAuthenticated == true;
             var trustedHomeLan = TrustedHomeLanWithoutPassword && IsAllowedLanRequest(context);
+            var externalWithoutPassword = IsAllowedExternalRequest(context);
+            var passwordFree = trustedHomeLan || externalWithoutPassword;
             return BrowserJson.Json(new
             {
                 authenticated, configured = Configured, trusted_home_lan = trustedHomeLan,
-                read_only = ReadOnly || (!Configured && !trustedHomeLan),
-                can_edit = !ReadOnly && (authenticated || trustedHomeLan),
+                external_without_password = externalWithoutPassword,
+                read_only = ReadOnly || (!Configured && !passwordFree),
+                can_edit = !ReadOnly && (authenticated || passwordFree),
                 csrf_token = csrf.GetAndStoreTokens(context).RequestToken
             });
         });
@@ -175,6 +197,16 @@ public sealed class BrowserAccess
             && context.Connection.LocalPort == _lan.Port
             && remote is not null && _subnet.Value.Contains(remote)
             && string.Equals(context.Request.Host.Value, _lan.Authority, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool IsAllowedExternalRequest(HttpContext context)
+    {
+        // A router may translate the destination port, but the browser's Host remains external.
+        // This is an explicitly anonymous mode: Host validation and CSRF are not authentication.
+        return _external is not null && _lan is not null && context.Request.IsHttps
+            && context.Connection.LocalIpAddress?.Equals(IPAddress.Parse(_lan.Host)) == true
+            && context.Connection.LocalPort == _lan.Port
+            && string.Equals(context.Request.Host.Value, _external.Authority, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsPrivateV4(IPAddress address)

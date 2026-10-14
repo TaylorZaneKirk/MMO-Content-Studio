@@ -43,16 +43,22 @@ function updateActions() {
 const request = createRequest(() => state.session, () => { state.session.authenticated = false; state.session.can_edit = false; updateSession(); });
 async function refreshSession() { state.session = await request('/session'); updateSession(); }
 function updateSession() {
-    if (state.session.trusted_home_lan) $('connection').textContent = state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor';
+    if ((state.session.trusted_home_lan || state.session.external_without_password)) $('connection').textContent = state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor';
     else if (!state.session.configured) $('connection').textContent = 'Local preview · read only';
     else if (!state.session.authenticated) $('connection').textContent = 'Sign in to edit';
     else $('connection').textContent = state.session.read_only ? 'Signed in · read only' : 'Connected · owner';
     $('session-button').textContent = state.session.authenticated ? 'Sign out' : 'Sign in';
-    $('session-button').hidden = !state.session.configured || state.session.trusted_home_lan;
-    $('access-notice').hidden = !state.session.trusted_home_lan;
+    $('session-button').hidden = !state.session.configured || (state.session.trusted_home_lan || state.session.external_without_password);
+    $('access-notice').hidden = !(state.session.trusted_home_lan || state.session.external_without_password);
     $('access-notice').textContent = state.session.read_only
         ? 'Trusted home LAN · no individual sign-in. This host currently permits viewing only.'
         : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete content. No individual sign-in.';
+    if (state.session.external_without_password) {
+        $('connection').textContent = state.session.read_only ? 'External access · read only' : 'External access · shared editor';
+        $('access-notice').textContent = state.session.read_only
+            ? 'External access without sign-in. This host currently permits viewing only.'
+            : 'External access without sign-in. Anyone who can reach this address can view and edit content.';
+    }
     updateActions();
 }
 async function loadOptionsAndAssets() {
@@ -451,5 +457,5 @@ $('upload-file').addEventListener('change',()=>{$('upload-name').value=$('upload
 $('search').value = new URLSearchParams(location.search).get('search') || '';
 installNavigation(() => dirty() || state.pending || state.uncertain, () => state.pending || state.uncertain, message => notice(message, true));
 try{await refreshSession();if(state.session.configured&&!state.session.authenticated){notice('Sign in to load the item catalog.');$('catalog-count').textContent='Sign in required';}
-    else{await loadOptionsAndAssets();await search();if(!state.session.configured && !state.session.trusted_home_lan)notice('Local read-only preview. Browser writes require host-configured credentials; none are created by this application.');}}
+    else{await loadOptionsAndAssets();await search();if(!state.session.configured && !(state.session.trusted_home_lan || state.session.external_without_password))notice('Local read-only preview. Browser writes require host-configured credentials; none are created by this application.');}}
 catch(error){notice(`Cannot reach Studio: ${error.message} Refresh the page to reconnect.`,true);$('connection').textContent='Disconnected';}

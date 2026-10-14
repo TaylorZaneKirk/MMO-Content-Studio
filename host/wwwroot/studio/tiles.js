@@ -17,11 +17,17 @@ function controls() {
     $('tile-fields').disabled = !editable; $('tileset').disabled = state.pending || state.uncertain;
     $('refresh').disabled = state.pending || state.uncertain; $('reload').disabled = state.pending || !state.tile;
     $('session-button').disabled = state.pending; $('compare-disk').disabled = state.pending; $('compare-draft').disabled = state.pending;
-    $('connection').textContent = state.session.trusted_home_lan ? 'Home LAN · owner access' : state.session.can_edit ? 'Connected · owner' : 'Read only';
-    $('session-button').hidden = !state.session.configured || state.session.trusted_home_lan;
+    $('connection').textContent = (state.session.trusted_home_lan || state.session.external_without_password) ? 'Home LAN · owner access' : state.session.can_edit ? 'Connected · owner' : 'Read only';
+    $('session-button').hidden = !state.session.configured || (state.session.trusted_home_lan || state.session.external_without_password);
     $('session-button').textContent = state.session.authenticated ? 'Sign out' : 'Sign in';
-    $('access-notice').hidden = !state.session.trusted_home_lan;
+    $('access-notice').hidden = !(state.session.trusted_home_lan || state.session.external_without_password);
     $('access-notice').textContent = 'Trusted home LAN · anyone on the allowed network can access Studio. Tiles saves change the configured Tiled source files.';
+    if (state.session.external_without_password) {
+        $('connection').textContent = state.session.read_only ? 'External access · read only' : 'External access · shared editor';
+        $('access-notice').textContent = state.session.read_only
+            ? 'External access without sign-in. This host currently permits viewing only.'
+            : 'External access without sign-in. Anyone who can reach this address can view and edit content. Tiles saves change the configured Tiled source files.';
+    }
 }
 function invalidated() { state.preview = null; $('review').hidden = true; controls(); }
 function setDraft(name, value) { state.draft[name] = value; invalidated(); renderDiagnostics(); }

@@ -50,15 +50,21 @@ const request = createRequest(() => state.session, () => {
 const calibration=new ActorCalibrationEditor($('calibration'),request,()=>state.session.can_edit&&!state.pending&&!state.uncertain,()=>changed(),()=>!state.pending&&!state.uncertain);
 async function refreshSession() { state.session = await request('/session'); updateSession(); }
 function updateSession() {
-    $('connection').textContent = state.session.trusted_home_lan ? (state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor')
+    $('connection').textContent = (state.session.trusted_home_lan || state.session.external_without_password) ? (state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor')
         : !state.session.configured ? 'Local preview · read only' : !state.session.authenticated ? 'Sign in to edit'
         : state.session.read_only ? 'Signed in · read only' : 'Connected · owner';
     $('session-button').textContent = state.session.authenticated ? 'Sign out' : 'Sign in';
-    $('session-button').hidden = !state.session.configured || state.session.trusted_home_lan;
-    $('access-notice').hidden = !state.session.trusted_home_lan;
+    $('session-button').hidden = !state.session.configured || (state.session.trusted_home_lan || state.session.external_without_password);
+    $('access-notice').hidden = !(state.session.trusted_home_lan || state.session.external_without_password);
     $('access-notice').textContent = state.session.read_only
         ? 'Trusted home LAN · no individual sign-in. This host currently permits viewing only.'
         : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete content. No individual sign-in.';
+    if (state.session.external_without_password) {
+        $('connection').textContent = state.session.read_only ? 'External access · read only' : 'External access · shared editor';
+        $('access-notice').textContent = state.session.read_only
+            ? 'External access without sign-in. This host currently permits viewing only.'
+            : 'External access without sign-in. Anyone who can reach this address can view and edit content.';
+    }
     updateActions();calibration.refreshPermission();
 }
 const draftKeys=['display_name', 'visual_texture_path', 'source_width', 'source_height', 'visual_anchor_offset_x', 'visual_anchor_offset_y', 'visual_render_scale', 'footprint_width_tiles', 'footprint_height_tiles', 'max_health', 'movement_speed_tiles_per_second', 'movement_behavior', 'wander_radius_tiles', 'aggression_mode', 'aggression_radius_tiles', 'leash_radius_tiles', 'return_home_behavior', 'combat_faction_id', 'can_proactively_target_hostile_mobs', 'mob_detection_radius_tiles', 'mob_target_scan_interval_ms', 'mob_target_scan_candidate_limit', 'primary_combat_profile', 'combat_bonuses', 'guaranteed_drops', 'visual_mode', 'composite_visual', 'root_loot_table_id'];
@@ -410,5 +416,5 @@ installNavigation(() => dirty() || state.pending || state.uncertain || calibrati
 try {
     await refreshSession();
     if (state.session.configured && !state.session.authenticated) { notice('Sign in to load the Mob catalog.'); $('catalog-count').textContent = 'Sign in required'; }
-    else { await Promise.all([loadOptions(), search()]); if (!state.session.configured && !state.session.trusted_home_lan) notice('Local read-only preview.'); }
+    else { await Promise.all([loadOptions(), search()]); if (!state.session.configured && !(state.session.trusted_home_lan || state.session.external_without_password)) notice('Local read-only preview.'); }
 } catch (error) { notice(`Cannot reach Studio: ${error.message} Refresh the page to reconnect.`, true); $('connection').textContent = 'Disconnected'; }

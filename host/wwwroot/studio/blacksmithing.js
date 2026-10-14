@@ -46,15 +46,21 @@ const request = createRequest(() => state.session, () => {
 });
 async function refreshSession() { state.session = await request('/session'); updateSession(); }
 function updateSession() {
-    $('connection').textContent = state.session.trusted_home_lan ? (state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor')
+    $('connection').textContent = (state.session.trusted_home_lan || state.session.external_without_password) ? (state.session.read_only ? 'Home LAN · read only' : 'Home LAN · shared editor')
         : !state.session.configured ? 'Local preview · read only' : !state.session.authenticated ? 'Sign in to edit'
         : state.session.read_only ? 'Signed in · read only' : 'Connected · owner';
     $('session-button').textContent = state.session.authenticated ? 'Sign out' : 'Sign in';
-    $('session-button').hidden = !state.session.configured || state.session.trusted_home_lan;
-    $('access-notice').hidden = !state.session.trusted_home_lan;
+    $('session-button').hidden = !state.session.configured || (state.session.trusted_home_lan || state.session.external_without_password);
+    $('access-notice').hidden = !(state.session.trusted_home_lan || state.session.external_without_password);
     $('access-notice').textContent = state.session.read_only
         ? 'Trusted home LAN · no individual sign-in. This host currently permits viewing only.'
         : 'Trusted home LAN · anyone on the allowed network can view, upload, edit, publish and delete content. No individual sign-in.';
+    if (state.session.external_without_password) {
+        $('connection').textContent = state.session.read_only ? 'External access · read only' : 'External access · shared editor';
+        $('access-notice').textContent = state.session.read_only
+            ? 'External access without sign-in. This host currently permits viewing only.'
+            : 'External access without sign-in. Anyone who can reach this address can view and edit content.';
+    }
     updateActions();
 }
 async function loadOptions() {
@@ -372,5 +378,5 @@ installNavigation(() => dirty() || state.pending || state.uncertain, () => state
 try {
     await refreshSession();
     if (state.session.configured && !state.session.authenticated) { notice('Sign in to load the Recipe catalog.'); $('catalog-count').textContent = 'Sign in required'; }
-    else { await Promise.all([loadOptions(), search()]); if (!state.session.configured && !state.session.trusted_home_lan) notice('Local read-only preview.'); }
+    else { await Promise.all([loadOptions(), search()]); if (!state.session.configured && !(state.session.trusted_home_lan || state.session.external_without_password)) notice('Local read-only preview.'); }
 } catch (error) { notice(`Cannot reach Studio: ${error.message} Refresh the page to reconnect.`, true); $('connection').textContent = 'Disconnected'; }

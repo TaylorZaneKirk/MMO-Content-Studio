@@ -194,3 +194,26 @@ The approved starter values are 500 bp. Base Defence adds 5 bp per level above 1
 capped at 1000 per response. No Concentration cost; the outgoing Block combat style
 is separate. Migration 106 is required before activating these host binaries.
 These gameplay facts load from SQL; the equipment visual export stays appearance-only.
+
+
+## Explicit external password-free access
+
+`Browser:AllowExternalWithoutPassword` defaults to `false`. When explicitly enabled,
+`Browser:ExternalUrl` names one public IPv4 HTTPS origin (including its external
+port). It uses the existing `LanUrl` HTTPS listener; the public address is never
+bound locally. Router destination-port translation does not change the browser's
+Host header. The certificate must cover the public IP and be trusted by the browser.
+
+This mode intentionally permits anonymous viewing and editing from any source IP
+at that exact authority. It requires no configured password hash. It does not
+extend `TrustedHomeLanWithoutPassword`: the LAN authority/subnet and loopback
+behavior remain separate. `ReadOnly` still prevents content writes. HTTPS, exact
+Origin/antiforgery checks and exclusion of legacy desktop routes remain enforced;
+these checks are not authentication. Browser session responses identify this mode
+as `external_without_password`, and pages label it as external access without sign-in.
+
+Enable only with explicit owner authorization. Keep local configuration, CA keys,
+server keys and certificate packages outside source control. Disabling the flag
+and restarting Studio removes this external authority without changing LAN access.
+A focused authentication/exposure review is deferred project work, not implemented
+by this mode.
