@@ -20,6 +20,7 @@ const CONTENT_STUDIO_LOGGER := preload("res://scripts/content_studio_logger.gd")
 @onready var mob_editor = %Mobs
 @onready var shop_editor = %Shops
 @onready var blacksmithing_editor = %Blacksmithing
+@onready var cooking_editor = %Cooking
 @onready var magic_spell_editor = %Spells
 @onready var npc_editor = %NPCs
 @onready var dialogue_editor = %Dialogue
@@ -192,6 +193,9 @@ func _on_workspace_open_requested(workspace_id: String, resource_id: String) -> 
 		"alchemy":
 			_open_tab(%Alchemy)
 			%Alchemy.open_resource(resource_id)
+		"cooking":
+			_open_tab(cooking_editor)
+			cooking_editor.open_resource(resource_id)
 		"blacksmithing":
 			_open_tab(blacksmithing_editor)
 			blacksmithing_editor.open_resource(resource_id)

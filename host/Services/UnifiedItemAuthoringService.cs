@@ -58,7 +58,7 @@ public sealed class UnifiedItemAuthoringService
                     _registry.LoadAttackFamilies(),
                     _registry.LoadAttackStyles(),
                     capabilities.Select(skill => new AuthoringOption(skill.SkillId, skill.DisplayName)).ToArray(),
-                    [new("eat", "Eat"), new("drink", "Drink"), new("use", "Use")],
+                    [new("eat", "Eat"), new("drink", "Drink"), new("use", "Use"), new("empty", "Empty")],
                     [new("restore_resource", "Restore Resource")],
                     [new("health", "Health"), new("concentration", "Concentration"), new("special", "Special")],
                     [new("skill_minimum", "Skill Minimum")],

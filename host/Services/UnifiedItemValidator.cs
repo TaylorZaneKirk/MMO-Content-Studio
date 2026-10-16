@@ -7,7 +7,7 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 public sealed class UnifiedItemValidator
 {
     private static readonly IReadOnlySet<string> UseActions =
-        new HashSet<string>(["eat", "drink", "use"], StringComparer.Ordinal);
+        new HashSet<string>(["eat", "drink", "use", "empty"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> EffectTypes =
         new HashSet<string>(["restore_resource"], StringComparer.Ordinal);
     private static readonly IReadOnlySet<string> ResourceTargets =
@@ -78,7 +78,7 @@ public sealed class UnifiedItemValidator
 
         if (draft.ConsumableBehavior is not null)
         {
-            await ValidateConsumableAsync(itemId, draft.ConsumableBehavior, forPublication, messages, cancellationToken);
+            await ValidateConsumableAsync(itemId, draft.Stackable, draft.ConsumableBehavior, forPublication, messages, cancellationToken);
         }
         if (draft.Equipment is not null)
         {
@@ -216,6 +216,7 @@ public sealed class UnifiedItemValidator
 
     private async Task ValidateConsumableAsync(
         string itemId,
+        bool stackable,
         NormalizedItemConsumableBehavior consumable,
         bool forPublication,
         ICollection<ApiError> messages,
@@ -225,7 +226,7 @@ public sealed class UnifiedItemValidator
         {
             messages.Add(new ApiError(
                 "invalid_use_action",
-                "Use action must be eat, drink, or use.",
+                "Use action must be eat, drink, use, or empty.",
                 ValidationSeverity.Error,
                 "consumable_behavior.use_action"));
         }
@@ -250,7 +251,19 @@ public sealed class UnifiedItemValidator
         ValidateSoundPath(consumable.UseSoundResourcePath, messages);
         await ValidateResultItemAsync(itemId, consumable.ResultItemId, forPublication, messages, cancellationToken);
         await ValidateConsumableRequirementsAsync(consumable.Requirements, messages, cancellationToken);
-        ValidateConsumableEffects(consumable.Effects, forPublication, messages);
+        var empty = consumable.UseAction == "empty";
+        var serving = consumable.UseAction == "eat" && consumable.ResultItemId is not null;
+        if (empty || serving)
+        {
+            var result = consumable.ResultItemId is null ? null : await _repository.LoadReferencedItemAsync(consumable.ResultItemId, cancellationToken);
+            if (stackable || result?.Stackable == true || consumable.ConsumeQuantity != 1 ||
+                consumable.ResultItemId is null || consumable.CooldownMs != 0 || consumable.Requirements.Count != 0 ||
+                (empty && consumable.Effects.Count != 0) ||
+                (serving && (!consumable.UsableInCombat || consumable.Effects.Count != 1 ||
+                    consumable.Effects[0].EffectType != "restore_resource" || consumable.Effects[0].TargetId != "health" || consumable.Effects[0].Amount <= 0)))
+                messages.Add(new ApiError("invalid_consumable_replacement", "Servings and Empty require one non-stackable input/result, no requirements or authored cooldown, and respectively one positive Health effect or no effects.", ValidationSeverity.Error, "consumable_behavior"));
+        }
+        if (!empty) ValidateConsumableEffects(consumable.Effects, forPublication, messages);
     }
 
     private async Task ValidateEquipmentAsync(

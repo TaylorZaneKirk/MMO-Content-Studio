@@ -1,4 +1,5 @@
 using MMO.ContentStudio.AuthoringHost.Features.Blacksmithing;
+using MMO.ContentStudio.AuthoringHost.Features.Cooking;
 using MMO.ContentStudio.AuthoringHost.Features.Farming;
 using MMO.ContentStudio.AuthoringHost.Features.Alchemy;
 using MMO.ContentStudio.AuthoringHost.Features.Crafting;
@@ -32,6 +33,7 @@ public static class AuthoringFeatureExtensions
         services.AddShopAuthoring();
         services.AddMagicSpellAuthoring();
         services.AddBlacksmithingAuthoring();
+        services.AddCookingAuthoring();
         services.AddFarmingAuthoring();
         services.AddAlchemyAuthoring();
         services.AddCraftingAuthoring();
@@ -54,6 +56,7 @@ public static class AuthoringFeatureExtensions
         endpoints.MapShopAuthoring();
         endpoints.MapMagicSpellAuthoring();
         endpoints.MapBlacksmithingAuthoring();
+        endpoints.MapCookingAuthoring();
         endpoints.MapFarmingAuthoring();
         endpoints.MapAlchemyAuthoring();
         endpoints.MapCraftingAuthoring();

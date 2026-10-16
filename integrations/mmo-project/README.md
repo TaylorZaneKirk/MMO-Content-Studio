@@ -246,3 +246,15 @@ authoring, graph editing, runtime catalog export, validator/runtime
 equivalence, reference safety, and end-to-end verification are complete; Quest
 Studio, arbitrary scripts, story flags, objectives, broader rewards, unlocks,
 and authored first-quest content remain deferred.
+
+## Cooking recipe authoring and servings
+
+Apply `prototype/sql/109_cooking_recipes_and_servings.sql` once before this version
+of Studio. This mirror is the same numbered game migration, not a second step.
+The Cooking workspace edits ordered ingredients, output/count, level, success XP,
+low/high success thresholds and optional burnt output. Save Draft retains the last
+published snapshot; Publish replaces it; Disable withdraws it before Delete.
+Publication exports `cooking/catalog.json`; packaging and coordinated runtime
+deployment remain separate. Items now permits narrow same-slot food servings and
+zero-effect Empty profiles. The game repository's guarded Apple Pie content script
+seeds the initial recipes and Mara stock; Studio startup never seeds content.

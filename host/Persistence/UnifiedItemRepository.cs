@@ -393,7 +393,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         CancellationToken cancellationToken = default)
     {
         const string sql = """
-            select item_id, item_name, runtime_enabled
+            select item_id, item_name, runtime_enabled, stackable
             from item_definitions
             where item_id = @item_id;
             """;
@@ -409,7 +409,7 @@ public sealed class UnifiedItemRepository : IUnifiedItemRepository
         return new ReferencedItemRecord(
             reader.GetString(reader.GetOrdinal("item_id")),
             reader.GetString(reader.GetOrdinal("item_name")),
-            reader.GetBoolean(reader.GetOrdinal("runtime_enabled")));
+            reader.GetBoolean(reader.GetOrdinal("runtime_enabled")), reader.GetBoolean(reader.GetOrdinal("stackable")));
     }
 
     public Task<UnifiedItemRecord> SaveDraftAsync(
@@ -2078,7 +2078,7 @@ public sealed record EquipmentSlotRecord(string SlotId, string DisplayName);
 
 public sealed record EquipmentSkillRecord(string SkillId, string DisplayName);
 
-public sealed record ReferencedItemRecord(string ItemId, string DisplayName, bool RuntimeEnabled);
+public sealed record ReferencedItemRecord(string ItemId, string DisplayName, bool RuntimeEnabled, bool Stackable = false);
 
 public sealed class UnifiedItemNotFoundException : Exception
 {

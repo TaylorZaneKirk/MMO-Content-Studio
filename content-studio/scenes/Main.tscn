@@ -20,6 +20,8 @@
 [ext_resource type="Script" path="res://scripts/crafting_editor.gd" id="15_crafting"]
 [ext_resource type="Script" path="res://scripts/lore_editor.gd" id="16_lore"]
 
+[ext_resource type="Script" path="res://scripts/cooking_editor.gd" id="17_cooking"]
+
 [sub_resource type="StyleBoxFlat" id="StylePanel"]
 bg_color = Color(0.086, 0.098, 0.122, 1)
 border_width_left = 1
@@ -291,3 +293,8 @@ script = ExtResource("11_spells")
 unique_name_in_owner = true
 layout_mode = 2
 script = ExtResource("16_lore")
+
+[node name="Cooking" type="HBoxContainer" parent="Margin/Root/Tabs"]
+unique_name_in_owner = true
+layout_mode = 2
+script = ExtResource("17_cooking")
