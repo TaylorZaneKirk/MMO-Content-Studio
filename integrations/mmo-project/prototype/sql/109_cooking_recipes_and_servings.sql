@@ -1,3 +1,9 @@
+BEGIN;
+DO $$ BEGIN
+ IF NOT EXISTS(SELECT 1 FROM schema_migrations WHERE migration_file='108_mob_projectile_attacks.sql')
+ OR EXISTS(SELECT 1 FROM schema_migrations WHERE migration_file='109_cooking_recipes_and_servings.sql')
+ THEN RAISE EXCEPTION 'Migration 109 requires migration 108 and must be applied once'; END IF;
+END $$;
 -- Additive Cooking authoring and explicit Empty consumables. Schema only; no player/content writes.
 CREATE TABLE cooking_recipes (
  recipe_id text PRIMARY KEY CHECK(recipe_id ~ '^[a-z][a-z0-9_]*$'),
@@ -62,3 +68,7 @@ BEGIN
 END $$;
 CREATE TRIGGER cooking_recipe_delete_guard BEFORE DELETE ON cooking_recipes
 FOR EACH ROW EXECUTE FUNCTION guard_cooking_recipe_delete();
+
+INSERT INTO schema_migrations(migration_file,migration_number,migration_name,notes)
+VALUES('109_cooking_recipes_and_servings.sql',109,'cooking_recipes_and_servings','Versioned Cooking recipes and narrow serving/Empty profiles; no player writes.');
+COMMIT;
