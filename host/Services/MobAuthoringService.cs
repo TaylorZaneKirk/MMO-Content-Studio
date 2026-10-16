@@ -367,7 +367,7 @@ public sealed class MobAuthoringService
             request.GuaranteedDrops,
             request.VisualMode,
             request.CompositeVisual,
-            request.RootLootTableId);
+            request.RootLootTableId, request.AnimateMovementWhileIdle);
 
     public static NormalizedMobDraft Normalize(MobPreviewRequest request) =>
         Normalize(
@@ -398,7 +398,7 @@ public sealed class MobAuthoringService
             request.GuaranteedDrops,
             request.VisualMode,
             request.CompositeVisual,
-            request.RootLootTableId);
+            request.RootLootTableId, request.AnimateMovementWhileIdle);
 
     public static NormalizedMobDraft Normalize(
         string displayName,
@@ -428,7 +428,8 @@ public sealed class MobAuthoringService
         IReadOnlyList<MobDropDraft>? guaranteedDrops,
         string? visualMode = ActorVisualModes.FlatSprite,
         RiggedSpriteVisualDescriptor? compositeVisual = null,
-        string? rootLootTableId = null)
+        string? rootLootTableId = null,
+        bool animateMovementWhileIdle = false)
     {
         var proactive = canProactivelyTargetHostileMobs;
         var presentation = RiggedSpriteVisualDescriptorNormalizer.Normalize(visualMode, compositeVisual);
@@ -470,7 +471,7 @@ public sealed class MobAuthoringService
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
             presentation.CompositeVisual,
-            MobDomainRules.NormalizeOptional(rootLootTableId)?.ToLowerInvariant());
+            MobDomainRules.NormalizeOptional(rootLootTableId)?.ToLowerInvariant(), animateMovementWhileIdle);
     }
 
     public static NormalizedMobDraft FromRecord(MobDefinitionRecord record) =>
@@ -507,7 +508,7 @@ public sealed class MobAuthoringService
                 .ToArray(),
             record.VisualMode,
             record.CompositeVisual,
-            record.RootLootTableId);
+            record.RootLootTableId, record.AnimateMovementWhileIdle);
 
     public static string ComputePreviewSignature(
         string mobDefinitionId,
@@ -563,6 +564,7 @@ public sealed class MobAuthoringService
         && record.PrimaryCombatProfile == draft.PrimaryCombatProfile
         && (record.CombatBonuses ?? MobCombatBonusDefinition.Zero) == draft.CombatBonuses
         && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops)
+        && record.AnimateMovementWhileIdle == draft.AnimateMovementWhileIdle
         && record.VisualMode == draft.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
         && string.Equals(record.RootLootTableId, draft.RootLootTableId, StringComparison.Ordinal);
@@ -595,6 +597,7 @@ public sealed class MobAuthoringService
         && left.PrimaryCombatProfile == right.PrimaryCombatProfile
         && (left.CombatBonuses ?? MobCombatBonusDefinition.Zero) == (right.CombatBonuses ?? MobCombatBonusDefinition.Zero)
         && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops)
+        && left.AnimateMovementWhileIdle == right.AnimateMovementWhileIdle
         && left.VisualMode == right.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
         && left.RootLootTableId == right.RootLootTableId;
@@ -728,7 +731,7 @@ public sealed class MobAuthoringService
             CalculateDerivedCombatLevel(FromRecord(record)),
             CalculateCombatLevelDiagnostics(FromRecord(record)),
             record.RootLootTableId,
-            null);
+            null, record.AnimateMovementWhileIdle);
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
@@ -799,6 +802,7 @@ public sealed class MobAuthoringService
         AddChange(changes, "mob_definition_id", existing?.MobDefinitionId, mobDefinitionId);
         AddChange(changes, "display_name", existing?.DisplayName, requested.DisplayName);
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
+        AddChange(changes, "animate_movement_while_idle", existing?.AnimateMovementWhileIdle.ToString(), requested.AnimateMovementWhileIdle.ToString());
         AddChange(changes, "visual_mode", existing?.VisualMode, requested.VisualMode);
         AddChange(changes, "composite_visual", SerializeCompositeVisual(existing?.CompositeVisual), SerializeCompositeVisual(requested.CompositeVisual));
         AddChange(changes, "source_width", existing?.SourceWidth.ToString(), requested.SourceWidth.ToString());

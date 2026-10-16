@@ -64,7 +64,8 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("derived_combat_level")] int? DerivedCombatLevel = null,
     [property: JsonPropertyName("combat_level_diagnostics")] MobCombatLevelDiagnosticsDefinition? CombatLevelDiagnostics = null,
     [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
-    [property: JsonPropertyName("root_loot_table_expected_value")] LootExpectedValueReport? RootLootTableExpectedValue = null);
+    [property: JsonPropertyName("root_loot_table_expected_value")] LootExpectedValueReport? RootLootTableExpectedValue = null,
+    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false);
 
 public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_type")] string AttackType,
@@ -122,7 +123,8 @@ public sealed record SaveMobDraftRequest(
     [property: JsonPropertyName("preview_signature")] string? PreviewSignature,
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
-    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null);
+    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
+    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false);
 
 public sealed record MobPreviewRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -156,7 +158,8 @@ public sealed record MobPreviewRequest(
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
     [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null,
-    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null);
+    [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
+    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false);
 
 public sealed record MobPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,

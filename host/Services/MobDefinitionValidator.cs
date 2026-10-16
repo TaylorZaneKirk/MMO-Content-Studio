@@ -664,7 +664,8 @@ public sealed record NormalizedMobDraft(
     IReadOnlyList<MobDropDraft> GuaranteedDrops,
     string VisualMode,
     RiggedSpriteVisualDescriptor? CompositeVisual,
-    string? RootLootTableId = null);
+    string? RootLootTableId = null,
+    bool AnimateMovementWhileIdle = false);
 
 public sealed record MobValidationOutcome(
     bool ValidForDraft,

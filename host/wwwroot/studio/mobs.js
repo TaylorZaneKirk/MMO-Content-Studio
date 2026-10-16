@@ -67,7 +67,7 @@ function updateSession() {
     }
     updateActions();calibration.refreshPermission();
 }
-const draftKeys=['display_name', 'visual_texture_path', 'source_width', 'source_height', 'visual_anchor_offset_x', 'visual_anchor_offset_y', 'visual_render_scale', 'footprint_width_tiles', 'footprint_height_tiles', 'max_health', 'movement_speed_tiles_per_second', 'movement_behavior', 'wander_radius_tiles', 'aggression_mode', 'aggression_radius_tiles', 'leash_radius_tiles', 'return_home_behavior', 'combat_faction_id', 'can_proactively_target_hostile_mobs', 'mob_detection_radius_tiles', 'mob_target_scan_interval_ms', 'mob_target_scan_candidate_limit', 'primary_combat_profile', 'combat_bonuses', 'guaranteed_drops', 'visual_mode', 'composite_visual', 'root_loot_table_id'];
+const draftKeys=['display_name', 'visual_texture_path', 'source_width', 'source_height', 'visual_anchor_offset_x', 'visual_anchor_offset_y', 'visual_render_scale', 'footprint_width_tiles', 'footprint_height_tiles', 'max_health', 'movement_speed_tiles_per_second', 'movement_behavior', 'wander_radius_tiles', 'aggression_mode', 'aggression_radius_tiles', 'leash_radius_tiles', 'return_home_behavior', 'combat_faction_id', 'can_proactively_target_hostile_mobs','animate_movement_while_idle', 'mob_detection_radius_tiles', 'mob_target_scan_interval_ms', 'mob_target_scan_candidate_limit', 'primary_combat_profile', 'combat_bonuses', 'guaranteed_drops', 'visual_mode', 'composite_visual', 'root_loot_table_id'];
 function toDraft(definition){return Object.fromEntries(draftKeys.map(key=>[key,key==='guaranteed_drops'?definition[key].map(({drop_order,item_id,stack_count})=>({drop_order,item_id,stack_count})):clone(definition[key])]));}
 async function loadOptions(){
     const revision=++state.optionsRevision;
@@ -115,7 +115,7 @@ function adopt(definition) {
 function newMob(){
     if(!mayReplace())return;calibration.clear();state.loadRevision++;state.definition=null;state.id='';state.version=null;state.base=null;state.uncertain=false;state.remote=undefined;
     const defaults=state.options.defaults||{};
-    state.draft={display_name:'',visual_texture_path:'',source_width:32,source_height:32,visual_anchor_offset_x:0,visual_anchor_offset_y:0,visual_render_scale:.25,footprint_width_tiles:1,footprint_height_tiles:1,max_health:10,movement_speed_tiles_per_second:1.25,movement_behavior:'static',wander_radius_tiles:0,aggression_mode:'retaliatory',aggression_radius_tiles:0,leash_radius_tiles:6,return_home_behavior:'return_to_spawn',combat_faction_id:null,can_proactively_target_hostile_mobs:false,mob_detection_radius_tiles:0,mob_target_scan_interval_ms:0,mob_target_scan_candidate_limit:0,primary_combat_profile:null,combat_bonuses:zeroBonuses(),guaranteed_drops:[],visual_mode:'flat_sprite',composite_visual:null,root_loot_table_id:null};
+    state.draft={display_name:'',visual_texture_path:'',source_width:32,source_height:32,visual_anchor_offset_x:0,visual_anchor_offset_y:0,visual_render_scale:.25,footprint_width_tiles:1,footprint_height_tiles:1,max_health:10,movement_speed_tiles_per_second:1.25,movement_behavior:'static',wander_radius_tiles:0,aggression_mode:'retaliatory',aggression_radius_tiles:0,leash_radius_tiles:6,return_home_behavior:'return_to_spawn',combat_faction_id:null,can_proactively_target_hostile_mobs:false,animate_movement_while_idle:false,mob_detection_radius_tiles:0,mob_target_scan_interval_ms:0,mob_target_scan_candidate_limit:0,primary_combat_profile:null,combat_bonuses:zeroBonuses(),guaranteed_drops:[],visual_mode:'flat_sprite',composite_visual:null,root_loot_table_id:null};
     for(const key of draftKeys)if(key in defaults)state.draft[key]=clone(defaults[key]);
     $('operation').value='save_draft';$('reconcile').hidden=true;render();location.hash='detail';notice('Choose a stable Mob ID and author its complete draft. Calibration has a separate save action.');
 }
@@ -178,6 +178,7 @@ function render(){
     p=section('Appearance',true,'Flat sprites and composite actors share the source texture. Changing mode retains authored data until you explicitly remove incompatible fields.');g=grid(p);
     selectField(g,d,'visual_mode','Visual mode',[{id:'flat_sprite',display_name:'Flat sprite'},{id:'composite_rig',display_name:'Composite rig'}]);reference(g,d,'visual_texture_path','Source PNG','asset');
     field(g,d,'source_width','Source width',{kind:'integer',min:1});field(g,d,'source_height','Source height',{kind:'integer',min:1});field(g,d,'visual_anchor_offset_x','Anchor X',{kind:'coordinate'});field(g,d,'visual_anchor_offset_y','Anchor Y',{kind:'coordinate'});field(g,d,'visual_render_scale','Render scale',{kind:'coordinate'});
+    checkField(p,d,'animate_movement_while_idle','Animate movement frames while idle (flying)');
     if(!d.composite_visual)p.append(button('Add composite descriptor',()=>{d.composite_visual={schema_version:1,rig_id:'',calibration_id:null,pose_policy:'actor_pose',fixed_direction:null,fixed_frame:null,cosmetic_item_ids:{}};render();}));
     else{
         const v=d.composite_visual,appearance=state.options.actor_appearance||{},rig=appearance.rigs?.find(r=>r.rig_id===v.rig_id);g=grid(p);

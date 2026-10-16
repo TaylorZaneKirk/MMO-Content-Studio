@@ -87,6 +87,7 @@ public sealed class MobRepository : IMobRepository
                 m.mob_target_scan_interval_ms,
                 m.mob_target_scan_candidate_limit,
                 m.root_loot_table_id,
+                m.animate_movement_while_idle,
                 m.updated_at,
                 exists (
                     select 1 from mob_combat_profiles profile
@@ -343,6 +344,7 @@ public sealed class MobRepository : IMobRepository
                 m.mob_target_scan_interval_ms,
                 m.mob_target_scan_candidate_limit,
                 m.root_loot_table_id,
+                m.animate_movement_while_idle,
                 m.updated_at,
                 exists (
                     select 1 from mob_combat_profiles profile
@@ -503,6 +505,7 @@ public sealed class MobRepository : IMobRepository
                 mob_target_scan_interval_ms,
                 mob_target_scan_candidate_limit,
                 root_loot_table_id,
+                animate_movement_while_idle,
                 created_at,
                 updated_at
             ) values (
@@ -533,6 +536,7 @@ public sealed class MobRepository : IMobRepository
                 @mob_target_scan_interval_ms,
                 @mob_target_scan_candidate_limit,
                 @root_loot_table_id,
+                @animate_movement_while_idle,
                 now(),
                 now()
             );
@@ -578,6 +582,7 @@ public sealed class MobRepository : IMobRepository
                 mob_target_scan_interval_ms = @mob_target_scan_interval_ms,
                 mob_target_scan_candidate_limit = @mob_target_scan_candidate_limit,
                 root_loot_table_id = @root_loot_table_id,
+                animate_movement_while_idle = @animate_movement_while_idle,
                 updated_at = now()
             where mob_definition_id = @mob_definition_id;
             """;
@@ -796,6 +801,7 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("mob_detection_radius_tiles", draft.MobDetectionRadiusTiles);
         command.Parameters.AddWithValue("mob_target_scan_interval_ms", draft.MobTargetScanIntervalMs);
         command.Parameters.AddWithValue("mob_target_scan_candidate_limit", draft.MobTargetScanCandidateLimit);
+        command.Parameters.AddWithValue("animate_movement_while_idle", draft.AnimateMovementWhileIdle);
         command.Parameters.Add("root_loot_table_id", NpgsqlDbType.Text).Value =
             (object?)draft.RootLootTableId ?? DBNull.Value;
     }
@@ -867,7 +873,8 @@ public sealed class MobRepository : IMobRepository
             reader.IsDBNull(compositeVisualOrdinal)
                 ? null
                 : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)),
-            reader.IsDBNull(rootLootTableOrdinal) ? null : reader.GetString(rootLootTableOrdinal));
+            reader.IsDBNull(rootLootTableOrdinal) ? null : reader.GetString(rootLootTableOrdinal),
+            reader.GetBoolean(reader.GetOrdinal("animate_movement_while_idle")));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -930,7 +937,8 @@ public sealed record MobDefinitionRecord(
     DateTimeOffset UpdatedAtUtc,
     string VisualMode = ActorVisualModes.FlatSprite,
     RiggedSpriteVisualDescriptor? CompositeVisual = null,
-    string? RootLootTableId = null);
+    string? RootLootTableId = null,
+    bool AnimateMovementWhileIdle = false);
 
 public sealed record MobFactionRecord(string FactionId, string DisplayName);
 

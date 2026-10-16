@@ -33,6 +33,7 @@ public sealed class MobSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("mob_definitions", "display_name"),
         AuthoringSchemaRequirement.Column("mob_definitions", "publication_state"),
         AuthoringSchemaRequirement.Column("mob_definitions", "visual_texture_path"),
+        AuthoringSchemaRequirement.Column("mob_definitions", "animate_movement_while_idle"),
         AuthoringSchemaRequirement.Column("mob_definitions", "source_width"),
         AuthoringSchemaRequirement.Column("mob_definitions", "source_height"),
         AuthoringSchemaRequirement.Column("mob_definitions", "visual_anchor_offset_x"),

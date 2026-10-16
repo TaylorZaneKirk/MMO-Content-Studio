@@ -1,0 +1,32 @@
+using MMO.ContentStudio.AuthoringHost.Configuration;
+using MMO.ContentStudio.AuthoringHost.Contracts;
+using MMO.ContentStudio.AuthoringHost.Persistence;
+using MMO.ContentStudio.AuthoringHost.Services;
+using Microsoft.Extensions.Options;
+using System.Text.Json;
+
+var connection = await DisposableDatabase.Connection();
+var factory = new AuthoringDatabaseConnectionFactory(Options.Create(new ConnectionProfilesOptions {Active="test", Profiles=new(){["test"]=new(){ConnectionString=connection}}}));
+var repo = new MobRepository(factory);
+var original = (await repo.LoadAsync("cave_bat"))!;
+var draft = MobAuthoringService.FromRecord(original);
+Check(draft.AnimateMovementWhileIdle, "published authored flight loads");
+var json = JsonSerializer.Serialize(draft, new JsonSerializerOptions {PropertyNamingPolicy=JsonNamingPolicy.SnakeCaseLower});
+var request = JsonSerializer.Deserialize<SaveMobDraftRequest>(json)!;
+Check(MobAuthoringService.Normalize(request).AnimateMovementWhileIdle, "API normalization preserves opt-in");
+var oldRequest = JsonSerializer.Deserialize<SaveMobDraftRequest>(json.Replace("\"animate_movement_while_idle\":true", "\"animate_movement_while_idle\":false"))!;
+Check(!MobAuthoringService.Normalize(oldRequest).AnimateMovementWhileIdle, "API supports opt-out");
+var disabled = draft with {AnimateMovementWhileIdle=false};
+Check(!MobAuthoringService.EquivalentDraft(original, disabled), "flag change is meaningful");
+Check(MobAuthoringService.ComputePreviewSignature("cave_bat","save_draft",draft,original.UpdatedAtUtc) != MobAuthoringService.ComputePreviewSignature("cave_bat","save_draft",disabled,original.UpdatedAtUtc), "preview signature covers flag");
+var saved = await repo.SaveDraftAsync("idle_regression", disabled, null);
+Check(!saved.AnimateMovementWhileIdle && saved.PublicationState=="Draft", "draft persists false");
+var loaded = (await repo.LoadAsync("idle_regression"))!;
+Check(MobAuthoringService.Equivalent(saved, loaded), "read back complete record");
+saved = await repo.SaveDraftAsync("idle_regression", draft, loaded.UpdatedAtUtc);
+var published = await repo.SetPublicationAsync("idle_regression", "Published", saved.UpdatedAtUtc);
+Check(published.AnimateMovementWhileIdle && MobAuthoringService.EquivalentDraft(published,draft), "publish preserves true and other fields");
+await repo.DeleteAsync("idle_regression", published.UpdatedAtUtc);
+Check(MobAuthoringService.Equivalent(original, (await repo.LoadAsync("cave_bat"))!), "existing published bat unchanged");
+Console.WriteLine("PASS Mob idle authoring request/signature/equality/insert/save/reload/publish");
+static void Check(bool ok, string label) {if(!ok) throw new Exception(label);}
