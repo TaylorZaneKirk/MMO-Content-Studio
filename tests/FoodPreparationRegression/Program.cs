@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
 // Isolated disposable fixture only; never reads the live connection settings.
-const string connection="Host=/tmp/pastry-pg-socket;Port=55436;Database=pastry_studio;Username=taylor;Pooling=false";
+var connection=await DisposableDatabase.Connection();
 var factory=new AuthoringDatabaseConnectionFactory(Options.Create(new ConnectionProfilesOptions {Active="test",Profiles=new(){["test"]=new(){ConnectionString=connection}}}));
 var repository=new CookingRepository(factory);var publisher=new RecordingPublisher();
 var service=new CookingAuthoringService(repository,publisher,NullLogger<CookingAuthoringService>.Instance);
