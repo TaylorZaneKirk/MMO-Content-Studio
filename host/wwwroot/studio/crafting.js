@@ -5,6 +5,8 @@ import {
 from './studio-common.js';
 const fields=[["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["chair_item_id", "Chair item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"], ["chair_level", "Chair level"], ["chair_xp_tenths", "Chair xp tenths"], ["chair_duration_ms", "Chair duration ms"], ["chair_planks", "Chair planks"], ["chair_nails", "Chair nails"], ["placement_level", "Placement level"], ["footprint_width_tiles", "Footprint width tiles"], ["footprint_height_tiles", "Footprint height tiles"], ["occupies_furniture_space", "Occupies furniture space"], ["blocks_movement", "Blocks movement"], ["east_texture_path", "East texture path"], ["west_texture_path", "West texture path"]];
 const defaults={"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "chair_item_id": "crude_wooden_chair", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "chair_level": 1, "chair_xp_tenths": 580, "chair_duration_ms": 3000, "chair_planks": 2, "chair_nails": 2, "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"};
+const arrowDefaults={"knife_item_id": "crafting_knife", "shaft_item_id": "arrow_shafts", "headless_item_id": "headless_arrows", "feather_item_id": "feather", "bronze_head_item_id": "bronze_arrowheads", "iron_head_item_id": "iron_arrowheads", "bronze_arrow_item_id": "bronze_arrows", "iron_arrow_item_id": "iron_arrows", "shafts": {"level": 1, "xp_tenths": 50, "duration_ms": 3000}, "headless": {"level": 1, "xp_tenths": 10, "duration_ms": 3000}, "bronze": {"level": 1, "xp_tenths": 13, "duration_ms": 3000}, "iron": {"level": 15, "xp_tenths": 25, "duration_ms": 3000}};
+const arrowFields=[["knife_item_id", "Knife Item Id"], ["shaft_item_id", "Shaft Item Id"], ["headless_item_id", "Headless Item Id"], ["feather_item_id", "Feather Item Id"], ["bronze_head_item_id", "Bronze Head Item Id"], ["iron_head_item_id", "Iron Head Item Id"], ["bronze_arrow_item_id", "Bronze Arrow Item Id"], ["iron_arrow_item_id", "Iron Arrow Item Id"], ["shafts.level", "Shafts level"], ["shafts.xp_tenths", "Shafts xp tenths"], ["shafts.duration_ms", "Shafts duration ms"], ["headless.level", "Headless level"], ["headless.xp_tenths", "Headless xp tenths"], ["headless.duration_ms", "Headless duration ms"], ["bronze.level", "Bronze level"], ["bronze.xp_tenths", "Bronze xp tenths"], ["bronze.duration_ms", "Bronze duration ms"], ["iron.level", "Iron level"], ["iron.xp_tenths", "Iron xp tenths"], ["iron.duration_ms", "Iron duration ms"]];
 let session={
 }, current=null, prepared=null, busy=false, uncertain=false, remote=undefined, base=null, retainedEdits=false;
 const $=id=>document.getElementById(id);
@@ -24,6 +26,17 @@ for(const [key,label] of fields){
     row.append(input);
     $('fields').append(row);
 }
+const arrowToggle=document.createElement('input');
+arrowToggle.type='checkbox';arrowToggle.id='arrows-enabled';
+const arrowLabel=document.createElement('label');arrowLabel.textContent='Enable inventory arrow recipes';
+arrowLabel.append(arrowToggle);$('fields').append(arrowLabel);arrowToggle.addEventListener('change',invalidate);
+for(const [key,label] of arrowFields){
+    const row=document.createElement('label');row.textContent=label;row.style.display='block';
+    const input=document.createElement('input');input.id='arrows.'+key;
+    input.type=key.endsWith('_item_id')?'text':'number';input.step='1';
+    input.addEventListener('input',invalidate);row.append(input);$('fields').append(row);
+}
+function arrowValue(settings,key){return key.split('.').reduce((value,part)=>value?.[part],settings);}
 function invalidate(){
     prepared=null;
     $('apply').disabled=true;
@@ -31,11 +44,15 @@ function invalidate(){
 // Compare raw inputs, not parsed numbers: even an incomplete edit must be retained.
 function localInputs(){
     const local=Object.fromEntries(fields.map(([key])=>[key,$(key).value]));
+    local.arrows_enabled=arrowToggle.checked;
+    for(const [key] of arrowFields)local["arrows."+key]=$("arrows."+key).value;
     return local;
 }
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
 function renderDefinition(definition){
     for(const [key] of fields)$(key).value=definition.draft[key];
+    arrowToggle.checked=definition.draft.arrows!=null;
+    for(const [key] of arrowFields)$('arrows.'+key).value=arrowValue(definition.draft.arrows||arrowDefaults,key);
 }
 function adopt(definition){
     current=definition;
@@ -134,6 +151,16 @@ $('preview').onclick=async()=>{
             if (["saw_item_id", "hammer_item_id", "log_item_id", "plank_item_id", "nails_item_id", "chair_item_id", "station_definition_id", "east_texture_path", "west_texture_path"].includes(key)) draft[key]=value.trim();
             else if (["occupies_furniture_space", "blocks_movement"].includes(key)) { if(!["true","false"].includes(value.toLowerCase()))throw new Error("Enter true or false for "+key); draft[key]=value.toLowerCase()==="true"; }
             else { if(!/^\d+$/.test(value))throw new Error("Enter a whole number for "+key);draft[key]=Number(value); }
+        }
+        draft.arrows=null;
+        if(arrowToggle.checked){
+            draft.arrows=structuredClone(arrowDefaults);
+            for(const [key] of arrowFields){
+                const value=$('arrows.'+key).value.trim();
+                if(!key.endsWith('_item_id')&&!/^\d+$/.test(value))throw new Error('Enter a whole number for '+key);
+                const parts=key.split('.');const target=parts.length===2?draft.arrows[parts[0]]:draft.arrows;
+                target[parts.at(-1)]=key.endsWith('_item_id')?value:Number(value);
+            }
         }
         const body={
             draft,expected_updated_at_utc:current.updated_at_utc,target_operation:$('operation').value
