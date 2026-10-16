@@ -16,7 +16,10 @@ public sealed record CookingRecipe(
     [property: JsonPropertyName("xp")] int Xp,
     [property: JsonPropertyName("success_low")] int SuccessLow,
     [property: JsonPropertyName("success_high")] int SuccessHigh,
-    [property: JsonPropertyName("burnt_output_item_id")] string? BurntOutputItemId = null)
+    [property: JsonPropertyName("burnt_output_item_id")] string? BurntOutputItemId = null,
+    [property: JsonPropertyName("operation")] string Operation = "cook",
+    [property: JsonPropertyName("duration_ms")] int DurationMs = 2400,
+    [property: JsonPropertyName("additional_outputs")] IReadOnlyList<CookingIngredient>? AdditionalOutputs = null)
 {
     public IReadOnlyList<string> Validate(IReadOnlySet<string>? items = null)
     {
@@ -28,7 +31,7 @@ public sealed record CookingRecipe(
                 errors.Add($"Missing, invalid or unpublished item '{id}'.");
         }
         if (!Id(RecipeId)) errors.Add("A stable recipe ID is required.");
-        if (Ingredients is null || Ingredients.Count == 0) errors.Add("At least one ingredient is required.");
+        if (Ingredients is null || (Ingredients.Count == 0 && Operation != "pick_wheat")) errors.Add("At least one ingredient is required.");
         else
         {
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -44,7 +47,22 @@ public sealed record CookingRecipe(
         if (BurntOutputItemId is not null) Item(BurntOutputItemId);
         if (OutputQuantity <= 0) errors.Add("Output quantity must be positive.");
         if (RequiredCookingLevel is < 1 or > 99) errors.Add("Cooking level must be 1–99.");
-        if (Xp <= 0) errors.Add("Success XP must be positive.");
+        if (Operation is not ("cook" or "pick_wheat" or "mill" or "mix" or "shape" or "fill")) errors.Add("Unknown Cooking operation.");
+        if (DurationMs is < 600 or > 60000 || DurationMs % 600 != 0) errors.Add("Duration must be whole 600 ms ticks, at most one minute.");
+        if (Operation == "cook" && DurationMs != 2400) errors.Add("Stove Cooking uses 2400 ms.");
+        if (Operation == "cook" && Xp <= 0) errors.Add("Success XP must be positive.");
+        if (Operation != "cook" && (Xp != 0 || RequiredCookingLevel != 1 || SuccessLow != 256 || SuccessHigh != 256 || BurntOutputItemId is not null))
+            errors.Add("Preparation must be guaranteed, Cooking 1, zero XP and without burnt output.");
+        if (Operation == "pick_wheat" && Ingredients?.Count != 0) errors.Add("Wheat picking has no inventory input.");
+        if (Operation is "mix" or "shape" && Ingredients?.Count != 2) errors.Add("Inventory preparation requires two distinct ingredients.");
+        var outputs = new HashSet<string>(StringComparer.Ordinal) { OutputItemId };
+        foreach (var output in AdditionalOutputs ?? [])
+        {
+            if (output is null) { errors.Add("An output row is required."); continue; }
+            Item(output.ItemId);
+            if (!outputs.Add(output.ItemId) || output.Quantity <= 0) errors.Add("Outputs must be distinct with positive quantities.");
+        }
+        if (Operation == "cook" && AdditionalOutputs?.Count > 0) errors.Add("Stove Cooking uses one output.");
         if (SuccessLow is < 0 or > 256 || SuccessHigh is < 0 or > 256 || SuccessHigh < SuccessLow)
             errors.Add("Burn thresholds must satisfy 0 <= low <= high <= 256.");
         return errors;

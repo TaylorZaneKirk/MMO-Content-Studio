@@ -45,6 +45,9 @@ func run() -> void:
 	check(editor._fields.xp.value == 140, "late load cannot replace previewed edits")
 	client.request_failed.emit("cooking_preview", "test failure", [])
 	check(editor._fields.output_item_id.editable and editor._apply.disabled, "failure unlocks form and invalidates apply")
+	editor._on_definition({"recipe_id":"preparation_mix", "draft":{"recipe_id":"preparation_mix", "ingredients":[{"item_id":"pot_of_flour","quantity":1},{"item_id":"bucket_of_water","quantity":1}], "output_item_id":"pastry_dough", "output_quantity":1, "required_cooking_level":1, "xp":0, "success_low":256, "success_high":256, "operation":"mix", "duration_ms":1200, "additional_outputs":[{"item_id":"empty_pot","quantity":1},{"item_id":"empty_cooking_bucket","quantity":1}]}})
+	var preparation: Dictionary = editor._draft()
+	check(preparation.operation=="mix" and preparation.duration_ms==1200 and preparation.xp==0 and preparation.additional_outputs.size()==2,"preparation fields round trip without losing returned containers")
 	print("PASS native Cooking editor pending/dirty reply guards" if failures.is_empty() else "FAIL " + str(failures))
 	scene.queue_free()
 	await process_frame

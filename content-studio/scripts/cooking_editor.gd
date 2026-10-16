@@ -6,6 +6,7 @@ const WORKSPACE_SUPPORT := preload("res://scripts/authoring_workspace_support.gd
 var _support := WORKSPACE_SUPPORT.new()
 var _current: Dictionary = {}
 var _fields: Dictionary = {}
+var _outputs: VBoxContainer
 var _inputs: VBoxContainer
 var _list: ItemList
 var _search: LineEdit
@@ -59,7 +60,7 @@ func _build_ui() -> void:
 	_form.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_form)
 	_heading(_form, "Recipe details", 22)
-	_note(_form, "Stove recipes consume every ingredient. XP is awarded only on success. Timing remains the game’s 2.4-second Cooking cadence.")
+	_note(_form, "Stove recipes consume every ingredient. XP is awarded only on success. Preparation: Cooking 1, guaranteed, zero XP. Stove Cooking remains 2.4 seconds.")
 	_definition_id = _text_field("Recipe ID", _form)
 	_state = _label(_form, "Draft")
 	_label(_form, "Ordered ingredients: item ID / quantity")
@@ -69,10 +70,16 @@ func _build_ui() -> void:
 	_fields["output_item_id"] = _text_field("Output item ID", _form)
 	_fields["output_quantity"] = _number("Output quantity", 1, 2147483647, 1)
 	_fields["required_cooking_level"] = _number("Required Cooking level", 1, 99, 1)
-	_fields["xp"] = _number("Cooking XP on success", 1, 2147483647, 1)
+	_fields["xp"] = _number("Cooking XP on success", 0, 2147483647, 1)
 	_fields["success_low"] = _number("Success threshold at level 1 (0–256)", 0, 256, 1)
 	_fields["success_high"] = _number("Success threshold at level 99 (0–256)", 0, 256, 1)
 	_fields["burnt_output_item_id"] = _text_field("Burnt output item ID (blank: none)", _form)
+	_fields["operation"] = _text_field("Operation: cook / pick_wheat / mill / mix / shape / fill", _form)
+	_fields["duration_ms"] = _number("Duration (milliseconds)", 600, 60000, 600)
+	_label(_form, "Returned containers / additional outputs")
+	_outputs = VBoxContainer.new()
+	_form.add_child(_outputs)
+	_button(_form, "+ Additional output", func(): _add_input({}, _outputs); _invalidate())
 	_operation = OptionButton.new()
 	for operation: String in ["save_draft", "publish", "disable", "delete"]:
 		_operation.add_item(_support.operation_name(operation))
@@ -97,9 +104,10 @@ func _number(caption: String, minimum: float, maximum: float, step: float) -> Sp
 	field.value_changed.connect(_invalidate)
 	return field
 
-func _add_input(value: Dictionary) -> void:
+func _add_input(value: Dictionary, destination: VBoxContainer = null) -> void:
+	if destination == null: destination = _inputs
 	var row := HBoxContainer.new()
-	_inputs.add_child(row)
+	destination.add_child(row)
 	var item := LineEdit.new()
 	item.placeholder_text = "item_id"
 	item.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -112,7 +120,7 @@ func _add_input(value: Dictionary) -> void:
 	quantity.value = int(value.get("quantity", 1))
 	row.add_child(quantity)
 	quantity.value_changed.connect(_invalidate)
-	_row_tools(row, _inputs)
+	_row_tools(row, destination)
 
 func _on_catalog(payload: Dictionary) -> void:
 	_list.clear()
@@ -170,13 +178,17 @@ func _on_definition(payload: Dictionary) -> void:
 	_definition_id.text = str(payload.get("recipe_id", ""))
 	_definition_id.editable = payload.get("updated_at_utc") == null
 	_state.text = str(payload.get("publication_state", "Draft"))
-	var draft: Dictionary = payload.get("draft", {})
+	var draft: Dictionary = payload.get("draft", {}).duplicate(true)
+	if not draft.has("operation"): draft["operation"] = "cook"
+	if not draft.has("duration_ms"): draft["duration_ms"] = 2400
 	for key: String in _fields:
 		var control: Control = _fields[key]
 		if control is LineEdit: control.text = str(draft.get(key, "")) if draft.get(key) != null else ""
 		elif control is SpinBox: control.value = float(draft.get(key, 0))
 	_support.clear_container(_inputs)
 	for ingredient: Dictionary in draft.get("ingredients", []): _add_input(ingredient)
+	_support.clear_container(_outputs)
+	for output: Dictionary in (draft.get("additional_outputs") if draft.get("additional_outputs") is Array else []): _add_input(output, _outputs)
 	_loading = false
 	_baseline = JSON.stringify(_draft())
 	_invalidate()
@@ -185,12 +197,16 @@ func _draft() -> Dictionary:
 	var inputs: Array = []
 	for row: Node in _inputs.get_children():
 		inputs.append({"item_id": row.get_child(0).text.strip_edges(), "quantity": int(row.get_child(1).value)})
+	var outputs: Array = []
+	for row: Node in _outputs.get_children():
+		outputs.append({"item_id": row.get_child(0).text.strip_edges(), "quantity": int(row.get_child(1).value)})
 	var burnt: String = _fields["burnt_output_item_id"].text.strip_edges()
 	return {"recipe_id": _definition_id.text.strip_edges(), "ingredients": inputs,
 		"output_item_id": _fields["output_item_id"].text.strip_edges(), "output_quantity": int(_fields["output_quantity"].value),
 		"required_cooking_level": int(_fields["required_cooking_level"].value), "xp": int(_fields["xp"].value),
 		"success_low": int(_fields["success_low"].value), "success_high": int(_fields["success_high"].value),
-		"burnt_output_item_id": null if burnt.is_empty() else burnt}
+		"burnt_output_item_id": null if burnt.is_empty() else burnt,
+		"operation": _fields["operation"].text.strip_edges(), "duration_ms": int(_fields["duration_ms"].value), "additional_outputs": outputs}
 
 
 func _panel(width: float = 0) -> VBoxContainer:

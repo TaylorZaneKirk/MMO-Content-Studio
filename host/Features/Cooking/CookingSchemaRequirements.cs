@@ -5,6 +5,7 @@ public sealed class CookingSchemaRequirements : IAuthoringSchemaRequirementProvi
     public string FeatureId => "cooking";
     public IReadOnlyList<AuthoringSchemaRequirement> GetRequirements() => [
         AuthoringSchemaRequirement.Table("cooking_recipes"),
+        AuthoringSchemaRequirement.Constraint("cooking_preparation_shape"),
         AuthoringSchemaRequirement.Column("cooking_recipes", "published_recipe"),
         AuthoringSchemaRequirement.Trigger("cooking_recipes", "cooking_publication_guard"),
         AuthoringSchemaRequirement.Trigger("item_definitions", "cooking_item_guard"),

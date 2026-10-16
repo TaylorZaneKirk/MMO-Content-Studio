@@ -169,10 +169,13 @@ function render() {
     $('recipe-state').textContent = state.definition?.publication_state?.toUpperCase() || 'NEW RECIPE';
     $('recipe-meta').textContent = state.definition ? `${state.id} · Updated ${state.version}` : 'Unsaved recipe';
     const d = state.draft;
+    d.operation ??= 'cook'; d.duration_ms ??= 2400; d.additional_outputs ??= [];
     const basics = section('Recipe details', true, 'Each successful recipe completion consumes the ordered inputs and grants the output and XP below. This workspace authors facts; it does not change gameplay rules.');
     const basicFields = grid(basics);
     const idInput = field(basicFields, state, 'id', 'Recipe ID', { readonly: !!state.definition, path: 'definition_id', required: true, hint: 'Stable lowercase ID, such as apple_pie.' });
     idInput.addEventListener('input', () => { if (!state.definition) { d.recipe_id = state.id; changed(); } });
+    field(basicFields, d, 'operation', 'Operation (cook / pick_wheat / mill / mix / shape / fill)');
+    field(basicFields, d, 'duration_ms', 'Duration in milliseconds (600 ms ticks)', {integer:true, min:600, max:60000});
     const inputs = section('Ordered inputs', true, 'Inputs are consumed in this authored order. Use one row per item with a positive quantity; duplicate items are invalid.');
     d.ingredients.forEach((row, index) => {
         const box = element('div', null, 'repeat-row'); box.append(element('p', `Ingredient ${index + 1}`, 'row-heading'));
@@ -185,14 +188,22 @@ function render() {
     });
     if (!d.ingredients.length) inputs.append(element('p','Add at least one input.','muted'));
     inputs.append(button('+ Add ingredient', () => { d.ingredients.push({ item_id:'', quantity:1 }); render(); }));
-    const output = section('Output & progression', true, 'Every attempt consumes all ingredients. XP is awarded only on success. Cooking cadence remains 2.4 seconds.');
+    const output = section('Output & progression', true, 'Every attempt consumes all ingredients. XP is awarded only on success. Preparation is guaranteed at Cooking 1 with zero XP; stove Cooking remains 2.4 seconds.');
     reference(output, d, 'output_item_id', 'Output item', 'items');
     const outputFields = grid(output);
     field(outputFields, d, 'output_quantity', 'Output quantity', { integer:true, min:1 });
     field(outputFields, d, 'required_cooking_level', 'Required Cooking level', { integer:true, min:1, max:99 });
-    field(outputFields, d, 'xp', 'XP on success', { integer:true, min:1 });
+    field(outputFields, d, 'xp', 'XP on success', { integer:true, min:0 });
     field(outputFields, d, 'success_low', 'Success threshold at level 1', { integer:true, min:0, max:256 });
     field(outputFields, d, 'success_high', 'Success threshold at level 99', { integer:true, min:0, max:256 });
+    const extras = section('Returned containers / additional outputs', true, 'Every output must fit after all inputs are removed. No partial exchange.');
+    d.additional_outputs.forEach((row,index) => {
+        const box = element('div', null, 'repeat-row');
+        reference(box,row,'item_id','Returned item','items',`additional_outputs.${index}.item_id`);
+        field(box,row,'quantity','Quantity',{integer:true,min:1,path:`additional_outputs.${index}.quantity`});
+        box.append(button('Remove',()=>{d.additional_outputs.splice(index,1);render();}));extras.append(box);
+    });
+    extras.append(button('+ Additional output',()=>{d.additional_outputs.push({item_id:'',quantity:1});render();}));
     reference(output, d, 'burnt_output_item_id', 'Burnt output (optional)', 'items', 'burnt_output_item_id', true);
     for (const node of document.querySelectorAll('.section')) if (opened.has(node.dataset.title)) node.open = true;
     changed();
