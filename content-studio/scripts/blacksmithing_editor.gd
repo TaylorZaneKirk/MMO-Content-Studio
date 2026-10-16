@@ -74,8 +74,9 @@ func _build_ui() -> void:
 	_fields["output_item_id"] = _text_field("Output item ID", _form)
 	_fields["output_quantity"] = _number("Output quantity", 1, 2147483647, 1)
 	_fields["required_level"] = _number("Required Blacksmithing level", 1, 99, 1)
-	_fields["xp"] = _number("Blacksmithing XP per unit", 0, 214748364.7, 0.1)
-	_fields["duration_ms"] = _number("Duration per unit (milliseconds)", 1, 2147483647, 1)
+	_fields["xp"] = _number("Blacksmithing XP per successful attempt", 0, 214748364.7, 0.1)
+	_fields["success_percent"] = _number("Success % (forge: 100; failure consumes inputs without output/XP)", 1, 100, 1)
+	_fields["duration_ms"] = _number("Duration per attempt (milliseconds)", 1, 2147483647, 1)
 	_operation = OptionButton.new()
 	for operation: String in ["save_draft", "publish", "disable", "delete"]:
 		_operation.add_item(_support.operation_name(operation))
@@ -124,7 +125,7 @@ func _on_catalog(payload: Dictionary) -> void:
 		_list.set_item_metadata(index, item["recipe_id"])
 
 func _new_definition() -> void:
-	_on_definition({"recipe_id": "", "publication_state": "Draft", "draft": {"required_level": 1, "output_quantity": 1, "duration_ms": 3000, "inputs": []}})
+	_on_definition({"recipe_id": "", "publication_state": "Draft", "draft": {"required_level": 1, "output_quantity": 1, "duration_ms": 3000, "success_percent": 100, "inputs": []}})
 
 func _on_definition(payload: Dictionary) -> void:
 	_loading = true
@@ -137,6 +138,7 @@ func _on_definition(payload: Dictionary) -> void:
 		var control: Control = _fields[key]
 		if control is LineEdit: control.text = str(draft.get(key, ""))
 		elif control is SpinBox: control.value = float(draft.get(key, 0))
+	_fields["success_percent"].value = float(draft.get("success_percent", 100))
 	_fields["xp"].value = float(draft.get("xp_tenths", 0)) / 10.0
 	_recipe_operation.select(1 if draft.get("operation") == "forge" else 0)
 	_support.clear_container(_inputs)
@@ -154,7 +156,7 @@ func _draft() -> Dictionary:
 		"required_inventory_tool_id": "blacksmithing_hammer" if forge else null, "inputs": inputs,
 		"output_item_id": _fields["output_item_id"].text.strip_edges(), "output_quantity": int(_fields["output_quantity"].value),
 		"required_level": int(_fields["required_level"].value), "xp_tenths": int(round(_fields["xp"].value * 10.0)),
-		"duration_ms": int(_fields["duration_ms"].value)}
+		"duration_ms": int(_fields["duration_ms"].value), "success_percent": int(_fields["success_percent"].value)}
 
 func _panel(width: float = 0) -> VBoxContainer:
 	var panel := PanelContainer.new()

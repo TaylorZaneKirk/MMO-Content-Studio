@@ -117,7 +117,7 @@ function newRecipe() {
     if (!mayReplace()) return;
     state.loadRevision++; state.definition = null; state.id = ''; state.version = null; state.base = null;
     state.uncertain = false; state.remote = undefined;
-    state.draft = { recipe_id: '', display_name: '', operation: 'smelt', station_definition_id: 'bronze_smelter', inputs: [], output_item_id: '', output_quantity: 1, required_level: 1, xp_tenths: 0, duration_ms: 3000, required_inventory_tool_id: null };
+    state.draft = { recipe_id: '', display_name: '', operation: 'smelt', station_definition_id: 'bronze_smelter', inputs: [], output_item_id: '', output_quantity: 1, required_level: 1, xp_tenths: 0, duration_ms: 3000, success_percent: 100, required_inventory_tool_id: null };
     $('operation').value = 'save_draft'; $('reconcile').hidden = true; render(); location.hash = 'detail';
     notice('Choose a stable Recipe ID, then choose inputs and output. Preview before saving.');
 }
@@ -169,7 +169,7 @@ function exactXp(value) {
 }
 function xpField(parent) {
     const wrap = element('div', null, 'field'), input = element('input'); input.type = 'text'; input.inputMode = 'decimal'; input.name = 'xp_tenths'; input.id = 'recipe-xp'; fields.set('xp_tenths', input);
-    input.value = exactXp(state.draft.xp_tenths); const caption = element('label', 'Blacksmithing XP per completed recipe'); caption.htmlFor = input.id;
+    input.value = exactXp(state.draft.xp_tenths); const caption = element('label', 'Blacksmithing XP per successful attempt'); caption.htmlFor = input.id;
     const hint = element('small', 'Exact tenths: 6.2 XP stores 62. Maximum 214748364.7 XP; no rounding.');
     function parse() {
         const match = /^(\d+)(?:\.(\d))?$/.exec(input.value.trim());
@@ -225,7 +225,8 @@ function render() {
     field(outputFields, d, 'output_quantity', 'Output quantity', { integer:true, min:1 });
     field(outputFields, d, 'required_level', 'Required Blacksmithing level', { integer:true, min:1, max:99 });
     xpField(outputFields);
-    field(outputFields, d, 'duration_ms', 'Duration per completion (milliseconds)', { integer:true, min:1, hint:'1000 milliseconds = 1 second. No conversion or rounding is applied.' });
+    field(outputFields, d, 'success_percent', 'Success chance (%)', { integer:true, min:1, max:100, hint:'Fixed per attempt. Forge requires 100. Failure consumes inputs with no output or XP.' });
+    field(outputFields, d, 'duration_ms', 'Duration per attempt (milliseconds)', { integer:true, min:1, hint:'1000 milliseconds = 1 second. No conversion or rounding is applied.' });
     for (const node of document.querySelectorAll('.section')) if (opened.has(node.dataset.title)) node.open = true;
     changed();
 }

@@ -17,7 +17,8 @@ public sealed record BlacksmithingRecipe(
     [property: JsonPropertyName("required_level")] int RequiredLevel,
     [property: JsonPropertyName("xp_tenths")] int XpTenths,
     [property: JsonPropertyName("duration_ms")] int DurationMs,
-    [property: JsonPropertyName("required_inventory_tool_id")] string? RequiredInventoryToolId)
+    [property: JsonPropertyName("required_inventory_tool_id")] string? RequiredInventoryToolId,
+    [property: JsonPropertyName("success_percent")] int SuccessPercent = 100)
 {
     // Drafts retain incomplete references. Published export and startup supply the
     // actual published item/station sets; malformed published facts never disappear.
@@ -58,6 +59,8 @@ public sealed record BlacksmithingRecipe(
         if (RequiredLevel is < 1 or > 99) Bad("required_level", "must be 1–99");
         if (XpTenths < 0) Bad("xp_tenths", "must be nonnegative integer tenths");
         if (DurationMs <= 0) Bad("duration_ms", "must be positive");
+        if (SuccessPercent is < 1 or > 100) Bad("success_percent", "must be 1–100");
+        if (Operation == "forge" && SuccessPercent != 100) Bad("success_percent", "forging is guaranteed");
         return errors;
     }
 }

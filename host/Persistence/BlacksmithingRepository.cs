@@ -27,13 +27,13 @@ public sealed class BlacksmithingRepository(AuthoringDatabaseConnectionFactory f
     }
     private static async Task<BlacksmithingDefinition?> LoadAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string id, bool locked, CancellationToken cancellationToken)
     {
-        await using var command = new NpgsqlCommand("SELECT display_name,operation,station_definition_id,output_item_id,output_quantity,required_level,xp_tenths,duration_ms,required_inventory_tool_id,publication_state,updated_at FROM blacksmithing_recipes WHERE recipe_id=@id" + (locked ? " FOR UPDATE" : ""), connection, transaction);
+        await using var command = new NpgsqlCommand("SELECT display_name,operation,station_definition_id,output_item_id,output_quantity,required_level,xp_tenths,duration_ms,required_inventory_tool_id,publication_state,updated_at,success_percent FROM blacksmithing_recipes WHERE recipe_id=@id" + (locked ? " FOR UPDATE" : ""), connection, transaction);
         command.Parameters.AddWithValue("id", id);
         BlacksmithingRecipe recipe; string state; DateTimeOffset updated;
         await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
         {
             if (!await reader.ReadAsync(cancellationToken)) return null;
-            recipe = new(id, reader.GetString(0), reader.GetString(1), reader.GetString(2), [], reader.GetString(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.IsDBNull(8) ? null : reader.GetString(8));
+            recipe = new(id, reader.GetString(0), reader.GetString(1), reader.GetString(2), [], reader.GetString(3), reader.GetInt32(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetInt32(7), reader.IsDBNull(8) ? null : reader.GetString(8), reader.GetInt32(11));
             state = reader.GetString(9); updated = reader.GetFieldValue<DateTimeOffset>(10);
         }
         command.CommandText = "SELECT item_id,quantity FROM blacksmithing_recipe_inputs WHERE recipe_id=@id ORDER BY input_order";
@@ -65,11 +65,11 @@ public sealed class BlacksmithingRepository(AuthoringDatabaseConnectionFactory f
         else if (operation == "save_draft")
         {
             command.CommandText = """
-                INSERT INTO blacksmithing_recipes(recipe_id,display_name,operation,station_definition_id,output_item_id,output_quantity,required_level,xp_tenths,duration_ms,required_inventory_tool_id)
-                VALUES(@id,@name,@operation,@station,@output,@quantity,@level,@xp,@duration,@tool)
+                INSERT INTO blacksmithing_recipes(recipe_id,display_name,operation,station_definition_id,output_item_id,output_quantity,required_level,xp_tenths,duration_ms,required_inventory_tool_id,success_percent)
+                VALUES(@id,@name,@operation,@station,@output,@quantity,@level,@xp,@duration,@tool,@success)
                 """;
             if (existing is not null) command.CommandText = """
-                UPDATE blacksmithing_recipes SET display_name=@name,operation=@operation,station_definition_id=@station,output_item_id=@output,output_quantity=@quantity,required_level=@level,xp_tenths=@xp,duration_ms=@duration,required_inventory_tool_id=@tool,publication_state='Draft',updated_at=clock_timestamp() WHERE recipe_id=@id
+                UPDATE blacksmithing_recipes SET display_name=@name,operation=@operation,station_definition_id=@station,output_item_id=@output,output_quantity=@quantity,required_level=@level,xp_tenths=@xp,duration_ms=@duration,required_inventory_tool_id=@tool,success_percent=@success,publication_state='Draft',updated_at=clock_timestamp() WHERE recipe_id=@id
                 """;
             command.Parameters.AddWithValue("name", draft.DisplayName);
             command.Parameters.AddWithValue("operation", draft.Operation);
@@ -79,6 +79,7 @@ public sealed class BlacksmithingRepository(AuthoringDatabaseConnectionFactory f
             command.Parameters.AddWithValue("level", draft.RequiredLevel);
             command.Parameters.AddWithValue("xp", draft.XpTenths);
             command.Parameters.AddWithValue("duration", draft.DurationMs);
+            command.Parameters.AddWithValue("success", draft.SuccessPercent);
             command.Parameters.AddWithValue("tool", NpgsqlTypes.NpgsqlDbType.Text, (object?)draft.RequiredInventoryToolId ?? DBNull.Value);
         }
         else

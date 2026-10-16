@@ -8,6 +8,8 @@ public sealed class BlacksmithingSchemaRequirements : IAuthoringSchemaRequiremen
         AuthoringSchemaRequirement.Table("blacksmithing_recipes"),
         AuthoringSchemaRequirement.Table("blacksmithing_recipe_inputs"),
         AuthoringSchemaRequirement.Column("blacksmithing_recipes", "xp_tenths"),
+        AuthoringSchemaRequirement.Column("blacksmithing_recipes", "success_percent"),
+        AuthoringSchemaRequirement.Constraint("blacksmithing_success_shape"),
         AuthoringSchemaRequirement.Constraint("blacksmithing_recipe_operation_shape"),
         AuthoringSchemaRequirement.Trigger("blacksmithing_recipes", "blacksmithing_publication_guard"),
         AuthoringSchemaRequirement.Trigger("blacksmithing_recipe_inputs", "blacksmithing_inputs_guard"),
