@@ -182,7 +182,7 @@ public partial class BrowserPngAssets(ItemAssetService assets, string readFolder
         }
         catch (Exception exception) when (exception is InvalidDataException or EndOfStreamException or OverflowException) { return false; }
     }
-    private static uint Crc(ReadOnlySpan<byte> bytes)
+    internal static uint Crc(ReadOnlySpan<byte> bytes)
     {
         uint crc = 0xffffffff;
         foreach (var value in bytes)

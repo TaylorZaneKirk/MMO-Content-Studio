@@ -86,6 +86,7 @@ function renderDiagnostics() {
 function renderEditor() {
     $('empty').hidden = !!state.tile; $('editor').hidden = !state.tile; if (!state.tile) { controls(); return; }
     const tile = state.tile;
+    $('wind-link').href = 'wind.html?' + new URLSearchParams({ file: state.file, tile: tile.id });
     $('tile-title').textContent = `Tile #${tile.id}`; $('tile-subtitle').textContent = `${state.catalog.name} · ${tile.image.label}`;
     $('tile-art').replaceChildren(imageCanvas(tile, true));
     const fields = $('tile-fields'); fields.replaceChildren();

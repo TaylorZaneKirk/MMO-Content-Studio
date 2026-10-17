@@ -63,6 +63,22 @@ public sealed class TileMetadataAuthoringService(
             throw new TileEditException("Tile image must be a PNG no larger than 16 MiB.");
         return bytes;
     }
+    // Raw tile geometry/pixels for the wind editor; it owns no wind policy.
+    public (string Identity, int Columns, FoliagePixels Pixels) Pixels(string file, int id)
+    {
+        var document = Read(file);
+        if (TilesetXml.Number(document.Root, "margin", 0) != 0 || TilesetXml.Number(document.Root, "spacing", 0) != 0 || document.Tile(id)?.Element("animation") is not null)
+            throw new TileEditException("New wind families require unspaced, static native tiles.");
+        var entry = Entries(document, FilePath(file)).SingleOrDefault(t => t.Id == id)
+            ?? throw new TileEditException("Tile not found.", 404);
+        if (entry.Image.Width != 32 || entry.Image.Height != 32)
+            throw new TileEditException("Wind families use existing 32 by 32 tiles.");
+        var image = FoliagePng.Decode(Image(file, id));
+        return ($"{document.Root.Attribute("name")!.Value}:{id}",
+            document.Root.Element("image") is null ? 0 : TilesetXml.Number(document.Root, "columns"),
+            FoliagePng.Crop(image, entry.Image.X, entry.Image.Y, 32, 32));
+    }
+
     public async Task<Dictionary<string, TileReferenceCatalog>> References(CancellationToken ct)
     {
         var result = new Dictionary<string, TileReferenceCatalog>();
