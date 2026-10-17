@@ -3,7 +3,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using MMO.ContentStudio.AuthoringHost.Contracts;
 using MMO.ContentStudio.AuthoringHost.Persistence;
 using Npgsql;
@@ -28,12 +27,7 @@ public sealed class CraftingAuthoringService(
     {
         var operation = request.TargetOperation ?? "save_draft";
         var existing = await repository.LoadAsync(definitionId, cancellationToken);
-        var messages = ValidateOperation(definitionId, operation, request, existing);
-        if (request.Draft is not null)
-            messages.AddRange((await repository.ValidateRetainedFurnitureAsync(operation, request.Draft, cancellationToken))
-                .Select(message => Error("retained_furniture", message)));
-        if (operation == "publish" && request.Draft is not null)
-            messages.AddRange((await repository.ValidatePublishedAsync(request.Draft, cancellationToken)).Select(message => Error("invalid_reference", message)));
+        var messages = await ValidateRequestAsync(definitionId, operation, request, existing, cancellationToken);
         var changes = new List<CraftingChange>();
         if (request.Draft is not null)
         {
@@ -59,12 +53,7 @@ public sealed class CraftingAuthoringService(
         CraftingRequest request, CancellationToken cancellationToken) => GuardAsync(async () =>
     {
         var existing = await repository.LoadAsync(definitionId, cancellationToken);
-        var messages = ValidateOperation(definitionId, operation, request, existing);
-        if (request.Draft is not null)
-            messages.AddRange((await repository.ValidateRetainedFurnitureAsync(operation, request.Draft, cancellationToken))
-                .Select(message => Error("retained_furniture", message)));
-        if (operation == "publish" && request.Draft is not null)
-            messages.AddRange((await repository.ValidatePublishedAsync(request.Draft, cancellationToken)).Select(message => Error("invalid_reference", message)));
+        var messages = await ValidateRequestAsync(definitionId, operation, request, existing, cancellationToken);
         if (request.PreviewSignature != Signature(definitionId, operation, request))
             messages.Add(Error("preview_signature_mismatch", "Preview this operation again before applying it."));
         if (messages.Any(message => message.Severity == ValidationSeverity.Error))
@@ -79,13 +68,27 @@ public sealed class CraftingAuthoringService(
         return AuthoringOperationResult<CraftingMutation>.Success(new(operation, verified, messages));
     });
 
+    // Preview and apply each load current facts and run this sequence afresh.
+    // Sharing the decisions must never turn preview results into apply-time authority.
+    private async Task<List<ApiError>> ValidateRequestAsync(string definitionId, string operation,
+        CraftingRequest request, CraftingDefinition? existing, CancellationToken cancellationToken)
+    {
+        var messages = ValidateOperation(definitionId, operation, request, existing);
+        if (request.Draft is not null)
+            messages.AddRange((await repository.ValidateRetainedFurnitureAsync(operation, request.Draft, cancellationToken))
+                .Select(message => Error("retained_furniture", message)));
+        if (operation == "publish" && request.Draft is not null)
+            messages.AddRange((await repository.ValidatePublishedAsync(request.Draft, cancellationToken)).Select(message => Error("invalid_reference", message)));
+        return messages;
+    }
+
     private List<ApiError> ValidateOperation(string definitionId, string operation, CraftingRequest request,
         CraftingDefinition? existing)
     {
         var messages = new List<ApiError>();
         if (operation is not ("save_draft" or "publish" or "disable" or "delete"))
             messages.Add(Error("invalid_operation", "Choose Save Draft, Publish, Disable or Delete."));
-        if (definitionId != "v1") messages.Add(Error("invalid_definition_id", "Use a lowercase snake-case definition ID.", "definition_id"));
+        if (definitionId != "v1") messages.Add(Error("invalid_definition_id", "Crafting settings use the single definition ID 'v1'.", "definition_id"));
         if (existing?.UpdatedAtUtc != request.ExpectedUpdatedAtUtc)
             messages.Add(Error("crafting_version_conflict", "Definition changed; reload before editing."));
         if (existing is null && operation != "save_draft")
@@ -100,7 +103,6 @@ public sealed class CraftingAuthoringService(
             messages.Add(Error("missing_draft", "The complete definition draft is required."));
             return messages;
         }
-        if (definitionId != "v1") messages.Add(Error("definition_id_mismatch", "Route and draft recipe IDs must match."));
         foreach (var path in new[] { draft.EastTexturePath, draft.WestTexturePath })
         {
             if (!string.IsNullOrWhiteSpace(path) && path.StartsWith("res://assets/", StringComparison.Ordinal) && !path.Contains(".."))
@@ -114,7 +116,6 @@ public sealed class CraftingAuthoringService(
         return messages;
     }
 
-    private static bool StableId(string? value) => value is not null && Regex.IsMatch(value, "^[a-z][a-z0-9_]*$");
     private static ApiError Error(string code, string message, string? field = null) => new(code, message, ValidationSeverity.Error, field);
     private static string Signature(string definitionId, string operation, CraftingRequest request) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
