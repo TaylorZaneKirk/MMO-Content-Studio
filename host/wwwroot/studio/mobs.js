@@ -67,7 +67,7 @@ function updateSession() {
     }
     updateActions();calibration.refreshPermission();
 }
-const draftKeys=['display_name', 'visual_texture_path', 'source_width', 'source_height', 'visual_anchor_offset_x', 'visual_anchor_offset_y', 'visual_render_scale', 'footprint_width_tiles', 'footprint_height_tiles', 'max_health', 'movement_speed_tiles_per_second', 'movement_behavior', 'wander_radius_tiles', 'aggression_mode', 'aggression_radius_tiles', 'leash_radius_tiles', 'return_home_behavior', 'combat_faction_id', 'can_proactively_target_hostile_mobs','animate_movement_while_idle', 'mob_detection_radius_tiles', 'mob_target_scan_interval_ms', 'mob_target_scan_candidate_limit', 'primary_combat_profile', 'combat_bonuses', 'guaranteed_drops', 'visual_mode', 'composite_visual', 'root_loot_table_id'];
+const draftKeys=['display_name', 'visual_texture_path', 'source_width', 'source_height', 'visual_anchor_offset_x', 'visual_anchor_offset_y', 'visual_render_scale', 'footprint_width_tiles', 'footprint_height_tiles', 'max_health', 'movement_speed_tiles_per_second', 'movement_behavior', 'wander_radius_tiles', 'aggression_mode', 'aggression_radius_tiles', 'leash_radius_tiles', 'return_home_behavior', 'combat_faction_id', 'can_proactively_target_hostile_mobs','animate_movement_while_idle', 'mob_detection_radius_tiles', 'mob_target_scan_interval_ms', 'mob_target_scan_candidate_limit', 'primary_combat_profile', 'combat_bonuses', 'guaranteed_drops', 'visual_mode', 'composite_visual', 'layer_asset_keys', 'root_loot_table_id'];
 function toDraft(definition){return Object.fromEntries(draftKeys.map(key=>[key,key==='guaranteed_drops'?definition[key].map(({drop_order,item_id,stack_count})=>({drop_order,item_id,stack_count})):clone(definition[key])]));}
 async function loadOptions(){
     const revision=++state.optionsRevision;
@@ -176,9 +176,18 @@ function render(){
     const d=state.draft;let p=section('Mob details',true,'The complete Mob definition is saved together. Shared calibration is saved separately.');let g=grid(p);
     field(g,state,'id','Mob ID',{required:true,readonly:!!state.definition,path:'mob_definition_id'});field(g,d,'display_name','Display name',{required:true});field(g,d,'max_health','Maximum Health',{kind:'integer',min:1});
     p=section('Appearance',true,'Flat sprites and composite actors share the source texture. Changing mode retains authored data until you explicitly remove incompatible fields.');g=grid(p);
-    selectField(g,d,'visual_mode','Visual mode',[{id:'flat_sprite',display_name:'Flat sprite'},{id:'composite_rig',display_name:'Composite rig'}]);reference(g,d,'visual_texture_path','Source PNG','asset');
+    selectField(g,d,'visual_mode','Visual mode',[{id:'flat_sprite',display_name:'Flat sprite'},{id:'composite_rig',display_name:'Composite rig'},{id:'layered_humanoid',display_name:'Layered human'}]).addEventListener('change',render);reference(g,d,'visual_texture_path','Source PNG','asset');
     field(g,d,'source_width','Source width',{kind:'integer',min:1});field(g,d,'source_height','Source height',{kind:'integer',min:1});field(g,d,'visual_anchor_offset_x','Anchor X',{kind:'coordinate'});field(g,d,'visual_anchor_offset_y','Anchor Y',{kind:'coordinate'});field(g,d,'visual_render_scale','Render scale',{kind:'coordinate'});
     checkField(p,d,'animate_movement_while_idle','Animate movement frames while idle (flying)');
+    // Explicit layer controls preserve unknown keys until the author removes them.
+    if(d.visual_mode==='layered_humanoid'||d.layer_asset_keys){
+        if(!d.layer_asset_keys)d.layer_asset_keys={head:'',body:'',legs:''};
+        p.append(element('h4','Human outfit'),element('p','Existing player asset keys (for example head1, defbod, fire_armor). Head, body and legs are required; blank optional slots show nothing. Source PNG preview is the fallback, not the layered outfit.','muted'));
+        g=grid(p);
+        for(const slot of new Set(['head','body','legs','boots','right_hand','left_hand','gloves','cape',...Object.keys(d.layer_asset_keys)]))
+            selectField(g,d.layer_asset_keys,slot,slot.replaceAll('_',' '),['',...(state.options.human_layer_assets?.[slot]||[])],`layer_asset_keys.${slot}`);
+        p.append(button('Remove human layers',()=>{d.layer_asset_keys=null;render();}));
+    }
     if(!d.composite_visual)p.append(button('Add composite descriptor',()=>{d.composite_visual={schema_version:1,rig_id:'',calibration_id:null,pose_policy:'actor_pose',fixed_direction:null,fixed_frame:null,cosmetic_item_ids:{}};render();}));
     else{
         const v=d.composite_visual,appearance=state.options.actor_appearance||{},rig=appearance.rigs?.find(r=>r.rig_id===v.rig_id);g=grid(p);

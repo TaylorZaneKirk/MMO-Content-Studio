@@ -88,6 +88,7 @@ public sealed class MobRepository : IMobRepository
                 m.mob_target_scan_candidate_limit,
                 m.root_loot_table_id,
                 m.animate_movement_while_idle,
+                m.layer_asset_keys,
                 m.updated_at,
                 exists (
                     select 1 from mob_combat_profiles profile
@@ -345,6 +346,7 @@ public sealed class MobRepository : IMobRepository
                 m.mob_target_scan_candidate_limit,
                 m.root_loot_table_id,
                 m.animate_movement_while_idle,
+                m.layer_asset_keys,
                 m.updated_at,
                 exists (
                     select 1 from mob_combat_profiles profile
@@ -506,6 +508,7 @@ public sealed class MobRepository : IMobRepository
                 mob_target_scan_candidate_limit,
                 root_loot_table_id,
                 animate_movement_while_idle,
+                layer_asset_keys,
                 created_at,
                 updated_at
             ) values (
@@ -537,6 +540,7 @@ public sealed class MobRepository : IMobRepository
                 @mob_target_scan_candidate_limit,
                 @root_loot_table_id,
                 @animate_movement_while_idle,
+                @layer_asset_keys,
                 now(),
                 now()
             );
@@ -583,6 +587,7 @@ public sealed class MobRepository : IMobRepository
                 mob_target_scan_candidate_limit = @mob_target_scan_candidate_limit,
                 root_loot_table_id = @root_loot_table_id,
                 animate_movement_while_idle = @animate_movement_while_idle,
+                layer_asset_keys = @layer_asset_keys,
                 updated_at = now()
             where mob_definition_id = @mob_definition_id;
             """;
@@ -802,6 +807,8 @@ public sealed class MobRepository : IMobRepository
         command.Parameters.AddWithValue("mob_target_scan_interval_ms", draft.MobTargetScanIntervalMs);
         command.Parameters.AddWithValue("mob_target_scan_candidate_limit", draft.MobTargetScanCandidateLimit);
         command.Parameters.AddWithValue("animate_movement_while_idle", draft.AnimateMovementWhileIdle);
+        command.Parameters.Add("layer_asset_keys", NpgsqlDbType.Jsonb).Value = draft.LayerAssetKeys is null
+            ? DBNull.Value : JsonSerializer.Serialize(draft.LayerAssetKeys);
         command.Parameters.Add("root_loot_table_id", NpgsqlDbType.Text).Value =
             (object?)draft.RootLootTableId ?? DBNull.Value;
     }
@@ -874,7 +881,8 @@ public sealed class MobRepository : IMobRepository
                 ? null
                 : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)),
             reader.IsDBNull(rootLootTableOrdinal) ? null : reader.GetString(rootLootTableOrdinal),
-            reader.GetBoolean(reader.GetOrdinal("animate_movement_while_idle")));
+            reader.GetBoolean(reader.GetOrdinal("animate_movement_while_idle")),
+            reader.IsDBNull(reader.GetOrdinal("layer_asset_keys")) ? null : JsonSerializer.Deserialize<Dictionary<string, string>>(reader.GetString(reader.GetOrdinal("layer_asset_keys"))));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -938,7 +946,8 @@ public sealed record MobDefinitionRecord(
     string VisualMode = ActorVisualModes.FlatSprite,
     RiggedSpriteVisualDescriptor? CompositeVisual = null,
     string? RootLootTableId = null,
-    bool AnimateMovementWhileIdle = false);
+    bool AnimateMovementWhileIdle = false,
+    IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
 
 public sealed record MobFactionRecord(string FactionId, string DisplayName);
 

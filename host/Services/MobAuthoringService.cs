@@ -81,7 +81,7 @@ public sealed class MobAuthoringService
                             table.LootTableId,
                             table.DisplayName,
                             table.PublicationState))
-                        .ToArray()));
+                        .ToArray(), LoadHumanLayerAssets()));
         }
         catch (Exception exception) when (IsDatabaseFailure(exception))
         {
@@ -367,7 +367,7 @@ public sealed class MobAuthoringService
             request.GuaranteedDrops,
             request.VisualMode,
             request.CompositeVisual,
-            request.RootLootTableId, request.AnimateMovementWhileIdle);
+            request.RootLootTableId, request.AnimateMovementWhileIdle, request.LayerAssetKeys);
 
     public static NormalizedMobDraft Normalize(MobPreviewRequest request) =>
         Normalize(
@@ -398,7 +398,7 @@ public sealed class MobAuthoringService
             request.GuaranteedDrops,
             request.VisualMode,
             request.CompositeVisual,
-            request.RootLootTableId, request.AnimateMovementWhileIdle);
+            request.RootLootTableId, request.AnimateMovementWhileIdle, request.LayerAssetKeys);
 
     public static NormalizedMobDraft Normalize(
         string displayName,
@@ -429,7 +429,8 @@ public sealed class MobAuthoringService
         string? visualMode = ActorVisualModes.FlatSprite,
         RiggedSpriteVisualDescriptor? compositeVisual = null,
         string? rootLootTableId = null,
-        bool animateMovementWhileIdle = false)
+        bool animateMovementWhileIdle = false,
+        IReadOnlyDictionary<string, string>? layerAssetKeys = null)
     {
         var proactive = canProactivelyTargetHostileMobs;
         var presentation = RiggedSpriteVisualDescriptorNormalizer.Normalize(visualMode, compositeVisual);
@@ -471,7 +472,24 @@ public sealed class MobAuthoringService
             MobDomainRules.NormalizeGuaranteedDrops(guaranteedDrops),
             presentation.VisualMode,
             presentation.CompositeVisual,
-            MobDomainRules.NormalizeOptional(rootLootTableId)?.ToLowerInvariant(), animateMovementWhileIdle);
+            MobDomainRules.NormalizeOptional(rootLootTableId)?.ToLowerInvariant(), animateMovementWhileIdle, layerAssetKeys is null ? null :
+                new SortedDictionary<string, string>(layerAssetKeys.ToDictionary(pair => pair.Key, pair => pair.Value), StringComparer.Ordinal));
+    }
+
+    // Offer the same existing layer keys the player renderer reads. No item or
+    // equipment definition is needed to select a cosmetic Mob outfit.
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> LoadHumanLayerAssets()
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>();
+        var root = _assetService.GetGameAssetsRoot();
+        foreach (var slot in new[] { "head", "body", "legs", "boots", "right_hand", "left_hand", "gloves", "cape" })
+        {
+            var directory = root is null ? "" : Path.Combine(root, "actors", "player", slot);
+            result[slot] = Directory.Exists(directory) ? Directory.EnumerateFiles(directory, "*-F*-*.png")
+                .Select(path => { var name = Path.GetFileNameWithoutExtension(path)!; return name[..name.LastIndexOf("-F", StringComparison.Ordinal)]; })
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray() : [];
+        }
+        return result;
     }
 
     public static NormalizedMobDraft FromRecord(MobDefinitionRecord record) =>
@@ -508,7 +526,11 @@ public sealed class MobAuthoringService
                 .ToArray(),
             record.VisualMode,
             record.CompositeVisual,
-            record.RootLootTableId, record.AnimateMovementWhileIdle);
+            record.RootLootTableId, record.AnimateMovementWhileIdle, record.LayerAssetKeys);
+
+    private static bool EquivalentLayers(IReadOnlyDictionary<string, string>? left, IReadOnlyDictionary<string, string>? right) =>
+        left is null ? right is null : right is not null && left.Count == right.Count &&
+            left.All(pair => right.TryGetValue(pair.Key, out var value) && pair.Value == value);
 
     public static string ComputePreviewSignature(
         string mobDefinitionId,
@@ -565,6 +587,7 @@ public sealed class MobAuthoringService
         && (record.CombatBonuses ?? MobCombatBonusDefinition.Zero) == draft.CombatBonuses
         && SerializeDrops(record.GuaranteedDrops) == JsonSerializer.Serialize(draft.GuaranteedDrops)
         && record.AnimateMovementWhileIdle == draft.AnimateMovementWhileIdle
+        && EquivalentLayers(record.LayerAssetKeys, draft.LayerAssetKeys)
         && record.VisualMode == draft.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
         && string.Equals(record.RootLootTableId, draft.RootLootTableId, StringComparison.Ordinal);
@@ -598,6 +621,7 @@ public sealed class MobAuthoringService
         && (left.CombatBonuses ?? MobCombatBonusDefinition.Zero) == (right.CombatBonuses ?? MobCombatBonusDefinition.Zero)
         && SerializeDrops(left.GuaranteedDrops) == SerializeDrops(right.GuaranteedDrops)
         && left.AnimateMovementWhileIdle == right.AnimateMovementWhileIdle
+        && EquivalentLayers(left.LayerAssetKeys, right.LayerAssetKeys)
         && left.VisualMode == right.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
         && left.RootLootTableId == right.RootLootTableId;
@@ -731,7 +755,7 @@ public sealed class MobAuthoringService
             CalculateDerivedCombatLevel(FromRecord(record)),
             CalculateCombatLevelDiagnostics(FromRecord(record)),
             record.RootLootTableId,
-            null, record.AnimateMovementWhileIdle);
+            null, record.AnimateMovementWhileIdle, record.LayerAssetKeys);
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
@@ -802,6 +826,7 @@ public sealed class MobAuthoringService
         AddChange(changes, "mob_definition_id", existing?.MobDefinitionId, mobDefinitionId);
         AddChange(changes, "display_name", existing?.DisplayName, requested.DisplayName);
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
+        AddChange(changes, "layer_asset_keys", JsonSerializer.Serialize(existing?.LayerAssetKeys), JsonSerializer.Serialize(requested.LayerAssetKeys));
         AddChange(changes, "animate_movement_while_idle", existing?.AnimateMovementWhileIdle.ToString(), requested.AnimateMovementWhileIdle.ToString());
         AddChange(changes, "visual_mode", existing?.VisualMode, requested.VisualMode);
         AddChange(changes, "composite_visual", SerializeCompositeVisual(existing?.CompositeVisual), SerializeCompositeVisual(requested.CompositeVisual));

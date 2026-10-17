@@ -65,7 +65,8 @@ public sealed record MobDefinition(
     [property: JsonPropertyName("combat_level_diagnostics")] MobCombatLevelDiagnosticsDefinition? CombatLevelDiagnostics = null,
     [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
     [property: JsonPropertyName("root_loot_table_expected_value")] LootExpectedValueReport? RootLootTableExpectedValue = null,
-    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false);
+    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false,
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
 
 public sealed record MobCombatProfileDefinition(
     [property: JsonPropertyName("attack_type")] string AttackType,
@@ -124,7 +125,8 @@ public sealed record SaveMobDraftRequest(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
-    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false);
+    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false,
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
 
 public sealed record MobPreviewRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -159,7 +161,8 @@ public sealed record MobPreviewRequest(
     [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
     [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null,
     [property: JsonPropertyName("root_loot_table_id")] string? RootLootTableId = null,
-    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false);
+    [property: JsonPropertyName("animate_movement_while_idle")] bool AnimateMovementWhileIdle = false,
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
 
 public sealed record MobPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,
@@ -211,7 +214,8 @@ public sealed record MobAuthoringOptionsResponse(
     [property: JsonPropertyName("visual_assets")] MobVisualAssetOptions VisualAssets,
     [property: JsonPropertyName("defaults")] MobAuthoringDefaults Defaults,
     [property: JsonPropertyName("actor_appearance")] ActorAppearanceOptionsDefinition? ActorAppearance = null,
-    [property: JsonPropertyName("loot_tables")] IReadOnlyList<LootTableOption>? LootTables = null);
+    [property: JsonPropertyName("loot_tables")] IReadOnlyList<LootTableOption>? LootTables = null,
+    [property: JsonPropertyName("human_layer_assets")] IReadOnlyDictionary<string, IReadOnlyList<string>>? HumanLayerAssets = null);
 
 public sealed record MobFactionOption(
     [property: JsonPropertyName("faction_id")] string FactionId,

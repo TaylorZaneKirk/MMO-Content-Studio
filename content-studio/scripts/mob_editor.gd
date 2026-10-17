@@ -217,6 +217,8 @@ var _visual_status: Label
 var _presentation_semantics: Label
 var _preview_facing: OptionButton
 var _preview_frame: OptionButton
+var _human_layer_fields: Dictionary = {}
+var _human_layer_grid: GridContainer
 var _visual_mode: OptionButton
 var _rig_id: OptionButton
 var _calibration_id: OptionButton
@@ -391,6 +393,11 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	var grid := _grid(parent)
 	_visual_mode = _option_field(grid, "Visual type")
 	_visual_mode.item_selected.connect(_on_visual_mode_changed.unbind(1))
+	_human_layer_grid = _grid(parent)
+	_human_layer_grid.tooltip_text = "Head/body/legs required. Cosmetic player layers; fallback source PNG is not the layered outfit preview."
+	for slot in ["head", "body", "legs", "boots", "right_hand", "left_hand", "gloves", "cape"]:
+		_human_layer_fields[slot] = _option_field(_human_layer_grid, "Human " + slot)
+		_human_layer_fields[slot].item_selected.connect(_on_form_changed.unbind(1))
 	_visual_path = _line_field(grid, "Texture path", "res://assets/maps/objects/mobs/slime.png")
 	_visual_path.text_changed.connect(_on_visual_path_changed)
 	_source_width = _spin_field(grid, "Source width", 1, 2048, 32, 1)
@@ -896,7 +903,20 @@ func _payload() -> Dictionary:
 		"expected_updated_at_utc": _current_mob.get("updated_at_utc", null),
 		"visual_mode": _selected_metadata(_visual_mode),
 		"composite_visual": _build_composite_visual(),
+		"layer_asset_keys": _human_layer_payload(),
+		"root_loot_table_id": _current_mob.get("root_loot_table_id"),
+		"animate_movement_while_idle": _current_mob.get("animate_movement_while_idle", false),
 	}
+
+
+# Outfit editing never changes the existing loot root or idle opt-in.
+func _human_layer_payload() -> Variant:
+	if _selected_metadata(_visual_mode) != "layered_humanoid":
+		return null
+	var layers: Dictionary = {}
+	for slot in _human_layer_fields:
+		layers[slot] = _selected_metadata(_human_layer_fields[slot])
+	return layers
 
 
 func _combat_profile_payload() -> Dictionary:
@@ -1046,7 +1066,18 @@ func _on_search_changed(value: String) -> void:
 
 func _apply_actor_appearance_options() -> void:
 	var appearance := _options.get("actor_appearance", {}) as Dictionary
+	var human_assets: Dictionary = _options.get("human_layer_assets", {})
+	for slot in _human_layer_fields:
+		var control: OptionButton = _human_layer_fields[slot]
+		control.clear()
+		control.add_item("(none)")
+		control.set_item_metadata(0, "")
+		for key in human_assets.get(slot, []):
+			control.add_item(str(key))
+			control.set_item_metadata(control.item_count - 1, str(key))
 	_fill_authoring_options(_visual_mode, appearance.get("visual_modes", []) as Array)
+	_visual_mode.add_item("Layered human")
+	_visual_mode.set_item_metadata(_visual_mode.item_count - 1, "layered_humanoid")
 	if _visual_mode.item_count == 0:
 		_visual_mode.add_item("Flat Sprite")
 		_visual_mode.set_item_metadata(0, "flat_sprite")
@@ -1068,7 +1099,10 @@ func _first_rig_id() -> String:
 func _load_composite_visual(payload: Dictionary) -> void:
 	var descriptor_variant: Variant = payload.get("composite_visual", {})
 	_composite_visual = (descriptor_variant as Dictionary).duplicate(true) if str(payload.get("visual_mode", "flat_sprite")) == "composite_rig" and descriptor_variant is Dictionary else {}
-	_select_option(_visual_mode, "composite_rig" if not _composite_visual.is_empty() else "flat_sprite")
+	_select_option(_visual_mode, str(payload.get("visual_mode", "flat_sprite")))
+	var layers: Dictionary = payload.get("layer_asset_keys") if payload.get("layer_asset_keys") is Dictionary else {}
+	for slot in _human_layer_fields:
+		_select_option(_human_layer_fields[slot], str(layers.get(slot, "")))
 	_rebuild_rigged_controls()
 	_refresh_socket_calibration_editor()
 
@@ -1182,6 +1216,7 @@ func _on_rigged_changed() -> void:
 
 
 func _rebuild_rigged_controls() -> void:
+	_human_layer_grid.visible = _selected_metadata(_visual_mode) == "layered_humanoid"
 	if _rigged_controls == null:
 		return
 	var enabled := _selected_metadata(_visual_mode) == "composite_rig"
