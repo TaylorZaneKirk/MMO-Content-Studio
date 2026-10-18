@@ -1,10 +1,13 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const DEFAULTS := {"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "chair_item_id": "crude_wooden_chair", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "chair_level": 1, "chair_xp_tenths": 580, "chair_duration_ms": 3000, "chair_planks": 2, "chair_nails": 2, "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}
-const FIELDS := [["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["chair_item_id", "Chair item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"], ["chair_level", "Chair level"], ["chair_xp_tenths", "Chair xp tenths"], ["chair_duration_ms", "Chair duration ms"], ["chair_planks", "Chair planks"], ["chair_nails", "Chair nails"], ["placement_level", "Placement level"], ["footprint_width_tiles", "Footprint width tiles"], ["footprint_height_tiles", "Footprint height tiles"], ["occupies_furniture_space", "Occupies furniture space"], ["blocks_movement", "Blocks movement"], ["east_texture_path", "East texture path"], ["west_texture_path", "West texture path"]]
+const DEFAULTS := {"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "furniture": [{"recipe_id": "craft_chair", "display_name": "Crude wooden chair", "item_id": "crude_wooden_chair", "level": 1, "xp_tenths": 580, "duration_ms": 3000, "planks": 2, "nails": 2, "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}]}
+const FIELDS := [["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"]]
 const ARROW_DEFAULTS := {"knife_item_id": "crafting_knife", "shaft_item_id": "arrow_shafts", "headless_item_id": "headless_arrows", "feather_item_id": "feather", "bronze_head_item_id": "bronze_arrowheads", "iron_head_item_id": "iron_arrowheads", "bronze_arrow_item_id": "bronze_arrows", "iron_arrow_item_id": "iron_arrows", "shafts": {"level": 1, "xp_tenths": 50, "duration_ms": 3000}, "headless": {"level": 1, "xp_tenths": 10, "duration_ms": 3000}, "bronze": {"level": 1, "xp_tenths": 13, "duration_ms": 3000}, "iron": {"level": 15, "xp_tenths": 25, "duration_ms": 3000}}
 const ARROW_FIELDS := [["knife_item_id", "Knife Item Id"], ["shaft_item_id", "Shaft Item Id"], ["headless_item_id", "Headless Item Id"], ["feather_item_id", "Feather Item Id"], ["bronze_head_item_id", "Bronze Head Item Id"], ["iron_head_item_id", "Iron Head Item Id"], ["bronze_arrow_item_id", "Bronze Arrow Item Id"], ["iron_arrow_item_id", "Iron Arrow Item Id"], ["shafts.level", "Shafts level"], ["shafts.xp_tenths", "Shafts xp tenths"], ["shafts.duration_ms", "Shafts duration ms"], ["headless.level", "Headless level"], ["headless.xp_tenths", "Headless xp tenths"], ["headless.duration_ms", "Headless duration ms"], ["bronze.level", "Bronze level"], ["bronze.xp_tenths", "Bronze xp tenths"], ["bronze.duration_ms", "Bronze duration ms"], ["iron.level", "Iron level"], ["iron.xp_tenths", "Iron xp tenths"], ["iron.duration_ms", "Iron duration ms"]]
+const FURNITURE_FIELDS := ["recipe_id", "display_name", "item_id", "level", "xp_tenths", "duration_ms", "planks", "nails", "placement_level", "footprint_width_tiles", "footprint_height_tiles", "occupies_furniture_space", "blocks_movement", "east_texture_path", "west_texture_path"]
+var _furniture_rows: VBoxContainer
+var _add_furniture_button: Button
 var _arrow_fields: Dictionary = {}
 var _arrows_enabled: CheckBox
 var _fields: Dictionary = {}
@@ -41,6 +44,18 @@ func _ready() -> void:
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
+	_furniture_rows = VBoxContainer.new()
+	form.add_child(_furniture_rows)
+	_add_furniture_button = Button.new()
+	_add_furniture_button.text = "Add furniture recipe"
+	_add_furniture_button.pressed.connect(func():
+		var facts: Dictionary = DEFAULTS.furniture[0].duplicate(true)
+		facts.recipe_id = ""
+		facts.item_id = ""
+		facts.display_name = ""
+		_add_furniture(facts)
+		_apply.disabled = true)
+	form.add_child(_add_furniture_button)
 	_arrows_enabled = CheckBox.new()
 	_arrows_enabled.text = "Enable inventory arrow recipes"
 	_arrows_enabled.toggled.connect(func(_enabled: bool): _apply.disabled = true)
@@ -86,9 +101,33 @@ func open_resource(_id: String) -> void:
 	_apply.disabled = true
 	_client.load_crafting("v1")
 
+func _add_furniture(facts: Dictionary) -> void:
+	var row := VBoxContainer.new()
+	_furniture_rows.add_child(row)
+	for key: String in FURNITURE_FIELDS:
+		var label := Label.new()
+		label.text = key.replace("_", " ")
+		row.add_child(label)
+		var field := LineEdit.new()
+		field.name = key
+		field.text = str(facts.get(key, ""))
+		field.text_changed.connect(func(_value: String): _apply.disabled = true)
+		row.add_child(field)
+	var remove := Button.new()
+	remove.text = "Remove recipe"
+	remove.pressed.connect(func():
+		_furniture_rows.remove_child(row)
+		row.queue_free()
+		_apply.disabled = true)
+	row.add_child(remove)
+
 func _loaded(data: Dictionary) -> void:
 	_set_busy(false)
 	_current = data
+	for row in _furniture_rows.get_children():
+		_furniture_rows.remove_child(row)
+		row.queue_free()
+	for facts: Dictionary in data.get("draft", {}).get("furniture", []): _add_furniture(facts)
 	var arrows: Variant = data.get("draft", {}).get("arrows")
 	_arrows_enabled.button_pressed = arrows is Dictionary
 	if not arrows is Dictionary: arrows = ARROW_DEFAULTS
@@ -118,6 +157,23 @@ func _preview() -> void:
 			return
 		else:
 			draft[key] = int(value)
+	draft["furniture"] = []
+	for row in _furniture_rows.get_children():
+		var facts := {}
+		for key: String in FURNITURE_FIELDS:
+			var value: String = row.get_node(key).text.strip_edges()
+			if key in ["occupies_furniture_space", "blocks_movement"]:
+				if value.to_lower() not in ["true", "false"]:
+					_status.text = "Enter true or false for " + key
+					return
+				facts[key] = value.to_lower() == "true"
+			elif key in ["level", "xp_tenths", "duration_ms", "planks", "nails", "placement_level", "footprint_width_tiles", "footprint_height_tiles"]:
+				if not value.is_valid_int():
+					_status.text = "Enter a whole number for " + key
+					return
+				facts[key] = int(value)
+			else: facts[key] = value
+		draft.furniture.append(facts)
 	draft["arrows"] = null
 	if _arrows_enabled.button_pressed:
 		var arrows := ARROW_DEFAULTS.duplicate(true)
@@ -169,6 +225,11 @@ func _failed(_operation_name: String, _message: String, _errors: Array) -> void:
 
 func _set_busy(value: bool) -> void:
 	_busy = value
+	_add_furniture_button.disabled = value
+	for row in _furniture_rows.get_children():
+		for field in row.get_children():
+			if field is LineEdit: field.editable = not value
+			elif field is Button: field.disabled = value
 	for field: LineEdit in _fields.values():
 		field.editable = not value
 	for field: LineEdit in _arrow_fields.values(): field.editable = not value

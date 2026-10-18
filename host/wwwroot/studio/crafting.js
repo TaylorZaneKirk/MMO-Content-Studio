@@ -3,8 +3,8 @@ import {
     createRequest, installNavigation
 }
 from './studio-common.js';
-const fields=[["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["chair_item_id", "Chair item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"], ["chair_level", "Chair level"], ["chair_xp_tenths", "Chair xp tenths"], ["chair_duration_ms", "Chair duration ms"], ["chair_planks", "Chair planks"], ["chair_nails", "Chair nails"], ["placement_level", "Placement level"], ["footprint_width_tiles", "Footprint width tiles"], ["footprint_height_tiles", "Footprint height tiles"], ["occupies_furniture_space", "Occupies furniture space"], ["blocks_movement", "Blocks movement"], ["east_texture_path", "East texture path"], ["west_texture_path", "West texture path"]];
-const defaults={"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "chair_item_id": "crude_wooden_chair", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "chair_level": 1, "chair_xp_tenths": 580, "chair_duration_ms": 3000, "chair_planks": 2, "chair_nails": 2, "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"};
+const fields=[["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"]];
+const defaults={"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "furniture": [{"recipe_id": "craft_chair", "display_name": "Crude wooden chair", "item_id": "crude_wooden_chair", "level": 1, "xp_tenths": 580, "duration_ms": 3000, "planks": 2, "nails": 2, "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}]};
 const arrowDefaults={"knife_item_id": "crafting_knife", "shaft_item_id": "arrow_shafts", "headless_item_id": "headless_arrows", "feather_item_id": "feather", "bronze_head_item_id": "bronze_arrowheads", "iron_head_item_id": "iron_arrowheads", "bronze_arrow_item_id": "bronze_arrows", "iron_arrow_item_id": "iron_arrows", "shafts": {"level": 1, "xp_tenths": 50, "duration_ms": 3000}, "headless": {"level": 1, "xp_tenths": 10, "duration_ms": 3000}, "bronze": {"level": 1, "xp_tenths": 13, "duration_ms": 3000}, "iron": {"level": 15, "xp_tenths": 25, "duration_ms": 3000}};
 const arrowFields=[["knife_item_id", "Knife Item Id"], ["shaft_item_id", "Shaft Item Id"], ["headless_item_id", "Headless Item Id"], ["feather_item_id", "Feather Item Id"], ["bronze_head_item_id", "Bronze Head Item Id"], ["iron_head_item_id", "Iron Head Item Id"], ["bronze_arrow_item_id", "Bronze Arrow Item Id"], ["iron_arrow_item_id", "Iron Arrow Item Id"], ["shafts.level", "Shafts level"], ["shafts.xp_tenths", "Shafts xp tenths"], ["shafts.duration_ms", "Shafts duration ms"], ["headless.level", "Headless level"], ["headless.xp_tenths", "Headless xp tenths"], ["headless.duration_ms", "Headless duration ms"], ["bronze.level", "Bronze level"], ["bronze.xp_tenths", "Bronze xp tenths"], ["bronze.duration_ms", "Bronze duration ms"], ["iron.level", "Iron level"], ["iron.xp_tenths", "Iron xp tenths"], ["iron.duration_ms", "Iron duration ms"]];
 let session={
@@ -26,6 +26,37 @@ for(const [key,label] of fields){
     row.append(input);
     $('fields').append(row);
 }
+const furnitureFields=["recipe_id", "display_name", "item_id", "level", "xp_tenths", "duration_ms", "planks", "nails", "placement_level", "footprint_width_tiles", "footprint_height_tiles", "occupies_furniture_space", "blocks_movement", "east_texture_path", "west_texture_path"];
+const furnitureRows=document.createElement('div');$('fields').append(furnitureRows);
+const addFurniture=document.createElement('button');addFurniture.type='button';addFurniture.textContent='Add furniture recipe';
+$('fields').append(addFurniture);
+addFurniture.onclick=()=>{appendFurniture({...defaults.furniture[0],recipe_id:'',display_name:'',item_id:''});invalidate();};
+function appendFurniture(facts){
+    const row=document.createElement('fieldset');
+    for(const key of furnitureFields){
+        const label=document.createElement('label');label.textContent=key.replaceAll('_',' ');label.style.display='block';
+        const input=document.createElement('input');input.dataset.field=key;input.value=String(facts[key]??'');
+        input.addEventListener('input',invalidate);label.append(input);row.append(label);
+    }
+    const remove=document.createElement('button');remove.type='button';remove.textContent='Remove recipe';
+    remove.onclick=()=>{row.remove();invalidate();};row.append(remove);furnitureRows.append(row);
+}
+function furnitureInputs(){
+    return [...furnitureRows.children].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value])));
+}
+function furnitureDraft(){
+    return furnitureInputs().map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>{
+        if(['occupies_furniture_space','blocks_movement'].includes(key)){
+            if(!['true','false'].includes(value.toLowerCase()))throw new Error('Enter true or false for '+key);
+            return [key,value.toLowerCase()==='true'];
+        }
+        if(['level','xp_tenths','duration_ms','planks','nails','placement_level','footprint_width_tiles','footprint_height_tiles'].includes(key)){
+            if(!/^\d+$/.test(value))throw new Error('Enter a whole number for '+key);
+            return [key,Number(value)];
+        }
+        return [key,value.trim()];
+    })));
+}
 const arrowToggle=document.createElement('input');
 arrowToggle.type='checkbox';arrowToggle.id='arrows-enabled';
 const arrowLabel=document.createElement('label');arrowLabel.textContent='Enable inventory arrow recipes';
@@ -44,6 +75,7 @@ function invalidate(){
 // Compare raw inputs, not parsed numbers: even an incomplete edit must be retained.
 function localInputs(){
     const local=Object.fromEntries(fields.map(([key])=>[key,$(key).value]));
+    local.furniture=furnitureInputs();
     local.arrows_enabled=arrowToggle.checked;
     for(const [key] of arrowFields)local["arrows."+key]=$("arrows."+key).value;
     return local;
@@ -51,6 +83,8 @@ function localInputs(){
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
 function renderDefinition(definition){
     for(const [key] of fields)$(key).value=definition.draft[key];
+    furnitureRows.replaceChildren();
+    for(const furniture of definition.draft.furniture||[])appendFurniture(furniture);
     arrowToggle.checked=definition.draft.arrows!=null;
     for(const [key] of arrowFields)$('arrows.'+key).value=arrowValue(definition.draft.arrows||arrowDefaults,key);
 }
@@ -152,6 +186,7 @@ $('preview').onclick=async()=>{
             else if (["occupies_furniture_space", "blocks_movement"].includes(key)) { if(!["true","false"].includes(value.toLowerCase()))throw new Error("Enter true or false for "+key); draft[key]=value.toLowerCase()==="true"; }
             else { if(!/^\d+$/.test(value))throw new Error("Enter a whole number for "+key);draft[key]=Number(value); }
         }
+        draft.furniture=furnitureDraft();
         draft.arrows=null;
         if(arrowToggle.checked){
             draft.arrows=structuredClone(arrowDefaults);

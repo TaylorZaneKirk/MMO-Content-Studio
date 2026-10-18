@@ -41,9 +41,9 @@ public sealed class CraftingRepository(AuthoringDatabaseConnectionFactory factor
         command.CommandText = "SELECT EXISTS(SELECT 1 FROM world_object_definitions w JOIN world_object_interactions x USING(definition_id) WHERE w.definition_id=@station AND w.publication_state='Published' AND x.action_id='crafting' AND w.blocks_movement AND w.footprint_width_tiles=1 AND w.footprint_height_tiles=1)";
         command.Parameters.AddWithValue("station", settings.StationDefinitionId);
         if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish an Crafting station with the crafting action first.");
-        command.CommandText = "SELECT EXISTS(SELECT 1 FROM item_definitions WHERE item_id=@chair AND trade_policy='tradeable')";
-        command.Parameters.AddWithValue("chair", settings.ChairItemId);
-        if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("The chair must be tradeable.");
+        command.CommandText = "SELECT count(*) FROM item_definitions WHERE item_id=ANY(@furniture) AND trade_policy='tradeable'";
+        command.Parameters.AddWithValue("furniture", settings.Furniture.Select(f => f.ItemId).ToArray());
+        if (Convert.ToInt64(await command.ExecuteScalarAsync(ct)) != settings.Furniture.Count) errors.Add("Furniture must be tradeable.");
         return errors;
     }
 
@@ -56,11 +56,14 @@ public sealed class CraftingRepository(AuthoringDatabaseConnectionFactory factor
         if (json is null) return [];
         if (operation is "disable" or "delete") return ["Pick up retained home furniture before disabling or deleting Crafting."];
         var old = JsonSerializer.Deserialize<CraftingSettings>(json)!;
-        if (!old.ItemIds.SequenceEqual(draft.ItemIds) || old.StationDefinitionId != draft.StationDefinitionId ||
-            old.EastTexturePath != draft.EastTexturePath || old.WestTexturePath != draft.WestTexturePath ||
-            old.FootprintWidthTiles != draft.FootprintWidthTiles || old.FootprintHeightTiles != draft.FootprintHeightTiles ||
-            old.OccupiesFurnitureSpace != draft.OccupiesFurnitureSpace || old.BlocksMovement != draft.BlocksMovement)
-            return ["Retained furniture prevents changing published item bindings, footprint, occupancy or directional art."];
+        command.CommandText = "SELECT DISTINCT item_id FROM character_home_furniture";
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            var itemId = reader.GetString(0);
+            if (old.FindFurniture(itemId) is not { } before || draft.FindFurniture(itemId) is not { } after || !before.SamePlacementFacts(after))
+                return ["Retained furniture prevents removing its item or changing its footprint, occupancy or directional art."];
+        }
         return [];
     }
 

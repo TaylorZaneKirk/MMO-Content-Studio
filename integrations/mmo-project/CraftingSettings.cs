@@ -1,23 +1,76 @@
 using System.Text.Json.Serialization;
 namespace MMO.Project.Crafting;
 
-// Published V1 recipe and decorative furniture facts. Player owns all live state.
+// Published production facts. One furniture entry owns its recipe and placement
+// facts; adding furniture does not add another runtime production lifecycle.
 public sealed record CraftingSettings(
     [property: JsonPropertyName("saw_item_id")] string SawItemId,
     [property: JsonPropertyName("hammer_item_id")] string HammerItemId,
     [property: JsonPropertyName("log_item_id")] string LogItemId,
     [property: JsonPropertyName("plank_item_id")] string PlankItemId,
     [property: JsonPropertyName("nails_item_id")] string NailsItemId,
-    [property: JsonPropertyName("chair_item_id")] string ChairItemId,
     [property: JsonPropertyName("station_definition_id")] string StationDefinitionId,
     [property: JsonPropertyName("saw_level")] int SawLevel,
     [property: JsonPropertyName("saw_xp_tenths")] int SawXpTenths,
     [property: JsonPropertyName("saw_duration_ms")] int SawDurationMs,
-    [property: JsonPropertyName("chair_level")] int ChairLevel,
-    [property: JsonPropertyName("chair_xp_tenths")] int ChairXpTenths,
-    [property: JsonPropertyName("chair_duration_ms")] int ChairDurationMs,
-    [property: JsonPropertyName("chair_planks")] int ChairPlanks,
-    [property: JsonPropertyName("chair_nails")] int ChairNails,
+    [property: JsonPropertyName("furniture")] IReadOnlyList<FurnitureRecipeSettings> Furniture)
+{
+    [JsonPropertyName("arrows")] public ArrowCraftingSettings? Arrows { get; init; }
+    [JsonIgnore] public IReadOnlyList<string> ItemIds => [SawItemId, HammerItemId, LogItemId, PlankItemId, NailsItemId,
+        .. (Furniture ?? []).Select(f => f?.ItemId ?? "")];
+    public FurnitureRecipeSettings? FindFurniture(string itemId) => Furniture?.FirstOrDefault(f => f?.ItemId == itemId);
+
+    public IReadOnlyList<string> Validate(IReadOnlySet<string>? items = null)
+    {
+        var errors = new List<string>();
+        foreach (var id in ItemIds)
+            if (string.IsNullOrWhiteSpace(id) || items is not null && !items.Contains(id)) errors.Add($"Missing or unavailable Crafting item '{id}'.");
+        if (ItemIds.Distinct().Count() != ItemIds.Count) errors.Add("Item bindings must be distinct.");
+        if (StationDefinitionId != "home_workbench") errors.Add("Furniture station must be home_workbench.");
+        if (SawLevel is < 1 or > 99 || SawXpTenths is < 0 or > 10000000 || SawDurationMs is < 1 or > 86400000)
+            errors.Add("Saw requires level 1–99, XP 0–10000000 tenths and duration 1–86400000 ms.");
+        if (Furniture is null || Furniture.Count == 0) errors.Add("At least one furniture recipe is required.");
+        var recipeIds = new HashSet<string> { "saw_plank", "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows" };
+        foreach (var f in Furniture ?? [])
+        {
+            if (f is null) { errors.Add("Furniture entries must be objects."); continue; }
+            if (string.IsNullOrWhiteSpace(f.RecipeId) || !recipeIds.Add(f.RecipeId)) errors.Add("Furniture recipe IDs must be present and unique.");
+            if (string.IsNullOrWhiteSpace(f.DisplayName)) errors.Add("Furniture display name is required.");
+            if (f.Level is < 1 or > 99 || f.PlacementLevel is < 1 or > 99) errors.Add("Furniture levels must be 1–99.");
+            if (f.DurationMs is < 1 or > 86400000 || f.XpTenths is < 0 or > 10000000) errors.Add("Invalid furniture duration or XP.");
+            if (f.Planks is < 1 or > 10000 || f.Nails is < 1 or > 10000) errors.Add("Furniture ingredients must be 1–10000.");
+            if (f.FootprintWidthTiles != 1 || f.FootprintHeightTiles != 1 || !f.OccupiesFurnitureSpace || f.BlocksMovement)
+                errors.Add("Furniture requires a 1×1 occupied, nonblocking footprint.");
+            foreach (var path in new[] { f.EastTexturePath, f.WestTexturePath })
+                if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) || !path.EndsWith(".png", StringComparison.Ordinal) || path.Contains(".."))
+                    errors.Add("Furniture directions require project PNG asset paths.");
+        }
+        if (Arrows is not null) errors.AddRange(Arrows.Validate(items, ItemIds));
+        return errors;
+    }
+    public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items)
+    {
+        var errors = new List<string>();
+        foreach (var id in ItemIds.Where(id => id != NailsItemId))
+            if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked) errors.Add($"'{id}' must be enabled/nonstackable.");
+        if (string.IsNullOrWhiteSpace(NailsItemId) || !items.TryGetValue(NailsItemId, out var nails) || !nails) errors.Add("Nails must be enabled/stackable.");
+        if (Arrows is not null)
+            foreach (var id in Arrows.ItemIds)
+                if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked != (id != Arrows.KnifeItemId))
+                    errors.Add($"Arrow item '{id}' has an unavailable or incorrect stack shape.");
+        return errors;
+    }
+}
+
+public sealed record FurnitureRecipeSettings(
+    [property: JsonPropertyName("recipe_id")] string RecipeId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("level")] int Level,
+    [property: JsonPropertyName("xp_tenths")] int XpTenths,
+    [property: JsonPropertyName("duration_ms")] int DurationMs,
+    [property: JsonPropertyName("planks")] int Planks,
+    [property: JsonPropertyName("nails")] int Nails,
     [property: JsonPropertyName("placement_level")] int PlacementLevel,
     [property: JsonPropertyName("footprint_width_tiles")] int FootprintWidthTiles,
     [property: JsonPropertyName("footprint_height_tiles")] int FootprintHeightTiles,
@@ -26,40 +79,11 @@ public sealed record CraftingSettings(
     [property: JsonPropertyName("east_texture_path")] string EastTexturePath,
     [property: JsonPropertyName("west_texture_path")] string WestTexturePath)
 {
-    [JsonPropertyName("arrows")] public ArrowCraftingSettings? Arrows { get; init; }
-    [JsonIgnore] public IReadOnlyList<string> ItemIds => [SawItemId, HammerItemId, LogItemId, PlankItemId, NailsItemId, ChairItemId];
-    public IReadOnlyList<string> Validate(IReadOnlySet<string>? items = null)
-    {
-        var errors = new List<string>();
-        foreach (var id in ItemIds)
-            if (string.IsNullOrWhiteSpace(id) || items is not null && !items.Contains(id)) errors.Add($"Missing or unavailable Crafting item '{id}'.");
-        if (ItemIds.Distinct().Count() != ItemIds.Count) errors.Add("Item bindings must be distinct.");
-        if (StationDefinitionId != "home_workbench") errors.Add("V1 station must be home_workbench.");
-        foreach (var level in new[] { SawLevel, ChairLevel, PlacementLevel }) if (level is < 1 or > 99) errors.Add("Levels must be 1–99.");
-        foreach (var time in new[] { SawDurationMs, ChairDurationMs }) if (time is < 1 or > 86400000) errors.Add("Duration must be 1–86400000 ms.");
-        foreach (var xp in new[] { SawXpTenths, ChairXpTenths }) if (xp is < 0 or > 10000000) errors.Add("XP must be 0–10000000 tenths.");
-        if (ChairPlanks is < 1 or > 10000 || ChairNails is < 1 or > 10000) errors.Add("Ingredient quantities must be 1–10000.");
-        if (FootprintWidthTiles != 1 || FootprintHeightTiles != 1 || !OccupiesFurnitureSpace || BlocksMovement)
-            errors.Add("V1 chairs require a 1×1 occupied footprint and walkable movement. Larger/blocking furniture is not supported.");
-        foreach (var path in new[] { EastTexturePath, WestTexturePath })
-            if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) || !path.EndsWith(".png", StringComparison.Ordinal) || path.Contains("..")) errors.Add("Directions require project PNG asset paths.");
-        if (Arrows is not null) errors.AddRange(Arrows.Validate(items, ItemIds));
-        return errors;
-    }
-    public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items)
-    {
-        var errors = new List<string>();
-        foreach (var id in new[] { SawItemId, HammerItemId, LogItemId, PlankItemId, ChairItemId })
-            if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked) errors.Add($"'{id}' must be enabled/nonstackable.");
-        if (string.IsNullOrWhiteSpace(NailsItemId) || !items.TryGetValue(NailsItemId, out var nails) || !nails) errors.Add("Nails must be enabled/stackable.");
-        if (Arrows is not null)
-        {
-            foreach (var id in Arrows.ItemIds)
-                if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked != (id != Arrows.KnifeItemId))
-                    errors.Add($"Arrow item '{id}' has an unavailable or incorrect stack shape.");
-        }
-        return errors;
-    }
+    // Retained placements keep their exact item, geometry and art when recipes change.
+    public bool SamePlacementFacts(FurnitureRecipeSettings other) => ItemId == other.ItemId &&
+        FootprintWidthTiles == other.FootprintWidthTiles && FootprintHeightTiles == other.FootprintHeightTiles &&
+        OccupiesFurnitureSpace == other.OccupiesFurnitureSpace && BlocksMovement == other.BlocksMovement &&
+        EastTexturePath == other.EastTexturePath && WestTexturePath == other.WestTexturePath;
 }
 
 // Four inventory recipes share the existing Crafting lifecycle, not furniture geometry.
