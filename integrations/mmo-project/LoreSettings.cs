@@ -114,8 +114,8 @@ public sealed record LoreSettings
                 errors.Add("Basic Goo remains level 1, 5 XP and 1 mastery point.");
             if (FindSpecimen("slime_goo")?.FamilyId != "slime") errors.Add("Goo remains a Slime specimen.");
             if (FindFamily("beasts") is not null && FindSpecimen("rat_tail") is not
-                { FamilyId: "beasts", RequiredLevel: 5, BaseXp: 10, MasteryPoints: 2 })
-                errors.Add("Rat Tail remains level 5, 10 XP and 2 Beast mastery points.");
+                { FamilyId: "beasts", RequiredLevel: 1, BaseXp: 10, MasteryPoints: 2 })
+                errors.Add("Rat Tail remains level 1, 10 XP and 2 Beast mastery points.");
         }
         if (FindFamily("flowers") is not null && (FindSpecimen("inventory_484_flowers") is not
                 { FamilyId: "flowers", RequiredLevel: 1, BaseXp: 10, MasteryPoints: 1 } ||
