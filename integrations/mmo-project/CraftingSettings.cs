@@ -16,8 +16,9 @@ public sealed record CraftingSettings(
     [property: JsonPropertyName("furniture")] IReadOnlyList<FurnitureRecipeSettings> Furniture)
 {
     [JsonPropertyName("arrows")] public ArrowCraftingSettings? Arrows { get; init; }
+    [JsonPropertyName("spinning")] public SpinningCraftingSettings? Spinning { get; init; }
     [JsonIgnore] public IReadOnlyList<string> ItemIds => [SawItemId, HammerItemId, LogItemId, PlankItemId, NailsItemId,
-        .. (Furniture ?? []).Select(f => f?.ItemId ?? "")];
+        .. (Furniture ?? []).Select(f => f?.ItemId ?? ""), .. (Spinning is { } spin ? new[] { spin.WoolItemId, spin.YarnItemId } : Array.Empty<string>())];
     public FurnitureRecipeSettings? FindFurniture(string itemId) => Furniture?.FirstOrDefault(f => f?.ItemId == itemId);
 
     public IReadOnlyList<string> Validate(IReadOnlySet<string>? items = null)
@@ -30,7 +31,7 @@ public sealed record CraftingSettings(
         if (SawLevel is < 1 or > 99 || SawXpTenths is < 0 or > 10000000 || SawDurationMs is < 1 or > 86400000)
             errors.Add("Saw requires level 1–99, XP 0–10000000 tenths and duration 1–86400000 ms.");
         if (Furniture is null || Furniture.Count == 0) errors.Add("At least one furniture recipe is required.");
-        var recipeIds = new HashSet<string> { "saw_plank", "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows" };
+        var recipeIds = new HashSet<string> { "saw_plank", "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows", "spin_wool" };
         foreach (var f in Furniture ?? [])
         {
             if (f is null) { errors.Add("Furniture entries must be objects."); continue; }
@@ -46,6 +47,9 @@ public sealed record CraftingSettings(
                     errors.Add("Furniture directions require project PNG asset paths.");
         }
         if (Arrows is not null) errors.AddRange(Arrows.Validate(items, ItemIds));
+        if (Spinning is { } spin && (spin.WoolItemId != "raw_wool" || spin.StationDefinitionId != "spinning_wheel" ||
+            spin.Level is < 1 or > 99 || spin.XpTenths is < 0 or > 10000000 || spin.DurationMs is < 1 or > 86400000))
+            errors.Add("Spinning requires spinning_wheel, level 1–99 and valid XP/duration.");
         return errors;
     }
     public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items)
@@ -117,6 +121,15 @@ public sealed record ArrowCraftingSettings(
     }
 }
 public sealed record ArrowCraftingStep(
+    [property: JsonPropertyName("level")] int Level,
+    [property: JsonPropertyName("xp_tenths")] int XpTenths,
+    [property: JsonPropertyName("duration_ms")] int DurationMs);
+
+// One ordinary station recipe; Crafting retains the shared production lifecycle.
+public sealed record SpinningCraftingSettings(
+    [property: JsonPropertyName("wool_item_id")] string WoolItemId,
+    [property: JsonPropertyName("yarn_item_id")] string YarnItemId,
+    [property: JsonPropertyName("station_definition_id")] string StationDefinitionId,
     [property: JsonPropertyName("level")] int Level,
     [property: JsonPropertyName("xp_tenths")] int XpTenths,
     [property: JsonPropertyName("duration_ms")] int DurationMs);

@@ -67,6 +67,15 @@ for(const [key,label] of arrowFields){
     input.type=key.endsWith('_item_id')?'text':'number';input.step='1';
     input.addEventListener('input',invalidate);row.append(input);$('fields').append(row);
 }
+const spinningDefaults={"wool_item_id": "raw_wool", "yarn_item_id": "wool_yarn", "station_definition_id": "spinning_wheel", "level": 1, "xp_tenths": 50, "duration_ms": 3000};
+const spinningToggle=document.createElement('input');spinningToggle.type='checkbox';
+const spinningLabel=document.createElement('label');spinningLabel.textContent='Enable wool spinning';
+spinningLabel.append(spinningToggle);$('fields').append(spinningLabel);spinningToggle.addEventListener('change',invalidate);
+for(const key of Object.keys(spinningDefaults)){
+    const label=document.createElement('label');label.textContent='Spinning '+key.replaceAll('_',' ');label.style.display='block';
+    const input=document.createElement('input');input.id='spinning.'+key;input.type=key.endsWith('_id')?'text':'number';
+    input.addEventListener('input',invalidate);label.append(input);$('fields').append(label);
+}
 function arrowValue(settings,key){return key.split('.').reduce((value,part)=>value?.[part],settings);}
 function invalidate(){
     prepared=null;
@@ -76,6 +85,8 @@ function invalidate(){
 function localInputs(){
     const local=Object.fromEntries(fields.map(([key])=>[key,$(key).value]));
     local.furniture=furnitureInputs();
+    local.spinning_enabled=spinningToggle.checked;
+    for(const key of Object.keys(spinningDefaults))local['spinning.'+key]=$('spinning.'+key).value;
     local.arrows_enabled=arrowToggle.checked;
     for(const [key] of arrowFields)local["arrows."+key]=$("arrows."+key).value;
     return local;
@@ -85,6 +96,8 @@ function renderDefinition(definition){
     for(const [key] of fields)$(key).value=definition.draft[key];
     furnitureRows.replaceChildren();
     for(const furniture of definition.draft.furniture||[])appendFurniture(furniture);
+    spinningToggle.checked=definition.draft.spinning!=null;
+    for(const key of Object.keys(spinningDefaults))$('spinning.'+key).value=(definition.draft.spinning||spinningDefaults)[key];
     arrowToggle.checked=definition.draft.arrows!=null;
     for(const [key] of arrowFields)$('arrows.'+key).value=arrowValue(definition.draft.arrows||arrowDefaults,key);
 }
@@ -195,6 +208,15 @@ $('preview').onclick=async()=>{
                 if(!key.endsWith('_item_id')&&!/^\d+$/.test(value))throw new Error('Enter a whole number for '+key);
                 const parts=key.split('.');const target=parts.length===2?draft.arrows[parts[0]]:draft.arrows;
                 target[parts.at(-1)]=key.endsWith('_item_id')?value:Number(value);
+            }
+        }
+        draft.spinning=null;
+        if(spinningToggle.checked){
+            draft.spinning={};
+            for(const key of Object.keys(spinningDefaults)){
+                const value=$('spinning.'+key).value.trim();
+                if(!key.endsWith('_id')&&!/^\d+$/.test(value))throw new Error('Enter a whole number for '+key);
+                draft.spinning[key]=key.endsWith('_id')?value:Number(value);
             }
         }
         const body={

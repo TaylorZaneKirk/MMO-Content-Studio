@@ -9,6 +9,9 @@ const FURNITURE_FIELDS := ["recipe_id", "display_name", "item_id", "level", "xp_
 var _furniture_rows: VBoxContainer
 var _add_furniture_button: Button
 var _arrow_fields: Dictionary = {}
+const SPINNING_DEFAULTS := {"wool_item_id": "raw_wool", "yarn_item_id": "wool_yarn", "station_definition_id": "spinning_wheel", "level": 1, "xp_tenths": 50, "duration_ms": 3000}
+var _spinning_fields := {}
+var _spinning_enabled: CheckBox
 var _arrows_enabled: CheckBox
 var _fields: Dictionary = {}
 var _current: Dictionary = {}
@@ -20,7 +23,7 @@ var _busy := false
 
 func _ready() -> void:
 	var title := Label.new()
-	title.text = "Crafting — planks, furniture and arrows"
+	title.text = "Crafting — planks, furniture, arrows and wool"
 	add_child(title)
 	var reload_button := Button.new()
 	reload_button.text = "Load / reload saved settings"
@@ -68,6 +71,18 @@ func _ready() -> void:
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_arrow_fields[spec[0]] = field
+	_spinning_enabled = CheckBox.new()
+	_spinning_enabled.text = "Enable wool spinning"
+	_spinning_enabled.toggled.connect(func(_enabled: bool): _apply.disabled = true)
+	form.add_child(_spinning_enabled)
+	for key: String in SPINNING_DEFAULTS:
+		var label := Label.new()
+		label.text = "Spinning " + key.replace("_", " ")
+		form.add_child(label)
+		var field := LineEdit.new()
+		field.text_changed.connect(func(_value: String): _apply.disabled = true)
+		form.add_child(field)
+		_spinning_fields[key] = field
 	_operation = OptionButton.new()
 	_operation.add_item("Save draft")
 	_operation.add_item("Publish saved settings")
@@ -128,6 +143,10 @@ func _loaded(data: Dictionary) -> void:
 		_furniture_rows.remove_child(row)
 		row.queue_free()
 	for facts: Dictionary in data.get("draft", {}).get("furniture", []): _add_furniture(facts)
+	var spinning: Variant = data.get("draft", {}).get("spinning")
+	_spinning_enabled.button_pressed = spinning is Dictionary
+	if not spinning is Dictionary: spinning = SPINNING_DEFAULTS
+	for key: String in _spinning_fields: _spinning_fields[key].text = str(spinning.get(key, ""))
 	var arrows: Variant = data.get("draft", {}).get("arrows")
 	_arrows_enabled.button_pressed = arrows is Dictionary
 	if not arrows is Dictionary: arrows = ARROW_DEFAULTS
@@ -186,6 +205,17 @@ func _preview() -> void:
 			if parts.size() == 1: arrows[key] = value
 			else: arrows[parts[0]][parts[1]] = int(value)
 		draft["arrows"] = arrows
+	draft["spinning"] = null
+	if _spinning_enabled.button_pressed:
+		var spinning := {}
+		for key: String in _spinning_fields:
+			var value: String = _spinning_fields[key].text.strip_edges()
+			if key.ends_with("_id"): spinning[key] = value
+			elif value.is_valid_int(): spinning[key] = int(value)
+			else:
+				_status.text = "Enter a whole number for " + key
+				return
+		draft["spinning"] = spinning
 	_request = {"draft": draft, "expected_updated_at_utc": _current.get("updated_at_utc"), "target_operation": ["save_draft", "publish", "disable", "delete"][_operation.selected]}
 	_apply.disabled = true
 	_set_busy(true)
@@ -233,5 +263,7 @@ func _set_busy(value: bool) -> void:
 	for field: LineEdit in _fields.values():
 		field.editable = not value
 	for field: LineEdit in _arrow_fields.values(): field.editable = not value
+	_spinning_enabled.disabled = value
+	for field: LineEdit in _spinning_fields.values(): field.editable = not value
 	_arrows_enabled.disabled = value
 	_operation.disabled = value

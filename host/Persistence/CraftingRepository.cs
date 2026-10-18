@@ -41,6 +41,11 @@ public sealed class CraftingRepository(AuthoringDatabaseConnectionFactory factor
         command.CommandText = "SELECT EXISTS(SELECT 1 FROM world_object_definitions w JOIN world_object_interactions x USING(definition_id) WHERE w.definition_id=@station AND w.publication_state='Published' AND x.action_id='crafting' AND w.blocks_movement AND w.footprint_width_tiles=1 AND w.footprint_height_tiles=1)";
         command.Parameters.AddWithValue("station", settings.StationDefinitionId);
         if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish an Crafting station with the crafting action first.");
+        if (settings.Spinning is { } spin)
+        {
+            command.Parameters["station"].Value = spin.StationDefinitionId;
+            if (await command.ExecuteScalarAsync(ct) is not true) errors.Add("Publish the spinning wheel with Crafting action first.");
+        }
         command.CommandText = "SELECT count(*) FROM item_definitions WHERE item_id=ANY(@furniture) AND trade_policy='tradeable'";
         command.Parameters.AddWithValue("furniture", settings.Furniture.Select(f => f.ItemId).ToArray());
         if (Convert.ToInt64(await command.ExecuteScalarAsync(ct)) != settings.Furniture.Count) errors.Add("Furniture must be tradeable.");
