@@ -439,7 +439,7 @@ public sealed class NpcAuthoringService
     private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string,string>> HumanOutfitPresets =
         new Dictionary<string, IReadOnlyDictionary<string,string>>
         {
-            ["Shepherd"] = new Dictionary<string,string> { ["head"]="head10", ["body"]="defbod", ["legs"]="defbod", ["right_hand"]="wooden_staff" },
+            ["Shepherd"] = new Dictionary<string,string> { ["head"]="head10", ["body"]="wool_tunic", ["legs"]="wool_trousers", ["right_hand"]="shepherd_crook" },
             ["Worker"] = new Dictionary<string,string> { ["head"]="head4", ["body"]="leather_armor", ["legs"]="leather_armor" },
             ["Traveller"] = new Dictionary<string,string> { ["head"]="head7", ["body"]="leather_armor", ["legs"]="leather_armor", ["cape"]="lords_armor" }
         };
