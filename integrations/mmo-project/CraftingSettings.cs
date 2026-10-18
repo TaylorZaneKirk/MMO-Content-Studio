@@ -39,8 +39,8 @@ public sealed record CraftingSettings(
             if (f.Level is < 1 or > 99 || f.PlacementLevel is < 1 or > 99) errors.Add("Furniture levels must be 1–99.");
             if (f.DurationMs is < 1 or > 86400000 || f.XpTenths is < 0 or > 10000000) errors.Add("Invalid furniture duration or XP.");
             if (f.Planks is < 1 or > 10000 || f.Nails is < 1 or > 10000) errors.Add("Furniture ingredients must be 1–10000.");
-            if (f.FootprintWidthTiles != 1 || f.FootprintHeightTiles != 1 || !f.OccupiesFurnitureSpace || f.BlocksMovement)
-                errors.Add("Furniture requires a 1×1 occupied, nonblocking footprint.");
+            if (f.FootprintWidthTiles != 1 || f.FootprintHeightTiles != 1 || !f.OccupiesFurnitureSpace)
+                errors.Add("Furniture requires a 1×1 occupied footprint.");
             foreach (var path in new[] { f.EastTexturePath, f.WestTexturePath })
                 if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) || !path.EndsWith(".png", StringComparison.Ordinal) || path.Contains(".."))
                     errors.Add("Furniture directions require project PNG asset paths.");
