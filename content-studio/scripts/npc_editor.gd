@@ -194,6 +194,8 @@ var _fixed_frame: OptionButton
 var _rigged_controls: VBoxContainer
 var _cosmetic_controls: Dictionary = {}
 var _composite_visual: Dictionary = {}
+var _human_layers: Variant = null
+var _human_controls: VBoxContainer
 var _socket_calibration_editor: ActorSocketCalibrationEditor
 var _has_persisted_rigged_preview := false
 var _has_rigged_preview := false
@@ -300,6 +302,8 @@ func _add_visual_section(parent: VBoxContainer) -> void:
 	_render_scale = _spin_field(grid, "Render scale", 0.01, 8, 0.25, 0.01)
 	_footprint_width = _spin_field(grid, "Footprint width tiles", 1, 1, 1, 1)
 	_footprint_height = _spin_field(grid, "Footprint height tiles", 1, 1, 1, 1)
+	_human_controls = VBoxContainer.new()
+	parent.add_child(_human_controls)
 	_rigged_controls = VBoxContainer.new()
 	parent.add_child(_rigged_controls)
 	var rig_grid := _grid(_rigged_controls)
@@ -733,7 +737,9 @@ func _start_new_npc() -> void:
 	_notes.text = ""
 	_asset_preview_file_path = ""
 	_composite_visual = {}
+	_human_layers = null
 	_select_option(_visual_mode, "flat_sprite")
+	_rebuild_human_controls()
 	_refresh_socket_calibration_editor()
 	_select_option(_operation, "save_draft")
 	_set_form_enabled(_schema_available)
@@ -824,6 +830,7 @@ func _payload() -> Dictionary:
 		"preview_signature": null,
 		"visual_mode": _selected_metadata(_visual_mode),
 		"composite_visual": _build_composite_visual(),
+		"layer_asset_keys": _human_layers,
 	}
 
 
@@ -861,7 +868,7 @@ func _on_operation_changed() -> void:
 
 
 func _on_preview_facing_changed() -> void:
-	if _selected_metadata(_visual_mode) == "composite_rig" and not _npc_id.text.strip_edges().is_empty():
+	if _selected_metadata(_visual_mode) in ["composite_rig", "layered_humanoid"] and not _npc_id.text.strip_edges().is_empty():
 		_visual_preview.set_rigged_sprite_preview({})
 		_preview()
 	else:
@@ -869,6 +876,13 @@ func _on_preview_facing_changed() -> void:
 
 
 func _on_visual_mode_changed() -> void:
+	if _selected_metadata(_visual_mode) == "layered_humanoid":
+		if _human_layers == null:
+			_human_layers = {"head": "", "body": "", "legs": ""}
+		_rebuild_human_controls()
+		_rebuild_rigged_controls()
+		_on_form_changed()
+		return
 	if _selected_metadata(_visual_mode) == "composite_rig" and _composite_visual.is_empty():
 		_composite_visual = {
 			"schema_version": 1,
@@ -880,6 +894,7 @@ func _on_visual_mode_changed() -> void:
 			"cosmetic_item_ids": {},
 		}
 	_load_composite_visual(_composite_visual)
+	_rebuild_human_controls()
 	_on_form_changed()
 
 
@@ -922,6 +937,8 @@ func _apply_actor_appearance_options() -> void:
 		return
 	var appearance := _options.get("actor_appearance", {}) as Dictionary
 	_fill_authoring_options(_visual_mode, appearance.get("visual_modes", []) as Array)
+	_visual_mode.add_item("Layered human")
+	_visual_mode.set_item_metadata(_visual_mode.item_count - 1, "layered_humanoid")
 	if _visual_mode.item_count == 0:
 		_visual_mode.add_item("Flat Sprite")
 		_visual_mode.set_item_metadata(0, "flat_sprite")
@@ -935,6 +952,67 @@ func _apply_actor_appearance_options() -> void:
 	_rebuild_rigged_controls()
 
 
+# Presets are authoring shortcuts. Their selections remain ordinary editable keys.
+func _rebuild_human_controls() -> void:
+	if _human_controls == null:
+		return
+	for child in _human_controls.get_children():
+		_human_controls.remove_child(child)
+		child.queue_free()
+	_human_controls.visible = _selected_metadata(_visual_mode) == "layered_humanoid" or _human_layers != null
+	if not _human_controls.visible:
+		return
+	_human_controls.add_child(_label("Human outfit — visual only; new shepherd art is not installed"))
+	for preset in (_options.get("human_outfit_presets", {}) as Dictionary):
+		var button := Button.new()
+		button.text = str(preset) + " starting outfit"
+		button.disabled = not _form_editable
+		button.pressed.connect(_apply_human_preset.bind(str(preset)))
+		_human_controls.add_child(button)
+	if _human_layers is Dictionary:
+		var assets := _options.get("human_layer_assets", {}) as Dictionary
+		var grid := _grid(_human_controls)
+		for slot in ["head", "body", "legs", "boots", "right_hand", "left_hand", "gloves", "cape"]:
+			grid.add_child(_label(slot.capitalize()))
+			var selector := OptionButton.new()
+			grid.add_child(selector)
+			selector.add_item("None")
+			selector.set_item_metadata(0, "")
+			for key in assets.get(slot, []):
+				selector.add_item(str(key))
+				selector.set_item_metadata(selector.item_count - 1, str(key))
+			var stored := str(_human_layers.get(slot, ""))
+			if not stored.is_empty() and not stored in assets.get(slot, []):
+				selector.add_item("Stored value: " + stored)
+				selector.set_item_metadata(selector.item_count - 1, stored)
+			_select_option(selector, stored)
+			selector.disabled = not _form_editable
+			selector.item_selected.connect(_on_human_layer_changed.bind(slot, selector).unbind(1))
+	var clear := Button.new()
+	clear.text = "Remove human layers"
+	clear.disabled = not _form_editable
+	clear.pressed.connect(func():
+		_human_layers = null
+		_rebuild_human_controls()
+		_on_form_changed())
+	_human_controls.add_child(clear)
+
+
+func _apply_human_preset(preset: String) -> void:
+	_human_layers = (_options.human_outfit_presets[preset] as Dictionary).duplicate(true)
+	_composite_visual = {}
+	_select_option(_visual_mode, "layered_humanoid")
+	_render_scale.value = 1.0
+	_rebuild_human_controls()
+	_rebuild_rigged_controls()
+	_on_form_changed()
+
+
+func _on_human_layer_changed(slot: String, selector: OptionButton) -> void:
+	_human_layers[slot] = _selected_metadata(selector)
+	_on_form_changed()
+
+
 func _first_rig_id() -> String:
 	var appearance := _options.get("actor_appearance", {}) as Dictionary
 	var rigs := appearance.get("rigs", []) as Array
@@ -942,12 +1020,16 @@ func _first_rig_id() -> String:
 
 
 func _load_composite_visual(payload: Dictionary) -> void:
+	if payload.has("visual_mode"):
+		var saved_layers: Variant = payload.get("layer_asset_keys")
+		_human_layers = saved_layers.duplicate(true) if saved_layers is Dictionary else null
 	if str(payload.get("visual_mode", "flat_sprite")) != "composite_rig":
 		_composite_visual = {}
 	else:
 		var descriptor_variant: Variant = payload.get("composite_visual", payload)
 		_composite_visual = (descriptor_variant as Dictionary).duplicate(true) if descriptor_variant is Dictionary else {}
-	_select_option(_visual_mode, "composite_rig" if not _composite_visual.is_empty() else "flat_sprite")
+	_select_option(_visual_mode, "layered_humanoid" if str(payload.get("visual_mode")) == "layered_humanoid" else ("composite_rig" if not _composite_visual.is_empty() else "flat_sprite"))
+	_rebuild_human_controls()
 	_rebuild_rigged_controls()
 	_refresh_socket_calibration_editor()
 
@@ -1383,6 +1465,7 @@ func _render_reference_summary(summary: Dictionary) -> void:
 func _set_form_enabled(enabled: bool) -> void:
 	var editable := enabled and _schema_available
 	_form_editable = editable
+	_rebuild_human_controls()
 	_new_button.disabled = not _schema_available
 	for control_variant in _form_controls:
 		var control := control_variant as Control

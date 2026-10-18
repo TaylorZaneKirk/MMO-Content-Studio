@@ -65,7 +65,7 @@ function updateSession() {
     }
     updateActions();calibration.refreshPermission();
 }
-const draftKeys=['display_name','visual_texture_path','source_width','source_height','visual_anchor_offset_x','visual_anchor_offset_y','visual_render_scale','footprint_width_tiles','footprint_height_tiles','movement_behavior','wander_radius_tiles','tick_interval_ms','idle_chance','interaction_enabled','interaction_range_tiles','default_interaction','default_dialogue_id','notes','visual_mode','composite_visual','shop_definition_id'];
+const draftKeys=['display_name','visual_texture_path','source_width','source_height','visual_anchor_offset_x','visual_anchor_offset_y','visual_render_scale','footprint_width_tiles','footprint_height_tiles','movement_behavior','wander_radius_tiles','tick_interval_ms','idle_chance','interaction_enabled','interaction_range_tiles','default_interaction','default_dialogue_id','notes','visual_mode','composite_visual','shop_definition_id','layer_asset_keys'];
 function toDraft(definition){return Object.fromEntries(draftKeys.map(key=>[key,clone(definition[key])]));}
 async function loadOptions(){
     const revision=++state.optionsRevision;
@@ -172,8 +172,17 @@ function render(){
     const d=state.draft;let p=section('NPC details',true,'The complete NPC definition is saved together. Shared calibration is saved separately.');let g=grid(p);
     field(g,state,'id','NPC ID',{required:true,readonly:!!state.definition,path:'npc_definition_id'});field(g,d,'display_name','Display name',{required:true});field(g,d,'notes','Author notes',{kind:'multiline',nullable:true});
     p=section('Appearance',true,'Flat sprites and composite actors share the source texture. Changing mode retains authored data until you explicitly remove incompatible fields.');g=grid(p);
-    selectField(g,d,'visual_mode','Visual mode',[{id:'flat_sprite',display_name:'Flat sprite'},{id:'composite_rig',display_name:'Composite rig'}]);reference(g,d,'visual_texture_path','Source PNG','asset');
+    selectField(g,d,'visual_mode','Visual mode',[{id:'flat_sprite',display_name:'Flat sprite'},{id:'composite_rig',display_name:'Composite rig'},{id:'layered_humanoid',display_name:'Layered human'}]).addEventListener('change',render);reference(g,d,'visual_texture_path','Source PNG','asset');
     field(g,d,'source_width','Source width',{kind:'integer',min:1});field(g,d,'source_height','Source height',{kind:'integer',min:1});field(g,d,'visual_anchor_offset_x','Anchor X',{kind:'coordinate'});field(g,d,'visual_anchor_offset_y','Anchor Y',{kind:'coordinate'});field(g,d,'visual_render_scale','Render scale',{kind:'coordinate'});
+    if(d.visual_mode==='layered_humanoid'||d.layer_asset_keys){
+        d.layer_asset_keys??={head:'',body:'',legs:''};
+        p.append(element('h4','Human outfit'),element('p','Visual layers only. Presets fill editable fields; they do not grant equipment. New shepherd art remains a preview until approved.','muted'));
+        const presets=state.options.human_outfit_presets||{};
+        for(const [name,layers] of Object.entries(presets))p.append(button(`${name} starting outfit`,()=>{d.layer_asset_keys=clone(layers);d.composite_visual=null;d.visual_mode='layered_humanoid';d.visual_render_scale=1;changed();render();}));
+        for(const slot of new Set(['head','body','legs','boots','right_hand','left_hand','gloves','cape',...Object.keys(d.layer_asset_keys)]))
+            selectField(p,d.layer_asset_keys,slot,slot.replaceAll('_',' '),['',...(state.options.human_layer_assets?.[slot]||[])],`layer_asset_keys.${slot}`);
+        p.append(button('Remove human layers',()=>{d.layer_asset_keys=null;changed();render();}));
+    }
     if(!d.composite_visual)p.append(button('Add composite descriptor',()=>{d.composite_visual={schema_version:1,rig_id:'',calibration_id:null,pose_policy:'actor_pose',fixed_direction:null,fixed_frame:null,cosmetic_item_ids:{}};render();}));
     else{
         const v=d.composite_visual,appearance=state.options.actor_appearance||{},rig=appearance.rigs?.find(r=>r.rig_id===v.rig_id);g=grid(p);
@@ -197,7 +206,7 @@ function render(){
     for(const node of document.querySelectorAll('.section'))if(opened.has(node.dataset.title))node.open=true;changed();
 }
 async function showAppearance(preview){
-    const revision=++state.appearanceRevision,d=clone(state.draft);$('appearance-status').textContent=preview?'Resolved composite preview. Item grip/pose editing remains in desktop Items.':'Flat source preview. Use Preview current appearance for the current pose and composite layers.';
+    const revision=++state.appearanceRevision,d=clone(state.draft);$('appearance-status').textContent=preview?'Resolved appearance preview. Human outfits use aligned source layers; check final grip details in the game renderer.':'Flat source preview. Use Preview current appearance for the current pose and composite layers.';
     try{await drawActorPreview($('actor-preview'),preview||{base_url:`/studio/api/actor-appearance/image?resource=${encodeURIComponent(d.visual_texture_path)}`,source_width:d.source_width,source_height:d.source_height,cosmetics:[],foreground_overlays:[]},()=>revision===state.appearanceRevision);}
     catch(error){if(revision===state.appearanceRevision)$('appearance-status').textContent=`Appearance unavailable: ${error.message}`;}
 }

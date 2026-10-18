@@ -145,6 +145,93 @@ public sealed class RiggedSpritePreviewResolver
             overlays.OrderBy(overlay => overlay.ZIndex).ToArray());
     }
 
+    // PlayerComposite selects legacy metadata by asset key, not published item ID.
+    // Keep its layer order and attachment math here; the existing native/browser
+    // preview consumers draw the resolved images without owning pose decisions.
+    public RiggedSpritePreviewDefinition? ResolveHumanLayers(
+        IReadOnlyDictionary<string,string>? layers, string? direction, int? frame)
+    {
+        if (layers is null) return null;
+        direction = direction?.ToUpperInvariant() ?? "S";
+        if (direction is not ("N" or "E" or "S" or "W")) return null;
+        var pose = Math.Clamp(frame ?? 2, 1, 4);
+        var frameKey = pose.ToString();
+        var rig = _catalogService.LoadRigCatalog().Rigs.FirstOrDefault(r => r.RigId == "humanoid_v1");
+        var assetsRoot = _assetService.GetGameAssetsRoot();
+        if (rig is null || assetsRoot is null) return null;
+        var legacyPath = Path.Combine(assetsRoot, "..", "actors", "appearance", "data", "equipped_visuals", "catalog_v1.json");
+        var legacy = System.Text.Json.JsonSerializer.Deserialize<HumanVisualCatalog>(File.ReadAllText(legacyPath),
+            new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower });
+        var resolved = new List<RiggedSpritePreviewCosmeticDefinition>();
+        var resolvedFrames = new Dictionary<string,int>();
+        var activeSockets = new HashSet<string>();
+        var slots = new[] { "cape", "legs", "boots", "body", "left_hand", "right_hand", "gloves", "head" };
+        for (var index = 0; index < slots.Length; index++)
+        {
+            var slot = slots[index];
+            if (!layers.TryGetValue(slot, out var key) || string.IsNullOrEmpty(key)) continue;
+            if (!Regex.IsMatch(key, "^[A-Za-z_][A-Za-z0-9_]*$")) return null;
+            var path = ResolveAppearanceFrame(slot, key, direction, pose);
+            if (path is null || !TryReadPngDimensions(path, out var width, out _)) return null;
+            var resolvedFrame = int.Parse(Regex.Match(Path.GetFileName(path), "-F([1-4])-").Groups[1].Value);
+            resolvedFrames[slot] = resolvedFrame;
+            var visual = legacy?.EquippedVisuals.LastOrDefault(v => v.AssetKey == key && v.RigId == rig.RigId);
+            var depth = rig.Layers.First(l => l.LayerId == slot).ZIndexByDirection.GetValueOrDefault(direction);
+            if (visual?.ZIndexOverrideByDirection?.TryGetValue(direction, out var overridden) == true) depth = overridden;
+            var flip = false; var x = 0; var y = 0;
+            if (visual?.RenderLayerId == slot)
+            {
+                if (IsPoseEnabled(visual.HiddenPoses, direction, frameKey)) continue;
+                flip = IsPoseEnabled(visual.FlipX, direction, frameKey);
+                if (IsPoseEnabled(visual.ItemOverGrip, direction, frameKey))
+                {
+                    var depths = rig.ForegroundOverlays.Where(o => o.SocketId == visual.SocketId &&
+                        FindRectangle(o.SourceRectByDirection, direction, frameKey) is not null)
+                        .Select(o => o.ZIndexByDirection.GetValueOrDefault(direction)).ToArray();
+                    depth = (depths.Length > 0 ? depths.Max() : Math.Max(depth, rig.Layers.Max(l => l.ZIndexByDirection.GetValueOrDefault(direction)))) + 1;
+                }
+                if (visual.BindingType == "socket")
+                {
+                    var socket = rig.Sockets.FirstOrDefault(p => p.SocketId == visual.SocketId);
+                    var point = FindPoint(socket?.Positions, direction, frameKey);
+                    var grip = FindPoint(visual.GripAnchors, direction, frameKey);
+                    if (point is not null && grip is not null)
+                    {
+                        x = point.X - (flip ? width - 1 - grip.X : grip.X) + (visual.Nudge?.X ?? 0);
+                        y = point.Y - grip.Y + (visual.Nudge?.Y ?? 0);
+                        activeSockets.Add(visual.SocketId!);
+                    }
+                }
+            }
+            // Encode stable scene sibling order for equal-depth body/legs/head.
+            resolved.Add(new(slot, path, x, y, depth * 10 + index, flip));
+        }
+        var body = resolved.FirstOrDefault(p => p.ItemId == "body");
+        if (body is null || !TryReadPngDimensions(body.FilePath, out var sourceWidth, out var sourceHeight)) return null;
+        var overlays = new List<RiggedSpritePreviewOverlayDefinition>();
+        foreach (var overlay in rig.ForegroundOverlays)
+        {
+            if (!activeSockets.Contains(overlay.SocketId)) continue;
+            // The humanoid rig's grip crops come from its body layer.
+            if (overlay.SourceLayerId != "body") return null;
+            var rect = FindRectangle(overlay.SourceRectByDirection, direction, resolvedFrames["body"].ToString());
+            if (rect is null || rect.X < 0 || rect.Y < 0 || rect.X + rect.Width > sourceWidth || rect.Y + rect.Height > sourceHeight) continue;
+            overlays.Add(new(overlay.OverlayId, rect, rect.X, rect.Y,
+                overlay.ZIndexByDirection.GetValueOrDefault(direction) * 10 - body.ZIndex));
+        }
+        return new(body.FilePath, sourceWidth, sourceHeight, direction, pose,
+            resolved.Where(p => p.ItemId != "body").Select(p => p with { X = p.X - body.X, Y = p.Y - body.Y, ZIndex = p.ZIndex - body.ZIndex }).ToArray(), overlays);
+    }
+
+    private sealed record HumanVisualCatalog(IReadOnlyList<HumanVisual> EquippedVisuals);
+    private sealed record HumanVisual(string AssetKey, string RigId, string BindingType, string RenderLayerId,
+        string? SocketId, SourcePixelPointDefinition? Nudge,
+        IReadOnlyDictionary<string,IReadOnlyDictionary<string,SourcePixelPointDefinition>>? GripAnchors,
+        IReadOnlyDictionary<string,IReadOnlyDictionary<string,bool>>? FlipX,
+        IReadOnlyDictionary<string,IReadOnlyDictionary<string,bool>>? HiddenPoses,
+        IReadOnlyDictionary<string,IReadOnlyDictionary<string,bool>>? ItemOverGrip,
+        IReadOnlyDictionary<string,int>? ZIndexOverrideByDirection);
+
     private string? ResolveAppearanceFrame(string renderLayerId, string assetKey, string direction, int frame)
     {
         foreach (var candidate in FrameCandidates(direction, frame))

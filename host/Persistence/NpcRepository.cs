@@ -62,7 +62,7 @@ public sealed class NpcRepository : INpcRepository
                 publication_state,
                 visual_texture_path,
                 visual_mode,
-                composite_visual,
+                composite_visual, layer_asset_keys,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -269,7 +269,7 @@ public sealed class NpcRepository : INpcRepository
                 publication_state,
                 visual_texture_path,
                 visual_mode,
-                composite_visual,
+                composite_visual, layer_asset_keys,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -313,7 +313,7 @@ public sealed class NpcRepository : INpcRepository
                 publication_state,
                 visual_texture_path,
                 visual_mode,
-                composite_visual,
+                composite_visual, layer_asset_keys,
                 source_width,
                 source_height,
                 visual_anchor_offset_x,
@@ -339,7 +339,7 @@ public sealed class NpcRepository : INpcRepository
                 'Draft',
                 @visual_texture_path,
                 @visual_mode,
-                @composite_visual,
+                @composite_visual, @layer_asset_keys,
                 @source_width,
                 @source_height,
                 @visual_anchor_offset_x,
@@ -379,7 +379,7 @@ public sealed class NpcRepository : INpcRepository
                 publication_state = 'Draft',
                 visual_texture_path = @visual_texture_path,
                 visual_mode = @visual_mode,
-                composite_visual = @composite_visual,
+                composite_visual = @composite_visual, layer_asset_keys = @layer_asset_keys,
                 source_width = @source_width,
                 source_height = @source_height,
                 visual_anchor_offset_x = @visual_anchor_offset_x,
@@ -418,6 +418,7 @@ public sealed class NpcRepository : INpcRepository
         command.Parameters.AddWithValue("display_name", draft.DisplayName);
         command.Parameters.AddWithValue("visual_texture_path", draft.VisualTexturePath);
         command.Parameters.AddWithValue("visual_mode", draft.VisualMode);
+        command.Parameters.Add("layer_asset_keys", NpgsqlDbType.Jsonb).Value = draft.LayerAssetKeys is null ? DBNull.Value : JsonSerializer.Serialize(draft.LayerAssetKeys);
         command.Parameters.Add("composite_visual", NpgsqlDbType.Jsonb).Value = draft.CompositeVisual is null
             ? DBNull.Value
             : JsonSerializer.Serialize(draft.CompositeVisual);
@@ -475,7 +476,8 @@ public sealed class NpcRepository : INpcRepository
             reader.IsDBNull(compositeVisualOrdinal)
                 ? null
                 : JsonSerializer.Deserialize<RiggedSpriteVisualDescriptor>(reader.GetString(compositeVisualOrdinal)),
-            reader.IsDBNull(reader.GetOrdinal("shop_definition_id")) ? null : reader.GetString(reader.GetOrdinal("shop_definition_id")));
+            reader.IsDBNull(reader.GetOrdinal("shop_definition_id")) ? null : reader.GetString(reader.GetOrdinal("shop_definition_id")),
+            reader.IsDBNull(reader.GetOrdinal("layer_asset_keys")) ? null : JsonSerializer.Deserialize<Dictionary<string,string>>(reader.GetString(reader.GetOrdinal("layer_asset_keys"))));
     }
 
     private static DateTimeOffset ReadUtc(NpgsqlDataReader reader, string column) =>
@@ -529,7 +531,7 @@ public sealed record NpcDefinitionRecord(
     DateTimeOffset UpdatedAtUtc,
     string VisualMode = ActorVisualModes.FlatSprite,
     RiggedSpriteVisualDescriptor? CompositeVisual = null,
-    string? ShopDefinitionId = null);
+    string? ShopDefinitionId = null, IReadOnlyDictionary<string,string>? LayerAssetKeys = null);
 
 public sealed record NpcReferenceSummaryRecord(
     string NpcDefinitionId,

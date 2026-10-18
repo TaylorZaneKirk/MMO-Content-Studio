@@ -66,7 +66,7 @@ public sealed class NpcAuthoringService
                     false,
                     false),
                 _registry.Defaults,
-                _actorAppearanceCatalogService.LoadOptions()));
+                _actorAppearanceCatalogService.LoadOptions(), LoadHumanLayerAssets(), HumanOutfitPresets));
     }
 
     public async Task<AuthoringOperationResult<NpcCatalogResponse>> ListAsync(
@@ -173,7 +173,9 @@ public sealed class NpcAuthoringService
                         operation,
                         effective,
                         request.ExpectedUpdatedAtUtc),
-                    _riggedSpritePreviewResolver.Resolve(
+                    effective.VisualMode == "layered_humanoid"
+                        ? _riggedSpritePreviewResolver.ResolveHumanLayers(effective.LayerAssetKeys, request.PreviewDirection, request.PreviewFrame)
+                        : _riggedSpritePreviewResolver.Resolve(
                         validation.AssetPreviewFilePath ?? string.Empty,
                         effective.SourceWidth,
                         effective.SourceHeight,
@@ -350,7 +352,7 @@ public sealed class NpcAuthoringService
             request.PreviewSignature,
             request.VisualMode,
             request.CompositeVisual,
-            request.ShopDefinitionId);
+            request.ShopDefinitionId, request.LayerAssetKeys);
 
     public static NpcDraft Normalize(PreviewNpcRequest request) =>
         Normalize(
@@ -376,7 +378,7 @@ public sealed class NpcAuthoringService
             null,
             request.VisualMode,
             request.CompositeVisual,
-            request.ShopDefinitionId);
+            request.ShopDefinitionId, request.LayerAssetKeys);
 
     public static NpcDraft Normalize(
         string displayName,
@@ -401,7 +403,7 @@ public sealed class NpcAuthoringService
         string? previewSignature,
         string? visualMode = ActorVisualModes.FlatSprite,
         RiggedSpriteVisualDescriptor? compositeVisual = null,
-        string? shopDefinitionId = null)
+        string? shopDefinitionId = null, IReadOnlyDictionary<string,string>? layerAssetKeys = null)
     {
         var movement = NpcDomainRules.NormalizeMovementBehavior(movementBehavior);
         var interaction = interactionEnabled;
@@ -429,8 +431,35 @@ public sealed class NpcAuthoringService
             previewSignature,
             presentation.VisualMode,
             presentation.CompositeVisual,
-            NpcDomainRules.NormalizeOptional(shopDefinitionId));
+            NpcDomainRules.NormalizeOptional(shopDefinitionId),
+            layerAssetKeys?.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => p.Value));
     }
+
+    // Starting combinations copy into ordinary fields; no preset identity is stored.
+    private static readonly IReadOnlyDictionary<string, IReadOnlyDictionary<string,string>> HumanOutfitPresets =
+        new Dictionary<string, IReadOnlyDictionary<string,string>>
+        {
+            ["Shepherd"] = new Dictionary<string,string> { ["head"]="head10", ["body"]="defbod", ["legs"]="defbod", ["right_hand"]="wooden_staff" },
+            ["Worker"] = new Dictionary<string,string> { ["head"]="head4", ["body"]="leather_armor", ["legs"]="leather_armor" },
+            ["Traveller"] = new Dictionary<string,string> { ["head"]="head7", ["body"]="leather_armor", ["legs"]="leather_armor", ["cape"]="lords_armor" }
+        };
+
+    private IReadOnlyDictionary<string, IReadOnlyList<string>> LoadHumanLayerAssets()
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>();
+        var root = _assetService.GetGameAssetsRoot();
+        foreach (var slot in new[] { "head", "body", "legs", "boots", "right_hand", "left_hand", "gloves", "cape" })
+        {
+            var directory = root is null ? "" : Path.Combine(root, "actors", "player", slot);
+            result[slot] = Directory.Exists(directory) ? Directory.EnumerateFiles(directory, "*-F*-*.png")
+                .Select(path => { var name = Path.GetFileNameWithoutExtension(path)!; return name[..name.LastIndexOf("-F", StringComparison.Ordinal)]; })
+                .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray() : [];
+        }
+        return result;
+    }
+
+    private static bool SameLayers(IReadOnlyDictionary<string,string>? left, IReadOnlyDictionary<string,string>? right) =>
+        left is null ? right is null : right is not null && left.Count == right.Count && left.All(p => right.TryGetValue(p.Key, out var value) && p.Value == value);
 
     public static NpcDraft FromRecord(NpcDefinitionRecord record) =>
         Normalize(
@@ -456,7 +485,7 @@ public sealed class NpcAuthoringService
             null,
             record.VisualMode,
             record.CompositeVisual,
-            record.ShopDefinitionId);
+            record.ShopDefinitionId, record.LayerAssetKeys);
 
     public static string ComputePreviewSignature(
         string npcDefinitionId,
@@ -507,7 +536,8 @@ public sealed class NpcAuthoringService
         && record.ShopDefinitionId == draft.ShopDefinitionId
         && string.Equals(record.Notes, draft.Notes, StringComparison.Ordinal)
         && string.Equals(record.VisualMode, draft.VisualMode, StringComparison.Ordinal)
-        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual);
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
+        && SameLayers(record.LayerAssetKeys, draft.LayerAssetKeys);
 
     public static bool Equivalent(NpcDefinitionRecord left, NpcDefinitionRecord right) =>
         left.NpcDefinitionId == right.NpcDefinitionId
@@ -532,7 +562,8 @@ public sealed class NpcAuthoringService
         && left.ShopDefinitionId == right.ShopDefinitionId
         && left.Notes == right.Notes
         && left.VisualMode == right.VisualMode
-        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual);
+        && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
+        && SameLayers(left.LayerAssetKeys, right.LayerAssetKeys);
 
     private async Task<AuthoringOperationResult<NpcMutationResponse>> SetPublicationAsync(
         string npcDefinitionId,
@@ -650,13 +681,15 @@ public sealed class NpcAuthoringService
             record.VisualMode,
             record.CompositeVisual,
             ResolvePersistedRiggedSpritePreview(record, asset),
-            record.ShopDefinitionId);
+            record.ShopDefinitionId, record.LayerAssetKeys);
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
         NpcDefinitionRecord record,
         ItemAssetResolution asset) =>
-        record.VisualMode == ActorVisualModes.CompositeRig
+        record.VisualMode == "layered_humanoid"
+            ? _riggedSpritePreviewResolver.ResolveHumanLayers(record.LayerAssetKeys, null, null)
+            : record.VisualMode == ActorVisualModes.CompositeRig
         && record.CompositeVisual is not null
         && asset.Exists
         && asset.FilePath is not null
@@ -682,7 +715,7 @@ public sealed class NpcAuthoringService
             record.UpdatedAtUtc,
             record.VisualMode,
             record.CompositeVisual,
-            record.ShopDefinitionId);
+            record.ShopDefinitionId, record.LayerAssetKeys);
 
     private static IReadOnlyList<AuthoringChange> CalculateChanges(
         string npcDefinitionId,
@@ -695,6 +728,7 @@ public sealed class NpcAuthoringService
         AddChange(changes, "display_name", existing?.DisplayName, requested.DisplayName);
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
         AddChange(changes, "visual_mode", existing?.VisualMode, requested.VisualMode);
+        AddChange(changes, "layer_asset_keys", JsonSerializer.Serialize(existing?.LayerAssetKeys), JsonSerializer.Serialize(requested.LayerAssetKeys));
         AddChange(changes, "composite_visual", SerializeCompositeVisual(existing?.CompositeVisual), SerializeCompositeVisual(requested.CompositeVisual));
         AddChange(changes, "source_width", existing?.SourceWidth.ToString(), requested.SourceWidth.ToString());
         AddChange(changes, "source_height", existing?.SourceHeight.ToString(), requested.SourceHeight.ToString());
@@ -1047,7 +1081,7 @@ public sealed class NpcAuthoringService
         draft.ShopDefinitionId,
         draft.Notes,
         draft.VisualMode,
-        draft.CompositeVisual
+        draft.CompositeVisual, draft.LayerAssetKeys
     };
 
     private static string? SerializeCompositeVisual(RiggedSpriteVisualDescriptor? descriptor) =>

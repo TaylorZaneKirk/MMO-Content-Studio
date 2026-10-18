@@ -30,6 +30,8 @@ public sealed class NpcSchemaRequirements : IAuthoringSchemaRequirementProvider
         AuthoringSchemaRequirement.Column("npc_definitions", "default_dialogue_id"),
         AuthoringSchemaRequirement.Column("npc_definitions", "shop_definition_id"),
         AuthoringSchemaRequirement.Column("npc_definitions", "notes"),
+        AuthoringSchemaRequirement.Column("npc_definitions", "layer_asset_keys"),
+        AuthoringSchemaRequirement.Constraint("npc_definitions_layered_human_check"),
         AuthoringSchemaRequirement.Column("npc_definitions", "created_at_utc"),
         AuthoringSchemaRequirement.Column("npc_definitions", "updated_at_utc"),
         AuthoringSchemaRequirement.Constraint("npc_definitions_id_format_check"),

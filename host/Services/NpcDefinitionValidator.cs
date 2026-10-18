@@ -14,6 +14,7 @@ public sealed partial class NpcDefinitionValidator
         "npc_invalid_visual_anchor",
         "npc_invalid_visual_render_scale",
         "npc_invalid_composite_visual",
+        "invalid_npc_layer_asset_keys",
         "npc_unsupported_footprint",
         "npc_unsupported_movement_behavior",
         "npc_invalid_wander_radius",
@@ -97,6 +98,31 @@ public sealed partial class NpcDefinitionValidator
         ICollection<ApiError> messages,
         CancellationToken cancellationToken)
     {
+        // Layered humans reuse player art; socket calibration belongs to solid actors.
+        if (draft.VisualMode == "layered_humanoid")
+        {
+            var layers = draft.LayerAssetKeys;
+            var slots = new[] { "head", "body", "legs", "boots", "right_hand", "left_hand", "gloves", "cape" };
+            var valid = draft.CompositeVisual is null && layers is not null &&
+                new[] { "head", "body", "legs" }.All(slot => layers.TryGetValue(slot, out var key) && !string.IsNullOrEmpty(key));
+            if (layers is not null)
+                foreach (var (slot, key) in layers)
+                {
+                    if (!slots.Contains(slot) || key is null || (key.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(key, "^[A-Za-z_][A-Za-z0-9_]*$")))
+                    { valid = false; continue; }
+                    if (key.Length == 0) continue;
+                    foreach (var direction in new[] { "N", "E", "S", "W" })
+                    {
+                        var path = $"res://assets/actors/player/{slot}/{key}";
+                        if (!_assetService.ResolveGameAssetPng($"{path}-F2-{direction}.png", "human layer").Exists &&
+                            !(direction == "N" && _assetService.ResolveGameAssetPng($"{path}-F4-N.png", "human layer").Exists)) valid = false;
+                    }
+                }
+            if (!valid) messages.Add(new ApiError("invalid_npc_layer_asset_keys", "Choose existing head, body and legs; optional player layers must have directional idle art. Remove any composite descriptor.", ValidationSeverity.Error, "layer_asset_keys"));
+            return;
+        }
+        if (draft.LayerAssetKeys is not null)
+            messages.Add(new ApiError("invalid_npc_layer_asset_keys", "Remove human layers before selecting another visual mode.", ValidationSeverity.Error, "layer_asset_keys"));
         var catalog = _actorAppearanceCatalogService?.LoadRiggedSpriteCatalog()
             ?? new ActorRiggedSpriteCatalogDefinition(false, "Canonical rigged-sprite catalogs are unavailable.", [], [], []);
         var itemIds = _itemRepository is null
