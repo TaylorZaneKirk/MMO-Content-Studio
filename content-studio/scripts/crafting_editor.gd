@@ -1,11 +1,11 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const DEFAULTS := {"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "furniture": [{"recipe_id": "craft_chair", "display_name": "Crude wooden chair", "item_id": "crude_wooden_chair", "level": 1, "xp_tenths": 580, "duration_ms": 3000, "planks": 2, "nails": 2, "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}]}
+const DEFAULTS := {"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "furniture": [{"recipe_id": "craft_chair", "display_name": "Crude wooden chair", "item_id": "crude_wooden_chair", "level": 1, "xp_tenths": 580, "duration_ms": 3000, "inputs": [{"item_id":"normal_plank","quantity":2},{"item_id":"bronze_nails","quantity":2}], "required_tool_ids":["blacksmithing_hammer","inventory_175_saw"], "placement_layer":"furniture", "south_texture_path":"", "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}]}
 const FIELDS := [["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"]]
 const ARROW_DEFAULTS := {"knife_item_id": "crafting_knife", "shaft_item_id": "arrow_shafts", "headless_item_id": "headless_arrows", "feather_item_id": "feather", "bronze_head_item_id": "bronze_arrowheads", "iron_head_item_id": "iron_arrowheads", "bronze_arrow_item_id": "bronze_arrows", "iron_arrow_item_id": "iron_arrows", "shafts": {"level": 1, "xp_tenths": 50, "duration_ms": 3000}, "headless": {"level": 1, "xp_tenths": 10, "duration_ms": 3000}, "bronze": {"level": 1, "xp_tenths": 13, "duration_ms": 3000}, "iron": {"level": 15, "xp_tenths": 25, "duration_ms": 3000}}
 const ARROW_FIELDS := [["knife_item_id", "Knife Item Id"], ["shaft_item_id", "Shaft Item Id"], ["headless_item_id", "Headless Item Id"], ["feather_item_id", "Feather Item Id"], ["bronze_head_item_id", "Bronze Head Item Id"], ["iron_head_item_id", "Iron Head Item Id"], ["bronze_arrow_item_id", "Bronze Arrow Item Id"], ["iron_arrow_item_id", "Iron Arrow Item Id"], ["shafts.level", "Shafts level"], ["shafts.xp_tenths", "Shafts xp tenths"], ["shafts.duration_ms", "Shafts duration ms"], ["headless.level", "Headless level"], ["headless.xp_tenths", "Headless xp tenths"], ["headless.duration_ms", "Headless duration ms"], ["bronze.level", "Bronze level"], ["bronze.xp_tenths", "Bronze xp tenths"], ["bronze.duration_ms", "Bronze duration ms"], ["iron.level", "Iron level"], ["iron.xp_tenths", "Iron xp tenths"], ["iron.duration_ms", "Iron duration ms"]]
-const FURNITURE_FIELDS := ["recipe_id", "display_name", "item_id", "level", "xp_tenths", "duration_ms", "planks", "nails", "placement_level", "footprint_width_tiles", "footprint_height_tiles", "occupies_furniture_space", "blocks_movement", "east_texture_path", "west_texture_path"]
+const FURNITURE_FIELDS := ["recipe_id", "display_name", "item_id", "level", "xp_tenths", "duration_ms", "inputs", "required_tool_ids", "placement_layer", "south_texture_path", "placement_level", "footprint_width_tiles", "footprint_height_tiles", "occupies_furniture_space", "blocks_movement", "east_texture_path", "west_texture_path"]
 var _furniture_rows: VBoxContainer
 var _add_furniture_button: Button
 var _arrow_fields: Dictionary = {}
@@ -126,6 +126,14 @@ func _add_furniture(facts: Dictionary) -> void:
 		var field := LineEdit.new()
 		field.name = key
 		field.text = str(facts.get(key, ""))
+		if key == "inputs":
+			var entries: PackedStringArray = []
+			for entry: Dictionary in facts.get(key, []): entries.append(str(entry.item_id) + ":" + str(entry.quantity))
+			field.text = ", ".join(entries)
+			label.text = "Materials (item_id:quantity, item_id:quantity)"
+		elif key == "required_tool_ids":
+			field.text = ", ".join(facts.get(key, []))
+			label.text = "Retained tools (comma separated; empty for none)"
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		row.add_child(field)
 	var remove := Button.new()
@@ -181,7 +189,17 @@ func _preview() -> void:
 		var facts := {}
 		for key: String in FURNITURE_FIELDS:
 			var value: String = row.get_node(key).text.strip_edges()
-			if key in ["occupies_furniture_space", "blocks_movement"]:
+			if key in ["inputs", "required_tool_ids"]:
+				facts[key] = []
+				for entry in value.split(",", false):
+					if key == "required_tool_ids": facts[key].append(entry.strip_edges())
+					else:
+						var parts := entry.strip_edges().split(":")
+						if parts.size() != 2 or not parts[1].is_valid_int():
+							_status.text = "Use item_id:quantity for materials"
+							return
+						facts[key].append({"item_id":parts[0], "quantity":int(parts[1])})
+			elif key in ["occupies_furniture_space", "blocks_movement"]:
 				if value.to_lower() not in ["true", "false"]:
 					_status.text = "Enter true or false for " + key
 					return

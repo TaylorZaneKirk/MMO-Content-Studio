@@ -15,7 +15,10 @@ public sealed record WorldObjectDraft(
     [property: JsonPropertyName("visual_render_scale")] double VisualRenderScale,
     [property: JsonPropertyName("visual_animation_fps")] double? VisualAnimationFps,
     [property: JsonPropertyName("public_interactions")] IReadOnlyList<WorldObjectInteraction> PublicInteractions,
-    [property: JsonPropertyName("visual_animation_frames")] IReadOnlyList<string> VisualAnimationFrames);
+    [property: JsonPropertyName("visual_animation_frames")] IReadOnlyList<string> VisualAnimationFrames)
+{
+    [JsonPropertyName("floor_decoration")] public bool FloorDecoration { get; init; }
+}
 
 public sealed record WorldObjectInteraction(
     [property: JsonPropertyName("action_id")] string ActionId,

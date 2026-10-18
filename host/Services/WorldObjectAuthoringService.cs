@@ -105,6 +105,7 @@ public sealed class WorldObjectAuthoringService(
         if (!double.IsFinite(draft.VisualAnchorOffsetX) || !double.IsFinite(draft.VisualAnchorOffsetY)
             || !double.IsFinite(draft.VisualRenderScale) || draft.VisualRenderScale <= 0)
             messages.Add(Error("invalid_visual_numbers", "Anchors must be finite and render scale must be positive."));
+        if (draft.FloorDecoration && draft.BlocksMovement) messages.Add(Error("blocking_floor", "Floor decorations must be nonblocking.", "floor_decoration"));
         if (draft.VisualAnimationFps is { } fps && (!double.IsFinite(fps) || fps <= 0))
             messages.Add(Error("invalid_animation_fps", "Animation FPS must be positive when supplied."));
         if (draft.PublicInteractions is null || draft.VisualAnimationFrames is null)

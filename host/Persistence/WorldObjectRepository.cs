@@ -41,7 +41,7 @@ public sealed class WorldObjectRepository(AuthoringDatabaseConnectionFactory con
             SELECT display_name, blocks_movement, footprint_width_tiles, footprint_height_tiles,
                    visual_texture_path, source_width, source_height, visual_anchor_offset_x,
                    visual_anchor_offset_y, visual_render_scale, visual_animation_fps,
-                   publication_state, updated_at_utc
+                   publication_state, updated_at_utc, floor_decoration
             FROM world_object_definitions WHERE definition_id = @id
             """ + (forUpdate ? " FOR UPDATE" : ""), connection, transaction);
         command.Parameters.AddWithValue("id", definitionId);
@@ -53,7 +53,7 @@ public sealed class WorldObjectRepository(AuthoringDatabaseConnectionFactory con
             if (!await reader.ReadAsync(cancellationToken)) return null;
             draft = new(reader.GetString(0), reader.GetBoolean(1), reader.GetInt32(2), reader.GetInt32(3),
                 reader.GetString(4), reader.GetInt32(5), reader.GetInt32(6), reader.GetDouble(7), reader.GetDouble(8),
-                reader.GetDouble(9), reader.IsDBNull(10) ? null : reader.GetDouble(10), [], []);
+                reader.GetDouble(9), reader.IsDBNull(10) ? null : reader.GetDouble(10), [], []) { FloorDecoration = reader.GetBoolean(13) };
             state = reader.GetString(11);
             updated = reader.GetFieldValue<DateTimeOffset>(12);
         }
@@ -91,17 +91,18 @@ public sealed class WorldObjectRepository(AuthoringDatabaseConnectionFactory con
             command.CommandText = """
                 INSERT INTO world_object_definitions (definition_id, display_name, publication_state, blocks_movement,
                     footprint_width_tiles, footprint_height_tiles, visual_texture_path, source_width, source_height,
-                    visual_anchor_offset_x, visual_anchor_offset_y, visual_render_scale, visual_animation_fps)
-                VALUES (@id, @name, 'Draft', @blocks, @fw, @fh, @texture, @sw, @sh, @x, @y, @scale, @fps)
+                    visual_anchor_offset_x, visual_anchor_offset_y, visual_render_scale, visual_animation_fps, floor_decoration)
+                VALUES (@id, @name, 'Draft', @blocks, @fw, @fh, @texture, @sw, @sh, @x, @y, @scale, @fps, @floor)
                 """;
             if (existing is not null)
                 command.CommandText = """
                     UPDATE world_object_definitions SET display_name=@name, publication_state='Draft', blocks_movement=@blocks,
                         footprint_width_tiles=@fw, footprint_height_tiles=@fh, visual_texture_path=@texture,
                         source_width=@sw, source_height=@sh, visual_anchor_offset_x=@x, visual_anchor_offset_y=@y,
-                        visual_render_scale=@scale, visual_animation_fps=@fps,
+                        visual_render_scale=@scale, visual_animation_fps=@fps, floor_decoration=@floor,
                         updated_at_utc=greatest(clock_timestamp(), updated_at_utc + interval '1 microsecond') WHERE definition_id=@id
                     """;
+            command.Parameters.AddWithValue("floor", draft.FloorDecoration);
             command.Parameters.AddWithValue("name", draft.DisplayName);
             command.Parameters.AddWithValue("blocks", draft.BlocksMovement);
             command.Parameters.AddWithValue("fw", draft.FootprintWidthTiles);

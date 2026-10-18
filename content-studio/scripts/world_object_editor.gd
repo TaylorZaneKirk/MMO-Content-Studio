@@ -105,6 +105,11 @@ func _build_ui() -> void:
 	basics.add_child(blocks)
 	blocks.toggled.connect(_invalidate)
 	_fields["blocks_movement"] = blocks
+	var floor_decoration := CheckBox.new()
+	floor_decoration.text = "Floor decoration (beneath actors and furniture)"
+	basics.add_child(floor_decoration)
+	floor_decoration.toggled.connect(_invalidate)
+	_fields["floor_decoration"] = floor_decoration
 	_fields["visual_texture_path"] = _text_field("Texture path", appearance)
 	_fields["visual_texture_path"].placeholder_text = "res://assets/maps/objects/world_objects/…png"
 	var grids := {}

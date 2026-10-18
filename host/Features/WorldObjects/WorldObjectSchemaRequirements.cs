@@ -22,6 +22,7 @@ public sealed class WorldObjectSchemaRequirements : IAuthoringSchemaRequirementP
         AuthoringSchemaRequirement.Column("world_object_definitions", "visual_animation_fps"),
         AuthoringSchemaRequirement.Column("world_object_definitions", "created_at_utc"),
         AuthoringSchemaRequirement.Column("world_object_definitions", "updated_at_utc"),
+        AuthoringSchemaRequirement.Column("world_object_definitions", "floor_decoration"),
         AuthoringSchemaRequirement.Table("world_object_interactions"),
         AuthoringSchemaRequirement.Column("world_object_interactions", "definition_id"),
         AuthoringSchemaRequirement.Column("world_object_interactions", "interaction_order"),

@@ -180,6 +180,7 @@ function render() {
     field(basicsGrid, d, 'footprint_width_tiles', 'Footprint width (tiles)', { integer: true });
     field(basicsGrid, d, 'footprint_height_tiles', 'Footprint height (tiles)', { integer: true });
     toggle(basics, d, 'blocks_movement', 'Blocks movement across the footprint');
+    toggle(basics, d, 'floor_decoration', 'Floor decoration (beneath actors and furniture)');
     const art = section('Artwork & alignment', true, 'Solid teal = footprint; amber cross = placement origin; dashed outline = declared source dimensions. Artwork starts at origin + anchor offset. One tile is 32 game pixels.');
     artwork(art, d, 'visual_texture_path', 'Base texture', 'visual_texture_path');
     const numbers = grid(art);

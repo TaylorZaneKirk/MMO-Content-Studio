@@ -17,8 +17,10 @@ public sealed record CraftingSettings(
 {
     [JsonPropertyName("arrows")] public ArrowCraftingSettings? Arrows { get; init; }
     [JsonPropertyName("spinning")] public SpinningCraftingSettings? Spinning { get; init; }
-    [JsonIgnore] public IReadOnlyList<string> ItemIds => [SawItemId, HammerItemId, LogItemId, PlankItemId, NailsItemId,
+    [JsonIgnore] public IReadOnlyList<string> BindingIds => [SawItemId, HammerItemId, LogItemId, PlankItemId, NailsItemId,
         .. (Furniture ?? []).Select(f => f?.ItemId ?? ""), .. (Spinning is { } spin ? new[] { spin.WoolItemId, spin.YarnItemId } : Array.Empty<string>())];
+    [JsonIgnore] public IReadOnlyList<string> ItemIds => BindingIds.Concat((Furniture ?? [])
+        .Where(f => f is not null).SelectMany(f => (f.Inputs ?? []).Where(i => i is not null).Select(i => i.ItemId).Concat(f.RequiredToolIds ?? []))).Distinct().ToArray();
     public FurnitureRecipeSettings? FindFurniture(string itemId) => Furniture?.FirstOrDefault(f => f?.ItemId == itemId);
 
     public IReadOnlyList<string> Validate(IReadOnlySet<string>? items = null)
@@ -26,7 +28,7 @@ public sealed record CraftingSettings(
         var errors = new List<string>();
         foreach (var id in ItemIds)
             if (string.IsNullOrWhiteSpace(id) || items is not null && !items.Contains(id)) errors.Add($"Missing or unavailable Crafting item '{id}'.");
-        if (ItemIds.Distinct().Count() != ItemIds.Count) errors.Add("Item bindings must be distinct.");
+        if (BindingIds.Distinct().Count() != BindingIds.Count) errors.Add("Item bindings must be distinct.");
         if (StationDefinitionId != "home_workbench") errors.Add("Furniture station must be home_workbench.");
         if (SawLevel is < 1 or > 99 || SawXpTenths is < 0 or > 10000000 || SawDurationMs is < 1 or > 86400000)
             errors.Add("Saw requires level 1–99, XP 0–10000000 tenths and duration 1–86400000 ms.");
@@ -39,10 +41,18 @@ public sealed record CraftingSettings(
             if (string.IsNullOrWhiteSpace(f.DisplayName)) errors.Add("Furniture display name is required.");
             if (f.Level is < 1 or > 99 || f.PlacementLevel is < 1 or > 99) errors.Add("Furniture levels must be 1–99.");
             if (f.DurationMs is < 1 or > 86400000 || f.XpTenths is < 0 or > 10000000) errors.Add("Invalid furniture duration or XP.");
-            if (f.Planks is < 1 or > 10000 || f.Nails is < 1 or > 10000) errors.Add("Furniture ingredients must be 1–10000.");
-            if (f.FootprintWidthTiles != 1 || f.FootprintHeightTiles != 1 || !f.OccupiesFurnitureSpace)
-                errors.Add("Furniture requires a 1×1 occupied footprint.");
-            foreach (var path in new[] { f.EastTexturePath, f.WestTexturePath })
+            if (f.Inputs is null || f.Inputs.Count is < 1 or > 8 || f.Inputs.Any(i => i is null || string.IsNullOrWhiteSpace(i.ItemId) || i.Quantity is < 1 or > 10000 || i.ItemId == f.ItemId) ||
+                f.Inputs.Where(i => i is not null).Select(i => i.ItemId).Distinct().Count() != f.Inputs.Count)
+                errors.Add("Furniture needs distinct material inputs with quantities 1–10000.");
+            if (f.RequiredToolIds is null || f.RequiredToolIds.Count > 4 || f.RequiredToolIds.Any(string.IsNullOrWhiteSpace) ||
+                f.RequiredToolIds.Distinct().Count() != f.RequiredToolIds.Count || f.RequiredToolIds.Contains(f.ItemId) ||
+                (f.Inputs ?? []).Any(i => i is not null && f.RequiredToolIds.Contains(i.ItemId)))
+                errors.Add("Furniture tools must be distinct from consumed materials and output.");
+            if (!f.OccupiesFurnitureSpace || (f.PlacementLayer == "floor"
+                ? f.FootprintWidthTiles != 2 || f.FootprintHeightTiles != 1 || f.BlocksMovement
+                : f.PlacementLayer != "furniture" || f.FootprintWidthTiles != 1 || f.FootprintHeightTiles != 1))
+                errors.Add("Use 1×1 furniture or a nonblocking 2×1 floor runner.");
+            foreach (var path in f.PlacementLayer == "floor" ? new[] { f.EastTexturePath, f.SouthTexturePath } : new[] { f.EastTexturePath, f.WestTexturePath })
                 if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) || !path.EndsWith(".png", StringComparison.Ordinal) || path.Contains(".."))
                     errors.Add("Furniture directions require project PNG asset paths.");
         }
@@ -55,7 +65,7 @@ public sealed record CraftingSettings(
     public IReadOnlyList<string> ValidateItemShapes(IReadOnlyDictionary<string, bool> items)
     {
         var errors = new List<string>();
-        foreach (var id in ItemIds.Where(id => id != NailsItemId))
+        foreach (var id in BindingIds.Where(id => id != NailsItemId).Concat((Furniture ?? []).Where(f => f is not null).SelectMany(f => f.RequiredToolIds ?? [])).Distinct())
             if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked) errors.Add($"'{id}' must be enabled/nonstackable.");
         if (string.IsNullOrWhiteSpace(NailsItemId) || !items.TryGetValue(NailsItemId, out var nails) || !nails) errors.Add("Nails must be enabled/stackable.");
         if (Arrows is not null)
@@ -73,8 +83,8 @@ public sealed record FurnitureRecipeSettings(
     [property: JsonPropertyName("level")] int Level,
     [property: JsonPropertyName("xp_tenths")] int XpTenths,
     [property: JsonPropertyName("duration_ms")] int DurationMs,
-    [property: JsonPropertyName("planks")] int Planks,
-    [property: JsonPropertyName("nails")] int Nails,
+    [property: JsonPropertyName("inputs")] IReadOnlyList<FurnitureMaterial> Inputs,
+    [property: JsonPropertyName("required_tool_ids")] IReadOnlyList<string> RequiredToolIds,
     [property: JsonPropertyName("placement_level")] int PlacementLevel,
     [property: JsonPropertyName("footprint_width_tiles")] int FootprintWidthTiles,
     [property: JsonPropertyName("footprint_height_tiles")] int FootprintHeightTiles,
@@ -83,12 +93,20 @@ public sealed record FurnitureRecipeSettings(
     [property: JsonPropertyName("east_texture_path")] string EastTexturePath,
     [property: JsonPropertyName("west_texture_path")] string WestTexturePath)
 {
+    [JsonPropertyName("placement_layer")] public string PlacementLayer { get; init; } = "furniture";
+    [JsonPropertyName("south_texture_path")] public string SouthTexturePath { get; init; } = "";
+    public int Width(string facing) => PlacementLayer == "floor" && facing == "south" ? FootprintHeightTiles : FootprintWidthTiles;
+    public int Height(string facing) => PlacementLayer == "floor" && facing == "south" ? FootprintWidthTiles : FootprintHeightTiles;
+    public string Texture(string facing) => facing == "east" ? EastTexturePath : facing == "south" ? SouthTexturePath : WestTexturePath;
     // Retained placements keep their exact item, geometry and art when recipes change.
     public bool SamePlacementFacts(FurnitureRecipeSettings other) => ItemId == other.ItemId &&
         FootprintWidthTiles == other.FootprintWidthTiles && FootprintHeightTiles == other.FootprintHeightTiles &&
         OccupiesFurnitureSpace == other.OccupiesFurnitureSpace && BlocksMovement == other.BlocksMovement &&
-        EastTexturePath == other.EastTexturePath && WestTexturePath == other.WestTexturePath;
+        EastTexturePath == other.EastTexturePath && WestTexturePath == other.WestTexturePath &&
+        SouthTexturePath == other.SouthTexturePath && PlacementLayer == other.PlacementLayer;
 }
+
+public sealed record FurnitureMaterial([property: JsonPropertyName("item_id")] string ItemId, [property: JsonPropertyName("quantity")] int Quantity);
 
 // Four inventory recipes share the existing Crafting lifecycle, not furniture geometry.
 public sealed record ArrowCraftingSettings(
