@@ -15,6 +15,7 @@ public sealed partial class NpcDefinitionValidator
         "npc_invalid_visual_render_scale",
         "npc_invalid_composite_visual",
         "invalid_npc_layer_asset_keys",
+        "invalid_npc_ambient_animation",
         "npc_unsupported_footprint",
         "npc_unsupported_movement_behavior",
         "npc_invalid_wander_radius",
@@ -58,6 +59,13 @@ public sealed partial class NpcDefinitionValidator
         ValidateIdentity(npcDefinitionId, draft, existing, messages);
         ValidateVisuals(draft, messages, forPublication);
         ValidateMovement(draft, messages);
+        if (draft.AmbientAnimation is not ("none" or "woodcutting") ||
+            (draft.AmbientAnimation == "woodcutting" &&
+             (draft.VisualMode != "layered_humanoid" || draft.LayerAssetKeys is null ||
+              !draft.LayerAssetKeys.TryGetValue("right_hand", out var tool) || tool is not ("axe" or "gold_axe"))))
+            messages.Add(new ApiError("invalid_npc_ambient_animation",
+                "Choose None, or Woodcutting with a layered human holding an axe.",
+                ValidationSeverity.Error, "ambient_animation"));
         await ValidateInteractionAsync(draft, messages, forPublication, cancellationToken);
         if (draft.ShopDefinitionId is not null)
         {

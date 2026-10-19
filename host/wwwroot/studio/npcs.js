@@ -65,7 +65,7 @@ function updateSession() {
     }
     updateActions();calibration.refreshPermission();
 }
-const draftKeys=['display_name','visual_texture_path','source_width','source_height','visual_anchor_offset_x','visual_anchor_offset_y','visual_render_scale','footprint_width_tiles','footprint_height_tiles','movement_behavior','wander_radius_tiles','tick_interval_ms','idle_chance','interaction_enabled','interaction_range_tiles','default_interaction','default_dialogue_id','notes','visual_mode','composite_visual','shop_definition_id','layer_asset_keys'];
+const draftKeys=['display_name','visual_texture_path','source_width','source_height','visual_anchor_offset_x','visual_anchor_offset_y','visual_render_scale','footprint_width_tiles','footprint_height_tiles','movement_behavior','wander_radius_tiles','tick_interval_ms','idle_chance','interaction_enabled','interaction_range_tiles','default_interaction','default_dialogue_id','notes','visual_mode','composite_visual','shop_definition_id','layer_asset_keys','ambient_animation'];
 function toDraft(definition){return Object.fromEntries(draftKeys.map(key=>[key,clone(definition[key])]));}
 async function loadOptions(){
     const revision=++state.optionsRevision;
@@ -112,7 +112,7 @@ function adopt(definition) {
 }
 function newNpc(){
     if(!mayReplace())return;calibration.clear();state.loadRevision++;state.definition=null;state.id='';state.version=null;state.base=null;state.uncertain=false;state.remote=undefined;
-    state.draft={display_name:'',visual_texture_path:'',source_width:32,source_height:32,visual_anchor_offset_x:0,visual_anchor_offset_y:0,visual_render_scale:1,footprint_width_tiles:1,footprint_height_tiles:1,movement_behavior:'static',wander_radius_tiles:0,tick_interval_ms:1000,idle_chance:.5,interaction_enabled:true,interaction_range_tiles:1,default_interaction:'talk',default_dialogue_id:null,notes:null,visual_mode:'flat_sprite',composite_visual:null,shop_definition_id:null,...clone(state.options.defaults||{})};
+    state.draft={display_name:'',visual_texture_path:'',source_width:32,source_height:32,visual_anchor_offset_x:0,visual_anchor_offset_y:0,visual_render_scale:1,footprint_width_tiles:1,footprint_height_tiles:1,movement_behavior:'static',wander_radius_tiles:0,tick_interval_ms:1000,idle_chance:.5,interaction_enabled:true,interaction_range_tiles:1,default_interaction:'talk',default_dialogue_id:null,notes:null,visual_mode:'flat_sprite',composite_visual:null,shop_definition_id:null,ambient_animation:'none',...clone(state.options.defaults||{})};
     $('operation').value='save_draft';$('reconcile').hidden=true;render();location.hash='detail';notice('Choose a stable NPC ID and author its complete draft. Calibration has a separate save action.');
 }
 function section(title, open, hint) {
@@ -174,6 +174,7 @@ function render(){
     p=section('Appearance',true,'Flat sprites and composite actors share the source texture. Changing mode retains authored data until you explicitly remove incompatible fields.');g=grid(p);
     selectField(g,d,'visual_mode','Visual mode',[{id:'flat_sprite',display_name:'Flat sprite'},{id:'composite_rig',display_name:'Composite rig'},{id:'layered_humanoid',display_name:'Layered human'}]).addEventListener('change',render);reference(g,d,'visual_texture_path','Source PNG','asset');
     field(g,d,'source_width','Source width',{kind:'integer',min:1});field(g,d,'source_height','Source height',{kind:'integer',min:1});field(g,d,'visual_anchor_offset_x','Anchor X',{kind:'coordinate'});field(g,d,'visual_anchor_offset_y','Anchor Y',{kind:'coordinate'});field(g,d,'visual_render_scale','Render scale',{kind:'coordinate'});
+    selectField(g,d,'ambient_animation','Ambient animation',[{id:'none',display_name:'None'},{id:'woodcutting',display_name:'Woodcutting · cosmetic axe pose'}]);
     if(d.visual_mode==='layered_humanoid'||d.layer_asset_keys){
         d.layer_asset_keys??={head:'',body:'',legs:''};
         p.append(element('h4','Human outfit'),element('p','Visual layers only. Presets fill editable fields; they do not grant equipment. New shepherd art remains a preview until approved.','muted'));

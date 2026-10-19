@@ -150,6 +150,7 @@ var _render_scale: SpinBox
 var _footprint_width: SpinBox
 var _footprint_height: SpinBox
 var _movement_behavior: OptionButton
+var _ambient_animation: OptionButton
 var _wander_radius: SpinBox
 var _tick_interval: SpinBox
 var _idle_chance: SpinBox
@@ -335,6 +336,8 @@ func _add_movement_section(parent: VBoxContainer) -> void:
 	var grid := _grid(parent)
 	_movement_behavior = _option_field(grid, "Movement behavior")
 	_movement_behavior.item_selected.connect(_on_movement_changed.unbind(1))
+	_ambient_animation = _option_field(grid, "Ambient animation")
+	_fill_authoring_options(_ambient_animation, [{"id": "none", "display_name": "None"}, {"id": "woodcutting", "display_name": "Woodcutting (cosmetic axe pose)"}])
 	_wander_radius = _spin_field(grid, "Wander radius tiles", 0, 128, 0, 1)
 	_tick_interval = _spin_field(grid, "Tick interval ms", 600, 60000, 1000, 50)
 	_idle_chance = _spin_field(grid, "Idle chance (0.0 to 1.0)", 0, 1, 0.5, 0.01)
@@ -620,6 +623,7 @@ func _apply_options() -> void:
 	_apply_actor_appearance_options()
 	if _current_npc.is_empty() and not _is_new:
 		_select_option(_movement_behavior, str(defaults.get("movement_behavior", "static")))
+		_select_option(_ambient_animation, "none")
 		_select_option(_default_interaction, str(defaults.get("default_interaction", "talk")))
 	_update_movement_controls()
 	_update_interaction_controls()
@@ -677,6 +681,7 @@ func _load_npc(payload: Dictionary) -> void:
 	_footprint_width.value = int(payload.get("footprint_width_tiles", 1))
 	_footprint_height.value = int(payload.get("footprint_height_tiles", 1))
 	_select_option(_movement_behavior, str(payload.get("movement_behavior", "static")))
+	_select_option(_ambient_animation, str(payload.get("ambient_animation", "none")))
 	_wander_radius.value = int(payload.get("wander_radius_tiles", 0))
 	_tick_interval.value = int(payload.get("tick_interval_ms", 1000))
 	_idle_chance.value = float(payload.get("idle_chance", 0.5))
@@ -723,6 +728,7 @@ func _start_new_npc() -> void:
 	_footprint_width.value = int(defaults.get("footprint_width_tiles", 1))
 	_footprint_height.value = int(defaults.get("footprint_height_tiles", 1))
 	_select_option(_movement_behavior, str(defaults.get("movement_behavior", "static")))
+	_select_option(_ambient_animation, "none")
 	_wander_radius.value = int(defaults.get("wander_radius_tiles", 0))
 	_tick_interval.value = int(defaults.get("tick_interval_ms", 1000))
 	_idle_chance.value = float(defaults.get("idle_chance", 0.5))
@@ -817,6 +823,7 @@ func _payload() -> Dictionary:
 		"footprint_width_tiles": int(_footprint_width.value),
 		"footprint_height_tiles": int(_footprint_height.value),
 		"movement_behavior": _selected_metadata(_movement_behavior),
+		"ambient_animation": _selected_metadata(_ambient_animation),
 		"wander_radius_tiles": int(_wander_radius.value),
 		"tick_interval_ms": int(_tick_interval.value),
 		"idle_chance": float(_idle_chance.value),

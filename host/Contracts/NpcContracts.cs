@@ -19,7 +19,8 @@ public sealed record NpcDefinitionSummary(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null,
-    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null,
+    [property: JsonPropertyName("ambient_animation")] string AmbientAnimation = "none");
 
 public sealed record NpcDefinition(
     [property: JsonPropertyName("npc_definition_id")] string NpcDefinitionId,
@@ -49,7 +50,8 @@ public sealed record NpcDefinition(
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("rigged_sprite_preview")] RiggedSpritePreviewDefinition? RiggedSpritePreview = null,
     [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null,
-    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null,
+    [property: JsonPropertyName("ambient_animation")] string AmbientAnimation = "none");
 
 public sealed record NpcDraft(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -75,7 +77,8 @@ public sealed record NpcDraft(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null,
-    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null,
+    [property: JsonPropertyName("ambient_animation")] string AmbientAnimation = "none");
 
 public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -103,7 +106,8 @@ public sealed record PreviewNpcRequest(
     [property: JsonPropertyName("preview_direction")] string? PreviewDirection = null,
     [property: JsonPropertyName("preview_frame")] int? PreviewFrame = null,
     [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null,
-    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null,
+    [property: JsonPropertyName("ambient_animation")] string AmbientAnimation = "none");
 
 public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("display_name")] string DisplayName,
@@ -129,7 +133,8 @@ public sealed record SaveNpcDraftRequest(
     [property: JsonPropertyName("visual_mode")] string VisualMode = ActorVisualModes.FlatSprite,
     [property: JsonPropertyName("composite_visual")] RiggedSpriteVisualDescriptor? CompositeVisual = null,
     [property: JsonPropertyName("shop_definition_id")] string? ShopDefinitionId = null,
-    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null);
+    [property: JsonPropertyName("layer_asset_keys")] IReadOnlyDictionary<string, string>? LayerAssetKeys = null,
+    [property: JsonPropertyName("ambient_animation")] string AmbientAnimation = "none");
 
 public sealed record NpcPublicationRequest(
     [property: JsonPropertyName("expected_updated_at_utc")] DateTimeOffset? ExpectedUpdatedAtUtc,

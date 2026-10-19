@@ -352,7 +352,7 @@ public sealed class NpcAuthoringService
             request.PreviewSignature,
             request.VisualMode,
             request.CompositeVisual,
-            request.ShopDefinitionId, request.LayerAssetKeys);
+            request.ShopDefinitionId, request.LayerAssetKeys, request.AmbientAnimation);
 
     public static NpcDraft Normalize(PreviewNpcRequest request) =>
         Normalize(
@@ -378,7 +378,7 @@ public sealed class NpcAuthoringService
             null,
             request.VisualMode,
             request.CompositeVisual,
-            request.ShopDefinitionId, request.LayerAssetKeys);
+            request.ShopDefinitionId, request.LayerAssetKeys, request.AmbientAnimation);
 
     public static NpcDraft Normalize(
         string displayName,
@@ -403,7 +403,7 @@ public sealed class NpcAuthoringService
         string? previewSignature,
         string? visualMode = ActorVisualModes.FlatSprite,
         RiggedSpriteVisualDescriptor? compositeVisual = null,
-        string? shopDefinitionId = null, IReadOnlyDictionary<string,string>? layerAssetKeys = null)
+        string? shopDefinitionId = null, IReadOnlyDictionary<string,string>? layerAssetKeys = null, string? ambientAnimation = "none")
     {
         var movement = NpcDomainRules.NormalizeMovementBehavior(movementBehavior);
         var interaction = interactionEnabled;
@@ -432,7 +432,8 @@ public sealed class NpcAuthoringService
             presentation.VisualMode,
             presentation.CompositeVisual,
             NpcDomainRules.NormalizeOptional(shopDefinitionId),
-            layerAssetKeys?.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => p.Value));
+            layerAssetKeys?.OrderBy(p => p.Key, StringComparer.Ordinal).ToDictionary(p => p.Key, p => p.Value),
+            string.IsNullOrWhiteSpace(ambientAnimation) ? "none" : ambientAnimation.Trim().ToLowerInvariant());
     }
 
     // Starting combinations copy into ordinary fields; no preset identity is stored.
@@ -485,7 +486,7 @@ public sealed class NpcAuthoringService
             null,
             record.VisualMode,
             record.CompositeVisual,
-            record.ShopDefinitionId, record.LayerAssetKeys);
+            record.ShopDefinitionId, record.LayerAssetKeys, record.AmbientAnimation);
 
     public static string ComputePreviewSignature(
         string npcDefinitionId,
@@ -537,7 +538,8 @@ public sealed class NpcAuthoringService
         && string.Equals(record.Notes, draft.Notes, StringComparison.Ordinal)
         && string.Equals(record.VisualMode, draft.VisualMode, StringComparison.Ordinal)
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(record.CompositeVisual, draft.CompositeVisual)
-        && SameLayers(record.LayerAssetKeys, draft.LayerAssetKeys);
+        && SameLayers(record.LayerAssetKeys, draft.LayerAssetKeys)
+        && record.AmbientAnimation == draft.AmbientAnimation;
 
     public static bool Equivalent(NpcDefinitionRecord left, NpcDefinitionRecord right) =>
         left.NpcDefinitionId == right.NpcDefinitionId
@@ -563,7 +565,8 @@ public sealed class NpcAuthoringService
         && left.Notes == right.Notes
         && left.VisualMode == right.VisualMode
         && RiggedSpriteVisualDescriptorNormalizer.Equivalent(left.CompositeVisual, right.CompositeVisual)
-        && SameLayers(left.LayerAssetKeys, right.LayerAssetKeys);
+        && SameLayers(left.LayerAssetKeys, right.LayerAssetKeys)
+        && left.AmbientAnimation == right.AmbientAnimation;
 
     private async Task<AuthoringOperationResult<NpcMutationResponse>> SetPublicationAsync(
         string npcDefinitionId,
@@ -681,7 +684,7 @@ public sealed class NpcAuthoringService
             record.VisualMode,
             record.CompositeVisual,
             ResolvePersistedRiggedSpritePreview(record, asset),
-            record.ShopDefinitionId, record.LayerAssetKeys);
+            record.ShopDefinitionId, record.LayerAssetKeys, record.AmbientAnimation);
     }
 
     private RiggedSpritePreviewDefinition? ResolvePersistedRiggedSpritePreview(
@@ -715,7 +718,7 @@ public sealed class NpcAuthoringService
             record.UpdatedAtUtc,
             record.VisualMode,
             record.CompositeVisual,
-            record.ShopDefinitionId, record.LayerAssetKeys);
+            record.ShopDefinitionId, record.LayerAssetKeys, record.AmbientAnimation);
 
     private static IReadOnlyList<AuthoringChange> CalculateChanges(
         string npcDefinitionId,
@@ -729,6 +732,7 @@ public sealed class NpcAuthoringService
         AddChange(changes, "visual_texture_path", existing?.VisualTexturePath, requested.VisualTexturePath);
         AddChange(changes, "visual_mode", existing?.VisualMode, requested.VisualMode);
         AddChange(changes, "layer_asset_keys", JsonSerializer.Serialize(existing?.LayerAssetKeys), JsonSerializer.Serialize(requested.LayerAssetKeys));
+        AddChange(changes, "ambient_animation", existing?.AmbientAnimation, requested.AmbientAnimation);
         AddChange(changes, "composite_visual", SerializeCompositeVisual(existing?.CompositeVisual), SerializeCompositeVisual(requested.CompositeVisual));
         AddChange(changes, "source_width", existing?.SourceWidth.ToString(), requested.SourceWidth.ToString());
         AddChange(changes, "source_height", existing?.SourceHeight.ToString(), requested.SourceHeight.ToString());
@@ -1081,7 +1085,7 @@ public sealed class NpcAuthoringService
         draft.ShopDefinitionId,
         draft.Notes,
         draft.VisualMode,
-        draft.CompositeVisual, draft.LayerAssetKeys
+        draft.CompositeVisual, draft.LayerAssetKeys, draft.AmbientAnimation
     };
 
     private static string? SerializeCompositeVisual(RiggedSpriteVisualDescriptor? descriptor) =>
