@@ -441,7 +441,7 @@ public sealed class NpcAuthoringService
         {
             ["Shepherd"] = new Dictionary<string,string> { ["head"]="head10", ["body"]="wool_tunic", ["legs"]="wool_trousers", ["right_hand"]="shepherd_crook" },
             ["Worker"] = new Dictionary<string,string> { ["head"]="head4", ["body"]="worker_apron", ["legs"]="worker_trousers" },
-            ["Traveller"] = new Dictionary<string,string> { ["head"]="head7", ["body"]="leather_armor", ["legs"]="leather_armor", ["cape"]="lords_armor" }
+            ["Traveller"] = new Dictionary<string,string> { ["head"]="head6", ["body"]="wool_tunic", ["legs"]="wool_trousers", ["cape"]="traveler_cloak" }
         };
 
     private IReadOnlyDictionary<string, IReadOnlyList<string>> LoadHumanLayerAssets()
