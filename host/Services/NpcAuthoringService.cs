@@ -440,7 +440,7 @@ public sealed class NpcAuthoringService
         new Dictionary<string, IReadOnlyDictionary<string,string>>
         {
             ["Shepherd"] = new Dictionary<string,string> { ["head"]="head10", ["body"]="wool_tunic", ["legs"]="wool_trousers", ["right_hand"]="shepherd_crook" },
-            ["Worker"] = new Dictionary<string,string> { ["head"]="head4", ["body"]="leather_armor", ["legs"]="leather_armor" },
+            ["Worker"] = new Dictionary<string,string> { ["head"]="head4", ["body"]="worker_apron", ["legs"]="worker_trousers" },
             ["Traveller"] = new Dictionary<string,string> { ["head"]="head7", ["body"]="leather_armor", ["legs"]="leather_armor", ["cape"]="lords_armor" }
         };
 
