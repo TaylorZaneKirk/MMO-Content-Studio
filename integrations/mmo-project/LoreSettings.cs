@@ -47,7 +47,9 @@ public sealed record LoreSettings
     [JsonPropertyName("arcane_clarity_minimum_magic_accuracy")] public int ArcaneClarityMinimumMagicAccuracy { get; init; } = 1;
     [JsonPropertyName("arcane_clarity_drain_ms")] public int ArcaneClarityDrainMs { get; init; } = 36000;
     [JsonPropertyName("arcane_clarity_ready_ms")] public int ArcaneClarityReadyMs { get; init; } = 600;
-    // Both rates spend exact integer units per 100 ns gameplay tick. Publication
+    // Shared denominator: skilling duration * combat duration * ticks per ms.
+    // Each 100 ns tick spends the opposite duration in units (see AdvanceFocus).
+    // Publication
     // cannot change the denominator while any saved partial point remains.
     [JsonIgnore] public long ConcentrationUnitsPerPoint => checked((long)FocusDrainMs * GuardedMindDrainMs * TimeSpan.TicksPerMillisecond);
     [JsonIgnore] public IReadOnlyList<InsightFocus> Focuses => [
@@ -84,12 +86,21 @@ public sealed record LoreSettings
                 continue;
             }
             if (family.MilestonePoints is not null) errors.Add("Only Flowers authors milestone point thresholds.");
-            if (family.FamilyId is not ("slime" or "beasts") ||
-                family.DisplayName != (family.FamilyId == "slime" ? "Slime" : "Beasts") ||
-                family.RequiredLevel != (family.FamilyId == "slime" ? 3 : 5) || family.DefenceStyle != "all" ||
+            var identity = family.FamilyId switch
+            {
+                "slime" => (Name: "Slime", Level: 3),
+                "beasts" => (Name: "Beasts", Level: 5),
+                "arachnids" => (Name: "Arachnids", Level: 7),
+                _ => (Name: "", Level: 0)
+            };
+            if (identity.Level == 0 || family.DisplayName != identity.Name ||
+                family.RequiredLevel != identity.Level || family.DefenceStyle != "all" ||
                 family.MobDefinitionIds is null || family.MobDefinitionIds.Length == 0 || family.MobDefinitionIds.Any(string.IsNullOrWhiteSpace))
-                errors.Add("Slime (Insight 3) and Beasts (Insight 5) require explicit members and all three combat defences.");
+                errors.Add("Slime (Insight 3), Beasts (Insight 5) and Arachnids (Insight 7) require explicit members and all three combat defences.");
         }
+        if (FindFamily("arachnids") is { } arachnids &&
+            (arachnids.MobDefinitionIds is not ["giant_spider"]))
+            errors.Add("Arachnids contains only Giant Spider.");
         var members = Families.SelectMany(f => f.MobDefinitionIds ?? []).ToArray();
         if (members.Distinct(StringComparer.Ordinal).Count() != members.Length)
             errors.Add("Each Mob definition may belong to only one family.");
@@ -117,6 +128,9 @@ public sealed record LoreSettings
                 { FamilyId: "beasts", RequiredLevel: 1, BaseXp: 10, MasteryPoints: 2 })
                 errors.Add("Rat Tail remains level 1, 10 XP and 2 Beast mastery points.");
         }
+        if (FindFamily("arachnids") is not null && FindSpecimen("spider_fang") is not
+            { FamilyId: "arachnids", RequiredLevel: 1, BaseXp: 20, MasteryPoints: 4 })
+            errors.Add("Spider Fang requires Insight 1 and awards 20 XP and 4 Arachnids points.");
         if (FindFamily("flowers") is not null && (FindSpecimen("inventory_484_flowers") is not
                 { FamilyId: "flowers", RequiredLevel: 1, BaseXp: 10, MasteryPoints: 1 } ||
                 (Specimens ?? []).Any(s => s is not null && s.FamilyId == "flowers" && s.ItemId != "inventory_484_flowers")))
