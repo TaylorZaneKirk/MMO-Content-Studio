@@ -1,7 +1,7 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const FIELDS := [["hoe_item_id", "Hoe / rake item"], ["bucket_item_id", "Watering bucket item"], ["seed_item_id", "Flower seed item"], ["flower_item_id", "Flower output item"], ["till_seconds", "Tilling attempt seconds"], ["growth_seconds", "Seconds per growth stage"], ["prepared_seconds", "Unused prepared soil seconds"], ["till_low_percent", "Till chance at level 1 (%)"], ["till_high_percent", "Till chance at cap (%)"], ["growth_low_percent", "Growth chance at level 1 (%)"], ["growth_high_percent", "Growth chance at cap (%)"], ["chance_cap_level", "Chance cap level"], ["water_bonus_percent", "Water bonus (percentage points)"], ["till_xp", "Successful till XP"], ["plant_xp", "Planting XP"], ["harvest_xp", "Flower pickup XP"]]
+const FIELDS := [["hoe_item_id", "Hoe Item Id"], ["bucket_item_id", "Bucket Item Id"], ["till_seconds", "Till Seconds"], ["prepared_seconds", "Prepared Seconds"], ["till_low_percent", "Till Low Percent"], ["till_high_percent", "Till High Percent"], ["growth_low_percent", "Growth Low Percent"], ["growth_high_percent", "Growth High Percent"], ["chance_cap_level", "Chance Cap Level"], ["water_bonus_percent", "Water Bonus Percent"], ["till_xp", "Till Xp"], ["crops", "Crops (JSON rows)"]]
 var _fields: Dictionary = {}
 var _current: Dictionary = {}
 var _request: Dictionary = {}
@@ -12,7 +12,7 @@ var _busy := false
 
 func _ready() -> void:
 	var title := Label.new()
-	title.text = "Flower farming — private patches"
+	title.text = "Farming crops — private patches"
 	add_child(title)
 	var reload_button := Button.new()
 	reload_button.text = "Load / reload saved settings"
@@ -32,8 +32,13 @@ func _ready() -> void:
 		var label := Label.new()
 		label.text = str(spec[1])
 		form.add_child(label)
-		var field := LineEdit.new()
-		field.text_changed.connect(func(_value: String): _apply.disabled = true)
+		var field: Variant = TextEdit.new() if spec[0] in ["crops"] else LineEdit.new()
+		if field is TextEdit:
+			field.custom_minimum_size = Vector2(600, 180)
+		if field is TextEdit:
+			field.text_changed.connect(func(): _apply.disabled = true)
+		else:
+			field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
 	_operation = OptionButton.new()
@@ -69,7 +74,7 @@ func _loaded(data: Dictionary) -> void:
 	_set_busy(false)
 	_current = data
 	for key: String in _fields:
-		_fields[key].text = str(data.get("draft", {}).get(key, ""))
+		_fields[key].text = JSON.stringify(data.get("draft", {}).get(key, []), "  ") if key in ["crops"] else str(data.get("draft", {}).get(key, ""))
 	_apply.disabled = true
 	_status.text = "Loaded %s. Draft edits retain the previous published rules. Growing crops retain their planted rules." % str(data.get("publication_state", ""))
 
@@ -79,7 +84,13 @@ func _preview() -> void:
 	var draft: Dictionary = {}
 	for key: String in _fields:
 		var value: String = _fields[key].text.strip_edges()
-		if key.ends_with("_id"):
+		if key in ["crops"]:
+			var parsed: Variant = JSON.parse_string(value)
+			if not parsed is Array:
+				_status.text = "Enter a JSON array for " + key
+				return
+			draft[key] = parsed
+		elif key.ends_with("_id"):
 			draft[key] = value
 		elif not value.is_valid_float():
 			_status.text = "Enter a number for " + key
@@ -116,6 +127,6 @@ func _failed(_operation_name: String, _message: String, _errors: Array) -> void:
 
 func _set_busy(value: bool) -> void:
 	_busy = value
-	for field: LineEdit in _fields.values():
+	for field: Variant in _fields.values():
 		field.editable = not value
 	_operation.disabled = value

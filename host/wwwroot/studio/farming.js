@@ -3,7 +3,7 @@ import {
     createRequest, installNavigation
 }
 from './studio-common.js';
-const fields=[["hoe_item_id", "Hoe / rake item"], ["bucket_item_id", "Watering bucket item"], ["seed_item_id", "Flower seed item"], ["flower_item_id", "Flower output item"], ["till_seconds", "Tilling attempt seconds"], ["growth_seconds", "Seconds per growth stage"], ["prepared_seconds", "Unused prepared soil seconds"], ["till_low_percent", "Till chance at level 1 (%)"], ["till_high_percent", "Till chance at cap (%)"], ["growth_low_percent", "Growth chance at level 1 (%)"], ["growth_high_percent", "Growth chance at cap (%)"], ["chance_cap_level", "Chance cap level"], ["water_bonus_percent", "Water bonus (percentage points)"], ["till_xp", "Successful till XP"], ["plant_xp", "Planting XP"], ["harvest_xp", "Flower pickup XP"]];
+const fields=[["hoe_item_id", "Hoe Item Id"], ["bucket_item_id", "Bucket Item Id"], ["till_seconds", "Till Seconds"], ["prepared_seconds", "Prepared Seconds"], ["till_low_percent", "Till Low Percent"], ["till_high_percent", "Till High Percent"], ["growth_low_percent", "Growth Low Percent"], ["growth_high_percent", "Growth High Percent"], ["chance_cap_level", "Chance Cap Level"], ["water_bonus_percent", "Water Bonus Percent"], ["till_xp", "Till Xp"], ["crops", "Crops (JSON rows)"]];
 let session={
 }, current=null, prepared=null, busy=false, uncertain=false, remote=undefined, base=null, retainedEdits=false;
 const $=id=>document.getElementById(id);
@@ -15,7 +15,8 @@ for(const [key,label] of fields){
     row.textContent=label;
     row.style.display='block';
     row.style.margin='12px 0';
-    const input=document.createElement('input');
+    const input=document.createElement(["crops"].includes(key)?'textarea':'input');
+    if (input.tagName==='TEXTAREA') { input.rows=14; input.style.width='100%'; }
     input.id=key;
     input.type=key.endsWith('_id')?'text':'number';
     input.step=key.endsWith('_percent')?'any':'1';
@@ -34,7 +35,7 @@ function localInputs(){
 }
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
 function renderDefinition(definition){
-    for(const [key] of fields)$(key).value=definition.draft[key];
+    for(const [key] of fields)$(key).value=(["crops"].includes(key)?JSON.stringify(definition.draft[key],null,2):definition.draft[key]);
 }
 function adopt(definition){
     current=definition;
@@ -130,7 +131,7 @@ $('preview').onclick=async()=>{
         };
         for(const [key]of fields){
             const value=$(key).value;
-            draft[key]=key.endsWith('_id')?value.trim():Number(value);
+            draft[key]=["crops"].includes(key)?JSON.parse(value):key.endsWith('_id')?value.trim():Number(value);
         }
         const body={
             draft,expected_updated_at_utc:current.updated_at_utc,target_operation:$('operation').value

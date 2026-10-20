@@ -3,7 +3,7 @@ import {
     createRequest, installNavigation
 }
 from './studio-common.js';
-const fields=[["crystal_item_id", "Crystal Item Id"], ["hammer_item_id", "Hammer Item Id"], ["shard_item_id", "Shard Item Id"], ["dust_item_id", "Dust Item Id"], ["flower_item_id", "Flower Item Id"], ["petals_item_id", "Petals Item Id"], ["bottle_item_id", "Bottle Item Id"], ["potion3_item_id", "Potion3 Item Id"], ["potion2_item_id", "Potion2 Item Id"], ["potion1_item_id", "Potion1 Item Id"], ["station_definition_id", "Station Definition Id"], ["crystal_low_percent", "Crystal Low Percent"], ["crystal_high_percent", "Crystal High Percent"], ["crystal_cap_level", "Crystal Cap Level"], ["crush_level", "Crush Level"], ["crush_duration_ms", "Crush Duration (milliseconds)"], ["crush_xp_tenths", "Crush XP (tenths)"], ["shard_min", "Shard Min"], ["shard_max", "Shard Max"], ["dust_min", "Dust Min"], ["dust_max", "Dust Max"], ["prepare_level", "Prepare Level"], ["prepare_duration_ms", "Prepare Duration (milliseconds)"], ["prepare_xp_tenths", "Prepare XP (tenths)"], ["prepare_flower_quantity", "Prepare Flower Quantity"], ["prepare_petals_quantity", "Prepare Petals Quantity"], ["brew_level", "Brew Level"], ["brew_duration_ms", "Brew Duration (milliseconds)"], ["brew_xp_tenths", "Brew XP (tenths)"], ["brew_bottle_quantity", "Brew Bottle Quantity"], ["brew_dust_quantity", "Brew Dust Quantity"], ["brew_petals_quantity", "Brew Petals Quantity"], ["brew_potion_quantity", "Brew Potion Quantity"], ["attack_bonus_flat", "Attack Bonus Flat"], ["attack_bonus_percent", "Attack Bonus Percent"], ["decay_interval_ms", "Decay Interval (milliseconds)"], ["sip_cooldown_ms", "Sip Cooldown (milliseconds)"]];
+const fields=[["crystal_item_id", "Crystal Item Id"], ["hammer_item_id", "Hammer Item Id"], ["shard_item_id", "Shard Item Id"], ["dust_item_id", "Dust Item Id"], ["bottle_item_id", "Bottle Item Id"], ["station_definition_id", "Station Definition Id"], ["crystal_low_percent", "Crystal Low Percent"], ["crystal_high_percent", "Crystal High Percent"], ["crystal_cap_level", "Crystal Cap Level"], ["crush_level", "Crush Level"], ["crush_duration_ms", "Crush Duration Ms"], ["crush_xp_tenths", "Crush Xp Tenths"], ["shard_min", "Shard Min"], ["shard_max", "Shard Max"], ["dust_min", "Dust Min"], ["dust_max", "Dust Max"], ["decay_interval_ms", "Decay Interval Ms"], ["sip_cooldown_ms", "Sip Cooldown Ms"], ["recipes", "Recipes (JSON rows)"], ["potions", "Potions (JSON rows)"]];
 let session={
 }, current=null, prepared=null, busy=false, uncertain=false, remote=undefined, base=null, retainedEdits=false;
 const $=id=>document.getElementById(id);
@@ -15,7 +15,8 @@ for(const [key,label] of fields){
     row.textContent=label;
     row.style.display='block';
     row.style.margin='12px 0';
-    const input=document.createElement('input');
+    const input=document.createElement(["recipes", "potions"].includes(key)?'textarea':'input');
+    if (input.tagName==='TEXTAREA') { input.rows=14; input.style.width='100%'; }
     input.id=key;
     input.type=key.endsWith('_id')?'text':'number';
     input.step=key.endsWith('_percent')?'any':'1';
@@ -34,7 +35,7 @@ function localInputs(){
 }
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
 function renderDefinition(definition){
-    for(const [key] of fields)$(key).value=definition.draft[key];
+    for(const [key] of fields)$(key).value=(["recipes", "potions"].includes(key)?JSON.stringify(definition.draft[key],null,2):definition.draft[key]);
 }
 function adopt(definition){
     current=definition;
@@ -130,7 +131,7 @@ $('preview').onclick=async()=>{
         };
         for(const [key]of fields){
             const value=$(key).value;
-            draft[key]=key.endsWith('_id')?value.trim():Number(value);
+            draft[key]=["recipes", "potions"].includes(key)?JSON.parse(value):key.endsWith('_id')?value.trim():Number(value);
         }
         const body={
             draft,expected_updated_at_utc:current.updated_at_utc,target_operation:$('operation').value

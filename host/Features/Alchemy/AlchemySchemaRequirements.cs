@@ -5,6 +5,7 @@ public sealed class AlchemySchemaRequirements : IAuthoringSchemaRequirementProvi
     public string FeatureId => "alchemy";
     public IReadOnlyList<AuthoringSchemaRequirement> GetRequirements() => [
         AuthoringSchemaRequirement.Table("alchemy_definitions"),
+        AuthoringSchemaRequirement.Constraint("alchemy_authored_rows"),
         AuthoringSchemaRequirement.Column("alchemy_definitions","published_settings"),
-        AuthoringSchemaRequirement.Table("character_attack_boost")];
+        AuthoringSchemaRequirement.Table("character_combat_boost")];
 }

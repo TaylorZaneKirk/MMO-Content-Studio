@@ -1,7 +1,7 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const FIELDS := [["crystal_item_id", "Crystal Item Id"], ["hammer_item_id", "Hammer Item Id"], ["shard_item_id", "Shard Item Id"], ["dust_item_id", "Dust Item Id"], ["flower_item_id", "Flower Item Id"], ["petals_item_id", "Petals Item Id"], ["bottle_item_id", "Bottle Item Id"], ["potion3_item_id", "Potion3 Item Id"], ["potion2_item_id", "Potion2 Item Id"], ["potion1_item_id", "Potion1 Item Id"], ["station_definition_id", "Station Definition Id"], ["crystal_low_percent", "Crystal Low Percent"], ["crystal_high_percent", "Crystal High Percent"], ["crystal_cap_level", "Crystal Cap Level"], ["crush_level", "Crush Level"], ["crush_duration_ms", "Crush Duration (milliseconds)"], ["crush_xp_tenths", "Crush XP (tenths)"], ["shard_min", "Shard Min"], ["shard_max", "Shard Max"], ["dust_min", "Dust Min"], ["dust_max", "Dust Max"], ["prepare_level", "Prepare Level"], ["prepare_duration_ms", "Prepare Duration (milliseconds)"], ["prepare_xp_tenths", "Prepare XP (tenths)"], ["prepare_flower_quantity", "Prepare Flower Quantity"], ["prepare_petals_quantity", "Prepare Petals Quantity"], ["brew_level", "Brew Level"], ["brew_duration_ms", "Brew Duration (milliseconds)"], ["brew_xp_tenths", "Brew XP (tenths)"], ["brew_bottle_quantity", "Brew Bottle Quantity"], ["brew_dust_quantity", "Brew Dust Quantity"], ["brew_petals_quantity", "Brew Petals Quantity"], ["brew_potion_quantity", "Brew Potion Quantity"], ["attack_bonus_flat", "Attack Bonus Flat"], ["attack_bonus_percent", "Attack Bonus Percent"], ["decay_interval_ms", "Decay Interval (milliseconds)"], ["sip_cooldown_ms", "Sip Cooldown (milliseconds)"]]
+const FIELDS := [["crystal_item_id", "Crystal Item Id"], ["hammer_item_id", "Hammer Item Id"], ["shard_item_id", "Shard Item Id"], ["dust_item_id", "Dust Item Id"], ["bottle_item_id", "Bottle Item Id"], ["station_definition_id", "Station Definition Id"], ["crystal_low_percent", "Crystal Low Percent"], ["crystal_high_percent", "Crystal High Percent"], ["crystal_cap_level", "Crystal Cap Level"], ["crush_level", "Crush Level"], ["crush_duration_ms", "Crush Duration Ms"], ["crush_xp_tenths", "Crush Xp Tenths"], ["shard_min", "Shard Min"], ["shard_max", "Shard Max"], ["dust_min", "Dust Min"], ["dust_max", "Dust Max"], ["decay_interval_ms", "Decay Interval Ms"], ["sip_cooldown_ms", "Sip Cooldown Ms"], ["recipes", "Recipes (JSON rows)"], ["potions", "Potions (JSON rows)"]]
 var _fields: Dictionary = {}
 var _current: Dictionary = {}
 var _request: Dictionary = {}
@@ -12,7 +12,7 @@ var _busy := false
 
 func _ready() -> void:
 	var title := Label.new()
-	title.text = "Alchemy — crystals and Attack potions"
+	title.text = "Alchemy — recipes and combat potions"
 	add_child(title)
 	var reload_button := Button.new()
 	reload_button.text = "Load / reload saved settings"
@@ -32,8 +32,13 @@ func _ready() -> void:
 		var label := Label.new()
 		label.text = str(spec[1])
 		form.add_child(label)
-		var field := LineEdit.new()
-		field.text_changed.connect(func(_value: String): _apply.disabled = true)
+		var field: Variant = TextEdit.new() if spec[0] in ["recipes", "potions"] else LineEdit.new()
+		if field is TextEdit:
+			field.custom_minimum_size = Vector2(600, 180)
+		if field is TextEdit:
+			field.text_changed.connect(func(): _apply.disabled = true)
+		else:
+			field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
 	_operation = OptionButton.new()
@@ -69,7 +74,7 @@ func _loaded(data: Dictionary) -> void:
 	_set_busy(false)
 	_current = data
 	for key: String in _fields:
-		_fields[key].text = str(data.get("draft", {}).get(key, ""))
+		_fields[key].text = JSON.stringify(data.get("draft", {}).get(key, []), "  ") if key in ["recipes", "potions"] else str(data.get("draft", {}).get(key, ""))
 	_apply.disabled = true
 	_status.text = "Loaded %s. Draft edits retain the previous published rules." % str(data.get("publication_state", ""))
 
@@ -79,7 +84,13 @@ func _preview() -> void:
 	var draft: Dictionary = {}
 	for key: String in _fields:
 		var value: String = _fields[key].text.strip_edges()
-		if key.ends_with("_id"):
+		if key in ["recipes", "potions"]:
+			var parsed: Variant = JSON.parse_string(value)
+			if not parsed is Array:
+				_status.text = "Enter a JSON array for " + key
+				return
+			draft[key] = parsed
+		elif key.ends_with("_id"):
 			draft[key] = value
 		elif not value.is_valid_float():
 			_status.text = "Enter a number for " + key
@@ -116,6 +127,6 @@ func _failed(_operation_name: String, _message: String, _errors: Array) -> void:
 
 func _set_busy(value: bool) -> void:
 	_busy = value
-	for field: LineEdit in _fields.values():
+	for field: Variant in _fields.values():
 		field.editable = not value
 	_operation.disabled = value
