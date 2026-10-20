@@ -215,7 +215,7 @@ func _set_busy(value: bool) -> void:
 func _add_specimen(specimen: Dictionary) -> void:
 	var row := VBoxContainer.new()
 	_specimens.add_child(row)
-	for spec: Array in [["item_id", "Specimen item ID"], ["family_id", "Family ID (slime, beasts or flowers)"], ["required_level", "Minimum Insight"], ["base_xp", "Base XP"], ["mastery_points", "Mastery points"]]:
+	for spec: Array in [["item_id", "Specimen item ID"], ["family_id", "Family ID (slime, beasts, flowers or arachnids)"], ["required_level", "Minimum Insight"], ["base_xp", "Base XP"], ["mastery_points", "Mastery points"]]:
 		var label := Label.new()
 		label.text = str(spec[1])
 		row.add_child(label)

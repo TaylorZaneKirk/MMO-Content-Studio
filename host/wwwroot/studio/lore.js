@@ -46,7 +46,7 @@ function addFamily(family) {
     familyRows.append(row);
 }
 const specimenRows=document.createElement('div'); $('fields').append(specimenRows);
-const specimenColumns=[['item_id','Item ID'],['family_id','Family ID (slime, beasts or flowers)'],['required_level','Minimum Insight'],['base_xp','Base XP'],['mastery_points','Mastery points']];
+const specimenColumns=[['item_id','Item ID'],['family_id','Family ID (slime, beasts, flowers or arachnids)'],['required_level','Minimum Insight'],['base_xp','Base XP'],['mastery_points','Mastery points']];
 function addSpecimen(specimen={}) {
     const row=document.createElement('fieldset'); row.className='specimen-row';
     const legend=document.createElement('legend'); legend.textContent='Study specimen'; row.append(legend);
