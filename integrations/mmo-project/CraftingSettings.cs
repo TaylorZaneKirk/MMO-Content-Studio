@@ -12,6 +12,7 @@ public sealed record CraftingSettings(
     [property: JsonPropertyName("sawing")] IReadOnlyList<SawingRecipeSettings> Sawing,
     [property: JsonPropertyName("furniture")] IReadOnlyList<FurnitureRecipeSettings> Furniture)
 {
+    [JsonPropertyName("bows")] public IReadOnlyList<BowCraftingSettings> Bows { get; init; } = [];
     [JsonPropertyName("arrows")] public ArrowCraftingSettings? Arrows { get; init; }
     [JsonPropertyName("spinning")] public SpinningCraftingSettings? Spinning { get; init; }
     [JsonIgnore] public IReadOnlyList<string> BindingIds => [SawItemId, HammerItemId, LogItemId, NailsItemId,
@@ -64,6 +65,19 @@ public sealed record CraftingSettings(
                 if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) || !path.EndsWith(".png", StringComparison.Ordinal) || path.Contains(".."))
                     errors.Add("Furniture directions require project PNG asset paths.");
         }
+        var bowOutputs = new HashSet<string>();
+        foreach (var bow in Bows ?? [])
+        {
+            if (bow is null) { errors.Add("Bow entries must be objects."); continue; }
+            if (string.IsNullOrWhiteSpace(bow.RecipeId) || !recipeIds.Add(bow.RecipeId) || string.IsNullOrWhiteSpace(bow.DisplayName))
+                errors.Add("Bow recipe IDs must be unique and names present.");
+            if (bow.Level is < 1 or > 99 || bow.XpTenths is < 0 or > 10000000 || bow.DurationMs is < 1 or > 86400000)
+                errors.Add("Invalid bow level, XP or duration.");
+            if (bow.ItemIds.Distinct().Count() != 4 || !bowOutputs.Add(bow.ItemId) || BindingIds.Contains(bow.ItemId) || (Arrows?.ItemIds.Contains(bow.ItemId) ?? false))
+                errors.Add("Bow output/material/tool bindings must be distinct; outputs must be unique.");
+            foreach (var id in bow.ItemIds)
+                if (string.IsNullOrWhiteSpace(id) || items is not null && !items.Contains(id)) errors.Add($"Missing or unavailable bow item '{id}'.");
+        }
         if (Arrows is not null) errors.AddRange(Arrows.Validate(items, ItemIds));
         if (Spinning is { } spin && (spin.WoolItemId != "raw_wool" || spin.StationDefinitionId != "spinning_wheel" ||
             spin.Level is < 1 or > 99 || spin.XpTenths is < 0 or > 10000000 || spin.DurationMs is < 1 or > 86400000))
@@ -76,6 +90,8 @@ public sealed record CraftingSettings(
         foreach (var id in BindingIds.Where(id => id != NailsItemId).Concat((Furniture ?? []).Where(f => f is not null).SelectMany(f => f.RequiredToolIds ?? [])).Distinct())
             if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked) errors.Add($"'{id}' must be enabled/nonstackable.");
         if (string.IsNullOrWhiteSpace(NailsItemId) || !items.TryGetValue(NailsItemId, out var nails) || !nails) errors.Add("Nails must be enabled/stackable.");
+        foreach (var id in (Bows ?? []).Where(b => b is not null).SelectMany(b => b.ItemIds).Distinct())
+            if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked) errors.Add($"Bow item '{id}' must be enabled/nonstackable.");
         if (Arrows is not null)
             foreach (var id in Arrows.ItemIds)
                 if (string.IsNullOrWhiteSpace(id) || !items.TryGetValue(id, out var stacked) || stacked != (id != Arrows.KnifeItemId))
@@ -176,3 +192,19 @@ public sealed record SpinningCraftingSettings(
     [property: JsonPropertyName("level")] int Level,
     [property: JsonPropertyName("xp_tenths")] int XpTenths,
     [property: JsonPropertyName("duration_ms")] int DurationMs);
+
+// One finished bow at the existing workbench; one log and yarn are consumed,
+// the knife is retained. No separate unstrung-item or production lifecycle.
+public sealed record BowCraftingSettings(
+    [property: JsonPropertyName("recipe_id")] string RecipeId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("item_id")] string ItemId,
+    [property: JsonPropertyName("log_item_id")] string LogItemId,
+    [property: JsonPropertyName("yarn_item_id")] string YarnItemId,
+    [property: JsonPropertyName("knife_item_id")] string KnifeItemId,
+    [property: JsonPropertyName("level")] int Level,
+    [property: JsonPropertyName("xp_tenths")] int XpTenths,
+    [property: JsonPropertyName("duration_ms")] int DurationMs)
+{
+    [JsonIgnore] public IReadOnlyList<string> ItemIds => [ItemId, LogItemId, YarnItemId, KnifeItemId];
+}

@@ -56,6 +56,37 @@ function sawingDraft(){
         return [key,value.trim()];
     })));
 }
+const bowDefaults={"recipe_id": "craft_oak_bow", "display_name": "Oak bow", "item_id": "oak_bow", "log_item_id": "oak_logs", "yarn_item_id": "wool_yarn", "knife_item_id": "crafting_knife", "level": 20, "xp_tenths": 330, "duration_ms": 3000};
+// Bow rows feed the same preview/save/publish document as furniture.
+const bowsFields=['recipe_id','display_name','item_id','log_item_id','yarn_item_id','knife_item_id','level','xp_tenths','duration_ms'];
+const bowsRows=document.createElement('div');$('fields').append(bowsRows);
+const addBow=document.createElement('button');addBow.type='button';addBow.textContent='Add bow recipe';
+$('fields').append(addBow);
+addBow.onclick=()=>{appendBow({...bowDefaults,recipe_id:'',display_name:'',item_id:'',log_item_id:'',yarn_item_id:'',knife_item_id:''});invalidate();};
+function appendBow(facts){
+    const row=document.createElement('fieldset');
+    const title=document.createElement('legend');title.textContent='Bow: one log + yarn, retained knife at workbench';row.append(title);
+    for(const key of bowsFields){
+        const label=document.createElement('label');label.textContent=key.replaceAll('_',' ');label.style.display='block';
+        const input=document.createElement('input');input.dataset.field=key;input.value=String(facts[key]??'');
+        input.type=['level','xp_tenths','duration_ms'].includes(key)?'number':'text';input.step='1';
+        input.addEventListener('input',invalidate);label.append(input);row.append(label);
+    }
+    const remove=document.createElement('button');remove.type='button';remove.textContent='Remove bow recipe';
+    remove.onclick=()=>{row.remove();invalidate();};row.append(remove);bowsRows.append(row);
+}
+function bowsInputs(){
+    return [...bowsRows.children].map(row=>Object.fromEntries([...row.querySelectorAll('input')].map(input=>[input.dataset.field,input.value])));
+}
+function bowsDraft(){
+    return bowsInputs().map(row=>Object.fromEntries(Object.entries(row).map(([key,value])=>{
+        if(['level','xp_tenths','duration_ms'].includes(key)){
+            if(!/^\d+$/.test(value))throw new Error('Enter a whole number for bows '+key);
+            return [key,Number(value)];
+        }
+        return [key,value.trim()];
+    })));
+}
 const furnitureFields=["recipe_id", "display_name", "item_id", "level", "xp_tenths", "duration_ms", "inputs", "required_tool_ids", "placement_layer", "south_texture_path", "placement_level", "footprint_width_tiles", "footprint_height_tiles", "occupies_furniture_space", "blocks_movement", "east_texture_path", "west_texture_path"];
 const furnitureRows=document.createElement('div');$('fields').append(furnitureRows);
 const addFurniture=document.createElement('button');addFurniture.type='button';addFurniture.textContent='Add furniture recipe';
@@ -125,6 +156,7 @@ function invalidate(){
 function localInputs(){
     const local=Object.fromEntries(fields.map(([key])=>[key,$(key).value]));
     local.sawing=sawingInputs();
+    local.bows=bowsInputs();
     local.furniture=furnitureInputs();
     local.spinning_enabled=spinningToggle.checked;
     for(const key of Object.keys(spinningDefaults))local['spinning.'+key]=$('spinning.'+key).value;
@@ -136,6 +168,8 @@ function localInputs(){
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
 function renderDefinition(definition){
     for(const [key] of fields)$(key).value=definition.draft[key];
+    bowsRows.replaceChildren();
+    for(const bow of definition.draft.bows||[])appendBow(bow);
     sawingRows.replaceChildren();
     for(const saw of definition.draft.sawing||[])appendSawing(saw);
     furnitureRows.replaceChildren();
@@ -246,6 +280,7 @@ $('preview').onclick=async()=>{
             else { if(!/^\d+$/.test(value))throw new Error("Enter a whole number for "+key);draft[key]=Number(value); }
         }
         draft.sawing=sawingDraft();
+        draft.bows=bowsDraft();
         draft.furniture=furnitureDraft();
         draft.arrows=null;
         if(arrowToggle.checked){
