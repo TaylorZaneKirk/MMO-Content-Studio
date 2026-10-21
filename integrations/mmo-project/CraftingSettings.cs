@@ -7,17 +7,15 @@ public sealed record CraftingSettings(
     [property: JsonPropertyName("saw_item_id")] string SawItemId,
     [property: JsonPropertyName("hammer_item_id")] string HammerItemId,
     [property: JsonPropertyName("log_item_id")] string LogItemId,
-    [property: JsonPropertyName("plank_item_id")] string PlankItemId,
     [property: JsonPropertyName("nails_item_id")] string NailsItemId,
     [property: JsonPropertyName("station_definition_id")] string StationDefinitionId,
-    [property: JsonPropertyName("saw_level")] int SawLevel,
-    [property: JsonPropertyName("saw_xp_tenths")] int SawXpTenths,
-    [property: JsonPropertyName("saw_duration_ms")] int SawDurationMs,
+    [property: JsonPropertyName("sawing")] IReadOnlyList<SawingRecipeSettings> Sawing,
     [property: JsonPropertyName("furniture")] IReadOnlyList<FurnitureRecipeSettings> Furniture)
 {
     [JsonPropertyName("arrows")] public ArrowCraftingSettings? Arrows { get; init; }
     [JsonPropertyName("spinning")] public SpinningCraftingSettings? Spinning { get; init; }
-    [JsonIgnore] public IReadOnlyList<string> BindingIds => [SawItemId, HammerItemId, LogItemId, PlankItemId, NailsItemId,
+    [JsonIgnore] public IReadOnlyList<string> BindingIds => [SawItemId, HammerItemId, LogItemId, NailsItemId,
+        .. (Sawing ?? []).Where(s => s is not null).SelectMany(s => new[] { s.LogItemId, s.PlankItemId }).Where(id => id != LogItemId),
         .. (Furniture ?? []).Select(f => f?.ItemId ?? ""), .. (Spinning is { } spin ? new[] { spin.WoolItemId, spin.YarnItemId } : Array.Empty<string>())];
     [JsonIgnore] public IReadOnlyList<string> ItemIds => BindingIds.Concat((Furniture ?? [])
         .Where(f => f is not null).SelectMany(f => (f.Inputs ?? []).Where(i => i is not null).Select(i => i.ItemId).Concat(f.RequiredToolIds ?? []))).Distinct().ToArray();
@@ -30,10 +28,20 @@ public sealed record CraftingSettings(
             if (string.IsNullOrWhiteSpace(id) || items is not null && !items.Contains(id)) errors.Add($"Missing or unavailable Crafting item '{id}'.");
         if (BindingIds.Distinct().Count() != BindingIds.Count) errors.Add("Item bindings must be distinct.");
         if (StationDefinitionId != "home_workbench") errors.Add("Furniture station must be home_workbench.");
-        if (SawLevel is < 1 or > 99 || SawXpTenths is < 0 or > 10000000 || SawDurationMs is < 1 or > 86400000)
-            errors.Add("Saw requires level 1–99, XP 0–10000000 tenths and duration 1–86400000 ms.");
         if (Furniture is null || Furniture.Count == 0) errors.Add("At least one furniture recipe is required.");
-        var recipeIds = new HashSet<string> { "saw_plank", "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows", "spin_wool" };
+        var recipeIds = new HashSet<string> { "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows", "spin_wool" };
+        if (Sawing is null || Sawing.Count == 0) errors.Add("At least one sawing recipe is required.");
+        var logs = new HashSet<string>();
+        foreach (var saw in Sawing ?? [])
+        {
+            if (saw is null) { errors.Add("Sawing entries must be objects."); continue; }
+            if (string.IsNullOrWhiteSpace(saw.RecipeId) || !recipeIds.Add(saw.RecipeId)) errors.Add("Sawing recipe IDs must be present and unique.");
+            if (string.IsNullOrWhiteSpace(saw.DisplayName)) errors.Add("Sawing display name is required.");
+            if (!logs.Add(saw.LogItemId) || saw.LogItemId == saw.PlankItemId || saw.PlankItemId == LogItemId)
+                errors.Add("Sawing needs unique logs and distinct plank outputs.");
+            if (saw.Level is < 1 or > 99 || saw.XpTenths is < 0 or > 10000000 || saw.DurationMs is < 1 or > 86400000)
+                errors.Add("Sawing requires level 1–99, XP 0–10000000 tenths and duration 1–86400000 ms.");
+        }
         foreach (var f in Furniture ?? [])
         {
             if (f is null) { errors.Add("Furniture entries must be objects."); continue; }
@@ -75,6 +83,17 @@ public sealed record CraftingSettings(
         return errors;
     }
 }
+
+// One log becomes one plank; the shared saw is retained. LogItemId above remains
+// the ordinary-log binding for arrow shafts, not a second sawing recipe owner.
+public sealed record SawingRecipeSettings(
+    [property: JsonPropertyName("recipe_id")] string RecipeId,
+    [property: JsonPropertyName("display_name")] string DisplayName,
+    [property: JsonPropertyName("log_item_id")] string LogItemId,
+    [property: JsonPropertyName("plank_item_id")] string PlankItemId,
+    [property: JsonPropertyName("level")] int Level,
+    [property: JsonPropertyName("xp_tenths")] int XpTenths,
+    [property: JsonPropertyName("duration_ms")] int DurationMs);
 
 public sealed record FurnitureRecipeSettings(
     [property: JsonPropertyName("recipe_id")] string RecipeId,

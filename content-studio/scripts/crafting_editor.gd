@@ -1,11 +1,14 @@
 # Owns this focused editor's fields and preview/apply decision. Host owns durable validation.
 extends VBoxContainer
 @onready var _client: AuthoringHostClient = %AuthoringHostClient
-const DEFAULTS := {"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "nails_item_id": "bronze_nails", "station_definition_id": "home_workbench", "saw_level": 1, "saw_xp_tenths": 25, "saw_duration_ms": 3000, "furniture": [{"recipe_id": "craft_chair", "display_name": "Crude wooden chair", "item_id": "crude_wooden_chair", "level": 1, "xp_tenths": 580, "duration_ms": 3000, "inputs": [{"item_id":"normal_plank","quantity":2},{"item_id":"bronze_nails","quantity":2}], "required_tool_ids":["blacksmithing_hammer","inventory_175_saw"], "placement_layer":"furniture", "south_texture_path":"", "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}]}
-const FIELDS := [["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Log item id"], ["plank_item_id", "Plank item id"], ["nails_item_id", "Nails item id"], ["station_definition_id", "Station definition id"], ["saw_level", "Saw level"], ["saw_xp_tenths", "Saw xp tenths"], ["saw_duration_ms", "Saw duration ms"]]
+const DEFAULTS := {"saw_item_id": "inventory_175_saw", "hammer_item_id": "blacksmithing_hammer", "log_item_id": "inventory_174_logs", "nails_item_id": "bronze_nails", "station_definition_id": "home_workbench", "furniture": [{"recipe_id": "craft_chair", "display_name": "Crude wooden chair", "item_id": "crude_wooden_chair", "level": 1, "xp_tenths": 580, "duration_ms": 3000, "inputs": [{"item_id": "normal_plank", "quantity": 2}, {"item_id": "bronze_nails", "quantity": 2}], "required_tool_ids": ["blacksmithing_hammer", "inventory_175_saw"], "placement_layer": "furniture", "south_texture_path": "", "placement_level": 1, "footprint_width_tiles": 1, "footprint_height_tiles": 1, "occupies_furniture_space": true, "blocks_movement": false, "east_texture_path": "res://assets/maps/objects/world_objects/MapGFX_83_C4.png", "west_texture_path": "res://assets/maps/objects/world_objects/MapGFX_84_D4.png"}], "sawing": [{"recipe_id": "saw_plank", "display_name": "Saw plank", "log_item_id": "inventory_174_logs", "plank_item_id": "normal_plank", "level": 1, "xp_tenths": 25, "duration_ms": 3000}]}
+const FIELDS := [["saw_item_id", "Saw item id"], ["hammer_item_id", "Hammer item id"], ["log_item_id", "Arrow shaft log item id"], ["nails_item_id", "Nails item id"], ["station_definition_id", "Station definition id"]]
 const ARROW_DEFAULTS := {"knife_item_id": "crafting_knife", "shaft_item_id": "arrow_shafts", "headless_item_id": "headless_arrows", "feather_item_id": "feather", "bronze_head_item_id": "bronze_arrowheads", "iron_head_item_id": "iron_arrowheads", "bronze_arrow_item_id": "bronze_arrows", "iron_arrow_item_id": "iron_arrows", "shafts": {"level": 1, "xp_tenths": 50, "duration_ms": 3000}, "headless": {"level": 1, "xp_tenths": 10, "duration_ms": 3000}, "bronze": {"level": 1, "xp_tenths": 13, "duration_ms": 3000}, "iron": {"level": 15, "xp_tenths": 25, "duration_ms": 3000}}
 const ARROW_FIELDS := [["knife_item_id", "Knife Item Id"], ["shaft_item_id", "Shaft Item Id"], ["headless_item_id", "Headless Item Id"], ["feather_item_id", "Feather Item Id"], ["bronze_head_item_id", "Bronze Head Item Id"], ["iron_head_item_id", "Iron Head Item Id"], ["bronze_arrow_item_id", "Bronze Arrow Item Id"], ["iron_arrow_item_id", "Iron Arrow Item Id"], ["shafts.level", "Shafts level"], ["shafts.xp_tenths", "Shafts xp tenths"], ["shafts.duration_ms", "Shafts duration ms"], ["headless.level", "Headless level"], ["headless.xp_tenths", "Headless xp tenths"], ["headless.duration_ms", "Headless duration ms"], ["bronze.level", "Bronze level"], ["bronze.xp_tenths", "Bronze xp tenths"], ["bronze.duration_ms", "Bronze duration ms"], ["iron.level", "Iron level"], ["iron.xp_tenths", "Iron xp tenths"], ["iron.duration_ms", "Iron duration ms"]]
 const FURNITURE_FIELDS := ["recipe_id", "display_name", "item_id", "level", "xp_tenths", "duration_ms", "inputs", "required_tool_ids", "placement_layer", "south_texture_path", "placement_level", "footprint_width_tiles", "footprint_height_tiles", "occupies_furniture_space", "blocks_movement", "east_texture_path", "west_texture_path"]
+const SAWING_FIELDS := ["recipe_id", "display_name", "log_item_id", "plank_item_id", "level", "xp_tenths", "duration_ms"]
+var _sawing_rows: VBoxContainer
+var _add_sawing_button: Button
 var _furniture_rows: VBoxContainer
 var _add_furniture_button: Button
 var _arrow_fields: Dictionary = {}
@@ -47,6 +50,16 @@ func _ready() -> void:
 		field.text_changed.connect(func(_value: String): _apply.disabled = true)
 		form.add_child(field)
 		_fields[spec[0]] = field
+	_sawing_rows = VBoxContainer.new()
+	form.add_child(_sawing_rows)
+	_add_sawing_button = Button.new()
+	_add_sawing_button.text = "Add sawing recipe"
+	_add_sawing_button.pressed.connect(func():
+		var facts: Dictionary = DEFAULTS.sawing[0].duplicate(true)
+		for key in ["recipe_id", "display_name", "log_item_id", "plank_item_id"]: facts[key] = ""
+		_add_sawing(facts)
+		_apply.disabled = true)
+	form.add_child(_add_sawing_button)
 	_furniture_rows = VBoxContainer.new()
 	form.add_child(_furniture_rows)
 	_add_furniture_button = Button.new()
@@ -116,6 +129,26 @@ func open_resource(_id: String) -> void:
 	_apply.disabled = true
 	_client.load_crafting("v1")
 
+func _add_sawing(facts: Dictionary) -> void:
+	var row := VBoxContainer.new()
+	_sawing_rows.add_child(row)
+	for key: String in SAWING_FIELDS:
+		var label := Label.new()
+		label.text = "Sawing " + key.replace("_", " ")
+		row.add_child(label)
+		var field := LineEdit.new()
+		field.name = key
+		field.text = str(facts.get(key, ""))
+		field.text_changed.connect(func(_value: String): _apply.disabled = true)
+		row.add_child(field)
+	var remove := Button.new()
+	remove.text = "Remove sawing recipe"
+	remove.pressed.connect(func():
+		_sawing_rows.remove_child(row)
+		row.queue_free()
+		_apply.disabled = true)
+	row.add_child(remove)
+
 func _add_furniture(facts: Dictionary) -> void:
 	var row := VBoxContainer.new()
 	_furniture_rows.add_child(row)
@@ -147,6 +180,10 @@ func _add_furniture(facts: Dictionary) -> void:
 func _loaded(data: Dictionary) -> void:
 	_set_busy(false)
 	_current = data
+	for row in _sawing_rows.get_children():
+		_sawing_rows.remove_child(row)
+		row.queue_free()
+	for facts: Dictionary in data.get("draft", {}).get("sawing", []): _add_sawing(facts)
 	for row in _furniture_rows.get_children():
 		_furniture_rows.remove_child(row)
 		row.queue_free()
@@ -184,7 +221,19 @@ func _preview() -> void:
 			return
 		else:
 			draft[key] = int(value)
-	draft["furniture"] = []
+	draft.sawing = []
+	for row in _sawing_rows.get_children():
+		var facts := {}
+		for key: String in SAWING_FIELDS:
+			var value: String = row.get_node(key).text.strip_edges()
+			if key in ["level", "xp_tenths", "duration_ms"]:
+				if not value.is_valid_int():
+					_status.text = "Enter a whole number for sawing " + key
+					return
+				facts[key] = int(value)
+			else: facts[key] = value
+		draft.sawing.append(facts)
+	draft.furniture = []
 	for row in _furniture_rows.get_children():
 		var facts := {}
 		for key: String in FURNITURE_FIELDS:
@@ -273,6 +322,11 @@ func _failed(_operation_name: String, _message: String, _errors: Array) -> void:
 
 func _set_busy(value: bool) -> void:
 	_busy = value
+	_add_sawing_button.disabled = value
+	for row in _sawing_rows.get_children():
+		for field in row.get_children():
+			if field is LineEdit: field.editable = not value
+			elif field is Button: field.disabled = value
 	_add_furniture_button.disabled = value
 	for row in _furniture_rows.get_children():
 		for field in row.get_children():
