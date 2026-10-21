@@ -91,11 +91,17 @@ function furnitureDraft(){
         return [key,value.trim()];
     })));
 }
+// Steel is optional until its items and publication guard are released together.
+const steelDefaults={steel_head_item_id:'steel_arrowheads',steel_arrow_item_id:'steel_arrows',steel:{level:30,xp_tenths:50,duration_ms:3000}};
+const steelFields=[['steel_head_item_id','Steel Head Item Id'],['steel_arrow_item_id','Steel Arrow Item Id'],['steel.level','Steel level'],['steel.xp_tenths','Steel xp tenths'],['steel.duration_ms','Steel duration ms']];
+const steelToggle=document.createElement('input');steelToggle.type='checkbox';steelToggle.id='steel-arrows-enabled';
+const steelLabel=document.createElement('label');steelLabel.textContent='Enable steel arrow assembly';
+steelLabel.append(steelToggle);$('fields').append(steelLabel);steelToggle.addEventListener('change',invalidate);
 const arrowToggle=document.createElement('input');
 arrowToggle.type='checkbox';arrowToggle.id='arrows-enabled';
 const arrowLabel=document.createElement('label');arrowLabel.textContent='Enable inventory arrow recipes';
 arrowLabel.append(arrowToggle);$('fields').append(arrowLabel);arrowToggle.addEventListener('change',invalidate);
-for(const [key,label] of arrowFields){
+for(const [key,label] of [...arrowFields,...steelFields]){
     const row=document.createElement('label');row.textContent=label;row.style.display='block';
     const input=document.createElement('input');input.id='arrows.'+key;
     input.type=key.endsWith('_item_id')?'text':'number';input.step='1';
@@ -123,7 +129,8 @@ function localInputs(){
     local.spinning_enabled=spinningToggle.checked;
     for(const key of Object.keys(spinningDefaults))local['spinning.'+key]=$('spinning.'+key).value;
     local.arrows_enabled=arrowToggle.checked;
-    for(const [key] of arrowFields)local["arrows."+key]=$("arrows."+key).value;
+    local.steel_enabled=steelToggle.checked;
+    for(const [key] of [...arrowFields,...steelFields])local["arrows."+key]=$("arrows."+key).value;
     return local;
 }
 function dirty(){ return retainedEdits || (base!==null && JSON.stringify(localInputs())!==base); }
@@ -137,6 +144,8 @@ function renderDefinition(definition){
     for(const key of Object.keys(spinningDefaults))$('spinning.'+key).value=(definition.draft.spinning||spinningDefaults)[key];
     arrowToggle.checked=definition.draft.arrows!=null;
     for(const [key] of arrowFields)$('arrows.'+key).value=arrowValue(definition.draft.arrows||arrowDefaults,key);
+    steelToggle.checked=definition.draft.arrows?.steel!=null;
+    for(const [key] of steelFields)$('arrows.'+key).value=arrowValue(definition.draft.arrows,key)??arrowValue(steelDefaults,key);
 }
 function adopt(definition){
     current=definition;
@@ -241,7 +250,8 @@ $('preview').onclick=async()=>{
         draft.arrows=null;
         if(arrowToggle.checked){
             draft.arrows=structuredClone(arrowDefaults);
-            for(const [key] of arrowFields){
+            if(steelToggle.checked)Object.assign(draft.arrows,structuredClone(steelDefaults));
+            for(const [key] of [...arrowFields,...(steelToggle.checked?steelFields:[])]){
                 const value=$('arrows.'+key).value.trim();
                 if(!key.endsWith('_item_id')&&!/^\d+$/.test(value))throw new Error('Enter a whole number for '+key);
                 const parts=key.split('.');const target=parts.length===2?draft.arrows[parts[0]]:draft.arrows;

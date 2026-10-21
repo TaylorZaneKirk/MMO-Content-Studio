@@ -29,7 +29,7 @@ public sealed record CraftingSettings(
         if (BindingIds.Distinct().Count() != BindingIds.Count) errors.Add("Item bindings must be distinct.");
         if (StationDefinitionId != "home_workbench") errors.Add("Furniture station must be home_workbench.");
         if (Furniture is null || Furniture.Count == 0) errors.Add("At least one furniture recipe is required.");
-        var recipeIds = new HashSet<string> { "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows", "spin_wool" };
+        var recipeIds = new HashSet<string> { "cut_arrow_shafts", "make_headless_arrows", "make_bronze_arrows", "make_iron_arrows", "make_steel_arrows", "spin_wool" };
         if (Sawing is null || Sawing.Count == 0) errors.Add("At least one sawing recipe is required.");
         var logs = new HashSet<string>();
         foreach (var saw in Sawing ?? [])
@@ -127,7 +127,7 @@ public sealed record FurnitureRecipeSettings(
 
 public sealed record FurnitureMaterial([property: JsonPropertyName("item_id")] string ItemId, [property: JsonPropertyName("quantity")] int Quantity);
 
-// Four inventory recipes share the existing Crafting lifecycle, not furniture geometry.
+// Inventory arrow recipes share the existing Crafting lifecycle, not furniture geometry.
 public sealed record ArrowCraftingSettings(
     [property: JsonPropertyName("knife_item_id")] string KnifeItemId,
     [property: JsonPropertyName("shaft_item_id")] string ShaftItemId,
@@ -140,9 +140,15 @@ public sealed record ArrowCraftingSettings(
     [property: JsonPropertyName("shafts")] ArrowCraftingStep Shafts,
     [property: JsonPropertyName("headless")] ArrowCraftingStep Headless,
     [property: JsonPropertyName("bronze")] ArrowCraftingStep Bronze,
-    [property: JsonPropertyName("iron")] ArrowCraftingStep Iron)
+    [property: JsonPropertyName("iron")] ArrowCraftingStep Iron,
+    [property: JsonPropertyName("steel_head_item_id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SteelHeadItemId = null,
+    [property: JsonPropertyName("steel_arrow_item_id"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SteelArrowItemId = null,
+    [property: JsonPropertyName("steel"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ArrowCraftingStep? Steel = null)
 {
-    [JsonIgnore] public IReadOnlyList<string> ItemIds => [KnifeItemId, ShaftItemId, HeadlessItemId, FeatherItemId, BronzeHeadItemId, IronHeadItemId, BronzeArrowItemId, IronArrowItemId];
+    // Optional as a complete group so older published catalogs remain valid until release.
+    [JsonIgnore] public bool HasSteel => SteelHeadItemId is not null || SteelArrowItemId is not null || Steel is not null;
+    [JsonIgnore] public IReadOnlyList<string> ItemIds => [KnifeItemId, ShaftItemId, HeadlessItemId, FeatherItemId, BronzeHeadItemId, IronHeadItemId, BronzeArrowItemId, IronArrowItemId,
+        .. HasSteel ? new[] { SteelHeadItemId ?? "", SteelArrowItemId ?? "" } : Array.Empty<string>()];
     public IReadOnlyList<string> Validate(IReadOnlySet<string>? items, IReadOnlyList<string> furnitureItems)
     {
         var errors = new List<string>();
@@ -151,7 +157,7 @@ public sealed record ArrowCraftingSettings(
                 errors.Add($"Missing or unavailable arrow item '{id}'.");
         if (ItemIds.Distinct().Count() != ItemIds.Count || ItemIds.Intersect(furnitureItems).Any())
             errors.Add("Arrow bindings must be distinct from each other and existing Crafting bindings.");
-        foreach (var step in new[] { Shafts, Headless, Bronze, Iron })
+        foreach (var step in HasSteel ? new[] { Shafts, Headless, Bronze, Iron, Steel } : new[] { Shafts, Headless, Bronze, Iron })
             if (step is null || step.Level is < 1 or > 99 || step.XpTenths is < 0 or > 10000000 || step.DurationMs is < 1 or > 86400000)
                 errors.Add("Arrow steps require level 1–99, XP 0–10000000 tenths and duration 1–86400000 ms.");
         return errors;
