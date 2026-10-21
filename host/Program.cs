@@ -67,6 +67,7 @@ app.MapBrowserLootTables();
 app.MapBrowserWorldObjects();
 app.MapBrowserBlacksmithing();
 app.MapBrowserCooking();
+app.MapBrowserFishing();
 app.MapBrowserFarming();
 app.MapBrowserAlchemy();
 app.MapBrowserCrafting();

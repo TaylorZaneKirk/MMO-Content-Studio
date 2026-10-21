@@ -19,7 +19,8 @@ public enum RuntimeCatalogPublicationScope
     Alchemy = 1 << 9,
     Crafting = 1 << 10,
     Lore = 1 << 11,
-    Cooking = 1 << 12
+    Cooking = 1 << 12,
+    Fishing = 1 << 13
 }
 
 public interface IRuntimeCatalogPublisher

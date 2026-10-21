@@ -11,6 +11,7 @@ public sealed class RuntimeCatalogPublisherService : IRuntimeCatalogPublisher
 {
     private static readonly (RuntimeCatalogPublicationScope Scope, string Command, string Label, string OutputPath)[] Exports =
     [
+        (RuntimeCatalogPublicationScope.Fishing, "export-fishing-catalog", "Fishing", "shared/fishing/catalog.json"),
         (RuntimeCatalogPublicationScope.Cooking, "export-cooking-catalog", "Cooking", "shared/cooking/catalog.json"),
         (RuntimeCatalogPublicationScope.Farming, "export-farming-catalog", "Farming", "shared/farming/catalog.json"),
         (RuntimeCatalogPublicationScope.Lore, "export-lore-catalog", "Lore", "shared/lore/catalog.json"),
