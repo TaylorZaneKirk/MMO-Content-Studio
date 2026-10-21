@@ -57,11 +57,17 @@ public sealed record CraftingSettings(
                 f.RequiredToolIds.Distinct().Count() != f.RequiredToolIds.Count || f.RequiredToolIds.Contains(f.ItemId) ||
                 (f.Inputs ?? []).Any(i => i is not null && f.RequiredToolIds.Contains(i.ItemId)))
                 errors.Add("Furniture tools must be distinct from consumed materials and output.");
-            if (!f.OccupiesFurnitureSpace || (f.PlacementLayer == "floor"
-                ? f.FootprintWidthTiles != 2 || f.FootprintHeightTiles != 1 || f.BlocksMovement
-                : f.PlacementLayer != "furniture" || f.FootprintWidthTiles != 1 || f.FootprintHeightTiles != 1))
-                errors.Add("Use 1×1 furniture or a nonblocking 2×1 floor runner.");
-            foreach (var path in f.PlacementLayer == "floor" ? new[] { f.EastTexturePath, f.SouthTexturePath } : new[] { f.EastTexturePath, f.WestTexturePath })
+            var validShape = f.PlacementLayer switch
+            {
+                "furniture" => f.FootprintWidthTiles == 1 && f.FootprintHeightTiles == 1,
+                "floor" => f.FootprintWidthTiles == 2 && f.FootprintHeightTiles == 1 && !f.BlocksMovement,
+                "wall" => f.FootprintWidthTiles == 1 && f.FootprintHeightTiles == 1 && !f.BlocksMovement,
+                _ => false
+            };
+            if (!f.OccupiesFurnitureSpace || !validShape)
+                errors.Add("Use 1×1 furniture, a nonblocking 2×1 floor runner or a nonblocking 1×1 wall decoration.");
+            foreach (var path in f.PlacementLayer == "wall" ? new[] { f.SouthTexturePath } :
+                f.PlacementLayer == "floor" ? new[] { f.EastTexturePath, f.SouthTexturePath } : new[] { f.EastTexturePath, f.WestTexturePath })
                 if (string.IsNullOrWhiteSpace(path) || !path.StartsWith("res://assets/", StringComparison.Ordinal) || !path.EndsWith(".png", StringComparison.Ordinal) || path.Contains(".."))
                     errors.Add("Furniture directions require project PNG asset paths.");
         }

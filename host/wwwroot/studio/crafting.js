@@ -97,6 +97,8 @@ function appendFurniture(facts){
     for(const key of furnitureFields){
         const label=document.createElement('label');label.textContent=key.replaceAll('_',' ');label.style.display='block';
         const input=document.createElement('input');input.dataset.field=key;input.value=Array.isArray(facts[key]) ? (key==='inputs' ? facts[key].map(i=>i.item_id+':'+i.quantity).join(', ') : facts[key].join(', ')) : String(facts[key]??'');
+        if(key==='placement_layer')label.textContent='Placement layer: furniture, floor, or wall (1×1 nonblocking; south art; north-wall slots only)';
+        if(key==='south_texture_path')label.textContent='South texture (required for wall decorations and floor runners)';
         if(key==='inputs')label.textContent='Materials (item_id:quantity, item_id:quantity)';
         if(key==='required_tool_ids')label.textContent='Retained tools (item_id, item_id; empty for none)';
         input.addEventListener('input',invalidate);label.append(input);row.append(label);

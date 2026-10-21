@@ -103,7 +103,7 @@ public sealed class CraftingAuthoringService(
             messages.Add(Error("missing_draft", "The complete definition draft is required."));
             return messages;
         }
-        foreach (var path in (draft.Furniture ?? []).Where(f => f is not null).SelectMany(f => new[] { f.EastTexturePath, f.WestTexturePath }))
+        foreach (var path in (draft.Furniture ?? []).Where(f => f is not null).SelectMany(f => new[] { f.EastTexturePath, f.WestTexturePath, f.SouthTexturePath }))
         {
             if (!string.IsNullOrWhiteSpace(path) && path.StartsWith("res://assets/", StringComparison.Ordinal) && !path.Contains(".."))
             {
