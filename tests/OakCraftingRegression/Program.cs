@@ -31,7 +31,7 @@ await using(var q=db.CreateCommand("SELECT published_settings->'sawing'->1->>'di
 await Apply("publish",edit);
 await Apply("save_draft",original);await Apply("publish",original);
 Check(publisher.Calls==2,"only publish requests Crafting export");
-foreach(var sql in new[]{"UPDATE item_definitions SET runtime_enabled=false WHERE item_id='oak_logs'","UPDATE crafting_definitions SET published_settings=jsonb_set(published_settings,'{sawing,1,level}','0') WHERE definition_id='v1'"})
+foreach(var sql in new[]{"UPDATE item_definitions SET runtime_enabled=false WHERE item_id='oak_logs'","UPDATE crafting_definitions SET published_settings=jsonb_set(published_settings,'{sawing,1,plank_item_id}','\"wool_yarn\"') WHERE definition_id='v1'","UPDATE crafting_definitions SET published_settings=jsonb_set(published_settings,'{sawing,1,level}','0') WHERE definition_id='v1'"})
 {
  bool rejected=false;try{await using var q=db.CreateCommand(sql);await q.ExecuteNonQueryAsync();}catch(PostgresException){rejected=true;}
  Check(rejected,"durable sawing publication guard");
