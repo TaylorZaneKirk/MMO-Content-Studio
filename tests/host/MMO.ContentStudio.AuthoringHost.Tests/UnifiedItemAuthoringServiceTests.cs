@@ -1580,6 +1580,21 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
         public Task<IReadOnlyList<AuthoringOption>> LoadPublishedItemOptionsAsync(CancellationToken cancellationToken = default) =>
             Task.FromResult<IReadOnlyList<AuthoringOption>>([]);
 
+        // This fixture contains item definitions only, with no character possessions or shop stock.
+        public Task<bool> HasTwoHandedEquipmentConflictAsync(string itemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<bool> HasIncompatibleStackQuantitiesAsync(string itemId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<bool> HasShopReferencesAsync(string itemId, bool publishedOnly, CancellationToken cancellationToken = default) =>
+            Task.FromResult(false);
+
+        public Task<IReadOnlyList<string>> LoadIncompatiblePublishedShopsAsync(
+            string itemId, string shopPolicy, long? npcBuyPrice, long? npcSellPrice,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult<IReadOnlyList<string>>([]);
+
         public Task<bool> HasLiveReferencesAsync(string itemId, CancellationToken cancellationToken = default) =>
             Task.FromResult(false);
 
@@ -1617,6 +1632,26 @@ public sealed class UnifiedItemAuthoringServiceTests : IDisposable
             }
 
             var saved = ToRecord(itemId, draft, false, NextTimestamp());
+            Records[itemId] = saved;
+            _corruptNextLoad = CorruptNextReloadAfterSave;
+            return Task.FromResult(saved);
+        }
+
+        public Task<UnifiedItemRecord> SaveAndPublishAsync(
+            string itemId, NormalizedItemDraft draft, DateTimeOffset? expectedUpdatedAtUtc,
+            CancellationToken cancellationToken = default)
+        {
+            Records.TryGetValue(itemId, out var existing);
+            EnsureExpectedVersion(itemId, existing, expectedUpdatedAtUtc);
+            if (existing is null)
+                throw new UnifiedItemNotFoundException(itemId);
+            if (!existing.RuntimeEnabled)
+                throw new UnifiedItemConcurrencyException(itemId, existing.UpdatedAtUtc);
+            if (HasPendingDialogueSettlementReferences)
+                throw new UnifiedItemReferencedByPendingDialogueSettlementException(itemId, "save_and_publish");
+
+            // Replace the complete aggregate while keeping it published, without a draft transition.
+            var saved = ToRecord(itemId, draft, true, NextTimestamp());
             Records[itemId] = saved;
             _corruptNextLoad = CorruptNextReloadAfterSave;
             return Task.FromResult(saved);
