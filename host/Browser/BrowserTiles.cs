@@ -8,6 +8,7 @@ public static class BrowserTiles
     {
         var group = app.MapGroup("/studio/api/tiles");
         group.MapGet("", (TileMetadataAuthoringService service) => Run(() => service.Catalog()));
+        group.MapGet("/search", (string query, TileMetadataAuthoringService service, CancellationToken ct) => Run(() => service.Search(query, ct)));
         group.MapGet("/tileset", (string file, TileMetadataAuthoringService service) => Run(() => service.Load(file)));
         group.MapGet("/references", async (TileMetadataAuthoringService service, CancellationToken ct) => BrowserJson.Json(await service.References(ct)));
         group.MapGet("/image", (string file, int id, TileMetadataAuthoringService service) =>

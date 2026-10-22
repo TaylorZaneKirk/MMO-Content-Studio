@@ -12,6 +12,8 @@ namespace MMO.ContentStudio.AuthoringHost.Services;
 public sealed record TileMetadataRequest(string ExpectedHash, Dictionary<string, string?> Changes, string? PreviewSignature);
 public sealed record TileReference(string Id, string Name, string PublicationState);
 public sealed record TileReferenceCatalog(bool Available, IReadOnlyList<TileReference> Items);
+public sealed record TileSearchMatch(string File, int Id, string ImageLabel, string? ArtLabel);
+public sealed record TileSearchResult(IReadOnlyList<TileSearchMatch> Matches, bool Truncated, IReadOnlyList<string> Warnings);
 public sealed record TileProperty(string Name, string Type, string? Value, bool Editable);
 public sealed record TileImage(string Label, int X, int Y, int Width, int Height, bool Available);
 public sealed record TileEntry(int Id, TileImage Image, IReadOnlyList<TileProperty> Properties, string[] EditableFields);
@@ -23,16 +25,44 @@ public sealed class TileMetadataAuthoringService(
     private readonly SemaphoreSlim _saveGate = new(1, 1);
     private readonly byte[] _previewKey = RandomNumberGenerator.GetBytes(32);
     private const int MaximumXmlBytes = 4 * 1024 * 1024;
+    private static readonly string[] ArtFields = ["art_label", "art_tags"];
     private static readonly string[] FlagFields = ["ignitable", "slick"];
     private static readonly string[] ReferenceFields = ["world_object_definition_id", "item_id", "mob_definition_id"];
 
-    public object Catalog()
+    private string[] TilesetFiles()
     {
         var root = Root();
         var options = new EnumerationOptions { RecurseSubdirectories = true, AttributesToSkip = FileAttributes.ReparsePoint, IgnoreInaccessible = false };
-        var files = Directory.EnumerateFiles(root, "*.tsx", options).Order(StringComparer.Ordinal)
+        return Directory.EnumerateFiles(root, "*.tsx", options).Order(StringComparer.Ordinal)
             .Select(p => Path.GetRelativePath(root, p).Replace('\\', '/')).ToArray();
-        return new { tilesets = files, target_label = "Configured Tiled tilesets", formats = new[] { "TSX" } };
+    }
+    public object Catalog() => new { tilesets = TilesetFiles(), target_label = "Configured Tiled tilesets", formats = new[] { "TSX" } };
+
+    // Search the same source files that the editor reads; no stale index or parallel metadata store.
+    public TileSearchResult Search(string query, CancellationToken ct)
+    {
+        query = query.Trim();
+        if (query.Length < 2 || query.Length > 256 || query.Any(char.IsControl))
+            throw new TileEditException("Enter 2–256 characters to search across tilesets.");
+        var matches = new List<TileSearchMatch>();
+        var warnings = new List<string>();
+        foreach (var file in TilesetFiles())
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                foreach (var tile in Entries(Read(file), FilePath(file)))
+                {
+                    var text = $"{file} {tile.Id} {tile.Image.Label} " + string.Join(" ", tile.Properties.Select(p => $"{p.Name} {p.Value}"));
+                    if (!text.Contains(query, StringComparison.OrdinalIgnoreCase)) continue;
+                    if (matches.Count == 200) return new(matches, true, warnings);
+                    matches.Add(new(file, tile.Id, tile.Image.Label, tile.Properties.FirstOrDefault(p => p.Name == "art_label")?.Value));
+                }
+            }
+            catch (Exception ex) when (ex is TileEditException or IOException or UnauthorizedAccessException)
+            { warnings.Add($"{file}: {ex.Message}"); }
+        }
+        return new(matches, false, warnings);
     }
     public object Load(string file)
     {
@@ -111,7 +141,7 @@ public sealed class TileMetadataAuthoringService(
             var document = Read(file);
             if (request.ExpectedHash != Hash(document.Bytes)) throw Conflict();
             var tile = Entries(document, path).SingleOrDefault(t => t.Id == id) ?? throw new TileEditException("Tile not found.", 404);
-            if (request.Changes is null || request.Changes.Count > 5) throw new TileEditException("Provide only the edited metadata fields.");
+            if (request.Changes is null || request.Changes.Count > 7) throw new TileEditException("Provide only the edited metadata fields.");
             var changes = new List<object>();
             var warnings = new List<string>();
             foreach (var (name, value) in request.Changes)
@@ -119,7 +149,7 @@ public sealed class TileMetadataAuthoringService(
                 if (!tile.EditableFields.Contains(name)) throw new TileEditException("This field is not editable for this tile or uses an unsupported XML structure.");
                 if (FlagFields.Contains(name) && value is not null and not "true" and not "false")
                     throw new TileEditException("Flags must be unset, true or false.");
-                if (value is not null && (value.Length > 256 || value.Any(char.IsControl))) throw new TileEditException("Reference values must be short single-line IDs.");
+                if (value is not null && (value.Length > 256 || value.Any(char.IsControl))) throw new TileEditException("Metadata values must be at most 256 characters on one line.");
                 var before = tile.Properties.FirstOrDefault(p => p.Name == name)?.Value;
                 if (before == value) continue;
                 if (ReferenceFields.Contains(name) && value is not null)
@@ -201,7 +231,7 @@ public sealed class TileMetadataAuthoringService(
                 x = margin + id % columns * (width + spacing); y = margin + id / columns * (height + spacing);
                 if ((long)x + width > TilesetXml.Number(image, "width") || (long)y + height > TilesetXml.Number(image, "height")) throw new TileEditException("Atlas crop exceeds its image.");
             }
-            var allowed = FlagFields.Concat(atlas is null ? ReferenceFields.Where(n => n != "item_id" || (string?)root.Attribute("name") == "item_spawns") : []).ToList();
+            var allowed = ArtFields.Concat(FlagFields).Concat(atlas is null ? ReferenceFields.Where(n => n != "item_id" || (string?)root.Attribute("name") == "item_spawns") : []).ToList();
             var properties = (tile?.Element("properties")?.Elements("property") ?? []).Select(p =>
             {
                 var name = (string)p.Attribute("name")!;

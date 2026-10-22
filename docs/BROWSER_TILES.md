@@ -25,7 +25,20 @@ Missing references remain visible; choosing a new reference requires an availabl
 catalog and an existing ID. Draft/Disabled references are labeled and warned about.
 Reference choices do not publish their definitions.
 
-Supported fields are `ignitable` and `slick` as bool (unset/false/true), plus
+Art label (`art_label`) and Art tags (`art_tags`) are editable single-line strings
+on collections and atlases (up to 256 characters each; empty unsets). Tags can be
+comma-separated descriptive words. They describe artwork only, without creating
+World Objects or changing gameplay/importer behavior. Both remain ordinary TSX
+properties readable by Tiled and assistants.
+
+Search across tilesets reads the same configured TSX files on demand. It matches
+filename, tile ID, image filename and property names/values case-insensitively.
+Results identify the file and tile and open its editor after the ordinary unsaved
+draft check. Searches require 2–256 characters, return the first 200 matches with
+a narrowing notice, and report skipped unreadable/unsupported files. No index or
+separate metadata database is maintained.
+
+Other supported fields are `ignitable` and `slick` as bool (unset/false/true), plus
 `world_object_definition_id` and `mob_definition_id` as string on image collections.
 `item_id` is editable only on the `item_spawns` collection. Atlas reference fields
 remain read-only because the current importer does not consume them. Unsupported
@@ -57,7 +70,17 @@ Success means TSX saved only. Map import, generated bundles, publication/package
 refresh and game reload remain separate. No automatic map or DB mutation occurs.
 Existing browser Host/subnet/auth/CSRF rules cover every new API route.
 
-## Validation at delivery
+## Art metadata validation (2026-10-22)
+
+The focused `TileArtMetadataTests` save/reload/search proof covers a collection
+and atlas, unrelated-property preservation and stale-hash rejection. It passes
+in an isolated test project using the committed test source. The host builds and
+JavaScript syntax checks pass. The existing combined host test project cannot
+compile because its unrelated `UnifiedItemAuthoringServiceTests` repository
+double is missing five current interface members; those tests were not changed.
+No live source files, database, deployed service or runtime were edited by the test.
+
+## Original Tiles delivery validation (historical)
 
 Production build: zero warnings/errors. JavaScript syntax and whitespace checks pass.
 Independent source review found and corrected static-file allowlisting, preserving

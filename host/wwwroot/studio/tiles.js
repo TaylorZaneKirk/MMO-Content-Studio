@@ -2,8 +2,9 @@
 import { createRequest, installNavigation } from './studio-common.js';
 const $ = id => document.getElementById(id);
 const state = { session: {}, catalog: null, file: '', tile: null, draft: {}, references: {}, pending: false, preview: null, uncertain: false, comparison: null, page: 0 };
+const artNames = ['art_label', 'art_tags'];
 const flagNames = ['ignitable', 'slick'];
-const labels = { ignitable: 'Can hold fire', slick: 'Can hold slick terrain', world_object_definition_id: 'World Object definition', item_id: 'Item definition', mob_definition_id: 'Mob definition' };
+const labels = { art_label: 'Art label', art_tags: 'Art tags', ignitable: 'Can hold fire', slick: 'Can hold slick terrain', world_object_definition_id: 'World Object definition', item_id: 'Item definition', mob_definition_id: 'Mob definition' };
 const images = new Map();
 function node(tag, text, className) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (className) e.className = className; return e; }
 function notice(text, error = false) { $('notice').textContent = text; $('catalog-notice').textContent = text; $('notice').classList.toggle('error', error); }
@@ -76,7 +77,7 @@ function selectTile(tile) {
 function renderDiagnostics() {
     const panel = $('diagnostics'); panel.replaceChildren();
     for (const name of state.tile?.editableFields || []) {
-        if (flagNames.includes(name) || state.draft[name] === null) continue;
+        if (flagNames.includes(name) || artNames.includes(name) || state.draft[name] === null) continue;
         const catalog = state.references[name], value = state.draft[name], found = catalog?.items.find(x => x.id === value);
         const message = !catalog?.available ? `${labels[name]}: catalog unavailable; ${value} is retained.` : !found ? `${labels[name]}: unknown reference “${value}” is retained. Choose a replacement or explicitly unset it.` : found.publicationState !== 'Published' ? `${found.name} is ${found.publicationState}. Publish separately before map import.` : `${found.name} · Published`;
         panel.append(node('p', message, !found || found.publicationState !== 'Published' ? 'tile-warning' : 'muted'));
@@ -92,6 +93,12 @@ function renderEditor() {
     const fields = $('tile-fields'); fields.replaceChildren();
     for (const name of tile.editableFields) {
         const field = node('div', null, 'field'), label = node('label', labels[name]); label.htmlFor = `field-${name}`; field.append(label);
+        if (artNames.includes(name)) {
+            const input = node('input'); input.type = 'text'; input.id = `field-${name}`; input.maxLength = 256;
+            input.value = state.draft[name] ?? ''; input.placeholder = name === 'art_label' ? 'Timber door' : 'roof, corner, northwest';
+            input.addEventListener('input', () => setDraft(name, input.value || null));
+            field.append(input, node('small', 'Descriptive only; does not change gameplay.', 'muted')); fields.append(field); continue;
+        }
         const select = node('select'); select.id = `field-${name}`;
         if (flagNames.includes(name)) {
             for (const [value, text] of [['', 'Unset (false in game)'], ['true', 'True'], ['false', 'False']]) select.add(new Option(text, value));
@@ -119,7 +126,7 @@ async function loadFile(file) {
     try {
         const catalog = await request(`/tiles/tileset?file=${encodeURIComponent(file)}`);
         state.catalog = catalog; state.file = file; state.tile = null; state.draft = {}; state.preview = null; state.page = 0; state.comparison = null; images.clear();
-        $('tileset').value = file; await renderGrid(); await renderEditor(); notice('Select a tile to inspect its metadata.');
+        $('tileset').value = file; await renderGrid(); await renderEditor(); notice('Select a tile to inspect its metadata.'); return true;
     } catch (e) { $('tileset').value = state.file; notice(e.message, true); }
     finally { state.pending = false; controls(); }
 }
@@ -177,6 +184,27 @@ function acceptComparison(keep) {
     else { state.tile = null; state.draft = {}; renderGrid(); renderEditor(); }
     invalidated(); notice(keep ? 'Draft retained against the compared disk version. Preview again before saving.' : 'Loaded the current disk version.');
 }
+// Explicit search keeps typing local and leaves any editor draft intact until a result is chosen.
+$('search-all-form').addEventListener('submit', async event => {
+    event.preventDefault(); const button = $('search-all-button'); button.disabled = true;
+    const results = $('search-all-results'); results.replaceChildren(node('p', 'Searching tilesets…'));
+    try {
+        const result = await request(`/tiles/search?query=${encodeURIComponent($('search-all-query').value)}`);
+        results.replaceChildren(node('p', `${result.matches.length} matches${result.truncated ? ' (first 200; narrow your search)' : ''}`));
+        for (const match of result.matches) {
+            const link = node('button', `${match.file} · #${match.id} · ${match.artLabel || match.imageLabel}`); link.type = 'button';
+            link.addEventListener('click', async () => {
+                if (!mayLeave() || !await loadFile(match.file)) return;
+                const tile = state.catalog.tiles.find(t => t.id === match.id);
+                if (!tile) { notice('This tile was removed. Search again.', true); return; }
+                selectTile(tile); location.hash = 'detail';
+            });
+            results.append(link);
+        }
+        for (const warning of result.warnings) results.append(node('p', warning, 'tile-warning'));
+    } catch (e) { results.replaceChildren(node('p', e.message, 'tile-warning')); }
+    finally { button.disabled = false; }
+});
 $('tileset').addEventListener('change', () => { const file = $('tileset').value; if (mayLeave()) loadFile(file); else $('tileset').value = state.file; });
 $('refresh').addEventListener('click', refresh);
 for (const id of ['tile-search', 'tile-filter']) $(id).addEventListener('input', () => { state.page = 0; renderGrid(); });
